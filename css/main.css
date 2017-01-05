@@ -2,6 +2,11 @@
     a:visited {color:#CE2029; text-decoration:none;}
     a:hover {text-decoration:underline;}
     
+<style>
+body {
+	background-color: #000000;}
+</style>
+
 
 pre {
 	font-family: "Courier New", Courier, "Lucida Sans Typewriter", "Lucida Typewriter", monospace;
