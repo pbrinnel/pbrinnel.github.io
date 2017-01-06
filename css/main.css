@@ -11,15 +11,19 @@ span:after {
 head {
       color: white;
       background-color: black;  
+      font-family: 12.0px Courier, 12.0px "Courier New", 12.0px monospace;
+
 }
 
 body {
       color: white;
-      background-color: black;  
+      background-color: black;
+      font-family: 16.0px Courier, 16.0px "Courier New", 16.0px monospace;
+
 }
 
     pre {
-      font-family: 13.0px Courier, 13.0px "Courier New", 13.0px monospace;
+      text-align: center;
       white-space: -moz-pre-wrap; /* Mozilla, supported since 1999 */
       white-space: -pre-wrap; /* Opera */
       white-space: -o-pre-wrap; /* Opera */
