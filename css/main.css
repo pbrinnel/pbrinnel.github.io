@@ -21,7 +21,7 @@ body {
 img {
     display:inline-block; 
     margin:0;
-    vertical-align:top;
+    vertical-align:bottom;
 }
 
 footer {
