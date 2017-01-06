@@ -12,14 +12,18 @@ head {
       color: white;
       background-color: black;  
       font-family: 12.0px Courier, 12.0px "Courier New", 12.0px monospace;
-
 }
 
 body {
       color: white;
       background-color: black;
       font-family: 16.0px Courier, 16.0px "Courier New", 16.0px monospace;
+}
 
+body {
+      color: white;
+      background-color: black;
+      font-family: 10.0px Courier, 10.0px "Courier New", 10.0px monospace;
 }
 
     pre {
