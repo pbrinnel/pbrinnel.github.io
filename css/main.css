@@ -14,7 +14,7 @@ body {
 </style>
 
 pre {
-	font-family: "Courier New", Courier, monospace;
+	font-family: monospace;
 	font-size: 11px;
 	width: 585px;
 	position: relative;
