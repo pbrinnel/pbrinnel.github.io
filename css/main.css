@@ -1,8 +1,6 @@
     a:link {color:#bcdcff; text-decoration:none;}
     a:visited {color:#d0e6ff; text-decoration:none;}
     a:hover {text-decoration:underline;}
-    background-color: black;  
-
 
 pre {
     white-space: -moz-pre-wrap; /* Mozilla, supported since 1999 */
@@ -12,20 +10,12 @@ pre {
     word-wrap: break-word; /* IE 5.5+ */
     }
 
-body1 {
+body {
     color: white;
     font-family: Courier, "Courier New", monospace;
     font-size: 14px;
     text-align: center;
-
-}
-
-body2 {
-    color: white;
-    font-family: Courier, "Courier New", monospace;
-    font-size: 16px;
-    text-align: center;
-
+    background-color: black;
 }
 
 footer {
@@ -33,5 +23,4 @@ footer {
     font-family: Courier, "Courier New", monospace;
     font-size: 10px;
     text-align: center;
-
 }
