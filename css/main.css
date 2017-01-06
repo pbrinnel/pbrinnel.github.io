@@ -18,6 +18,12 @@ body {
     background-color: black;
 }
 
+img {
+    display:inline-block; 
+    margin:0;
+    vertical-align:top;
+}
+
 footer {
     color: white;
     font-family: Courier, "Courier New", monospace;
