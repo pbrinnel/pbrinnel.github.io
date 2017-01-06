@@ -1,9 +1,10 @@
     a:link {color:#bcdcff; text-decoration:none;}
     a:visited {color:#d0e6ff; text-decoration:none;}
     a:hover {text-decoration:underline;}
+    background-color: black;  
+
 
 pre {
-    text-align: center;
     white-space: -moz-pre-wrap; /* Mozilla, supported since 1999 */
     white-space: -pre-wrap; /* Opera */
     white-space: -o-pre-wrap; /* Opera */
@@ -13,23 +14,24 @@ pre {
 
 body1 {
     color: white;
-    background-color: black;  
     font-family: Courier, "Courier New", monospace;
     font-size: 14px;
+    text-align: center;
+
 }
 
 body2 {
     color: white;
-    background-color: black;
     font-family: Courier, "Courier New", monospace;
     font-size: 16px;
+    text-align: center;
 
 }
 
 footer {
     color: white;
-    background-color: black;
     font-family: Courier, "Courier New", monospace;
     font-size: 10px;
+    text-align: center;
 
 }
