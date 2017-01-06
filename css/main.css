@@ -11,7 +11,7 @@ body {
 
 
 pre {
-	font-family: "Courier New", "Courier", "Lucida Sans Typewriter", "Lucida Typewriter", monospace;
+	font-family: "Courier New", Courier, monospace;
 	font-size: 11px;
 	width: 585px;
 	position: relative;
