@@ -20,4 +20,5 @@ pre {
 	font-variant: normal;
 	font-weight: 400;
 	line-height: 18.5714px;
+	white-space: pre;
 }
