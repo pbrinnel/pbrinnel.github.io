@@ -2,10 +2,9 @@
     a:visited {color:#d0e6ff; text-decoration:none;}
     a:hover {text-decoration:underline;}
 
-color: white;
-background-color: black;
-
     pre {
+      color: white;
+      background-color: black;  
       font-family: monospace;
       white-space: -moz-pre-wrap; /* Mozilla, supported since 1999 */
       white-space: -pre-wrap; /* Opera */
