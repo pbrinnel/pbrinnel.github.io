@@ -24,6 +24,14 @@ img.center {
     vertical-align:bottom;
 }
 
+p {
+    display: block;
+    margin-top: 0em;
+    margin-bottom: 2em;
+    margin-left: 0;
+    margin-right: 0;
+}
+
 footer {
     color: white;
     font-family: Courier, "Courier New", monospace;
