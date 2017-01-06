@@ -20,7 +20,6 @@ body {
 
     pre {
       font-family: 13.0px Courier, 13.0px "Courier New", 13.0px monospace;
-      width: 595px;
       white-space: -moz-pre-wrap; /* Mozilla, supported since 1999 */
       white-space: -pre-wrap; /* Opera */
       white-space: -o-pre-wrap; /* Opera */
