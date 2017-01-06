@@ -2,6 +2,12 @@
     a:visited {color:#d0e6ff; text-decoration:none;}
     a:hover {text-decoration:underline;}
 
+span:after {
+    content: ".";
+    visibility: hidden;
+}
+
+
 head {
       color: white;
       background-color: black;  
