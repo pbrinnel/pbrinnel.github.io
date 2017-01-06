@@ -3,26 +3,11 @@
     a:hover {text-decoration:underline;}
 
     pre {
-      font: 11.0px 'Vulf Mono_Regular Italic';
-      width: 585px;
-      position: relative;
+      font-family: monospace;
       white-space: -moz-pre-wrap; /* Mozilla, supported since 1999 */
       white-space: -pre-wrap; /* Opera */
       white-space: -o-pre-wrap; /* Opera */
       white-space: pre-wrap; /* CSS3 - Text module (Candidate Recommendation) http://www.w3.org/TR/css3-text/#white-space */
       word-wrap: break-word; /* IE 5.5+ */
-    }
-
-		
-    @font-face {
-    font-family: 'Vulf Mono_Regular Italic';
-    src:    url('Vulf_Mono-Regular_Italic_web.eot');
-    src:    url('Vulf_Mono-Regular_Italic_web.eot?#iefix') format('embedded-opentype'),
-            url('Vulf_Mono-Regular_Italic_web.woff') format('woff'),
-            url('Vulf_Mono-Regular_Italic_web.woff2') format('woff2'),
-            url('Vulf_Mono-Regular_Italic_web.ttf') format('truetype'),
-            url('Vulf_Mono-Regular_Italic_web.svg#svgFontName') format('svg');
-    font-weight: normal;
-    font-style: normal;
     }
   
