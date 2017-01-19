@@ -27,6 +27,7 @@ img.center {
     display: block; 
     margin:0;
     vertical-align:bottom;
+     width: 460px;
 }
 
 p {
