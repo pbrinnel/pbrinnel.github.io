@@ -19,8 +19,8 @@ body {
 }
 
 table.center {
- margin-left:auto; 
- margin-right:auto;
+ margin-left: 8%; 
+ margin-right: 8%;
  table-layout: fixed;
  width: 750px;
 }
