@@ -20,13 +20,13 @@ body {
 
 table {
  table-layout: fixed;
- width: 150px;
+ width: 800px;
  margin-left:15%; 
  margin-right:15%;
 }
 
 td {
- width: 50px;   
+ width: 700px;   
 }
 
 img.center {
