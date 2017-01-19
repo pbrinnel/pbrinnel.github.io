@@ -13,7 +13,7 @@ pre {
 body {
     color: white;
     font-family: Courier, "Courier New", monospace;
-    font-size: 12px;
+    font-size: 11px;
     text-align: center;
     background-color: black;
 }
@@ -27,7 +27,7 @@ img.center {
     display: block; 
     margin:0;
     vertical-align:bottom;
-     width: 460px;
+     width: 300px;
 }
 
 p {
