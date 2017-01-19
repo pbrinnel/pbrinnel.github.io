@@ -20,9 +20,9 @@ body {
 
 table {
  table-layout: fixed;
- width: 1200px;
- margin-left:5%; 
- margin-right:5%;
+ width: 750px;
+ margin-left:10%; 
+ margin-right:10%;
 }
 
 img.center {
