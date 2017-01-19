@@ -20,9 +20,9 @@ body {
 
 table {
  table-layout: fixed;
- width: 800px;
- margin-left:15%; 
- margin-right:15%;
+ width: 650px;
+ margin-left:35%; 
+ margin-right:35%;
 }
 
 td {
