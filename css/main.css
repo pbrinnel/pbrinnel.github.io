@@ -18,11 +18,11 @@ body {
     background-color: black;
 }
 
-table {
+table.center {
+ margin-left:auto; 
+ margin-right:auto;
  table-layout: fixed;
  width: 750px;
- margin-left:10%; 
- margin-right:10%;
 }
 
 img.center {
