@@ -18,6 +18,15 @@ body {
     background-color: black;
 }
 
+table {
+ table-layout: fixed;
+ width: 60px
+}
+
+th, td {
+ width: 10px;   
+}
+
 img.center {
     display: block; 
     margin:0;
