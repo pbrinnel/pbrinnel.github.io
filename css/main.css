@@ -19,7 +19,8 @@ body {
 }
 
 table.center {
- margin-left: 15%;
+ width: 750px;
+ margin-left: auto;
  margin-left: auto;
 }
 
