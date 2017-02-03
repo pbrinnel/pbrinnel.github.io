@@ -38,32 +38,34 @@ ga('send', 'pageview');
  
   
    
-var transitionON;   
+var transitionON = 0;
    
    <!--MouseOver Scripting-->
-function mouseOverScript() {
-   transitionON = 1;
-   setTimeout(function() {
-      document.getElementById("pic").src="web1.1image.jpg";
+while (transitionON = 0) {
+   function mouseOverScript() {
+      transitionON = 1;
       setTimeout(function() {
-         document.getElementById("pic").src="web1.2image.jpg";
+         document.getElementById("pic").src="web1.1image.jpg";
          setTimeout(function() {
-            document.getElementById("pic").src="web1.3image.jpg";
+            document.getElementById("pic").src="web1.2image.jpg";
             setTimeout(function() {
-               document.getElementById("pic").src="web1.4image.jpg";
+               document.getElementById("pic").src="web1.3image.jpg";
                setTimeout(function() {
-                  document.getElementById("pic").src="web1.5image.jpg";
+                  document.getElementById("pic").src="web1.4image.jpg";
                   setTimeout(function() {
-                     document.getElementById("pic").src="web1.6image.jpg";
+                     document.getElementById("pic").src="web1.5image.jpg";
                      setTimeout(function() {
-                        document.getElementById("pic").src="web1.7image.jpg";
+                        document.getElementById("pic").src="web1.6image.jpg";
                         setTimeout(function() {
-                           document.getElementById("pic").src="web1.8image.jpg";
+                           document.getElementById("pic").src="web1.7image.jpg";
                            setTimeout(function() {
-                              document.getElementById("pic").src="web1.9image.jpg";
+                              document.getElementById("pic").src="web1.8image.jpg";
                               setTimeout(function() {
-                                 document.getElementById("pic").src="web2.0image.jpg";
-                                 transitionON = 0;
+                                 document.getElementById("pic").src="web1.9image.jpg";
+                                 setTimeout(function() {
+                                    document.getElementById("pic").src="web2.0image.jpg";
+                                    transitionON = 0;
+                                 }, 300);
                               }, 300);
                            }, 300);
                         }, 300);
@@ -72,11 +74,11 @@ function mouseOverScript() {
                }, 300);
             }, 300);
          }, 300);
-      }, 300);
-   }, 500);
+      }, 500);
+   }
 }
    
-
+   
    
 </script>
   
