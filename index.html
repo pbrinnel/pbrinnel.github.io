@@ -40,40 +40,39 @@ ga('send', 'pageview');
    <!--MouseOver Scripting-->
 function mouseOverScript() {
    setTimeout(function() {
-       document.getElementById("pic").src="web1.1image.jpg";
+      document.getElementById("pic").src="web1.1image.jpg";
+      setTimeout(function() {
+         document.getElementById("pic").src="web1.2image.jpg";
          setTimeout(function() {
-             document.getElementById("pic").src="web1.2image.jpg";
+            document.getElementById("pic").src="web1.3image.jpg";
+            setTimeout(function() {
+               document.getElementById("pic").src="web1.4image.jpg";
                setTimeout(function() {
-                   document.getElementById("pic").src="web1.3image.jpg";
+                  document.getElementById("pic").src="web1.5image.jpg";
                   setTimeout(function() {
-                      document.getElementById("pic").src="web1.4image.jpg";
+                     document.getElementById("pic").src="web1.6image.jpg";
                      setTimeout(function() {
-                         document.getElementById("pic").src="web1.5image.jpg";
-                     }, 500);
-                  }, 500);   
-               }, 500);
-         }, 500);
-    }, 500);
+                        document.getElementById("pic").src="web1.7image.jpg";
+                        setTimeout(function() {
+                           document.getElementById("pic").src="web1.8image.jpg";
+                           setTimeout(function() {
+                              document.getElementById("pic").src="web1.9image.jpg";
+                              setTimeout(function() {
+                                 document.getElementById("pic").src="web2.0image.jpg";
+                                 }, 300);                                 
+                              }, 300);                         
+                           }, 300);                         
+                        }, 300);                           
+                     }, 300);
+                  }, 300);                     
+               }, 300);
+            }, 300);   
+         }, 300);
+      }, 300);
+   }, 500);
 }
    
-      <!--MouseOff Scripting-->
-function mouseOffScript() {
-   setTimeout(function() {
-       document.getElementById("pic").src="web1.4image.jpg";
-         setTimeout(function() {
-             document.getElementById("pic").src="web1.3image.jpg";
-               setTimeout(function() {
-                   document.getElementById("pic").src="web1.2image.jpg";
-                  setTimeout(function() {
-                      document.getElementById("pic").src="web1.1image.jpg";
-                     setTimeout(function() {
-                         document.getElementById("pic").src="web1.0image.jpg";
-                     }, 500);
-                  }, 500);   
-               }, 500);
-         }, 500);
-    }, 4000);
-}
+
    
 </script>
   
