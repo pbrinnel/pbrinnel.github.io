@@ -56,6 +56,25 @@ function mouseOverScript() {
     }, 500);
 }
    
+      <!--MouseOff Scripting-->
+function mouseOffScript() {
+   setTimeout(function() {
+       document.getElementById("pic").src="web1.4image.jpg";
+         setTimeout(function() {
+             document.getElementById("pic").src="web1.3image.jpg";
+               setTimeout(function() {
+                   document.getElementById("pic").src="web1.2image.jpg";
+                  setTimeout(function() {
+                      document.getElementById("pic").src="web1.1image.jpg";
+                     setTimeout(function() {
+                         document.getElementById("pic").src="web1.0image.jpg";
+                     }, 500);
+                  }, 500);   
+               }, 500);
+         }, 500);
+    }, 3000);
+}
+   
 </script>
   
 </head>
