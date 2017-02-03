@@ -39,10 +39,12 @@ ga('send', 'pageview');
   
    
 var transitionON;
+
+[lbl] beg:
    
    <!--MouseOver Scripting-->
-while (transitionON != 1) {
-   function mouseOverScript() {
+function mouseOverScript() {
+   while (transitionON != 1) {
       transitionON = 1;
       setTimeout(function() {
          document.getElementById("pic").src="web1.1image.jpg";
@@ -65,6 +67,7 @@ while (transitionON != 1) {
                                  setTimeout(function() {
                                     document.getElementById("pic").src="web2.0image.jpg";
                                     transitionON = 0;
+                                    goto beg;
                                  }, 300);
                               }, 300);
                            }, 300);
