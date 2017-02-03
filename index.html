@@ -36,9 +36,13 @@ m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
 ga('create', 'UA-90303307-1', 'auto');
 ga('send', 'pageview');
  
+  
+   
+var transitionON;   
    
    <!--MouseOver Scripting-->
 function mouseOverScript() {
+   transitionON = 1;
    setTimeout(function() {
       document.getElementById("pic").src="web1.1image.jpg";
       setTimeout(function() {
@@ -58,7 +62,8 @@ function mouseOverScript() {
                            setTimeout(function() {
                               document.getElementById("pic").src="web1.9image.jpg";
                               setTimeout(function() {
-                                 document.getElementById("pic").src="web2.0image.jpg";                          
+                                 document.getElementById("pic").src="web2.0image.jpg";
+                                 transitionON = 0;
                               }, 300);
                            }, 300);
                         }, 300);
