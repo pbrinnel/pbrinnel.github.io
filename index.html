@@ -38,12 +38,12 @@ ga('send', 'pageview');
 
    
    <!--MouseOver Scripting-->
-function picScript() {
-    document.getElementById("pic").style.color = "red";
+function mouseOverScript() {
+    document.getElementById("pic").src="web1.5image.jpg";
 }
 
-function picScript() {
-    document.getElementById("pic").style.color = "black";
+function mouseNotOverScript() {
+    document.getElementById("pic").src="web1.0image.jpg";
 }
 </script>
   
@@ -86,7 +86,7 @@ function picScript() {
 €                                                                         €
 ‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹ZZZZZZZ››››››››››››››››››››››››››››››››››</p>
 
-  <img  onmouseover="picScript" id="pic" class="center" src="web1.0image.jpg" alt=""><!--
+  <img  onmouseover="mouseOverScript" onmouseout="mouseNotOverScript" id="pic" class="center" src="web1.0image.jpg" alt=""><!--
 --><p style="font-size:10px">photo by <a href="http://alexusmclanephoto.com/">Alexus McLane</a>
 </p>
 
