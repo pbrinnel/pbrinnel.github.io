@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html>
+<head>
+   <meta name="viewport" content="width=device-width">
+   
+   <link rel='stylesheet' media='screen and (max-width: 300px)' href="/css/main-300max.css"/>
+   <link rel='stylesheet' media='screen and (min-width: 301px)' href="/css/main-610max.css"/>
+   <link rel='stylesheet' media='screen and (min-width: 611px)' href="/css/main.css"/>
+<!--link rel="stylesheet" type="text/css" href="/css/main.css"-->
+<!--favicon crap-->
+<link rel="apple-touch-icon" sizes="57x57" href="/favicon/apple-icon-57x57.png">
+<link rel="apple-touch-icon" sizes="60x60" href="/favicon/apple-icon-60x60.png">
+<link rel="apple-touch-icon" sizes="72x72" href="/favicon/apple-icon-72x72.png">
+<link rel="apple-touch-icon" sizes="76x76" href="/favicon/apple-icon-76x76.png">
+<link rel="apple-touch-icon" sizes="114x114" href="/favicon/apple-icon-114x114.png">
+<link rel="apple-touch-icon" sizes="120x120" href="/favicon/apple-icon-120x120.png">
+<link rel="apple-touch-icon" sizes="144x144" href="/favicon/apple-icon-144x144.png">
+<link rel="apple-touch-icon" sizes="152x152" href="/favicon/apple-icon-152x152.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-icon-180x180.png">
+<link rel="icon" type="image/png" sizes="192x192"  href="/favicon/android-icon-192x192.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="96x96" href="/favicon/favicon-96x96.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon/favicon-16x16.png">
+<link rel="manifest" href="/favicon/manifest.json">
+<meta name="msapplication-TileColor" content="#ffffff">
+<meta name="msapplication-TileImage" content="/favicon/ms-icon-144x144.png">
+<meta name="theme-color" content="#ffffff">
+  
+<script>
+   <!--Google Analytics Scripting-->
+(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+ga('create', 'UA-90303307-1', 'auto');
+ga('send', 'pageview');
+ 
+  
+var transitionSTAGE = 0;
+   <!--MouseOver Scripting-->
+function mouseOverScript() {
+   unblur();
+}
+   
+   <!--MouseOff Scripting-->
+function mouseOffScript() {
+   blur();
+}   
+   
+   <!--MouseClick Scripting-->
+function mouseClickScript() {
+   unblur();
+   blur();
+}
+   
+function unblur() {   
+   if (transitionSTAGE==0) {
+      transitionSTAGE = 1;
+      setTimeout(function() {
+         document.getElementById("pic").src="web1.1image.jpg";
+         setTimeout(function() {
+            document.getElementById("pic").src="web1.2image.jpg";
+            setTimeout(function() {
+               document.getElementById("pic").src="web1.3image.jpg";
+               setTimeout(function() {
+                  document.getElementById("pic").src="web1.4image.jpg";
+                  setTimeout(function() {
+                     document.getElementById("pic").src="web1.5image.jpg";
+                     setTimeout(function() {
+                        document.getElementById("pic").src="web1.6image.jpg";
+                        setTimeout(function() {
+                           document.getElementById("pic").src="web1.7image.jpg";
+                           setTimeout(function() {
+                              document.getElementById("pic").src="web1.8image.jpg";
+                              setTimeout(function() {
+                                 document.getElementById("pic").src="web1.9image.jpg";
+                                 setTimeout(function() {
+                                    document.getElementById("pic").src="web2.0image.jpg";
+                                    transitionSTAGE = 2;
+                                 }, 300);
+                              }, 300);
+                           }, 300);
+                        }, 300);
+                     }, 300);
+                  }, 300);
+               }, 300);
+            }, 300);
+         }, 300);
+      }, 500);
+   }
+}  
+   
+function blur() {
+   if (transitionSTAGE==2) {
+      transitionSTAGE = 3;
+      setTimeout(function() {
+         document.getElementById("pic").src="web1.9image.jpg";
+         setTimeout(function() {
+            document.getElementById("pic").src="web1.8image.jpg";
+            setTimeout(function() {
+               document.getElementById("pic").src="web1.7image.jpg";
+               setTimeout(function() {
+                  document.getElementById("pic").src="web1.6image.jpg";
+                  setTimeout(function() {
+                     document.getElementById("pic").src="web1.5image.jpg";
+                     setTimeout(function() {
+                        document.getElementById("pic").src="web1.4image.jpg";
+                        setTimeout(function() {
+                           document.getElementById("pic").src="web1.3image.jpg";
+                           setTimeout(function() {
+                              document.getElementById("pic").src="web1.2image.jpg";
+                              setTimeout(function() {
+                                 document.getElementById("pic").src="web1.1image.jpg";
+                                 setTimeout(function() {
+                                    document.getElementById("pic").src="web1.0image.jpg";
+                                    transitionSTAGE = 0;
+                                 }, 300);
+                              }, 300);
+                           }, 300);
+                        }, 300);
+                     }, 300);
+                  }, 300);
+               }, 300);
+            }, 300);
+         }, 300);
+      }, 500);
+   }
+}
+</script>
+  
+</head>
+<body>
+<pre>
+<p>‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹AAAAAAAAA›››››››››››››››››››››››››››››››››
+:                                                                         :
+ﬂ         ‹€€€€‹       ‹€€€€‹     ‹‹C‹‹      ‹€€   ‹€€€                   ﬂ
+:        €€€C€€€C     €€€€€€€€     ‹C€€€      C€€   ‹€€€                  :
+€       €€€C ﬂ€€€C    €€€Cﬂ C€€€   ‹€€€C      ‹ﬂﬂ‹   C€€€                 €
+:      C€€€    C€€€   €€€    €€€‹   ‹€€€       €€C   €€€‹                 :
+€      €€€C     ﬂﬂC    €€€    ﬂ€€€  ‹CC€€      €€ﬂC   €€€                 €
+€      €€€       ﬂﬂ    €€€    €€€    C€€       €€€C   €€C                 €
+€      €€€       €€€   €€€    €€€€   ‹€€€      C€€€   €€C‹                €
+€      €€€       €€€   C€     C€€€C  ‹€C€      C€€‹   C€€‹                €
+€      C€€€     ‹€€   C€€€    €€€€‹   €€‹      ‹€C‹   ‹€€C                €
+€      C€€€€‹ C€€€C   C€€€CC€€‹€€C    €€C      ‹C€€   C€C‹                €
+€      C€€€€€€ﬂC     C€€€‹    €€€C   €€€€      C€€ﬂ   ‹C€C                €
+€      C€€€C        ‹€€€C     €€€€   €€€       C€€C   C€€C‹               €
+€      €€€C         C€€€€    C€€€    €C‹      ‹€€€   €C€€C                €
+€      €€€C        ‹€€€C     C€€€   €€C       C€€‹  ‹€€€C‹                €
+€      €€€€        C€€€C    C€€ﬂ    €€‹      ‹€€ﬂ  ‹€€ﬂﬂ‹                 €
+€      €€ﬂC    ‹   C€€€C    C€€‹   €€ﬂC     ‹ﬂﬂ€  ‹€ﬂ€€C             ‹C   €
+€      €€€C   ‹C   ‹€€€C    C€€ﬂ   €€€€C‹   C€€€  C€ﬂ€ﬂﬂ             C‹   €
+€      €€€‹  C€€C  C€€€C    C€€‹   C€€€CC€€ﬂ€€C  ‹€ﬂ€€€€ﬂ€€€ﬂﬂCﬂ€€ﬂﬂC‹    €
+€          ‹€€€ﬂC‹                                                        €
+€   Cﬂ€€€€€€€€€€€€€C€€€€€€€€€€‹‹‹‹‹‹‹‹‹‹‹‹‹€€€€€€€€€€€€€€€€€€€ﬂﬂ€€€€€ﬂCC  €
+€   €€€€€€€€€€€€€€€€€€€€€€€€€‹‹ P A U L ‹‹‹‹‹‹‹‹‹€€€€€€€€€€€€€€€€€€€€€€€  €
+€   C€€€€€€ﬂ€€€€€€€€€€€€€€€€€€‹‹‹ B R I N N E L ‹€€€€€€€€€€€€€€€€€€€€€€C  €
+€   Cﬂ€€€€€€€€€€€€€C€€€€€€€€€€€‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹€€€€€€€€€€€€€€€€ﬂﬂ€€€ﬂC  €
+:   ﬂ€                                                           ‹Cﬂ€ﬂC‹  :
+:   C    C€€€C   CﬂﬂC    €€  CCﬂ€    C  ‹Cﬂ€    C  €€€€€ﬂ  €€     Cﬂ€€‹   :
+ﬂ   ‹    €€  C‹  €€  C   ﬂﬂ  €€ ﬂ€   €  €€ ﬂ€   €  ﬂﬂ      ﬂ€     ‹€€C    ﬂ
+€        €€ C    Cﬂ  €   €€  CC  €C  ﬂ  CC  €C  ﬂ  CC      €C      Cﬂ‹    €
+ﬂ        €€€€C   ﬂﬂﬂ€    €€  ﬂﬂ   €€ C  ﬂﬂ   €€ C  Cﬂ€€C‹  Cﬂ       ﬂ     ﬂ
+€        €€   C  ﬂ  ﬂ    CC  ﬂ€   C€ C  ﬂ€   C€ C  CC      €€       ‹     €
+€        €€   C  €   C   ﬂﬂ  ﬂC    ﬂﬂ€  ﬂC    ﬂﬂ€  €ﬂ      ﬂﬂ             €
+€        C€€€C‹  C    ﬂ  ﬂC  ﬂﬂ     C€  ﬂﬂ     C€  ﬂ€€ﬂ€ﬂ  €€€€€ﬂC‹       €
+€                                                                         €
+‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹ZZZZZZZ››››››››››››››››››››››››››››››››››</p>
+
+  <img  onmouseover="mouseOverScript()" onmouseout="mouseOffScript()" onclick="mouseClickScript()" id="pic" class="center" src="web1.0image.jpg" alt=""><!--
+--><p style="font-size:10px">photo by <a href="http://alexusmclanephoto.com/">Alexus McLane</a>
+</p>
+
+<i>‹‹›NEW MUSIC‹››</i>
+<a href="https://paulbrinnel.bandcamp.com/">TBA EP [2017]</a>
+
+<i>‹‹›OLD MUSIC‹››</i>
+<a href="https://soundcloud.com/pbrinnel/sets/the-adventures-of-bean-machine">The Adventures of Bean Machine [2011]</a>
+
+<i>‹‹›UPCOMING GIGS‹››</i>
+<table class="center"><tr><td align="left"><a href ="https://www.facebook.com/events/375001016212186/">Wed 2-8-17 Clamor &amp; Claw</a>
+<a href ="https://www.facebook.com/events/375001016212186/">@ The Foundation Room - The House of Blues</a>
+</td>
+</tr>
+<tr>
+<td align="left">
+<a href ="http://www.janismeandbobbymcgee.com/">Sat 3-4-17 Janis, Me &amp; Bobby McGee</a> 
+<a href="http://elgin.edu/ecceventviewer/EventDetailInfo.aspx?Origin=Public&id=205644&esid=6431234">@ Elgin Community College Arts Center</a>
+</td>
+</tr>
+<tr>
+<td align="left">
+<a href ="http://www.quenchers.com/">Wed 3-8-17 Paul Brinnel &amp; His Personnel</a> 
+<a href="http://www.quenchers.com/">@ Quenchers Saloon</a>
+</td>
+</tr>
+<tr>
+<td align="left">
+<a href ="https://www.facebook.com/MoesTavernChicago/">Thur 3-30-17 Paul Brinnel &amp; His Personnel</a> 
+<a href="https://www.facebook.com/MoesTavernChicago/">@ Moe's Tavern</a>
+</td>
+</tr>
+<tr>
+<td align="left">
+<a href="http://www.cafemustache.com/">Wed 4-12-17 Paul Brinnel &amp; His Personnel</a>
+<a href="http://www.cafemustache.com/">       - EP Release Show -</a>
+<a href="http://www.cafemustache.com/">@ Cafe Mustache</a> w/ <a href="http://finesubterraneans.com/">Fine Subterraneans</a> &amp; <a href="https://soundcloud.com/tommaso-moretti">Tommaso Moretti</a>
+</td>
+</tr>
+</table>
+
+<i>‹‹›SOCIAL MEDIA‹››</i>
+<table class="center"><tr><td align="left"><a href="https://www.facebook.com/paulbrinnel/">Paul Brinnel &amp; His Personnel - Facebook</a>
+</td></tr><tr><td align="left"><a href="https://www.facebook.com/Clamorandclaw/">Clamor &amp; Claw - Facebook</a></td></tr>
+</table>
+
+<i>‹‹›BOOKING‹››</i>
+<a href="mailto:pbrinnel@gmail.com">pbrinnel@gmail.com</a>
+
+
+<footer>
+©2017 PAUL BRINNEL
+</footer>
+</pre>
+</body>
+</html>
