@@ -42,45 +42,12 @@ var transitionSTAGE = 0;
 
    <!--MouseOver Scripting-->
 function mouseOverScript() {
-   unblur()
+   unblur();
 }
    
    <!--MouseOff Scripting-->
 function mouseOffScript() {
-   if (transitionSTAGE==2) {
-      transitionSTAGE = 3;
-      setTimeout(function() {
-         document.getElementById("pic").src="web1.9image.jpg";
-         setTimeout(function() {
-            document.getElementById("pic").src="web1.8image.jpg";
-            setTimeout(function() {
-               document.getElementById("pic").src="web1.7image.jpg";
-               setTimeout(function() {
-                  document.getElementById("pic").src="web1.6image.jpg";
-                  setTimeout(function() {
-                     document.getElementById("pic").src="web1.5image.jpg";
-                     setTimeout(function() {
-                        document.getElementById("pic").src="web1.4image.jpg";
-                        setTimeout(function() {
-                           document.getElementById("pic").src="web1.3image.jpg";
-                           setTimeout(function() {
-                              document.getElementById("pic").src="web1.2image.jpg";
-                              setTimeout(function() {
-                                 document.getElementById("pic").src="web1.1image.jpg";
-                                 setTimeout(function() {
-                                    document.getElementById("pic").src="web1.0image.jpg";
-                                    transitionSTAGE = 0;
-                                 }, 300);
-                              }, 300);
-                           }, 300);
-                        }, 300);
-                     }, 300);
-                  }, 300);
-               }, 300);
-            }, 300);
-         }, 300);
-      }, 500);
-   }
+   blur();
 }   
 
    
@@ -119,7 +86,45 @@ function unblur() {
          }, 300);
       }, 500);
    }
-}   
+}  
+   
+
+function blur() {
+   if (transitionSTAGE==2) {
+      transitionSTAGE = 3;
+      setTimeout(function() {
+         document.getElementById("pic").src="web1.9image.jpg";
+         setTimeout(function() {
+            document.getElementById("pic").src="web1.8image.jpg";
+            setTimeout(function() {
+               document.getElementById("pic").src="web1.7image.jpg";
+               setTimeout(function() {
+                  document.getElementById("pic").src="web1.6image.jpg";
+                  setTimeout(function() {
+                     document.getElementById("pic").src="web1.5image.jpg";
+                     setTimeout(function() {
+                        document.getElementById("pic").src="web1.4image.jpg";
+                        setTimeout(function() {
+                           document.getElementById("pic").src="web1.3image.jpg";
+                           setTimeout(function() {
+                              document.getElementById("pic").src="web1.2image.jpg";
+                              setTimeout(function() {
+                                 document.getElementById("pic").src="web1.1image.jpg";
+                                 setTimeout(function() {
+                                    document.getElementById("pic").src="web1.0image.jpg";
+                                    transitionSTAGE = 0;
+                                 }, 300);
+                              }, 300);
+                           }, 300);
+                        }, 300);
+                     }, 300);
+                  }, 300);
+               }, 300);
+            }, 300);
+         }, 300);
+      }, 500);
+   }
+}
 </script>
   
 </head>
