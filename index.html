@@ -37,14 +37,12 @@ ga('create', 'UA-90303307-1', 'auto');
 ga('send', 'pageview');
  
   
-   
-var transitionON;
 
-[lbl] beg:
+var transitionON = 0;
    
    <!--MouseOver Scripting-->
 function mouseOverScript() {
-   while (transitionON != 1) {
+   if (transitionON!=1) {
       transitionON = 1;
       setTimeout(function() {
          document.getElementById("pic").src="web1.1image.jpg";
@@ -67,7 +65,6 @@ function mouseOverScript() {
                                  setTimeout(function() {
                                     document.getElementById("pic").src="web2.0image.jpg";
                                     transitionON = 0;
-                                    goto beg;
                                  }, 300);
                               }, 300);
                            }, 300);
