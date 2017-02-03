@@ -57,21 +57,22 @@ function mouseOverScript() {
 }
 
 function mouseOutScript() {
-setTimeout(function() {
-    document.getElementById("pic").src="web1.4image.jpg";
-}, 500);
-setTimeout(function() {
-    document.getElementById("pic").src="web1.3image.jpg";
-}, 1000);
-setTimeout(function() {
-    document.getElementById("pic").src="web1.2image.jpg";
-}, 1500);
-setTimeout(function() {
-    document.getElementById("pic").src="web1.1image.jpg";
-}, 2000);
-setTimeout(function() {
-    document.getElementById("pic").src="web1.0image.jpg";
-}, 2500);
+function mouseOverScript() {
+   setTimeout(function() {
+       document.getElementById("pic").src="web1.4image.jpg";
+         setTimeout(function() {
+             document.getElementById("pic").src="web1.3image.jpg";
+               setTimeout(function() {
+                   document.getElementById("pic").src="web1.2image.jpg";
+                  setTimeout(function() {
+                      document.getElementById("pic").src="web1.1image.jpg";
+                     setTimeout(function() {
+                         document.getElementById("pic").src="web1.0image.jpg";
+                     }, 500);
+                  }, 500);   
+               }, 500);
+          }, 500);
+    }, 3000);
 }
 </script>
   
