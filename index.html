@@ -37,14 +37,23 @@ ga('create', 'UA-90303307-1', 'auto');
 ga('send', 'pageview');
  
    
-     <!--MouseOver Scripting-->
-function mouseOverScript() {   
+   <!--MouseOver Scripting-->
+function mouseOverScript() {
    setTimeout(function() {
-      document.getElementById("pic").src="web1.1image.jpg";
-      setTimeout(function() {
-         document.getElementById("pic").src="web1.2image.jpg";
-    }, 1000);
-}, 1000);   
+       document.getElementById("pic").src="web1.1image.jpg";
+         setTimeout(function() {
+             document.getElementById("pic").src="web1.2image.jpg";
+               setTimeout(function() {
+                   document.getElementById("pic").src="web1.3image.jpg";
+                  setTimeout(function() {
+                      document.getElementById("pic").src="web1.4image.jpg";
+                     setTimeout(function() {
+                         document.getElementById("pic").src="web1.5image.jpg";
+                     }, 500);
+                  }, 500);   
+               }, 500);
+         }, 500);
+    }, 500);
 }
    
 </script>
