@@ -40,13 +40,13 @@ p {
     margin-right: 0;
 }
 
-example {
+#example {
   position: relative;
 }
-example-checkbox {
+#example-checkbox {
   display: none;
 }
-example-checkbox:checked + example:after {
+#example-checkbox:checked + #example:after {
   content: "Hide";
   position: absolute;
   top: 0;
@@ -55,6 +55,8 @@ example-checkbox:checked + example:after {
   bottom: 0;
   background: white;
 }
+
+div.textContent { display:none }
 
 footer {
     color: white;
