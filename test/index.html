@@ -137,20 +137,21 @@ function blur() {
 
 
 
-  gord -&gt; <span id="‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹AAAAAAAAA›››››››››››››››››››››››››››››››››" onclick="toggle()">______________________________________________________________________</span> &lt;- Have 
+gord -&gt; <span id="word" onclick="toggle()">____</span> &lt;- Have 
 
   <p id="demo"></p>
 
   <script>
     function toggle() {
-      var ‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹AAAAAAAAA››››››››››››››››››››››››››››››››› = document.getElementById("‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹AAAAAAAAA›››››››››››››››››››››››››››››››››").innerHTML;
-      if (‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹AAAAAAAAA›››››››››››››››››››››››››››››››››.split('_').join('').trim().length === 0) {
-        document.getElementById("‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹AAAAAAAAA›››››››››››››››››››››››››››››››››").innerHTML = "‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹AAAAAAAAA›››››››››››››››››››››››››››››››››";
+      var word = document.getElementById("word").innerHTML;
+      if (word.split('_').join('').trim().length === 0) {
+        document.getElementById("word").innerHTML = "word";
       } else {
-        document.getElementById("‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹AAAAAAAAA›››››››››››››››››››››››››››››››››").innerHTML = "_______________________________________________________________________";
+        document.getElementById("word").innerHTML = "_____";
       }
     }
   </script>
+
 
 
 
