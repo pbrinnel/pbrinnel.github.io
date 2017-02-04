@@ -134,7 +134,7 @@ function blur() {
 <pre>
 <p>TEST
 
- <span id="OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO" onclick="toggle()">XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX</span>
+  This is a paragraph. Click on the next word -&gt; <span id="word" onclick="toggle()">____</span> &lt;- Have you clicked on previous word.
 
   <p id="demo"></p>
 
@@ -142,9 +142,9 @@ function blur() {
     function toggle() {
       var word = document.getElementById("word").innerHTML;
       if (word.split('_').join('').trim().length === 0) {
-        document.getElementById("word").innerHTML = "OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO";
+        document.getElementById("word").innerHTML = "word";
       } else {
-        document.getElementById("word").innerHTML = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
+        document.getElementById("word").innerHTML = "_____";
       }
     }
   </script>
