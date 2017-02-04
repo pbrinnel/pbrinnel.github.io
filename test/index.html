@@ -176,8 +176,20 @@ slide()
 <div class="textContent">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi sit amet risus vitae ligula lobortis feugiat. Aenean a lorem vitae nisi vehicula tempor. Donec suscipit ornare dui, sit amet tincidunt lorem aliquet id. Donec egestas sollicitudin consectetur. Donec ante dolor, bibendum a ultrices scelerisque, sagittis imperdiet sapien. Maecenas sagittis, sem et pharetra sollicitudin, orci nisi commodo augue, id molestie velit ipsum eget est. </div>
 <div class="textContent">In sit amet diam et arcu aliquam tincidunt. Vestibulum quis mi id lacus fringilla pulvinar in nec lorem. Duis sed est at nunc euismod scelerisque. Nulla venenatis augue non urna sollicitudin et molestie neque aliquet. Proin odio ligula, sodales a auctor ac, iaculis ut urna. Nam tellus felis, ultrices sed ornare a, pretium eget odio. Suspendisse potenti. </div>
 
+ This is a paragraph. Click on the next word -&gt; <span id="word" onclick="toggle()">____</span> &lt;- Have you clicked on previous word.
 
+  <p id="demo"></p>
 
+  <script>
+    function toggle() {
+      var word = document.getElementById("word").innerHTML;
+      if (word.split('_').join('').trim().length === 0) {
+        document.getElementById("word").innerHTML = "word";
+      } else {
+        document.getElementById("word").innerHTML = "_____";
+      }
+    }
+  </script>
 
 
 ‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹AAAAAAAAA›››››››››››››››››››››››››››››››››
