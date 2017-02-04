@@ -40,6 +40,22 @@ p {
     margin-right: 0;
 }
 
+#example {
+  position: relative;
+}
+#example-checkbox {
+  display: none;
+}
+#example-checkbox:checked + #example:after {
+  content: "Hide";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: white;
+}
+
 footer {
     color: white;
     font-family: Courier, "Courier New", monospace;
