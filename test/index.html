@@ -63,19 +63,23 @@ function ImgMouseClickScript() {
 }
    
    
-
+   
    <!--Animate Text Scripting-->
 function animateON() {
    
    
 document.getElementById("word").innerHTML = "initializing"; 
-   
-      setTimeout(function() {
-         document.getElementById("word").innerHTML = "11111";
+
+   do {
          setTimeout(function() {
-            document.getElementById("word").innerHTML = "22222";
-         }, 500);
-      }, 500);  
+            document.getElementById("word").innerHTML = "11111";
+            setTimeout(function() {
+               document.getElementById("word").innerHTML = "22222";
+            }, 500);
+         }, 500);  
+   
+   } while (animateACTIVE == 1);
+
    
 }  
 
