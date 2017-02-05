@@ -72,18 +72,18 @@ function animateON() {
    <!--Declare Img Toggle Global Var-->
 var transitionSTAGE = 0;
    
-   <!--MouseOver Scripting-->
-function mouseOverScript() {
+   <!--Img MouseOver Scripting-->
+function ImgMouseOverScript() {
    unblur();
 }
    
-   <!--MouseOff Scripting-->
-function mouseOffScript() {
+   <!--Img MouseOff Scripting-->
+function ImgMouseOffScript() {
    blur();
 }   
    
-   <!--MouseClick Scripting-->
-function mouseClickScript() {
+   <!--Img MouseClick Scripting-->
+function ImgMouseClickScript() {
    unblur();
    blur();
 }
@@ -213,7 +213,7 @@ function blur() {
 €                                                                         €
 ‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹ZZZZZZZ››››››››››››››››››››››››››››››››››</p>
 
-  <img  onmouseover="mouseOverScript()" onmouseout="mouseOffScript()" onclick="mouseClickScript()" id="pic" class="center" src="web1.0image.jpg" alt=""><!--
+  <img  onmouseover="ImgMouseOverScript()" onmouseout="ImgMouseOffScript()" onclick="ImgMouseClickScript()" id="pic" class="center" src="web1.0image.jpg" alt=""><!--
 --><p style="font-size:10px">photo by <a href="http://alexusmclanephoto.com/">Alexus McLane</a>
 </p>
 
