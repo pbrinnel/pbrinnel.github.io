@@ -36,12 +36,23 @@ ga('create', 'UA-90303307-1', 'auto');
 ga('send', 'pageview');
  
   
-   
+   <!--Declare ASCII Toggle Global Var-->
 var animateSTAGE = 0;
 
+ function toggle() {
+   var word = document.getElementById("word").innerHTML;
+   if (animateSTAGE == 0) {
+     document.getElementById("word").innerHTML = "word1";
+     animateSTAGE = 1;
+   } else {
+     document.getElementById("word").innerHTML = "_____";
+     animateSTAGE = 0;
+   }
+ }
    
-   
+   <!--Declare Img Toggle Global Var-->
 var transitionSTAGE = 0;
+   
    <!--MouseOver Scripting-->
 function mouseOverScript() {
    unblur();
@@ -140,30 +151,10 @@ function blur() {
 <p>TEST
 
 
+<span id="word" onclick="toggle()">11111</span>
 
-
-AAA -&gt; <span id="word" onclick="toggle()">11111</span> &lt;- ZZZ 
 
   <p id="demo"></p>
-
-
-
-
-  <script>
-    function toggle() {
-      var word = document.getElementById("word").innerHTML;
-      if (animateSTAGE == 0) {
-        document.getElementById("word").innerHTML = "word1";
-        animateSTAGE = 1;
-      } else {
-        document.getElementById("word").innerHTML = "_____";
-        animateSTAGE = 0;
-      }
-    }
-  </script>
-
-
-
 
 
 
