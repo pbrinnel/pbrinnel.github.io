@@ -36,6 +36,11 @@ ga('create', 'UA-90303307-1', 'auto');
 ga('send', 'pageview');
  
   
+   
+var animateSTAGE = 0;
+
+   
+   
 var transitionSTAGE = 0;
    <!--MouseOver Scripting-->
 function mouseOverScript() {
@@ -143,7 +148,6 @@ AAA -&gt; <span id="word" onclick="toggle()">11111</span> &lt;- ZZZ
 
 
 
-var animateSTAGE = 0;
 
   <script>
     function toggle() {
@@ -153,6 +157,7 @@ var animateSTAGE = 0;
         animateSTAGE = 1;
       } else {
         document.getElementById("word").innerHTML = "_____";
+        animateSTAGE = 0;
       }
     }
   </script>
