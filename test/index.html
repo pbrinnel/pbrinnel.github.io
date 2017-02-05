@@ -46,27 +46,49 @@ ga('send', 'pageview');
    var animateACTIVE = 0;
    var animateSTAGE = 0;
 
+   
+   <!--ASCII MouseOver Scripting-->
+function ImgMouseOverScript() {
+   animateACTIVE = 1;
+   animateON();
+}
+   
+   <!--ASCII MouseOff Scripting-->
+function ImgMouseOffScript() {
+   animateACTIVE = 0;
+}   
+   
+   <!--ASCII MouseClick Scripting-->
+function ImgMouseClickScript() {
+
+}
+   
+   
 
    <!--Animate Text Scripting-->
 function animateON() {
-   var word = document.getElementById("word").innerHTML;
-    
-   if (animateSTAGE == 0) {
-     document.getElementById("word").innerHTML = "11111";
-     animateSTAGE = 1;
+   
+   do {
+   
+      var word = document.getElementById("word").innerHTML;
 
+      if (animateSTAGE == 0) {
+        document.getElementById("word").innerHTML = "11111";
+        animateSTAGE = 1;
+
+      }
+
+      else {
+        document.getElementById("word").innerHTML = "22222";
+        animateSTAGE = 0;
+      }
+      
    }
    
-   else {
-     document.getElementById("word").innerHTML = "22222";
-     animateSTAGE = 0;
-   }
- }
+} while (animateACTIVE == 1);
    
    
-   
-   
-   
+
    
    
    <!--Declare Img Toggle Global Var-->
