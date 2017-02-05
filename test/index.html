@@ -43,14 +43,21 @@ ga('send', 'pageview');
    
   
    <!--Declare ASCII Toggle Global Var-->
-var animateSTAGE = 0;
+   var animateACTIVE = 0;
+   var animateSTAGE = 0;
 
- function toggle() {
+
+   <!--Animate Text Scripting-->
+function animateON() {
    var word = document.getElementById("word").innerHTML;
+    
    if (animateSTAGE == 0) {
      document.getElementById("word").innerHTML = "11111";
      animateSTAGE = 1;
-   } else {
+
+   }
+   
+   else {
      document.getElementById("word").innerHTML = "22222";
      animateSTAGE = 0;
    }
@@ -163,7 +170,7 @@ function blur() {
 <p>TEST
 
 
-<span id="word" onclick="toggle()" onmouseover="toggle()" onmouseout="toggle()">00000</span>
+<span id="word" onmouseover="animateON()" onmouseout="animateOFF()">00000</span>
 
 
 
