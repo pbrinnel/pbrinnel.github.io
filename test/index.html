@@ -71,19 +71,14 @@ function animateON() {
    do {
    
       var word = document.getElementById("word").innerHTML;
-
-      if (animateSTAGE == 0) {
-        document.getElementById("word").innerHTML = "11111";
-        animateSTAGE = 1;
-
-      }
-
-      else {
-        document.getElementById("word").innerHTML = "22222";
-        animateSTAGE = 0;
-      }
-      
-   }
+      setTimeout(function() {
+         document.getElementById("word").innerHTML = "11111";
+         animateSTAGE = 1;
+         setTimeout(function() {
+            document.getElementById("word").innerHTML = "22222";
+            animateSTAGE = 0;
+         }, 500);
+      }, 500);
    
 } while (animateACTIVE == 1);
    
