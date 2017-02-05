@@ -50,7 +50,6 @@ ga('send', 'pageview');
    <!--ASCII MouseOver Scripting-->
 function ImgMouseOverScript() {
    animateACTIVE = 1;
-   animateON();
 }
    
    <!--ASCII MouseOff Scripting-->
@@ -60,7 +59,7 @@ function ImgMouseOffScript() {
    
    <!--ASCII MouseClick Scripting-->
 function ImgMouseClickScript() {
-
+   animateON();
 }
    
    
@@ -68,18 +67,17 @@ function ImgMouseClickScript() {
    <!--Animate Text Scripting-->
 function animateON() {
    
-
-      var word = document.getElementById("word").innerHTML;
+   
+document.getElementById("word").innerHTML = "initializing"; 
+   
       setTimeout(function() {
          document.getElementById("word").innerHTML = "11111";
-         animateSTAGE = 1;
          setTimeout(function() {
             document.getElementById("word").innerHTML = "22222";
-            animateSTAGE = 0;
          }, 500);
       }, 500);  
    
-   
+}  
 
    
    
