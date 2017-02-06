@@ -66,22 +66,16 @@ function TXTMouseClickScript() {
    
    <!--Animate Text Scripting-->
 function animateON() {
-
-var i = 0;
-   
-document.getElementById("word").innerHTML = "initializing"; 
-
-   do {
+   document.getElementById("word").innerHTML = "initializing";    
+   while (i < 10) {
+      setTimeout(function() {
+         document.getElementById("word").innerHTML = "11111";
          setTimeout(function() {
-            document.getElementById("word").innerHTML = "11111";
-            setTimeout(function() {
-               document.getElementById("word").innerHTML = "22222";
-            }, 500);
-         }, 500);  
-   i++;   
-   } while (i < 5);
-
-   
+            document.getElementById("word").innerHTML = "22222";
+         }, 500);
+      }, 500);     
+   i++;
+   }  
 }  
 
    
