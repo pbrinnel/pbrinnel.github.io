@@ -49,11 +49,13 @@ ga('send', 'pageview');
    
    <!--ASCII MouseOver Scripting-->
 function TXTMouseOverScript() {
+   animateACTIVE = 1;
    animateON();
 }
    
    <!--ASCII MouseOff Scripting-->
 function TXTMouseOffScript() {
+   animateACTIVE = 0;
 }   
    
    <!--ASCII MouseClick Scripting-->
@@ -76,7 +78,7 @@ document.getElementById("word").innerHTML = "initializing";
             }, 500);
          }, 500);  
    
-   } while (0 == 1);
+   } while (animateACTIVE == 1);
 
    
 }  
