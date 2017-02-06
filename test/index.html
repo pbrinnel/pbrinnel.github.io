@@ -45,11 +45,12 @@ ga('send', 'pageview');
    <!--Declare ASCII Toggle Global Var-->
    var animateACTIVE = 1;
    var animateSTAGE = 0;
+   var INTERV;
 
    
    <!--ASCII MouseOver Scripting-->
 function TXTMouseOverScript() {
-   setInterval(animateON(), 4000);
+   INTERV = setInterval(animateON(), 1500);
 }
    
    <!--ASCII MouseOff Scripting-->
