@@ -49,7 +49,7 @@ ga('send', 'pageview');
    
    <!--ASCII MouseOver Scripting-->
 function TXTMouseOverScript() {
-   animateON();
+   setInterval(animateON();, 4000);
 }
    
    <!--ASCII MouseOff Scripting-->
@@ -67,16 +67,14 @@ function TXTMouseClickScript() {
    <!--Animate Text Scripting-->
 function animateON() {
    document.getElementById("word").innerHTML = "initializing";
-   var i = 0;
-   while (i < 10) {
+   if (animateACTIVE == 1) {
       setTimeout(function() {
          document.getElementById("word").innerHTML = "11111";
          setTimeout(function() {
             document.getElementById("word").innerHTML = "22222";
          }, 500);
-      }, 500);     
-   i++;
-   }  
+      }, 500);
+   }
 }  
 
    
