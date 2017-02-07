@@ -84,7 +84,7 @@ function unblur() {
 function blur() {
    if (transitionSTAGE==2) {
       transitionSTAGE = 3;
-      i = 11;
+      i = 10;
       INTERVimg = setInterval(BswapIMG, IMGcycleTIME);
    }
 }
@@ -100,7 +100,7 @@ function UBswapIMG() {
 }
 
 function BswapIMG() {
-   if(i>0) {
+   if(i>=0) {
       document.getElementById("pic").src=UBnextImage[i];
       i--;
    } else {
