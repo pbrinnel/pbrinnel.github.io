@@ -252,11 +252,12 @@ document.getElementById("art").innerHTML = CenterAnimation;
 var animateACTIVE = false;
 var animateSTAGE = 0;
 var INTERV;
-
+var cycleTIME = 2000;
+ 
    
    <!--ASCII MouseOver Scripting-->
 function TXTMouseOverScript() {
-   INTERV = setInterval(animateON, 1200);
+   INTERV = setInterval(animateON, cycleTIME);
    animateACTIVE = true;
 }
    
@@ -272,7 +273,7 @@ function TXTMouseClickScript() {
       clearInterval(INTERV);
       animateACTIVE = false;
    } else {
-      INTERV = setInterval(animateON, 2000);
+      INTERV = setInterval(animateON, cycleTIME);
       animateACTIVE = true;
    }   
 }
