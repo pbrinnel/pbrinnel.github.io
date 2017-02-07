@@ -139,8 +139,8 @@ function blur() {
 
 
 <span id="art" onmouseover="TXTMouseOverScript()" onmouseout="TXTMouseOffScript()" onclick="TXTMouseClickScript()">THIS-TEXT-SHOULD-NOT-BE-VISIBLE</span>
-<span id="leftCELL">THIS-TEXT-SHOULD-NOT-BE-VISIBLE-#2</span>
-<span id="rightCELL">THIS-TEXT-SHOULD-NOT-BE-VISIBLE-#3</span>
+<span id="leftCELL">LEFT CELL TEXT</span>
+<span id="rightCELL">RIGHT CELL TEXT</span>
 
 
 ‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹AAAAAAAAA›››››››››››››››››››››››››››››››››
@@ -249,9 +249,9 @@ var RightAnimation = "R|R|R|R"
 
 document.getElementById("art").innerHTML = CenterAnimation;
 
-document.getElementById("leftCELL").innerHTML = LeftAnimation;
+LeftAnimation = document.getElementById("leftCELL").innerHTML;
      
-document.getElementById("rightCELL").innerHTML = RightAnimation;
+RightAnimation = document.getElementById("rightCELL").innerHTML;
     
       
    <!--Declare ASCII Toggle Global Var-->
