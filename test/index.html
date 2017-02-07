@@ -40,6 +40,7 @@ ga('send', 'pageview');
    
    <!--Declare Img Toggle Global Var-->
 var transitionSTAGE = 0;
+var nextImage;
    
    <!--Img MouseOver Scripting-->
 function ImgMouseOverScript() {
@@ -56,8 +57,16 @@ function ImgMouseClickScript() {
    unblur();
    blur();
 }
+
+function unblur() {
+   setTimeout(function() {
+      nextImage = "web1.1image.jpg";
+      document.getElementById("pic").src=nextImage;
+   }, 500);
+}  
+
    
-function unblur() {   
+function unblurOLD() {   
    if (transitionSTAGE==0) {
       transitionSTAGE = 1;
       setTimeout(function() {
