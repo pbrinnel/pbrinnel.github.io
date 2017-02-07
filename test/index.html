@@ -39,8 +39,19 @@ ga('send', 'pageview');
      
    
    <!--Declare Img Toggle Global Var-->
-var transitionSTAGE = 0;
-var nextImage;
+var transitionSTAGE = 0; 
+var UBnextImage = [
+ "web1.1image.jpg",
+ "web1.2image.jpg",
+ "web1.3image.jpg",
+ "web1.4image.jpg",
+ "web1.5image.jpg",
+ "web1.6image.jpg",
+ "web1.7image.jpg",
+ "web1.8image.jpg",
+ "web1.9image.jpg",
+ "web2.0image.jpg"
+];
    
    <!--Img MouseOver Scripting-->
 function ImgMouseOverScript() {
@@ -60,13 +71,12 @@ function ImgMouseClickScript() {
 
 function unblur() {
    setTimeout(function() {
-      nextImage = "web1.1image.jpg";
-      document.getElementById("pic").src=nextImage;
+      document.getElementById("pic").src=nextImage[++i];
    }, 500);
 }  
 
    
-function unblurOLD() {   
+function unblurOLD() {
    if (transitionSTAGE==0) {
       transitionSTAGE = 1;
       setTimeout(function() {
