@@ -37,15 +37,29 @@ ga('send', 'pageview');
  
    
    
+ 
    
    
+
+
+var LeftAnimation = "L|L|L|L" 
+
+
+
+
+var RightAnimation = "R|R|R|R" 
    
-   
+
+
+
+document.getElementById("test").innerHTML = "Look At Me";
+
+
   
    <!--Declare ASCII Toggle Global Var-->
-   var animateACTIVE = false;
-   var animateSTAGE = 0;
-   var INTERV;
+var animateACTIVE = false;
+var animateSTAGE = 0;
+var INTERV;
 
    
    <!--ASCII MouseOver Scripting-->
@@ -66,7 +80,7 @@ function TXTMouseClickScript() {
       clearInterval(INTERV);
       animateACTIVE = false;
    } else {
-      INTERV = setInterval(animateON, 1500);
+      INTERV = setInterval(animateON, 400);
       animateACTIVE = true;
    }   
 }
@@ -75,13 +89,13 @@ function TXTMouseClickScript() {
    
    <!--Animate Text Scripting-->
 function animateON() {
-   document.getElementById("word").innerHTML = "initializing";
+   document.getElementById("word").innerHTML = LeftAnimation;
    setTimeout(function() {
-      document.getElementById("word").innerHTML = "11111";
+      document.getElementById("word").innerHTML = RightAnimation;
       setTimeout(function() {
          document.getElementById("word").innerHTML = "22222";
-      }, 500);
-   }, 500);
+      }, 200);
+   }, 200);
 }  
 
    
@@ -189,9 +203,7 @@ function blur() {
 
 <span id="word" onmouseover="TXTMouseOverScript()" onmouseout="TXTMouseOffScript()" onclick="TXTMouseClickScript()">00000</span>
 
-
-
-
+<span id="test">YOU CAN'T SEE ME</span>
 
 
 ‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹AAAAAAAAA›››››››››››››››››››››››››››››››››
