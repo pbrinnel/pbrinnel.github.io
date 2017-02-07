@@ -35,69 +35,7 @@ m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
 ga('create', 'UA-90303307-1', 'auto');
 ga('send', 'pageview');
  
-   
-   
- 
-   
-   
-
-
-var LeftAnimation = "L|L|L|L" 
-
-
-
-
-var RightAnimation = "R|R|R|R" 
-   
-
-
-
-
-   
-  
-   <!--Declare ASCII Toggle Global Var-->
-var animateACTIVE = false;
-var animateSTAGE = 0;
-var INTERV;
-
-   
-   <!--ASCII MouseOver Scripting-->
-function TXTMouseOverScript() {
-   INTERV = setInterval(animateON, 1500);
-   animateACTIVE = true;
-}
-   
-   <!--ASCII MouseOff Scripting-->
-function TXTMouseOffScript() {
-   clearInterval(INTERV);
-   animateACTIVE = false;
-}   
-   
-   <!--ASCII MouseClick Scripting-->
-function TXTMouseClickScript() {
-   if (animateACTIVE == true) {
-      clearInterval(INTERV);
-      animateACTIVE = false;
-   } else {
-      INTERV = setInterval(animateON, 400);
-      animateACTIVE = true;
-   }   
-}
-   
-   
-   
-   <!--Animate Text Scripting-->
-function animateON() {
-   document.getElementById("word").innerHTML = LeftAnimation;
-   setTimeout(function() {
-      document.getElementById("word").innerHTML = RightAnimation;
-      setTimeout(function() {
-         document.getElementById("word").innerHTML = "22222";
-      }, 200);
-   }, 200);
-}  
-
-   
+     
    
    <!--Declare Img Toggle Global Var-->
 var transitionSTAGE = 0;
@@ -300,6 +238,57 @@ function blur() {
    <script>
       
       document.getElementById("test").innerHTML = "Look At Me";
+   
+      
+      
+      var LeftAnimation = "L|L|L|L" 
+
+var RightAnimation = "R|R|R|R" 
+
+   
+  
+   <!--Declare ASCII Toggle Global Var-->
+var animateACTIVE = false;
+var animateSTAGE = 0;
+var INTERV;
+
+   
+   <!--ASCII MouseOver Scripting-->
+function TXTMouseOverScript() {
+   INTERV = setInterval(animateON, 1500);
+   animateACTIVE = true;
+}
+   
+   <!--ASCII MouseOff Scripting-->
+function TXTMouseOffScript() {
+   clearInterval(INTERV);
+   animateACTIVE = false;
+}   
+   
+   <!--ASCII MouseClick Scripting-->
+function TXTMouseClickScript() {
+   if (animateACTIVE == true) {
+      clearInterval(INTERV);
+      animateACTIVE = false;
+   } else {
+      INTERV = setInterval(animateON, 400);
+      animateACTIVE = true;
+   }   
+}
+   
+   
+   
+   <!--Animate Text Scripting-->
+function animateON() {
+   document.getElementById("word").innerHTML = LeftAnimation;
+   setTimeout(function() {
+      document.getElementById("word").innerHTML = RightAnimation;
+      setTimeout(function() {
+         document.getElementById("word").innerHTML = "22222";
+      }, 200);
+   }, 200);
+}  
+      
       
       
    </script>
