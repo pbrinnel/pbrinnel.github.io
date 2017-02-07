@@ -43,6 +43,7 @@ var transitionSTAGE = 0;
 var i;
 var INTERVimg;
 var UBnextImage = [
+ "web1.0image.jpg",
  "web1.1image.jpg",
  "web1.2image.jpg",
  "web1.3image.jpg",
@@ -79,8 +80,16 @@ function unblur() {
    }
 }
    
+function blur() {
+   if (transitionSTAGE==2) {
+      transitionSTAGE = 3;
+      i = 11;
+      INTERVimg = setInterval(UBswapIMG, 250);
+   }
+}
+   
 function UBswapIMG() {
-   if(i<10) {
+   if(i<11) {
       document.getElementById("pic").src=UBnextImage[i];
       i++;
    } else {
@@ -89,45 +98,17 @@ function UBswapIMG() {
    }
 }
 
-   
-function unblurOLD() {
-   if (transitionSTAGE==0) {
-      transitionSTAGE = 1;
-      setTimeout(function() {
-         document.getElementById("pic").src="web1.1image.jpg";
-         setTimeout(function() {
-            document.getElementById("pic").src="web1.2image.jpg";
-            setTimeout(function() {
-               document.getElementById("pic").src="web1.3image.jpg";
-               setTimeout(function() {
-                  document.getElementById("pic").src="web1.4image.jpg";
-                  setTimeout(function() {
-                     document.getElementById("pic").src="web1.5image.jpg";
-                     setTimeout(function() {
-                        document.getElementById("pic").src="web1.6image.jpg";
-                        setTimeout(function() {
-                           document.getElementById("pic").src="web1.7image.jpg";
-                           setTimeout(function() {
-                              document.getElementById("pic").src="web1.8image.jpg";
-                              setTimeout(function() {
-                                 document.getElementById("pic").src="web1.9image.jpg";
-                                 setTimeout(function() {
-                                    document.getElementById("pic").src="web2.0image.jpg";
-                                    transitionSTAGE = 2;
-                                 }, 300);
-                              }, 300);
-                           }, 300);
-                        }, 300);
-                     }, 300);
-                  }, 300);
-               }, 300);
-            }, 300);
-         }, 300);
-      }, 500);
+function BswapIMG() {
+   if(i<11) {
+      document.getElementById("pic").src=UBnextImage[i];
+      i--;
+   } else {
+      clearInterval(INTERVimg);
+      transitionSTAGE = 0;
    }
-}  
+}
    
-function blur() {
+function blurOLD() {
    if (transitionSTAGE==2) {
       transitionSTAGE = 3;
       setTimeout(function() {
