@@ -325,11 +325,13 @@ function TXTMouseClickScript() {
    if (animateACTIVE == true && cycleBUFFER < 1) {
       clearInterval(INTERV);
       animateACTIVE = false;
-   } else {
+   } else if (animateACTIVE == false) {
       cycleBUFFER = 2;
       INTERV = setInterval(animateON, cycleTIME);
       animateACTIVE = true;
-   }   
+   } else {
+      
+   }
 }
    
    
