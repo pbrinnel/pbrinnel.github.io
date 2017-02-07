@@ -138,9 +138,7 @@ function blur() {
 <p>TEST
 
 
-<span id="word" onmouseover="TXTMouseOverScript()" onmouseout="TXTMouseOffScript()" onclick="TXTMouseClickScript()">00000</span>
-
-<span id="art"></span>
+<span id="art" onmouseover="TXTMouseOverScript()" onmouseout="TXTMouseOffScript()" onclick="TXTMouseClickScript()">THIS-TEXT-SHOULD-NOT-BE-VISIBLE</span>
 
 
 ‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹AAAAAAAAA›››››››››››››››››››››››››››››››››
@@ -283,13 +281,13 @@ function TXTMouseClickScript() {
    
    <!--Animate Text Scripting-->
 function animateON() {
-   document.getElementById("word").innerHTML = LeftAnimation;
+   document.getElementById("art").innerHTML = LeftAnimation;
    setTimeout(function() {
-      document.getElementById("word").innerHTML = CenterAnimation;
+      document.getElementById("art").innerHTML = CenterAnimation;
       setTimeout(function() {
-         document.getElementById("word").innerHTML = RightAnimation;
+         document.getElementById("art").innerHTML = RightAnimation;
          setTimeout(function() {
-            document.getElementById("word").innerHTML = CenterAnimation;
+            document.getElementById("art").innerHTML = CenterAnimation;
          }, 200);
       }, 200);
    }, 200);
