@@ -302,7 +302,7 @@ document.getElementById("rightCELL").innerHTML = "";
       
    <!--Declare ASCII Toggle Global Var-->
 var animateACTIVE = false;
-var animateSTAGE = 0;
+var cycleBUFFER = 2;
 var INTERV;
 var cycleTIME = 2000;
  
@@ -321,10 +321,11 @@ function TXTMouseOffScript() {
    
    <!--ASCII MouseClick Scripting-->
 function TXTMouseClickScript() {
-   if (animateACTIVE == true) {
+   if (animateACTIVE == true && cycleBUFFER < 1) {
       clearInterval(INTERV);
       animateACTIVE = false;
    } else {
+      cycleBUFFER = 2;
       INTERV = setInterval(animateON, cycleTIME);
       animateACTIVE = true;
    }   
@@ -341,6 +342,7 @@ function animateON() {
          document.getElementById("art").innerHTML = RightAnimation;
          setTimeout(function() {
             document.getElementById("art").innerHTML = CenterAnimation;
+            cycleBUFFER = cycleBUFFER - 1;
          }, 500);
       }, 500);
    }, 500);
