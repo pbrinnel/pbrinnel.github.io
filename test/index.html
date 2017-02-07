@@ -41,6 +41,7 @@ ga('send', 'pageview');
    <!--Declare Img Toggle Global Var-->
 var transitionSTAGE = 0; 
 var i;
+var INTERVimg;
 var UBnextImage = [
  "web1.1image.jpg",
  "web1.2image.jpg",
@@ -74,13 +75,18 @@ function unblur() {
    if (transitionSTAGE==0) {
       transitionSTAGE = 1;
       i = 0;
-      INTERV = setInterval(UBswapIMG, 250);
+      INTERVimg = setInterval(UBswapIMG, 250);
    }
 }
    
 function UBswapIMG() {
-   document.getElementById("pic").src=UBnextImage[i];
-   i++;
+   if(i<10) {
+      document.getElementById("pic").src=UBnextImage[i];
+      i++;
+   } else {
+      clearInterval(INTERVimg);
+      transitionSTAGE = 2;
+   }
 }
 
    
