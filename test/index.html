@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+   <title>P B</title>
    <meta name="viewport" content="width=device-width">
    
    <link rel='stylesheet' media='screen and (max-width: 300px)' href="/css/main-300max.css"/>
@@ -129,7 +130,6 @@ function blur() {
       }, 500);
    }
 }
-
 </script>
   
 </head>
@@ -295,25 +295,22 @@ function blur() {
 </body>
    
    <script>
-
-
-
 var CenterAnimation = document.getElementById("art").innerHTML;
 var LeftAnimation = document.getElementById("leftCELL").innerHTML;  
 var RightAnimation = document.getElementById("rightCELL").innerHTML;
-
 document.getElementById("leftCELL").innerHTML = "";  
 document.getElementById("rightCELL").innerHTML = "";
       
    <!--Declare ASCII Toggle Global Var-->
 var animateACTIVE = false;
-var animateSTAGE = 0;
+var cycleBUFFER = 2;
 var INTERV;
 var cycleTIME = 2000;
  
    
    <!--ASCII MouseOver Scripting-->
 function TXTMouseOverScript() {
+   cycleBUFFER = 2;
    INTERV = setInterval(animateON, cycleTIME);
    animateACTIVE = true;
 }
@@ -326,13 +323,16 @@ function TXTMouseOffScript() {
    
    <!--ASCII MouseClick Scripting-->
 function TXTMouseClickScript() {
-   if (animateACTIVE == true) {
+   if (animateACTIVE == true && cycleBUFFER < 1) {
       clearInterval(INTERV);
       animateACTIVE = false;
-   } else {
+   } else if (animateACTIVE == false) {
+      cycleBUFFER = 2;
       INTERV = setInterval(animateON, cycleTIME);
       animateACTIVE = true;
-   }   
+   } else {
+      
+   }
 }
    
    
@@ -346,11 +346,11 @@ function animateON() {
          document.getElementById("art").innerHTML = RightAnimation;
          setTimeout(function() {
             document.getElementById("art").innerHTML = CenterAnimation;
+            cycleBUFFER = cycleBUFFER - 1;
          }, 500);
       }, 500);
    }, 500);
 }  
-
       
       
    </script>
