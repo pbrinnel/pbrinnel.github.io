@@ -40,6 +40,7 @@ ga('send', 'pageview');
    
    <!--Declare Img Toggle Global Var-->
 var transitionSTAGE = 0; 
+var IMGcycleTIME = 250;
 var i;
 var INTERVimg;
 var UBnextImage = [
@@ -76,7 +77,7 @@ function unblur() {
    if (transitionSTAGE==0) {
       transitionSTAGE = 1;
       i = 0;
-      INTERVimg = setInterval(UBswapIMG, 250);
+      INTERVimg = setInterval(UBswapIMG, IMGcycleTIME);
    }
 }
    
@@ -84,10 +85,10 @@ function blur() {
    if (transitionSTAGE==2) {
       transitionSTAGE = 3;
       i = 11;
-      INTERVimg = setInterval(UBswapIMG, 250);
+      INTERVimg = setInterval(BswapIMG, IMGcycleTIME);
    }
 }
-   
+
 function UBswapIMG() {
    if(i<11) {
       document.getElementById("pic").src=UBnextImage[i];
