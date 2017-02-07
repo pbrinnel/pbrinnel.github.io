@@ -272,7 +272,7 @@ function TXTMouseClickScript() {
       clearInterval(INTERV);
       animateACTIVE = false;
    } else {
-      INTERV = setInterval(animateON, 800);
+      INTERV = setInterval(animateON, 1200);
       animateACTIVE = true;
    }   
 }
@@ -288,9 +288,9 @@ function animateON() {
          document.getElementById("art").innerHTML = RightAnimation;
          setTimeout(function() {
             document.getElementById("art").innerHTML = CenterAnimation;
-         }, 200);
-      }, 200);
-   }, 200);
+         }, 300);
+      }, 300);
+   }, 300);
 }  
 
       
