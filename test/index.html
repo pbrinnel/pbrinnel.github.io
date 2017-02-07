@@ -43,24 +43,32 @@ ga('send', 'pageview');
    
   
    <!--Declare ASCII Toggle Global Var-->
-   var animateACTIVE = 1;
+   var animateACTIVE = false;
    var animateSTAGE = 0;
    var INTERV;
 
    
    <!--ASCII MouseOver Scripting-->
 function TXTMouseOverScript() {
-   clearInterval(INTERV);
    INTERV = setInterval(animateON, 1500);
+   animateACTIVE = true;
 }
    
    <!--ASCII MouseOff Scripting-->
 function TXTMouseOffScript() {
+   clearInterval(INTERV);
+   animateACTIVE = false;
 }   
    
    <!--ASCII MouseClick Scripting-->
 function TXTMouseClickScript() {
-   animateACTIVE = 0;
+   if (animateACTIVE == true) {
+      clearInterval(INTERV);
+      animateACTIVE = false;
+   } else {
+      INTERV = setInterval(animateON, 1500);
+      animateACTIVE = true;
+   }   
 }
    
    
@@ -68,14 +76,12 @@ function TXTMouseClickScript() {
    <!--Animate Text Scripting-->
 function animateON() {
    document.getElementById("word").innerHTML = "initializing";
-   if (animateACTIVE == 1) {
+   setTimeout(function() {
+      document.getElementById("word").innerHTML = "11111";
       setTimeout(function() {
-         document.getElementById("word").innerHTML = "11111";
-         setTimeout(function() {
-            document.getElementById("word").innerHTML = "22222";
-         }, 500);
+         document.getElementById("word").innerHTML = "22222";
       }, 500);
-   }
+   }, 500);
 }  
 
    
