@@ -140,7 +140,7 @@ function blur() {
 
 <span id="word" onmouseover="TXTMouseOverScript()" onmouseout="TXTMouseOffScript()" onclick="TXTMouseClickScript()">00000</span>
 
-<span id="test">YOU CAN'T SEE ME</span>
+<span id="art"></span>
 
 
 ‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹AAAAAAAAA›››››››››››››››››››››››››››››››››
@@ -236,15 +236,18 @@ function blur() {
 </body>
    
    <script>
-      
-      document.getElementById("test").innerHTML = "Look At Me";
+
    
+var CenterAnimation = "C|C|C|C" 
       
-      
-      var LeftAnimation = "L|L|L|L" 
+var LeftAnimation = "L|L|L|L" 
 
 var RightAnimation = "R|R|R|R" 
 
+
+
+
+document.getElementById("art").innerHTML = CenterAnimation;
    
   
    <!--Declare ASCII Toggle Global Var-->
@@ -282,13 +285,16 @@ function TXTMouseClickScript() {
 function animateON() {
    document.getElementById("word").innerHTML = LeftAnimation;
    setTimeout(function() {
-      document.getElementById("word").innerHTML = RightAnimation;
+      document.getElementById("word").innerHTML = CenterAnimation;
       setTimeout(function() {
-         document.getElementById("word").innerHTML = "22222";
+         document.getElementById("word").innerHTML = RightAnimation;
+         setTimeout(function() {
+            document.getElementById("word").innerHTML = CenterAnimation;
+         }, 200);
       }, 200);
    }, 200);
 }  
-      
+
       
       
    </script>
