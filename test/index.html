@@ -608,7 +608,9 @@ var CELL = [
 ];
 
 alert(CELL[7]);
+
       
+      <!--Fallback shit-->
 var CELL0 = document.getElementById("CELL0").innerHTML;
 var CELL1 = document.getElementById("CELL1").innerHTML;  
 var CELL2 = document.getElementById("CELL2").innerHTML;
@@ -622,6 +624,8 @@ var CELL9 = document.getElementById("CELL9").innerHTML;
 var CELL10 = document.getElementById("CELL10").innerHTML;  
 var CELL11 = document.getElementById("CELL11").innerHTML;
 
+      
+      
 document.getElementById("CELL1").innerHTML = "";
 document.getElementById("CELL2").innerHTML = "";
 document.getElementById("CELL3").innerHTML = "";  
@@ -634,6 +638,39 @@ document.getElementById("CELL9").innerHTML = "";
 document.getElementById("CELL10").innerHTML = "";
 document.getElementById("CELL11").innerHTML = "";  
       
+   <!--Declare ASCII Toggle Global Var-->
+var animateACTIVE = false;
+var cycleBUFFER = 2;
+var INTERV;
+var TXTcycleTIME = 2000;
+ 
+   
+   <!--ASCII MouseOver Scripting-->
+function TXTMouseOverScript() {
+   cycleBUFFER = 2;
+   INTERVtxt = setInterval(animateON, cycleTIME);
+   animateACTIVE = true;
+}
+   
+   <!--ASCII MouseOff Scripting-->
+function TXTMouseOffScript() {
+   clearInterval(INTERV);
+   animateACTIVE = false;
+}   
+   
+   <!--ASCII MouseClick Scripting-->
+function TXTMouseClickScript() {
+   if (animateACTIVE == true && cycleBUFFER < 1) {
+      clearInterval(INTERV);
+      animateACTIVE = false;
+   } else if (animateACTIVE == false) {
+      cycleBUFFER = 2;
+      INTERV = setInterval(animateON, cycleTIME);
+      animateACTIVE = true;
+   } else {
+      
+   }
+}
       
       
       
