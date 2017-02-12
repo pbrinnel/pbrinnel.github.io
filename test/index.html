@@ -652,6 +652,7 @@ function TXTMouseClickScript() {
       
    <!--Animate Text Scripting-->
 function animateON() {
+         alert("inside animateON")
    if (transitionSTAGE==2) {
       transitionSTAGE = 3;
       i = 1;
@@ -662,7 +663,6 @@ function animateON() {
       
 function swapTXT() {
    if(i<12) {
-      alert("yo")
       document.getElementById("CELL0").innerHTML=CELL[i];
       i++;
    } else {
