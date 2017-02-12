@@ -113,7 +113,7 @@ function BswapIMG() {
 </head>
 <body>
 <pre>
-<p><span id="CELL0" onmouseover="TXTMouseOverScript()" onmouseout="TXTMouseOffScript()" onclick="TXTMouseClickScript()">‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹AAAAAAAAA›››››››››››››››››››››››››››››››››
+<p><span id="art" onmouseover="TXTMouseOverScript()" onmouseout="TXTMouseOffScript()" onclick="TXTMouseClickScript()">‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹AAAAAAAAA›››››››››››››››››››››››››››››››››
 0                                                                         :
 ﬂ         ‹€€€€‹       ‹€€€€‹     ‹‹C‹‹      ‹€€   ‹€€€                   ﬂ
 :        €€€C€€€C     €€€€€€€€     ‹C€€€      C€€   ‹€€€                  :
@@ -148,7 +148,7 @@ function BswapIMG() {
 €        C€€€C‹  C    ﬂ  ﬂC  ﬂﬂ     C€  ﬂﬂ     C€  ﬂ€€ﬂ€ﬂ  €€€€€ﬂC‹       €
 €                                                                         €
 ‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹ZZZZZZZ››››››››››››››››››››››››››››››››››</span>
-<span id="CELL1">‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹AAAAAAAAA›››››››››››››››››››››››››››››››››
+<span id="leftCELL">‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹AAAAAAAAA›››››››››››››››››››››››››››››››››
 1                                                                         :
 ﬂ         ‹€€€€‹       ‹€€€€‹     ‹‹C‹‹      ‹€€   ‹€€€                   ﬂ
 :        €€€C€€€C     €€€€€€€€     ‹C€€€      C€€   ‹€€€                  :
@@ -183,7 +183,7 @@ function BswapIMG() {
 €        C€€€C‹  C    ﬂ  ﬂC  ﬂﬂ     C€  ﬂﬂ     C€  ﬂ€€ﬂ€ﬂ  €€€€€ﬂC‹       €
 €                                                                         €
 ‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹ZZZZZZZ››››››››››››››››››››››››››››››››››</span>
-<span id="CELL2">‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹AAAAAAAAA›››››››››››››››››››››››››››››››››
+<span id="rightCELL">‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹AAAAAAAAA›››››››››››››››››››››››››››››››››
 2                                                                         :
 ﬂ         ‹€€€€‹       ‹€€€€‹     ‹‹C‹‹      ‹€€   ‹€€€                   ﬂ
 :        €€€C€€€C     €€€€€€€€     ‹C€€€      C€€   ‹€€€                  :
@@ -590,7 +590,14 @@ function BswapIMG() {
    <script>
 
                            
-   <!--Clear Cells from HTML-->                           
+   <!--Clear Cells from HTML-->    
+      
+var CenterAnimation = document.getElementById("art").innerHTML;
+var LeftAnimation = document.getElementById("leftCELL").innerHTML;  
+var RightAnimation = document.getElementById("rightCELL").innerHTML;
+document.getElementById("leftCELL").innerHTML = "";  
+document.getElementById("rightCELL").innerHTML = "";      
+      
 document.getElementById("CELL1").innerHTML = "";  
 document.getElementById("CELL2").innerHTML = "";
 document.getElementById("CELL3").innerHTML = "";  
