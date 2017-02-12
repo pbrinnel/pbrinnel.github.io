@@ -680,10 +680,14 @@ function animateON() {
 }   
  
       
-
-      
-      
-      
+function swapTXT() {
+   if(i<12) {
+      document.getElementById("CELL0").innerHTML=CELL[i];
+      i++;
+   } else {
+      clearInterval(INTERVtxt);
+   }
+}
       
    </script>
 </html>
