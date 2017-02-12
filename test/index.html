@@ -623,6 +623,7 @@ document.getElementById("CELL11").innerHTML = "";
 var animateACTIVE = false;
 var INTERVtxt;
 var TXTcycleTIME = 5000;
+var TXTtransitionSTAGE = 0;
  
    
    <!--ASCII MouseOver Scripting-->
@@ -652,9 +653,8 @@ function TXTMouseClickScript() {
       
    <!--Animate Text Scripting-->
 function animateON() {
-         alert("inside animateON")
-   if (transitionSTAGE==2) {
-      transitionSTAGE = 3;
+   if (TXTtransitionSTAGE==0) {
+      TXTtransitionSTAGE = 1;
       i = 1;
       INTERVtxt = setInterval(swapTXT, TXTcycleTIME);
    }
@@ -668,6 +668,7 @@ function swapTXT() {
    } else {
       document.getElementById("CELL0").innerHTML=CELL[0]
       clearInterval(INTERVtxt);
+      TXTtransitionSTAGE = 0
    }
 }
       
