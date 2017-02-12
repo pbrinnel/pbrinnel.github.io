@@ -670,7 +670,15 @@ function TXTMouseClickScript() {
    }
 }
       
-      
+   <!--Animate Text Scripting-->
+function animateON() {
+   if (transitionSTAGE==2) {
+      transitionSTAGE = 3;
+      i = 10;
+      INTERVtxt = setInterval(swapTXT, TXTcycleTIME);
+   }
+}   
+
       
    </script>
 </html>
