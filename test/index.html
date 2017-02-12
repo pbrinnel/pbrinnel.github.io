@@ -639,14 +639,14 @@ document.getElementById("CELL11").innerHTML = "";
    <!--Declare ASCII Toggle Global Var-->
 var animateACTIVE = false;
 var cycleBUFFER = 2;
-var INTERV;
+var INTERVtxt;
 var TXTcycleTIME = 2000;
  
    
    <!--ASCII MouseOver Scripting-->
 function TXTMouseOverScript() {
    cycleBUFFER = 2;
-   INTERVtxt = setInterval(animateON, cycleTIME);
+   INTERVtxt = setInterval(animateON, TXTcycleTIME);
    animateACTIVE = true;
 }
    
@@ -663,7 +663,7 @@ function TXTMouseClickScript() {
       animateACTIVE = false;
    } else if (animateACTIVE == false) {
       cycleBUFFER = 2;
-      INTERV = setInterval(animateON, cycleTIME);
+      INTERV = setInterval(animateON, TXTcycleTIME);
       animateACTIVE = true;
    } else {
       
@@ -674,12 +674,11 @@ function TXTMouseClickScript() {
 function animateON() {
    if (transitionSTAGE==2) {
       transitionSTAGE = 3;
-      i = 10;
+      i = 0;
       INTERVtxt = setInterval(swapTXT, TXTcycleTIME);
    }
 }   
-
-      
+ 
       
 function swapTXT() {
    if(i<12) {   
