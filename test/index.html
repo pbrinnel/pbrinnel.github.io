@@ -653,7 +653,9 @@ function TXTMouseClickScript() {
       
    <!--Animate Text Scripting-->
 function animateON() {
+   alert("animateON");
    if (TXTtransitionSTAGE==0) {
+         alert("TXTtransitionSTAGE is 0");
       TXTtransitionSTAGE = 1;
       i = 1;
       INTERVtxt = setInterval(swapTXT, TXTcycleTIME);
@@ -662,7 +664,9 @@ function animateON() {
  
       
 function swapTXT() {
+            alert("swapTXT");
    if(i<12) {
+               alert("i is less than 12");
       document.getElementById("CELL0").innerHTML=CELL[i];
       i++;
    } else {
