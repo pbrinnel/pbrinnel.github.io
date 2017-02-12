@@ -272,26 +272,19 @@ function BswapIMG() {
 </pre>
 </body>
    
-   <script>   
-elements = document.getElementById("CELL0").innerHTML;
-alert(elements);
-      
-var CELL = [];      
-      
-CELL = [
-   document.getElementById("CELL0").innerHTML,
-   document.getElementById("CELL1").innerHTML,
-   document.getElementById("CELL2").innerHTML,
-   document.getElementById("CELL3").innerHTML,
-   document.getElementById("CELL4").innerHTML,
-   document.getElementById("CELL5").innerHTML,
-   document.getElementById("CELL6").innerHTML,
-   document.getElementById("CELL7").innerHTML,
-   document.getElementById("CELL8").innerHTML,
-   document.getElementById("CELL9").innerHTML,
-   document.getElementById("CELL10").innerHTML,
-   document.getElementById("CELL11").innerHTML
-];
+   <script>
+CELL0 = document.getElementById("CELL0").innerHTML;
+CELL1 = document.getElementById("CELL1").innerHTML;
+CELL2 = document.getElementById("CELL2").innerHTML;
+CELL3 = document.getElementById("CELL3").innerHTML;
+CELL4 = document.getElementById("CELL4").innerHTML;
+CELL5 = document.getElementById("CELL5").innerHTML;
+CELL6 = document.getElementById("CELL6").innerHTML;
+CELL7 = document.getElementById("CELL7").innerHTML;
+CELL8 = document.getElementById("CELL8").innerHTML;
+CELL9 = document.getElementById("CELL9").innerHTML;
+CELL10 = document.getElementById("CELL10").innerHTML;
+CELL11 = document.getElementById("CELL11").innerHTML;
                            
    <!--Clear Cells from HTML-->                           
 document.getElementById("CELL1").innerHTML = "";  
@@ -353,7 +346,7 @@ function animateON() {
 
 function swapTXT() {
    if(i<12) {   
-      document.getElementById("CELL0").innerHTML = CELL[i];
+      document.getElementById("CELL0").innerHTML = CELL[i]);
       i++;
    } else {
       clearInterval(INTERVtxt);
