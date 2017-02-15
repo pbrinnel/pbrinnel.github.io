@@ -450,7 +450,7 @@ var animateACTIVE = false;
 var INTERVtxt;
 var TXTcycleTIME = 154;
 var TXTtransitionSTAGE = 0;
-var j;
+var j = 1;
  
    <!--ASCII MouseOver Scripting-->
 function TXTMouseOverScript() {
@@ -476,7 +476,6 @@ function TXTMouseClickScript() {
 function animateON() {
    if (TXTtransitionSTAGE==0) {
       TXTtransitionSTAGE = 1;
-      j = 1;
       INTERVtxt = setInterval(swapTXT, TXTcycleTIME);
    }
 }   
