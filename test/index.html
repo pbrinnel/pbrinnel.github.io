@@ -443,7 +443,7 @@ var CELLorder = [
    6,
    5,
    4,
-   ];
+];
       
    <!--Declare ASCII Toggle Global Var-->
 var animateACTIVE = false;
@@ -451,7 +451,6 @@ var INTERVtxt;
 var TXTcycleTIME = 1000;
 var TXTtransitionSTAGE = 0;
  
-   
    <!--ASCII MouseOver Scripting-->
 function TXTMouseOverScript() {
    animateACTIVE = true;
@@ -489,10 +488,11 @@ function swapTXT() {
    if(i<12) {
       document.getElementById("CELL0").innerHTML=CELL[CELLorder[i]];
       i++;
-   } else {
+   } else if (i == 12) {
       document.getElementById("CELL0").innerHTML=CELL[0];
       clearInterval(INTERVtxt);
       TXTtransitionSTAGE = 0;
+   } else {   
    }
 }
       
