@@ -409,30 +409,41 @@ function BswapIMG() {
       €                                                                         €
      ‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹ZZZZZZZ›››››››››››››››››››››››››››››››››› 
 </span></p></pre></body>
-<script>          
-   <!--Clear Cells from HTML-->    
-      
+<script>  
+      <!--Save Cells from HTML order-->      
 var CELL = [
    document.getElementById("CELL0").innerHTML,
    document.getElementById("CELL1").innerHTML,
    document.getElementById("CELL2").innerHTML,
    document.getElementById("CELL3").innerHTML,
-   document.getElementById("CELL2").innerHTML,
-   document.getElementById("CELL1").innerHTML,
-   document.getElementById("CELL0").innerHTML,
    document.getElementById("CELL4").innerHTML,
    document.getElementById("CELL5").innerHTML,
    document.getElementById("CELL6").innerHTML,
-   document.getElementById("CELL5").innerHTML,
-   document.getElementById("CELL4").innerHTML
-];
-    
+];   
+
+      <!--Clear Cells from HTML-->    
 document.getElementById("CELL1").innerHTML = "";
 document.getElementById("CELL2").innerHTML = "";
 document.getElementById("CELL3").innerHTML = "";  
 document.getElementById("CELL4").innerHTML = "";
 document.getElementById("CELL5").innerHTML = "";  
-document.getElementById("CELL6").innerHTML = ""; 
+document.getElementById("CELL6").innerHTML = "";    
+   
+   <!--Set Cell order-->         
+var CELLorder = [
+   0,
+   1,
+   2,
+   3,
+   2,
+   1,
+   0,
+   4,
+   5,
+   6,
+   5,
+   4,
+   ];
       
    <!--Declare ASCII Toggle Global Var-->
 var animateACTIVE = false;
@@ -476,7 +487,7 @@ function animateON() {
       
 function swapTXT() {
    if(i<12) {
-      document.getElementById("CELL0").innerHTML=CELL[i];
+      document.getElementById("CELL0").innerHTML=CELL[CELLorder[i]];
       i++;
    } else {
       document.getElementById("CELL0").innerHTML=CELL[0];
