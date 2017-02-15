@@ -448,29 +448,27 @@ var CELLorder = [
    <!--Declare ASCII Toggle Global Var-->
 var animateACTIVE = false;
 var INTERVtxt;
-var TXTcycleTIME = 1000;
+var TXTcycleTIME = 154;
 var TXTtransitionSTAGE = 0;
+var j;
  
    <!--ASCII MouseOver Scripting-->
 function TXTMouseOverScript() {
-   animateACTIVE = true;
-   INTERVtxt = setInterval(animateON, TXTcycleTIME);
+   animateON();
 }
    
    <!--ASCII MouseOff Scripting-->
 function TXTMouseOffScript() {
+   animateOFF();
 }   
    
    <!--ASCII MouseClick Scripting-->
 function TXTMouseClickScript() {
-   if (animateACTIVE == true) {
-      clearInterval(INTERVtxt);
-      animateACTIVE = false;
-   } else if (animateACTIVE == false) {
-      INTERVtxt = setInterval(animateON, TXTcycleTIME);
-      animateACTIVE = true;
+   if (TXTtransitionSTAGE==0) {
+         animateON();
+   } else if (TXTtransitionSTAGE==2) {
+         animateOFF();
    } else {
-      
    }
 }
       
@@ -478,23 +476,27 @@ function TXTMouseClickScript() {
 function animateON() {
    if (TXTtransitionSTAGE==0) {
       TXTtransitionSTAGE = 1;
-      i = 1;
+      j = 1;
       INTERVtxt = setInterval(swapTXT, TXTcycleTIME);
    }
 }   
- 
-      
-function swapTXT() {
-   if(i<12) {
-      document.getElementById("CELL0").innerHTML=CELL[CELLorder[i]];
-      i++;
-   } else if (i == 12) {
-      document.getElementById("CELL0").innerHTML=CELL[0];
+   
+function animateOFF() {
+   if (TXTtransitionSTAGE==2) {
       clearInterval(INTERVtxt);
       TXTtransitionSTAGE = 0;
-   } else {   
+   } else {
+   }
+}   
+      
+function swapTXT() {
+   if(j<12) {
+      document.getElementById("CELL0").innerHTML=CELL[CELLorder[j]];
+      j++;
+   } else {
+      TXTtransitionSTAGE = 2;
+      j = 0;
    }
 }
-      
    </script>
 </html>
