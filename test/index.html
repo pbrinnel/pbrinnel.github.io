@@ -484,12 +484,28 @@ function animateOFF() {
       clearInterval(INTERVtxt);
       TXTtransitionSTAGE = 0;
 }
-      
+   
+   
+   
+   
 function swapTXT() {
+   if(j<12) {
       document.getElementById("CELL0").innerHTML=CELL[CELLorder[j]];
+      j++;
+   } else {
+      document.getElementById("CELL0").innerHTML=CELL[CELLorder[0]];
+      TXTtransitionSTAGE = 2;
+      j = 1;
+   }
+}
+   
+   
+function swapTXT() {
       if(j>11) {
          TXTtransitionSTAGE = 2;
-         j = 0;
+      j = 0;
+      document.getElementById("CELL0").innerHTML=CELL[CELLorder[j]];
+
       } else {
          j++;
       }
