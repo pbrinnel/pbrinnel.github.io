@@ -486,13 +486,13 @@ function animateOFF() {
 }
       
 function swapTXT() {
-   if(j<12) {
       document.getElementById("CELL0").innerHTML=CELL[CELLorder[j]];
-      j++;
-   } else {
-      TXTtransitionSTAGE = 2;
-      j = 0;
-   }
+      if(j>11) {
+         TXTtransitionSTAGE = 2;
+         j = 0;
+      } else {
+         j++;
+      }
 }
    </script>
 </html>
