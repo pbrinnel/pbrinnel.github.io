@@ -32,6 +32,10 @@ img.center {
     margin-right: auto;
 }
 
+iframe.center {
+    width: 200px;
+}
+
 p {
     display: block;
     font-size:5px;
