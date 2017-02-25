@@ -31,6 +31,15 @@ img.center {
     vertical-align:bottom;
 }
 
+img.EP {
+    display: block; 
+    margin:0;
+    vertical-align:bottom;
+    width: 273px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
 iframe.center {
     width: 400px;
 }
