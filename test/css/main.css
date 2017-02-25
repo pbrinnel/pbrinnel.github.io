@@ -31,6 +31,15 @@ img.center {
     vertical-align:bottom;
 }
 
+imgEP.center {
+    display: block; 
+    margin:0;
+    vertical-align:bottom;
+    width: 273px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
 p {
     display: block;
     font-size: 10px;
