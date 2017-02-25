@@ -31,7 +31,7 @@ img.center {
     vertical-align:bottom;
 }
 
-imgEP.center {
+img.EP {
     display: block; 
     margin:0;
     vertical-align:bottom;
