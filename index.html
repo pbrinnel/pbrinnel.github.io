@@ -5,8 +5,7 @@
   <meta name="description" content="The Official Website for Paul Brinnel's Music Stuff">
   <meta name="keywords" content="Paul Brinnel, Paul, Brinnel, Chicago, Piano, Logan">
   <meta name="author" content="Paul Brinnel">
-   <meta name="viewport" content="width=device-width">
-   
+   <meta name="viewport" content="width=device-width">   
    <link rel='stylesheet' media='screen and (max-width: 300px)' href="/css/main-300max.css"/>
    <link rel='stylesheet' media='screen and (min-width: 301px)' href="/css/main-610max.css"/>
 <!--link rel='stylesheet' media='screen and (min-width: 611px)' href="/css/main.css"/-->
@@ -37,10 +36,7 @@
 m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
 })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
 ga('create', 'UA-90303307-1', 'auto');
-ga('send', 'pageview');
- 
-     
-   
+ga('send', 'pageview');  
    <!--Declare Img Toggle Global Var-->
 var transitionSTAGE = 0; 
 var IMGcycleTIME = 150;
@@ -58,32 +54,27 @@ var UBnextImage = [
  "web1.8image.jpg",
  "web1.9image.jpg",
  "web2.0image.jpg"
-];
-   
+];  
    <!--Img MouseOver Scripting-->
 function ImgMouseOverScript() {
    unblur();
 }
-   
    <!--Img MouseOff Scripting-->
 function ImgMouseOffScript() {
    blur();
-}   
-   
+}      
    <!--Img MouseClick Scripting-->
 function ImgMouseClickScript() {
    unblur();
    blur();
 }
-
 function unblur() {
    if (transitionSTAGE==0) {
       transitionSTAGE = 1;
       i = 0;
       INTERVimg = setInterval(UBswapIMG, IMGcycleTIME);
    }
-}
-   
+}  
 function blur() {
    if (transitionSTAGE==2) {
       transitionSTAGE = 3;
@@ -91,7 +82,6 @@ function blur() {
       INTERVimg = setInterval(BswapIMG, IMGcycleTIME);
    }
 }
-
 function UBswapIMG() {
    if(i<11) {
       document.getElementById("pic").src=UBnextImage[i];
@@ -101,7 +91,6 @@ function UBswapIMG() {
       transitionSTAGE = 2;
    }
 }
-
 function BswapIMG() {
    if(i>=0) {
       document.getElementById("pic").src=UBnextImage[i];
@@ -111,8 +100,7 @@ function BswapIMG() {
       transitionSTAGE = 0;
    }
 }
-</script>
-  
+</script> 
 </head>
 <body>
 <pre>
@@ -160,7 +148,7 @@ function BswapIMG() {
 
 <i>‹‹›UPCOMING GIGS‹››</i>
 <table class="center"><tr><td align="left"><a href ="http://www.uncommonground.com/home">Mon 5-22-17 Paul Brinnel and his Personnel</a> 
-<a href="http://www.uncommonground.com/home">@ Uncommon Ground (3800 N Clark St)</a> w/ <a href="https://elijahberlow.bandcamp.com/releases" target="_blank">Elijah Berlow</a> and <a href="https://soundcloud.com/maryannmichael" target="_blank">Peggy Tenderass</a>
+<a href="http://www.uncommonground.com/home">@ Uncommon Ground (3800 N Clark St)</a> w/ <a href="https://elijahberlow.bandcamp.com/releases" target="_blank">Elijah Berlow</a> &amp; <a href="https://soundcloud.com/maryannmichael" target="_blank">Peggy Tenderass</a>
 </td>
 </tr>
 </table>
