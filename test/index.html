@@ -2,11 +2,10 @@
 <html>
 <head>
    <title>Paul Brinnel</title>
-    <meta name="description" content="Personal Website for Musical Stuff">
-  <meta name="keywords" content="Chicago,Piano,Logan,Brinnel">
+  <meta name="description" content="The Official Website for Paul Brinnel's Music Stuff">
+  <meta name="keywords" content="Paul Brinnel, Paul, Brinnel, Chicago, Piano, Logan">
   <meta name="author" content="Paul Brinnel">
-   <meta name="viewport" content="width=device-width">
-   
+   <meta name="viewport" content="width=device-width">   
    <link rel='stylesheet' media='screen and (max-width: 300px)' href="/css/main-300max.css"/>
    <link rel='stylesheet' media='screen and (min-width: 301px)' href="/css/main-610max.css"/>
 <!--link rel='stylesheet' media='screen and (min-width: 611px)' href="/css/main.css"/-->
@@ -37,13 +36,10 @@
 m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
 })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
 ga('create', 'UA-90303307-1', 'auto');
-ga('send', 'pageview');
- 
-     
-   
+ga('send', 'pageview');  
    <!--Declare Img Toggle Global Var-->
 var transitionSTAGE = 0; 
-var IMGcycleTIME = 250;
+var IMGcycleTIME = 150;
 var i;
 var INTERVimg;
 var UBnextImage = [
@@ -58,32 +54,27 @@ var UBnextImage = [
  "web1.8image.jpg",
  "web1.9image.jpg",
  "web2.0image.jpg"
-];
-   
+];  
    <!--Img MouseOver Scripting-->
 function ImgMouseOverScript() {
    unblur();
 }
-   
    <!--Img MouseOff Scripting-->
 function ImgMouseOffScript() {
    blur();
-}   
-   
+}      
    <!--Img MouseClick Scripting-->
 function ImgMouseClickScript() {
    unblur();
    blur();
 }
-
 function unblur() {
    if (transitionSTAGE==0) {
       transitionSTAGE = 1;
       i = 0;
       INTERVimg = setInterval(UBswapIMG, IMGcycleTIME);
    }
-}
-   
+}  
 function blur() {
    if (transitionSTAGE==2) {
       transitionSTAGE = 3;
@@ -91,7 +82,6 @@ function blur() {
       INTERVimg = setInterval(BswapIMG, IMGcycleTIME);
    }
 }
-
 function UBswapIMG() {
    if(i<11) {
       document.getElementById("pic").src=UBnextImage[i];
@@ -101,7 +91,6 @@ function UBswapIMG() {
       transitionSTAGE = 2;
    }
 }
-
 function BswapIMG() {
    if(i>=0) {
       document.getElementById("pic").src=UBnextImage[i];
@@ -111,20 +100,11 @@ function BswapIMG() {
       transitionSTAGE = 0;
    }
 }
-</script>
-  
+</script> 
 </head>
 <body>
 <pre>
-
-<iframe src="https://www.google.com/maps/embed?pb=!1m76!1m12!1m3!1d1084058.0812825987!2d-21.134573809922422!3d64.083549018841!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!4m61!3e0!4m5!1s0x4929fdfce2ab799f%3A0x27f88d0a15c328cd!2sKeflav%C3%ADk+International+Airport%2C+Iceland!3m2!1d63.978840399999996!2d-22.6321636!4m5!1s0x48d60b2f31258063%3A0x2dc2829d2df3d9c7!2sOddsson+Ho(s)tel!3m2!1d64.1507297!2d-21.9606568!4m5!1s0x48d6811ffb13697b%3A0x6b756c8b079262f2!2s%C3%9Eingvellir%2C+Iceland!3m2!1d64.25585699999999!2d-21.1303621!4m5!1s0x48d6a574af45b6c9%3A0x2c6347db0b411601!2sGullfoss+Falls%2C+Iceland!3m2!1d64.3270716!2d-20.1199478!4m5!1s0x48d6960fa24a2489%3A0xdce730667b705c9b!2sIcelandair+Hotel+Fludir!3m2!1d64.13181!2d-20.32368!4m5!1s0x48d737d0f7757b95%3A0xa2fcb04d5e524930!2sFarmhouse+Lodge%2C+Iceland!3m2!1d63.4374961!2d-19.1896855!4m5!1s0x48d035dd195fd15b%3A0x7aeae20830cc34d0!2sSkaftafell!3m2!1d64.070414!2d-16.9751755!4m5!1s0x48d055c1d7a311e9%3A0x808ac667863073ef!2sK%C3%A1lfafell%2C+Iceland!3m2!1d63.939448999999996!2d-17.7112099!4m5!1s0x48d61d76fbd18b55%3A0xfac6d4589ad02a38!2sBlue+Lagoon+Iceland%2C+Grindavik%2C+Iceland!3m2!1d63.880390999999996!2d-22.449508899999998!4m5!1s0x48d6018a0b9e5105%3A0x48d25c4f56c6b449!2sHotel+Berg!3m2!1d64.0095364!2d-22.5566483!5e0!3m2!1sen!2sus!4v1511922253597" width="1000" height="1000" frameborder="0" style="border:0" allowfullscreen></iframe>
-
-<p><a href="http://paulbrinnel.bandcamp.com/album/songs-for-people-like-me" target="_blank"><img class="EP" src="songs_for_people_like_me_web.jpg" alt=""></a><!--
---><iframe style="border: 0; width: 273px; height: 350px;" src="https://bandcamp.com/EmbeddedPlayer/album=1158682962/size=large/bgcol=333333/linkcol=ffffff/artwork=none/transparent=true/" seamless><a href="http://paulbrinnel.bandcamp.com/album/songs-for-people-like-me">Songs for People Like Me by Paul Brinnel</a></iframe>
-
-<iframe src="https://embed.spotify.com/?uri=spotify%3Aalbum%3A6F6i2ntjRxPYp6yu2OH6vt" width="300" height="380" frameborder="0" allowtransparency="true"></iframe>
-
-<span id="CELL0" onmouseover="TXTMouseOverScript()" onmouseout="TXTMouseOffScript()" onclick="TXTMouseClickScript()">
+<p><span id="CELL0" onmouseover="TXTMouseOverScript()" onmouseout="TXTMouseOffScript()" onclick="TXTMouseClickScript()">
    ‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹AAAAAAAAA›››››››››››››››››››››››››››››››››   
    :                                                                         :   
    ﬂ         ‹€€€€‹       ‹€€€€‹     ‹‹C‹‹      ‹€€   ‹€€€                   ﬂ   
@@ -162,47 +142,68 @@ function BswapIMG() {
    ‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹ZZZZZZZ››››››››››››››››››››››››››››››››››   
 </span></p>
 
-<i>‹‹›OLD MUSIC‹››</i>
-<a href="https://soundcloud.com/pbrinnel/sets/the-adventures-of-bean-machine">The Adventures of Bean Machine [2011]</a>
-
+<a href="http://paulbrinnel.bandcamp.com/album/songs-for-people-like-me" target="_blank"><img class="EP" src="songs_for_people_like_me_web.jpg" alt=""></a><!--
+--><iframe style="border: 0; width: 273px; height: 350px;" src="https://bandcamp.com/EmbeddedPlayer/album=1158682962/size=large/bgcol=333333/linkcol=ffffff/artwork=none/transparent=true/" seamless><a href="http://paulbrinnel.bandcamp.com/album/songs-for-people-like-me">Songs for People Like Me by Paul Brinnel</a></iframe><!--
+--><p style="font-size:10px"><a href="https://open.spotify.com/album/6F6i2ntjRxPYp6yu2OH6vt" target="_blank">also on Spotify</a></p>
 
 <i>‹‹›UPCOMING GIGS‹››</i>
-<table class="center"><tr><td align="left"><a href ="http://www.janismeandbobbymcgee.com/">Sat 3-4-17 Janis, Me &amp; Bobby McGee</a> 
-<a href="https://sa1.seatadvisor.com/sabo/servlets/TicketRequest?eventId=1062401">@ Elgin Community College Arts Center</a>
+<table class="center">
+<tr><td align="left">
+<a href="https://www.facebook.com/events/832180103645987/">Sat 6-9-18 Paul Brinnel and his Personnel
+@ Gallery Cabaret w/ Seet, Laughing Hearts, and Dilettante</a>
 </td>
 </tr>
 <tr>
-<td align="left"><center>---
-<img id="pic" class="center" src="11-2-PAUL-BRINNEL.jpg" alt=""></center>
-<a href ="https://www.facebook.com/MoesTavernChicago/">Thur 3-30-17 Paul Brinnel &amp; His Personnel</a> 
-<a href="https://www.facebook.com/MoesTavernChicago/">@ Moe's Tavern</a> w/ <a href="https://soundcloud.com/maryannmichael/tracks">Peggy Tenderass</a> &amp; <a href="https://rahimsalaam.bandcamp.com/">Rageing Salaam</a>
-</td>
-</tr>
-<tr>
-<td align="left"><center>---</center><a href="http://www.cafemustache.com/">Wed 4-12-17 Paul Brinnel &amp; His Personnel</a>
-<a href="http://www.cafemustache.com/">       - EP Release Show -</a>
-<a href="http://www.cafemustache.com/">@ Cafe Mustache</a> w/ <a href="http://finesubterraneans.com/">Fine Subterraneans</a> &amp; <a href="https://soundcloud.com/tommaso-moretti">Tommaso Moretti</a>
+<td align="left"><center>---</center>
+<a href="https://www.facebook.com/events/1786586611650691/">Sun 6-24-17 Paul Brinnel and his Personnel
+@ Ravenswood On Tap 2018</a>
 </td>
 </tr>
 </table>
-</p>
-<iframe src="171102_PBahP-poster.pdf" width="50%" height="50%">
-<p>
+
+
 <i>‹‹›SOCIAL MEDIA‹››</i>
-<table class="center"><tr><td align="left"><a href="https://www.facebook.com/paulbrinnel/">Paul Brinnel &amp; His Personnel - Facebook</a>
-</td></tr><tr><td align="left"><a href="https://www.facebook.com/Clamorandclaw/">Clamor &amp; Claw - Facebook</a></td></tr>
-</table>
+<a href="https://www.facebook.com/paulbrinnel/" target="_blank">Paul Brinnel and his Personnel - Facebook</a>
+
 
 <i>‹‹›BOOKING‹››</i>
-<a href="mailto:pbrinnel@gmail.com">pbrinnel@gmail.com</a>
+<a href="mailto:pbrinnel@gmail.com" target="_blank">pbrinnel@gmail.com</a>
+
+
+<i>‹‹›OLD MUSIC‹››</i>
+<a href="https://soundcloud.com/pbrinnel/sets/the-adventures-of-bean-machine" target="_blank">The Adventures of Bean Machine [2011]</a>
+
+
+<i>‹‹›ALSO APPEARS ON:‹››</i><!--
+--><table class="center"><tr><td align="left"><!--
+--><a href="https://www.mothermarket.info/music" target="_blank">Mother Market [2018] by David Ladon (T. Sax)</a></td></tr>
+<tr><td align="left"><!--
+--><a href="https://clamorandclaw.bandcamp.com/releases" target="_blank">Clamor & Claw [2018] by Clamor & Claw (Piano/Organ/Clarinet/T. Sax/C Sax)</a></td></tr>
+<tr><td align="left"><!--
+--><a href="https://danielshaughnessy.bandcamp.com/" target="_blank">11 Minutes [2017] by Daniel Shaughnessy (Piano)</a>
+</td></tr></table>
 
 <img  onmouseover="ImgMouseOverScript()" onmouseout="ImgMouseOffScript()" onclick="ImgMouseClickScript()" id="pic" class="center" src="web1.0image.jpg" alt=""><!--
---><p style="font-size:10px">photo by <a href="http://alexusmclanephoto.com/">Alexus McLane</a>
+--><p style="font-size:10px">photo by <a href="http://alexusmclanephoto.com/" target="_blank">Alexus McLane</a>
 </p>
 
+<i>‹‹›OLD GIGS‹››</i>
+<table class="center">
+<tr><td align="left">
+<a href="https://www.facebook.com/events/197748804069368/">Mon 5-22-17 Paul Brinnel and his Personnel</a> 
+<a href="https://www.facebook.com/events/197748804069368/">@ Uncommon Ground (3800 N Clark St)</a> w/ <a href="https://elijahberlow.bandcamp.com/releases" target="_blank">Elijah Berlow</a> &amp; <a href="https://soundcloud.com/maryannmichael" target="_blank">Peggy Tenderass</a>
+</td>
+</tr>
+<tr>
+<td align="left"><center>---</center>
+<a href="https://web.archive.org/web/20170521142749/https://www.facebook.com/events/234581343692432">Fri 5-26-17 Paul Brinnel and his Personnel</a>
+<a href="https://www.facebook.com/events/234581343692432">@ Lilly's</a> w/ <a href="https://cygnusloop.bandcamp.com/">Trini &amp; Da Ruckus</a> &amp; <a href="https://soundcloud.com/corbin-swagerty">Corbin Swagerty</a>
+</td>
+</tr>
+</table>
 
 <footer>
-©2017 PAUL BRINNEL
+©2018 PAUL BRINNEL
 </footer>
 <p style="font-size:2px"><span id="CELL1">
    ‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹AAAAAAAAA›››››››››››››››››››››››››››››››››   
@@ -511,9 +512,5 @@ function swapTXT() {
    
    window.onload = animateON;
    setTimeout(function() { animateOFF(); }, 1000);
-   </script> 
-   
-   <iframe src="https://docs.google.com/forms/d/e/1FAIpQLSdkRYWXO9G2pgboSVVUMsOmHLDsYGERnUST7EJDbC67Fjd2nQ/viewform?embedded=true" width="760" height="1800" frameborder="0" marginheight="0" marginwidth="0">Loading...</iframe>
-   
-   
+   </script>
 </html>
