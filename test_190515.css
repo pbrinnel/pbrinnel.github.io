@@ -8,7 +8,7 @@ html {
 }
 
 pre {
-    font-size: calc(0.4vw + 11px);
+    font-size: calc(0.4vw + 10px);
     align-items: center;
     justify-content: center;
     text-align: center;
