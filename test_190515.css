@@ -92,9 +92,9 @@ h5 {
     font-style: normal;
 }
 
-iframe {
+iframe.center {
     border: none;
-    width: 90vw;
+    width: 420px;
     height: 604px;
     margin: 0;
     padding: 0;
