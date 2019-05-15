@@ -135,6 +135,7 @@ img {
     height: calc(30vw + 305px);
     min-height: 580px;
     max-height: 875px;
+    max-width: 700px;
 }
 
 
