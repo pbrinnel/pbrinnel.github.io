@@ -1,5 +1,5 @@
-    a:link {color:#085ca2; text-decoration:none;}
-    a:visited {color:#085ca2; text-decoration:none;}
+    a:link {color:#bcdcff; text-decoration:none;}
+    a:visited {color:#d0e6ff; text-decoration:none;}
     a:hover {text-decoration:underline;}
 
 html {
@@ -17,9 +17,8 @@ h1 {
     line-height: 1;
     padding: 0;
     margin: 0;
-    color: #f4dac1;
-    background-color: #ad8624;
-    font-family: 'Cooper Black', 'Corben', cursive;
+    color: #ffffff;
+    font-family: Courier, "Courier New", monospace;
     font-style: bold;
 }
 
@@ -31,10 +30,9 @@ h2 {
     line-height: 1;
     padding: 0;
     margin: 0;
-    color: #f4dac1;
-    background-color: #ad8624;
+    color: #ffffff;
+    font-family: Courier, "Courier New", monospace;
     font-style: italic;
-    font-family: 'Cooper Black', 'Corben', cursive;
 }
 
 h3 {
@@ -45,9 +43,9 @@ h3 {
     line-height: 1;
     padding: 0;
     margin: 0;
-    color: #ad8624;
+    color: #ffffff;
+    font-family: Courier, "Courier New", monospace;
     font-style: normal;
-    font-family: 'Nobile', sans-serif;
 }
 
 h4 {
@@ -58,9 +56,9 @@ h4 {
     line-height: 1;
     padding: 0;
     margin: 0;
-    color: #ad8624;
+    color: #ffffff;
+    font-family: Courier, "Courier New", monospace;
     font-style: normal;
-    font-family: 'Nobile', sans-serif;
 }
 
 h5 {
@@ -71,9 +69,9 @@ h5 {
     line-height: 1;
     padding: 0;
     margin: 0;
-    color: #ad8624;
+    color: #ffffff;
+    font-family: Courier, "Courier New", monospace;
     font-style: normal;
-    font-family: 'Nobile', sans-serif;
 }
 
 iframe {
@@ -92,9 +90,8 @@ body {
     text-align: -webkit-center;
     margin: 0;
     padding: 0;
-    color: #000000;
-    background-color: #000000;
-    font-family: 'Nobile', sans-serif;
+    color: #ffffff;
+    font-family: Courier, "Courier New", monospace;
     font-style: normal;
     white-space: -moz-pre-wrap; /* Mozilla, supported since 1999 */
     white-space: -pre-wrap; /* Opera */
@@ -140,6 +137,6 @@ footer {
     line-height: 0;
     margin: 0;
     padding: 0;
-    color: #ad8624;
-    font-family: 'Cooper Black', 'Corben', cursive;
+    color: #ffffff;
+    font-family: Courier, "Courier New", monospace;
 }
