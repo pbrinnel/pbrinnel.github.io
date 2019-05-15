@@ -130,6 +130,15 @@ img {
 
 }
 
+p {
+    display: block;
+    font-size: calc(.3vw + 7px);
+    margin-top: 0em;
+    margin-bottom: 0em;
+    margin-left: 0;
+    margin-right: 0;
+}
+
 .container {
 }
 
