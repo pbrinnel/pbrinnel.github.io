@@ -94,8 +94,8 @@ h5 {
 
 iframe {
     border: none;
-    width: 420px;
-    height: 604px;
+    /*width: 420px;
+    height: 604px;*/
     margin: 0;
     padding: 0;
     text-align: center
@@ -143,7 +143,7 @@ img {
 .bandcamp-embed {
     width: 30vw;
     min-width: 300px;
-    height: calc(40vw + 305px);
+    height: calc(30vw + 305px);
     min-height: 604px;
     max-height: 1004px;
 }
