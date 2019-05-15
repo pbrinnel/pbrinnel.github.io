@@ -141,7 +141,7 @@ img {
 }
 
 .bandcamp-embed {
-    width: 40vw;
+    width: 30vw;
     min-width: 300px;
     height: calc(40vw + 305px);
     min-height: 604px;
