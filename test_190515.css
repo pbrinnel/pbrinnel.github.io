@@ -8,7 +8,7 @@ html {
 }
 
 pre {
-    font-size: calc(0.3vw + 7px);
+    font-size: calc(0.3vw + 6px);
     align-items: center;
     justify-content: center;
     text-align: center;
@@ -149,7 +149,7 @@ img {
 
 
 footer {
-    font-size: calc(1vw + 6.5px);
+    font-size: calc(.4vw + 4px);
     align-items: center;
     justify-content: center;
     text-align: center;
