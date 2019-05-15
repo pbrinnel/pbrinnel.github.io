@@ -127,27 +127,15 @@ table.center {
 img {
     width: 40vmin;
     vertical-align: bottom;
-
-}
-
-.container {
-}
-
-.video {
-    width: 60vw;
-    height: calc(60vw * .5625);
-    min-width: 300px;
-    min-height: calc(300px*.5625);
 }
 
 .bandcamp-embed {
     width: 30vw;
     min-width: 305px;
     height: calc(30vw + 305px);
-    min-height: 615px;
+    min-height: 630px;
     /*max-height: 790px;*/
 }
-
 
 
 footer {
