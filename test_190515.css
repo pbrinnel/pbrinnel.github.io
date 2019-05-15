@@ -126,6 +126,8 @@ table.center {
 
 img {
     width: 55vmin;
+    vertical-align: bottom;
+
 }
 
 .container {
