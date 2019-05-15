@@ -54,7 +54,7 @@ h2 {
 }
 
 h3 {
-    font-size: calc(0.4vw + 7px);
+    font-size: calc(0.7vw + 7px);
     align-items: left;
     justify-content: left;
     text-align: center;
@@ -67,7 +67,7 @@ h3 {
 }
 
 h4 {
-    font-size: calc(0.3vw + 6px);
+    font-size: calc(0.5vw + 6px);
     align-items: left;
     justify-content: left;
     text-align: left;
