@@ -139,6 +139,15 @@ img {
     max-width: 700px;
 }
 
+.bandcamp-SINGLE-embed {
+    width: 30vw;
+    min-width: 305px;
+    height: calc(30vw + 110px);
+    min-height: 400px;
+    max-height: 875px;
+    max-width: 700px;
+}
+
 
 footer {
     font-size: calc(.4vw + 6px);
