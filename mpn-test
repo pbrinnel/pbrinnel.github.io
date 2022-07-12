@@ -4,7 +4,7 @@
 
  <title>Test Page. If you have reached in error, TURN BACK!</title>
  
- <!-- <meta name="description" content="The Official Website for Paul Brinnel's Music Stuff">
+ <meta name="description" content="The Official Website for Paul Brinnel's Music Stuff">
   <meta name="keywords" content="Paul Brinnel, Paul, Brinnel, Chicago, Piano, Boulder">
   <meta name="author" content="Paul Brinnel">
    <meta name="viewport" content="width=device-width">
@@ -18,7 +18,7 @@
 <meta property="og:type" content="music.album" />
  <meta property="fb:app_id" content="139528530170918"/>
    <link rel='stylesheet' media='screen' href="/css/main.css">
-  --> 
+ 
    
    
    <!--favicons-->
