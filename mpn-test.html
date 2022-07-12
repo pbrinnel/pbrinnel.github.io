@@ -11,12 +11,10 @@
     <script>
 
       function calculate(){
-        var A = document.getElementById("a").value;
-        var B = document.getElementById("b").value;
-        var C = document.getElementById("c").value;
-        var D = document.getElementById("Large").value;
+        var Large = document.getElementById("Large").value;
+        var Small = document.getElementById("Small").value;
 
-        var ans = ((A * B) - (C * D)) / (C - B);
+        var ans = ((Large) + (Small));
         alert(ans);
       }
 </script>
@@ -138,15 +136,6 @@ function BswapIMG() {
 <body>
  
  
-    <input type='number' id='a'/>
-    <input type='number' id='b'/>
-    <input type='number' id='c'/>
-
-    <button onClick='calculate()'>calculate</button>
- 
- 
- 
- 
 <pre>
 </br></pre>
 <BR>
@@ -162,19 +151,15 @@ function BswapIMG() {
 
  </H2><h4><table class="center">
 <tr>
-<td align="left"># Large Wells =<input type='number' id='Large'/> </a>
+<td align="left"># Large Wells = <input type='number' id='Large'/> </a>
 </td>
 </tr>
 <tr>
-<td align="left"><center>---</center><a href="">test1</a>
-</td>
-</tr>
- <tr>
-<td align="left"><center>---</center><a href="">test2</a>
+<td align="left"># Small Wells = <input type='number' id='Small'/> </a>
 </td>
 </tr>
 <tr>
-<td align="left"><center>---</center><a href="">test3</a>
+<td align="left"><button onClick='calculate()'>calculate</button></a>
 </td>
 </tr>
  </table></h4>
