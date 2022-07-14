@@ -95,104 +95,13 @@
 <meta property="og:image:type" content="image/png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
- <meta property="og:url" content="http://paulbrinnel.com/mpn-test" />
+ <meta property="og:url" content="http://paulbrinnel.com/mpn" />
  <meta property="og:title" content="MPN-IN-JAVASCRIPT-DEMO" />
   <meta property="og:description" content="MPN-IN-JAVASCRIPT-DEMO" />
-<meta property="og:type" content="music.album" />
- <meta property="fb:app_id" content="139528530170918"/>
+
    <link rel='stylesheet' media='screen' href="/css/main.css">
    
-   <!--favicons-->
-<link rel="apple-touch-icon" sizes="57x57" href="/favicon/apple-icon-57x57.png">
-<link rel="apple-touch-icon" sizes="60x60" href="/favicon/apple-icon-60x60.png">
-<link rel="apple-touch-icon" sizes="72x72" href="/favicon/apple-icon-72x72.png">
-<link rel="apple-touch-icon" sizes="76x76" href="/favicon/apple-icon-76x76.png">
-<link rel="apple-touch-icon" sizes="114x114" href="/favicon/apple-icon-114x114.png">
-<link rel="apple-touch-icon" sizes="120x120" href="/favicon/apple-icon-120x120.png">
-<link rel="apple-touch-icon" sizes="144x144" href="/favicon/apple-icon-144x144.png">
-<link rel="apple-touch-icon" sizes="152x152" href="/favicon/apple-icon-152x152.png">
-<link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-icon-180x180.png">
-<link rel="icon" type="image/png" sizes="192x192"  href="/favicon/android-icon-192x192.png">
-<link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
-<link rel="icon" type="image/png" sizes="96x96" href="/favicon/favicon-96x96.png">
-<link rel="icon" type="image/png" sizes="16x16" href="/favicon/favicon-16x16.png">
-<link rel="manifest" href="/favicon/manifest.json">
-<meta name="msapplication-TileColor" content="#ffffff">
-<meta name="msapplication-TileImage" content="/favicon/ms-icon-144x144.png">
-<meta name="theme-color" content="#ffffff">
 
-<script>
-   <!--Google Analytics Scripting-->
-(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
-(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
-m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
-})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
-ga('create', 'UA-90303307-1', 'auto');
-ga('send', 'pageview');  
-   <!--Declare Img Toggle Global Var-->
-var transitionSTAGE = 0; 
-var IMGcycleTIME = 150;
-var i;
-var INTERVimg;
-var UBnextImage = [
- "/images/web1.0image.jpg",
- "/images/web1.1image.jpg",
- "/images/web1.2image.jpg",
- "/images/web1.3image.jpg",
- "/images/web1.4image.jpg",
- "/images/web1.5image.jpg",
- "/images/web1.6image.jpg",
- "/images/web1.7image.jpg",
- "/images/web1.8image.jpg",
- "/images/web1.9image.jpg",
- "/images/web2.0image.jpg"
-];  
-   <!--Img MouseOver Scripting-->
-function ImgMouseOverScript() {
-   unblur();
-}
-   <!--Img MouseOff Scripting-->
-function ImgMouseOffScript() {
-   blur();
-}      
-   <!--Img MouseClick Scripting-->
-function ImgMouseClickScript() {
-   unblur();
-   blur();
-}
-function unblur() {
-   if (transitionSTAGE==0) {
-      transitionSTAGE = 1;
-      i = 0;
-      INTERVimg = setInterval(UBswapIMG, IMGcycleTIME);
-   }
-}  
-function blur() {
-   if (transitionSTAGE==2) {
-      transitionSTAGE = 3;
-      i = 10;
-      INTERVimg = setInterval(BswapIMG, IMGcycleTIME);
-   }
-}
-function UBswapIMG() {
-   if(i<11) {
-      document.getElementById("pic").src=UBnextImage[i];
-      i++;
-   } else {
-      clearInterval(INTERVimg);
-      transitionSTAGE = 2;
-   }
-}
-function BswapIMG() {
-   if(i>=0) {
-      document.getElementById("pic").src=UBnextImage[i];
-      i--;
-   } else {
-      clearInterval(INTERVimg);
-      transitionSTAGE = 0;
-   }
-}
-</script> 
 </head>
    
 <body>
@@ -202,10 +111,6 @@ function BswapIMG() {
 </br></pre>
 <BR>
 
- 
- 
- 
- 
  
  
  
@@ -232,95 +137,4 @@ function BswapIMG() {
 
 </footer>
 
-<script>  
-      <!--Save Cells from HTML order-->      
-var CELL = [
-   document.getElementById("CELL0").innerHTML,
-   document.getElementById("CELL1").innerHTML,
-   document.getElementById("CELL2").innerHTML,
-   document.getElementById("CELL3").innerHTML,
-   document.getElementById("CELL4").innerHTML,
-   document.getElementById("CELL5").innerHTML,
-   document.getElementById("CELL6").innerHTML,
-];   
-
-      <!--Clear Cells from HTML-->    
-document.getElementById("CELL1").innerHTML = "";
-document.getElementById("CELL2").innerHTML = "";
-document.getElementById("CELL3").innerHTML = "";  
-document.getElementById("CELL4").innerHTML = "";
-document.getElementById("CELL5").innerHTML = "";  
-document.getElementById("CELL6").innerHTML = "";    
-   
-   <!--Set Cell order-->         
-var CELLorder = [
-   0,
-   1,
-   2,
-   3,
-   2,
-   1,
-   0,
-   4,
-   5,
-   6,
-   5,
-   4,
-];
-      
-   <!--Declare ASCII Toggle Global Var-->
-var animateACTIVE = false;
-var INTERVtxt;
-var TXTcycleTIME = 154;
-var TXTtransitionSTAGE = 0;
-var j = 1;
- 
-   <!--ASCII MouseOver Scripting-->
-function TXTMouseOverScript() {
-   animateON();
-}
-   
-   <!--ASCII MouseOff Scripting-->
-function TXTMouseOffScript() {
-   animateOFF();
-}   
-   
-   <!--ASCII MouseClick Scripting-->
-function TXTMouseClickScript() {
-   if (TXTtransitionSTAGE==0) {
-         animateON();
-   } else if (TXTtransitionSTAGE==2) {
-         animateOFF();
-   } else {
-   }
-}
-      
-   <!--Animate Text Scripting-->
-function animateON() {
-   if (TXTtransitionSTAGE==0) {
-      TXTtransitionSTAGE = 1;
-      INTERVtxt = setInterval(swapTXT, TXTcycleTIME);
-   }
-}   
-   
-function animateOFF() {
-      clearInterval(INTERVtxt);
-      TXTtransitionSTAGE = 0;
-}
-
-function swapTXT() {
-   if(j<12) {
-      document.getElementById("CELL0").innerHTML=CELL[CELLorder[j]];
-      j++;
-   } else {
-      document.getElementById("CELL0").innerHTML=CELL[CELLorder[0]];
-      TXTtransitionSTAGE = 2;
-      j = 1;
-   }
-}
-   
-   
-   window.onload = animateON;
-   setTimeout(function() { animateOFF(); }, 1000);
-   </script>
 </html>
