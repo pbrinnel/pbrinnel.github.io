@@ -17,7 +17,8 @@ pre {
     margin: 0;
     color: white;
     background-color: black;
-    font-family: Courier, "Courier New", monospace;
+/*    font-family: Courier, "Courier New", monospace;   */
+    font-family: 'Trebuchet MS', sans-serif;
     font-style: normal;
     white-space: -moz-pre-wrap; /* Mozilla, supported since 1999 */
     white-space: -pre-wrap; /* Opera */
@@ -50,7 +51,8 @@ h2 {
     padding: 0;
     margin: 0;
     color: #ffffff;
-    font-family: Courier, "Courier New", monospace;
+/*    font-family: Courier, "Courier New", monospace;   */
+    font-family: 'Trebuchet MS', sans-serif;
     font-style: italic;
 }
 
@@ -63,7 +65,8 @@ h3 {
     padding: 0;
     margin: 0;
     color: #ffffff;
-    font-family: Courier, "Courier New", monospace;
+/*    font-family: Courier, "Courier New", monospace;   */
+    font-family: 'Trebuchet MS', sans-serif;
     font-style: normal;
 }
 
@@ -76,7 +79,8 @@ h4 {
     padding: 0;
     margin: 0;
     color: #ffffff;
-    font-family: Courier, "Courier New", monospace;
+/*    font-family: Courier, "Courier New", monospace;   */
+    font-family: 'Trebuchet MS', sans-serif;
     font-style: normal;
 }
 
@@ -89,7 +93,8 @@ h5 {
     padding: 0;
     margin: 0;
     color: #ffffff;
-    font-family: Courier, "Courier New", monospace;
+/*    font-family: Courier, "Courier New", monospace;   */
+    font-family: 'Trebuchet MS', sans-serif;
     font-style: normal;
 }
 
@@ -112,7 +117,8 @@ body {
     padding: 0;
     color: white;
     background-color: black;
-    font-family: Courier, "Courier New", monospace;
+/*    font-family: Courier, "Courier New", monospace;   */
+    font-family: 'Trebuchet MS', sans-serif;
     font-style: normal;
     white-space: -moz-pre-wrap; /* Mozilla, supported since 1999 */
     white-space: -pre-wrap; /* Opera */
@@ -159,5 +165,6 @@ footer {
     margin: 0;
     padding: 0;
     color: #ffffff;
-    font-family: Courier, "Courier New", monospace;
+/*    font-family: Courier, "Courier New", monospace;   */
+    font-family: 'Trebuchet MS', sans-serif;
 }
