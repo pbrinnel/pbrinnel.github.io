@@ -47,71 +47,6 @@
 <meta name="msapplication-TileImage" content="/favicon/ms-icon-144x144.png">
 <meta name="theme-color" content="#ffffff">
 
-<script>
-   <!--Declare Img Toggle Global Var-->
-var transitionSTAGE = 0; 
-var IMGcycleTIME = 150;
-var i;
-var INTERVimg;
-var UBnextImage = [
- "/images/web1.0image.jpg",
- "/images/web1.1image.jpg",
- "/images/web1.2image.jpg",
- "/images/web1.3image.jpg",
- "/images/web1.4image.jpg",
- "/images/web1.5image.jpg",
- "/images/web1.6image.jpg",
- "/images/web1.7image.jpg",
- "/images/web1.8image.jpg",
- "/images/web1.9image.jpg",
- "/images/web2.0image.jpg"
-];  
-   <!--Img MouseOver Scripting-->
-function ImgMouseOverScript() {
-   unblur();
-}
-   <!--Img MouseOff Scripting-->
-function ImgMouseOffScript() {
-   blur();
-}      
-   <!--Img MouseClick Scripting-->
-function ImgMouseClickScript() {
-   unblur();
-   blur();
-}
-function unblur() {
-   if (transitionSTAGE==0) {
-      transitionSTAGE = 1;
-      i = 0;
-      INTERVimg = setInterval(UBswapIMG, IMGcycleTIME);
-   }
-}  
-function blur() {
-   if (transitionSTAGE==2) {
-      transitionSTAGE = 3;
-      i = 10;
-      INTERVimg = setInterval(BswapIMG, IMGcycleTIME);
-   }
-}
-function UBswapIMG() {
-   if(i<11) {
-      document.getElementById("pic").src=UBnextImage[i];
-      i++;
-   } else {
-      clearInterval(INTERVimg);
-      transitionSTAGE = 2;
-   }
-}
-function BswapIMG() {
-   if(i>=0) {
-      document.getElementById("pic").src=UBnextImage[i];
-      i--;
-   } else {
-      clearInterval(INTERVimg);
-      transitionSTAGE = 0;
-   }
-}
-</script> 
 </head>
    
 <body>
@@ -136,7 +71,7 @@ based out of Portland, ME</i></h3>
  
  <BR>
  
- <h2><i>‹‹›UPCOMING GIGS‹››</i></h2><h3><table class="center"><tr><td align="left"><!--
+ <h2><i>UPCOMING GIGS</i></h2><h3><table class="center"><tr><td align="left"><!--
 --><h3><a href="https://www.blueportlandmaine.com/events/open-mic-variety-hours-featuring-paul-brinnel-2024-02-27-19-00" target="_blank">Tues 2/27/24 Blue Portland Maine Open Mic Variety Hours featuring Paul Brinnel</a></h3>
 
    
@@ -146,27 +81,27 @@ based out of Portland, ME</i></h3>
 
  <BR>
  
-<h2><i>‹‹›SOCIAL MEDIA‹››</i></h2><!--
+<h2><i>SOCIAL MEDIA</i></h2><!--
 --><h3><a href="https://www.facebook.com/paulbrinnel/" target="_blank">Paul Brinnel and his Personnel - Facebook</a></h3>
 
  <BR>
 
- <h2><i>‹‹›BOOKING‹››</i></h2><!--
+ <h2><i>BOOKING</i></h2><!--
  --><h3><a href="mailto:pbrinnel@gmail.com" target="_blank">pbrinnel@gmail.com</a></h3>
 
   <BR>
   
-<img  onmouseover="ImgMouseOverScript()" onmouseout="ImgMouseOffScript()" onclick="ImgMouseClickScript()" id="pic" class="center" src="/images/web1.0image.jpg" alt=""><!--
+<img id="pic" class="center" src="/images/web1.0image.jpg" alt=""><!--
 --><h3>photo by <a href="https://www.alexhazelstudios.com/" target="_blank">Alexus McLane</a></h3>
 
  <BR>
 
- <h2><i>‹‹›OLD MUSIC‹››</i></h2><!--
+ <h2><i>OLD MUSIC</i></h2><!--
 --><h3><a href="https://soundcloud.com/pbrinnel/sets/the-adventures-of-bean-machine" target="_blank">The Adventures of Bean Machine [2011]</a></h3>
 
  <BR>
  
- <h2><i>‹‹›ALSO APPEARING ON‹››</i></h2><!--
+ <h2><i>ALSO APPEARING ON</i></h2><!--
 --><h4><table class="center"><tr><td align="left"><!--
 --><a href="https://despairia.bandcamp.com/track/bruce-banner" target="_blank">Bruce Banner [2020] by Despairia (Keys)</a></td></tr>
 <tr><td align="left"><!--
@@ -185,11 +120,11 @@ based out of Portland, ME</i></h3>
 
   <BR>
  
- <h2><i><a href="http://paulbrinnel.com/old-gigs">‹‹›<u>OLD GIGS</u>‹››</a></i></h2>   
+ <h2><i><a href="http://paulbrinnel.com/old-gigs"><u>OLD GIGS</u></a></i></h2>   
    
      <BR>
  
- <h2><i><a href="http://paulbrinnel.com/charts">‹‹›<u>DOWNLOAD CHARTS</u>‹››</a></i></h2>   
+ <h2><i><a href="http://paulbrinnel.com/charts"><u>DOWNLOAD CHARTS</u></a></i></h2>   
       
                <BR>            
 </body>
@@ -198,93 +133,4 @@ based out of Portland, ME</i></h3>
 ©2024 PAUL BRINNEL
 </footer>
    
-<script>  
-      <!--Save Cells from HTML order-->      
-var CELL = [
-   document.getElementById("CELL0").innerHTML,
-   document.getElementById("CELL1").innerHTML,
-   document.getElementById("CELL2").innerHTML,
-   document.getElementById("CELL3").innerHTML,
-   document.getElementById("CELL4").innerHTML,
-   document.getElementById("CELL5").innerHTML,
-   document.getElementById("CELL6").innerHTML,
-];   
-      <!--Clear Cells from HTML-->    
-document.getElementById("CELL1").innerHTML = "";
-document.getElementById("CELL2").innerHTML = "";
-document.getElementById("CELL3").innerHTML = "";  
-document.getElementById("CELL4").innerHTML = "";
-document.getElementById("CELL5").innerHTML = "";  
-document.getElementById("CELL6").innerHTML = "";    
-   
-   <!--Set Cell order-->         
-var CELLorder = [
-   0,
-   1,
-   2,
-   3,
-   2,
-   1,
-   0,
-   4,
-   5,
-   6,
-   5,
-   4,
-];
-      
-   <!--Declare ASCII Toggle Global Var-->
-var animateACTIVE = false;
-var INTERVtxt;
-var TXTcycleTIME = 154;
-var TXTtransitionSTAGE = 0;
-var j = 1;
- 
-   <!--ASCII MouseOver Scripting-->
-function TXTMouseOverScript() {
-   animateON();
-}
-   
-   <!--ASCII MouseOff Scripting-->
-function TXTMouseOffScript() {
-   animateOFF();
-}   
-   
-   <!--ASCII MouseClick Scripting-->
-function TXTMouseClickScript() {
-   if (TXTtransitionSTAGE==0) {
-         animateON();
-   } else if (TXTtransitionSTAGE==2) {
-         animateOFF();
-   } else {
-   }
-}
-      
-   <!--Animate Text Scripting-->
-function animateON() {
-   if (TXTtransitionSTAGE==0) {
-      TXTtransitionSTAGE = 1;
-      INTERVtxt = setInterval(swapTXT, TXTcycleTIME);
-   }
-}   
-   
-function animateOFF() {
-      clearInterval(INTERVtxt);
-      TXTtransitionSTAGE = 0;
-}
-function swapTXT() {
-   if(j<12) {
-      document.getElementById("CELL0").innerHTML=CELL[CELLorder[j]];
-      j++;
-   } else {
-      document.getElementById("CELL0").innerHTML=CELL[CELLorder[0]];
-      TXTtransitionSTAGE = 2;
-      j = 1;
-   }
-}
-   
-   
-   window.onload = animateON;
-   setTimeout(function() { animateOFF(); }, 1000);
-   </script>
 </html>
