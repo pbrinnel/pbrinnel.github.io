@@ -80,19 +80,54 @@
             </div>
         </header>
         
-        <!-- YouTube Player Section -->
+        <!-- YouTube Video Grid -->
         <section class="video-section">
-            <h2 class="section-title">VIDEO PLAYLIST</h2>
-            <div class="video-wrapper">
-                <iframe
-                    src="https://www.youtube.com/embed/videoseries?list=PL5xZ6eZhnaVxU1fRjo-AmVqFm5yusvte-&listType=playlist"
-                    title="Paul Brinnel YouTube Playlist"
-                    frameborder="0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    allowfullscreen>
-                </iframe>
+            <div id="video-player-container" style="display: none;">
+                <div class="video-wrapper">
+                    <iframe id="video-player" src="" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+                </div>
+                <button id="back-to-grid" class="back-button">← Back to Videos</button>
             </div>
+            <div id="video-grid" class="video-grid"></div>
         </section>
+
+        <script>
+            const playlistId = 'PL5xZ6eZhnaVxU1fRjo-AmVqFm5yusvte-';
+            const videos = [
+                'RqJu_V85nCs', 'zJWn6Fu3iFg', 'kWGxV9VWXkk', 'R29UU4VdpWE',
+                'xRCFJDYSdu0', 'n0TnBs_jkKI', 'YyqA0z78cDY', 'FDk8XjGShfM',
+                'vCR8B48OHb8', 'S_V87t0MJFE', 'bXFsF2uhqJg', 'WdH7Zqxk_Nw',
+                'pVZSt08HHdM', 'fVDdHkXkYt4', 'jMq9hDnKdWU', 'EK2HEW3CJ3s',
+                '3eTEYlG2ank', 'KXxKBVPZ9u8', 'zFu9wnw8GKw', 'UPjKMJtx8_8',
+                'R_awfFCj4oE'
+            ];
+
+            const grid = document.getElementById('video-grid');
+            const playerContainer = document.getElementById('video-player-container');
+            const player = document.getElementById('video-player');
+            const backButton = document.getElementById('back-to-grid');
+
+            videos.forEach(videoId => {
+                const thumbnail = document.createElement('div');
+                thumbnail.className = 'video-thumbnail';
+                thumbnail.innerHTML = `
+                    <img src="https://img.youtube.com/vi/${videoId}/mqdefault.jpg" alt="Video thumbnail">
+                    <div class="play-overlay">▶</div>
+                `;
+                thumbnail.onclick = () => {
+                    player.src = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+                    grid.style.display = 'none';
+                    playerContainer.style.display = 'block';
+                };
+                grid.appendChild(thumbnail);
+            });
+
+            backButton.onclick = () => {
+                player.src = '';
+                playerContainer.style.display = 'none';
+                grid.style.display = 'grid';
+            };
+        </script>
         
         <!-- Upcoming Gigs -->
         <section class="gigs-section">
