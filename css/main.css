@@ -71,7 +71,7 @@ h1 {
     align-items: center;
     gap: 10px;
     flex-wrap: wrap;
-    margin: 10px 0;
+    margin-top: 20px;
 }
 
 .social-icons a {
