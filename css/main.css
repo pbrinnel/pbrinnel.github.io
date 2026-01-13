@@ -16,7 +16,7 @@ body {
     color: #fff;
     text-align: center;
     padding: 20px;
-    line-height: 1.6;
+    line-height: 1;
 }
 
 /* Links */
@@ -50,6 +50,7 @@ h1 {
     font-size: clamp(2rem, 5vw + 14px, 5rem);
     font-weight: bold;
     margin-bottom: 20px;
+    line-height: 1;
     color: #ffffff;
     font-family: 'Trebuchet MS', sans-serif;
 }
@@ -57,7 +58,7 @@ h1 {
 .tagline {
     font-size: clamp(0.9rem, 0.7vw + 9px, 1.4rem);
     font-style: italic;
-    line-height: 1.8;
+    line-height: 1;
     margin-bottom: 30px;
     color: #ffffff;
     font-family: 'Trebuchet MS', sans-serif;
@@ -124,12 +125,14 @@ h1 {
     font-size: clamp(1.2rem, 1.5vw + 8px, 2rem);
     font-style: italic;
     margin-bottom: 20px;
+    line-height: 1;
     color: #ffffff;
     font-family: 'Trebuchet MS', sans-serif;
 }
 
 .gigs-content {
     font-size: clamp(1rem, 0.7vw + 9px, 1.3rem);
+    line-height: 1;
     color: #ffffff;
     font-family: 'Trebuchet MS', sans-serif;
 }
