@@ -94,6 +94,11 @@ h1 {
     margin: 50px 0;
 }
 
+.playlist-link {
+    margin-top: 15px;
+    font-size: clamp(0.9rem, 0.7vw + 9px, 1.2rem);
+}
+
 .video-wrapper {
     position: relative;
     padding-bottom: 56.25%; /* 16:9 aspect ratio */
