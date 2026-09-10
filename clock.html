@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Paul Brinnel</title>
+
+    <!-- not linked from anywhere, and kept out of search results -->
+    <meta name="robots" content="noindex, nofollow">
+
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon/favicon-16x16.png">
+    <meta name="theme-color" content="#000000">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background-color: #000;
+            color: #fff;
+            font-family: 'Trebuchet MS', sans-serif;
+            text-align: center;
+            padding: 20px;
+            line-height: 1;
+        }
+
+        .countdown {
+            display: inline-block;
+            background: #090908;
+            border: 1px solid #2e2a24;
+            border-radius: 3px;
+            padding: 0.13em 0.14em;
+            font-size: clamp(2.3rem, 8.5vw, 5.6rem);
+            font-family: 'Trebuchet MS', sans-serif;
+            font-weight: bold;
+            letter-spacing: -0.02em;
+            line-height: 1;
+            color: #f2efe9;
+            font-variant-numeric: tabular-nums;
+            font-feature-settings: "tnum" 1;
+            box-shadow:
+                inset 0 0.11em 0.24em rgba(0, 0, 0, 0.95),
+                inset 0 -0.11em 0.24em rgba(0, 0, 0, 0.95),
+                0 1px 0 rgba(242, 239, 233, 0.05);
+        }
+
+        .cd-digits {
+            display: flex;
+        }
+
+        .cd-cell {
+            padding: 0 0.11em;
+            border-right: 1px solid rgba(0, 0, 0, 0.9);
+            box-shadow: 1px 0 0 rgba(242, 239, 233, 0.055);
+        }
+
+        .cd-cell:last-child {
+            border-right: 0;
+            box-shadow: none;
+        }
+
+        /* the opening, tall enough to show a sliver of the digit above and below */
+        .cd-drum {
+            --ap: 1.34em;
+            position: relative;
+            display: block;
+            overflow: hidden;
+            width: 0.62em;
+            height: var(--ap);
+            -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 26%, #000 74%, transparent 100%);
+                    mask-image: linear-gradient(to bottom, transparent 0, #000 26%, #000 74%, transparent 100%);
+        }
+
+        /* --e is 0 at midnight and 1 at the drop, set from js */
+        .cd-col {
+            display: block;
+            transform: translateY(calc(-1em + (var(--ap) - 1em) / 2 - var(--e, 0) * 1em));
+        }
+
+        .cd-f {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 1em;
+        }
+
+        .countdown-label {
+            display: block;
+            margin-top: clamp(8px, 1vw, 12px);
+            font-size: clamp(0.68rem, 0.5vw + 6px, 0.85rem);
+            font-style: italic;
+            line-height: 1;
+            color: #9a958c;
+            font-family: 'Trebuchet MS', sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <div class="countdown" role="timer">
+        <span class="cd-digits" data-countdown></span>
+    </div>
+    <span class="countdown-label">days</span>
+
+    <script src="/js/countdown.js"></script>
+</body>
+</html>
