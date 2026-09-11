@@ -202,7 +202,12 @@
     // he is drawn proportionally, so growing him makes him taller as well as
     // longer -- the hitbox has to grow with him or a BIG brandon would have
     // the ball passing through his chest
-    const padW = () => paddle.w * (1 + CLIMB_GROW * climb);
+    // BIG and the boss climb are both 1.5x, and they take the larger rather
+    // than multiplying: 2.25x brandon plus DOUBLE asks for more span than the
+    // field has, and the clamp would answer by pinning him at dead centre,
+    // unable to move, during the tightest part of the fight. so BIG keeps
+    // winning for most of the climb and simply stops compounding at the end.
+    const padW = () => Math.max(paddle.w, PADDLE_W * (1 + CLIMB_GROW * climb));
     const padH = () => PADDLE_H * (padW() / PADDLE_W);
     const PADDLE_Y   = LH - 58;
 
@@ -462,7 +467,7 @@
     // Paste the deployed worker's URL here to switch the board on. While it is
     // empty the game behaves exactly as it did before one existed: no table, no
     // initials prompt, no network calls at all.
-    const BOARD_URL = '';
+    const BOARD_URL = 'https://brandon-scores.pbrinnel.workers.dev';
     const BOARD_ON = !!BOARD_URL;
     const TOP_N = 10;
 
@@ -539,11 +544,7 @@
     }
     function halfSpan() {
         const w = padW();
-        // BIG on top of DOUBLE on top of the boss climb can ask for more span
-        // than the field has, and the clamp that uses this would then pin him
-        // off-centre and refuse to move. capped at half the field: past that
-        // he is simply centred, which is at least honest.
-        return Math.min(LW / 2, w / 2 + (w + w * DBL_GAP) / 2 * spread());
+        return w / 2 + (w + w * DBL_GAP) / 2 * spread();
     }
 
     // ---- the wiggle ---------------------------------------------------------
