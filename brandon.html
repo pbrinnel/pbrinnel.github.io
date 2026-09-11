@@ -945,6 +945,16 @@
     // with a flat no -- skipping fullscreen entirely on the devices it exists
     // for. The event knows what actually touched the screen; a media query is
     // guessing about the device.
+    //
+    // HONEST STATUS: all of the above is a real fix to a real spec violation --
+    // asking on pointerdown could never have worked with a finger. It still did
+    // not visibly hide the address bar on chrome for android when tested on a
+    // handset, and we stopped digging there rather than keep spending on it.
+    // So treat this as plausible but UNPROVEN on a real phone. The game does not
+    // depend on it: every call fails soft, and the field is sized off what is
+    // actually visible either way. If you pick this up again, instrument the
+    // phone itself -- log the rejection reason and navigator.userActivation at
+    // the moment of the call -- rather than reasoning about it from a desktop.
     addEventListener('pointerup', e => {
         if (fsSettled || !splash.hidden || e.pointerType === 'mouse') return;
         enterFS();      // keeps offering on later taps until one lands
