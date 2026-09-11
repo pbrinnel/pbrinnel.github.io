@@ -202,8 +202,21 @@
     // he is drawn proportionally, so growing him makes him taller as well as
     // longer -- the hitbox has to grow with him or a BIG brandon would have
     // the ball passing through his chest
-    const padH = () => PADDLE_H * (paddle.w / PADDLE_W);
+    const padW = () => paddle.w * (1 + CLIMB_GROW * climb);
+    const padH = () => PADDLE_H * (padW() / PADDLE_W);
     const PADDLE_Y   = LH - 58;
+
+    // ...except during the boss, who pulls you off that line. as his health
+    // goes you drift north and swell, so the last hits are traded at close
+    // range -- and with more brandon to trade them with. 150px up still leaves
+    // ~160px of daylight under his lowest bob, which is four ball-heights: the
+    // fight gets intimate without getting unwinnable. `climb` chases his damage
+    // rather than matching it, so a hit slides you up over a second or so
+    // instead of stepping you.
+    const CLIMB_RISE = 150;
+    const CLIMB_GROW = 0.5;
+    const CLIMB_EASE = 0.8;     // seconds to catch up, near enough
+    const padY = () => PADDLE_Y - CLIMB_RISE * climb;
 
     // the ball is a HEAD, 141 x 209, so it is an ellipse and not a circle.
     // colliding against its real shape means rotation changes how far it
@@ -425,8 +438,13 @@
     let bricks, stage, score, best, lives, combo, phase, banner;
     let paddle, balls, popups, hits, tierSeen, bw, bh;
     let speed, capsule, fx, callout, clock = 0, spreadT = 0, bossPhase = 0;
-    let ascendT = 0, uiScale = 1;
+    let ascendT = 0, uiScale = 1, climb = 0;
+    // where the fight left him when he started for the throne -- the takeover
+    // rises from there, not from the line he opened the fight on
+    let ascendFrom = { y: PADDLE_Y, w: PADDLE_W };
     let phantoms = [], phGap = 0, shout = null, enterT = 0, rings = [];
+    let board = [], boardLive = false;
+    let entry = '', entryRank = -1, endedWon = false, sending = false;
 
     function loadBest() {
         try { return parseInt(localStorage.getItem('brandon.best'), 10) || 0; }
@@ -434,6 +452,61 @@
     }
     function saveBest() {
         try { localStorage.setItem('brandon.best', String(best)); } catch (e) { /* private mode */ }
+    }
+
+    // ---- the leaderboard -----------------------------------------------------
+    // One shared table for everyone, held by a small Cloudflare Worker (its
+    // source is brandon-leaderboard-worker.js next to this file). Everything
+    // here fails soft: if the board is unreachable the game plays exactly as it
+    // did before, just without a table. It is never awaited on a hot path.
+    // Paste the deployed worker's URL here to switch the board on. While it is
+    // empty the game behaves exactly as it did before one existed: no table, no
+    // initials prompt, no network calls at all.
+    const BOARD_URL = '';
+    const BOARD_ON = !!BOARD_URL;
+    const TOP_N = 10;
+
+    // rows come back from a public endpoint, so treat them as untrusted text
+    function cleanRows(raw) {
+        if (!Array.isArray(raw)) return [];
+        return raw.map(r => ({
+            ini: String((r && r.ini) || '???').toUpperCase()
+                     .replace(/[^A-Z]/g, '').slice(0, 3).padEnd(3, '?'),
+            score: Math.max(0, Math.min(9999999, parseInt(r && r.score, 10) || 0))
+        })).sort((a, b) => b.score - a.score).slice(0, TOP_N);
+    }
+
+    async function fetchBoard() {
+        if (!BOARD_URL) return;
+        try {
+            const res = await fetch(BOARD_URL, { cache: 'no-store' });
+            if (!res.ok) throw new Error(res.status);
+            board = cleanRows(await res.json());
+            boardLive = true;
+        } catch (e) { boardLive = false; }
+    }
+
+    async function submitScore(ini, n) {
+        if (!BOARD_URL) return;
+        try {
+            const res = await fetch(BOARD_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ini, score: n })
+            });
+            if (!res.ok) throw new Error(res.status);
+            board = cleanRows(await res.json());
+            boardLive = true;
+        } catch (e) { boardLive = false; }
+        entryRank = board.findIndex(r => r.ini === ini && r.score === n);
+    }
+
+    // decided against the table we last saw. it can be a little stale, which at
+    // worst means someone types three letters and does not appear -- the server
+    // is the one that actually sorts.
+    function qualifies(n) {
+        if (!boardLive || n <= 0) return false;
+        return board.length < TOP_N || n > board[board.length - 1].score;
     }
 
     // ---- the ball's real, non-round shape -----------------------------------
@@ -457,7 +530,7 @@
         return t * t * (3 - 2 * t);        // smoothstep, no overshoot either way
     }
     function segs() {
-        const w = paddle.w;
+        const w = padW();
         const k = spread();
         if (k < 0.001) return [{ cx: paddle.x, w, i: 0 }];
         const off = (w + w * DBL_GAP) / 2 * k;
@@ -465,8 +538,12 @@
                 { cx: paddle.x + off, w, i: 1 }];
     }
     function halfSpan() {
-        const w = paddle.w;
-        return w / 2 + (w + w * DBL_GAP) / 2 * spread();
+        const w = padW();
+        // BIG on top of DOUBLE on top of the boss climb can ask for more span
+        // than the field has, and the clamp that uses this would then pin him
+        // off-centre and refuse to move. capped at half the field: past that
+        // he is simply centred, which is at least honest.
+        return Math.min(LW / 2, w / 2 + (w + w * DBL_GAP) / 2 * spread());
     }
 
     // ---- the wiggle ---------------------------------------------------------
@@ -531,6 +608,7 @@
         const lvl = LEVELS[n];
         hits = 0;
         tierSeen = {};
+        climb = 0;              // a fresh stage puts him back on his own line
 
         if (lvl.boss) {
             bw = BOSS_W0;
@@ -627,13 +705,32 @@
         }
     }
 
+    // how far up the boss has drawn you: his damage, exactly, but arrived at
+    // slowly. everything that is not the fight itself -- the takeover, the
+    // game-over choices -- wants him back on the original line, so they all
+    // aim at nothing and he glides home.
+    function climbTarget() {
+        const b = bricks && bricks[0];
+        if (!LEVELS[stage].boss || !b || b.kind !== 'Z') return 0;
+        if (phase === 'ascend' || phase === 'won' || phase === 'over' ||
+            phase === 'initials' || phase === 'scores') return 0;
+        return 1 - b.hp / b.maxHp;
+    }
+
+    function stepClimb(dt) {
+        // exponential, so the rate is the same whatever the frame rate. one
+        // hit moves the target by a thirty-second; this spends about a second
+        // covering it, which is slow enough that you never catch him moving.
+        climb += (climbTarget() - climb) * (1 - Math.exp(-dt / CLIMB_EASE));
+    }
+
     function resetBall() {
         // the one thing that made every stage feel identical: this used to be
         // a flat BASE_SPEED, so stage five opened exactly as slow as stage one
         speed = BASE_SPEED * (1 + 0.08 * stage);
         clearEffects();
         combo = 0;
-        const b = newBall(paddle.x, PADDLE_Y - padH() / 2 - bRY() - 2);
+        const b = newBall(paddle.x, padY() - padH() / 2 - bRY() - 2);
         b.stuck = true;
         balls = [b];
         ascendT = 0;
@@ -650,6 +747,7 @@
     paddle = { x: LW / 2, prevX: LW / 2, vx: 0, w: PADDLE_W, jt: 0, tilt: 0 };
     fx = { B: 0, D: 0, S: 0, R: 0, P: 0, W: 0, E: 0 };
     best = loadBest();
+    fetchBoard();                 // async; the game never waits on it
     newGame();
 
     // ---- splash ------------------------------------------------------------
@@ -670,13 +768,32 @@
         const r = canvas.getBoundingClientRect();
         paddle.x = (e.clientX - r.left) / r.width * LW;
     };
-    canvas.addEventListener('pointermove', track);
+    canvas.addEventListener('pointermove', e => { if (phase !== 'initials') track(e); });
     canvas.addEventListener('pointerdown', e => {
+        if (phase === 'initials') {
+            const r = canvas.getBoundingClientRect();
+            const px = (e.clientX - r.left) / r.width * LW;
+            const py = (e.clientY - r.top) / r.height * LH;
+            for (const c of GRID) {
+                if (px >= c.x && px <= c.x + c.w && py >= c.y && py <= c.y + c.h) {
+                    entryKey(c.k); return;
+                }
+            }
+            return;
+        }
         track(e);                               // wherever you tap, he goes
         if (phase === 'over') { overCommit(); return; }
         action();
     });
     addEventListener('keydown', e => {
+        if (phase === 'initials') {
+            if (/^[a-zA-Z]$/.test(e.key)) entryKey(e.key.toUpperCase());
+            else if (e.code === 'Backspace') { e.preventDefault(); entryKey('DEL'); }
+            else if (e.code === 'Enter' || e.code === 'Space') {
+                e.preventDefault(); entryKey('OK');
+            }
+            return;
+        }
         if (e.code === 'ArrowLeft')  paddle.x -= 34;    // steer him either way
         if (e.code === 'ArrowRight') paddle.x += 34;
         if (phase === 'over') {
@@ -693,7 +810,7 @@
         for (const b of balls) {
             if (!b.stuck) continue;
             b.stuck = false;
-            const off = Math.max(-1, Math.min(1, b.off / (paddle.w / 2)));
+            const off = Math.max(-1, Math.min(1, b.off / (padW() / 2)));
             aim(b, off * MAX_ANGLE * 0.8 + (Math.random() * 0.2 - 0.1));
         }
     }
@@ -737,9 +854,49 @@
         }
     }, true);
 
+    // ---- initials ------------------------------------------------------------
+    // 26 letters plus DEL and OK across seven columns. Tappable for phones and
+    // typeable everywhere else, so neither input is second class.
+    const GRID = (() => {
+        const cells = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').concat(['DEL', 'OK']);
+        const cw = 66, chh = 46, cols = 7;
+        const x0 = LW / 2 - (cols * cw) / 2, y0 = 300;
+        return cells.map((k, i) => ({
+            k, x: x0 + (i % cols) * cw, y: y0 + ((i / cols) | 0) * chh,
+            w: cw - 7, h: chh - 7
+        }));
+    })();
+
+    function entryKey(k) {
+        if (sending) return;
+        if (k === 'DEL') entry = entry.slice(0, -1);
+        else if (k === 'OK') {
+            if (entry.length !== 3) return;
+            sending = true;
+            submitScore(entry, score).then(() => {
+                sending = false;
+                phase = endedWon ? 'scores' : 'over';
+            });
+        } else if (entry.length < 3) entry += k;
+    }
+
+    // a run has ended: take initials if it made the table, else carry straight on
+    function finishRun(won) {
+        endedWon = won;
+        climb = 0;              // the choices sit on the original line; so does he
+        if (qualifies(score)) {
+            entry = ''; entryRank = -1;
+            phase = 'initials';
+        } else {
+            fetchBoard();                 // refresh it for the screen that follows
+            if (won) newGame(); else phase = 'over';
+        }
+    }
+
     function action() {
         if (!debugEl.hidden) return;              // ignore taps behind the menu
-        if (phase === 'ascend' || phase === 'entrance') return;   // let it play
+        if (phase === 'ascend' || phase === 'entrance' || phase === 'initials') return;
+        if (phase === 'scores') { newGame(); return; }
         if (phase === 'ready') {
             releaseStuck();
             phase = 'play';
@@ -748,7 +905,7 @@
             buildStage(stage);
             banner = '';
         } else if (phase === 'won') {
-            newGame();
+            finishRun(true);
         }
         // 'over' is handled by the CONTINUE / NEW GAME boxes, not by a stray tap
     }
@@ -799,7 +956,7 @@
         const cap = CAPS[kind];
         score += CAP_SCORE;
         if (score > best) { best = score; saveBest(); }
-        popups.push({ x: paddle.x, y: PADDLE_Y - 40, text: '+' + CAP_SCORE, color: cap.color, life: 1 });
+        popups.push({ x: paddle.x, y: padY() - 40, text: '+' + CAP_SCORE, color: cap.color, life: 1 });
         callout = { text: cap.name, color: cap.color, life: CALLOUT_SECS };
 
         if (kind === 'M') { splitBalls(); return; }
@@ -883,6 +1040,9 @@
             // the last one occupied, and swells to fill it.
             phase = 'ascend';
             ascendT = 0;
+            // he sets off from wherever the fight left him -- by now that is
+            // most of the way up the screen already, and half again as big
+            ascendFrom = { y: padY(), w: padW() };
             banner = 'BRANDON WINS   +' + bonus;
         } else {
             phase = 'cleared';
@@ -893,7 +1053,7 @@
     function loseLife() {
         lives--;
         combo = 0;
-        if (lives <= 0) { phase = 'over'; banner = 'GAME OVER'; return; }
+        if (lives <= 0) { banner = 'GAME OVER'; finishRun(false); return; }
         resetBall();
     }
 
@@ -1072,12 +1232,13 @@
 
         // the paddle, which may be one brandon or a pair with a hole between
         const halfH = padH() / 2;
-        if (b.vy > 0 && b.y + ry > PADDLE_Y - halfH && b.y - ry < PADDLE_Y + halfH) {
+        const py = padY();
+        if (b.vy > 0 && b.y + ry > py - halfH && b.y - ry < py + halfH) {
             for (const sg of segs()) {
                 const hw = sg.w / 2;
                 if (b.x + rx <= sg.cx - hw || b.x - rx >= sg.cx + hw) continue;
 
-                b.y = PADDLE_Y - halfH - ry;
+                b.y = py - halfH - ry;
 
                 // where it lands on him sets the angle, and if he is wiggling
                 // then the lean he happens to be at goes into the shot too
@@ -1114,6 +1275,7 @@
         }
 
         bossUpdate(dt);          // before the physics, so his box is current
+        stepClimb(dt);           // and before the clamp, so his span is too
 
         if (phase === 'entrance') {
             enterT += dt;
@@ -1154,7 +1316,7 @@
 
         for (const b of balls) if (b.stuck) {
             b.x = paddle.x + b.off;
-            b.y = PADDLE_Y - padH() / 2 - bRY() - 2;
+            b.y = padY() - padH() / 2 - bRY() - 2;
         }
 
         if (phase === 'play') {
@@ -1185,10 +1347,10 @@
         // the falling capsule
         if (capsule) {
             capsule.y += CAP_FALL * dt;
-            const halfH2 = padH() / 2;
+            const halfH2 = padH() / 2, py2 = padY();
             let caught = false;
-            if (capsule.y + CAP_H / 2 > PADDLE_Y - halfH2 &&
-                capsule.y - CAP_H / 2 < PADDLE_Y + halfH2) {
+            if (capsule.y + CAP_H / 2 > py2 - halfH2 &&
+                capsule.y - CAP_H / 2 < py2 + halfH2) {
                 for (const sg of segs()) {
                     if (capsule.x + CAP_W / 2 > sg.cx - sg.w / 2 &&
                         capsule.x - CAP_W / 2 < sg.cx + sg.w / 2) { caught = true; break; }
@@ -1377,7 +1539,11 @@
         return Math.min(1, ascendT / DRAIN_SECS);
     }
 
-    // the next one, rising from below to take a run at the throne you just took
+    // the next one, rising from below to take a run at the throne you just
+    // took. he is already yours: he tracks the mouse from the moment he clears
+    // the floor, so the thing you are about to play answers to you before this
+    // run has even finished. he arrives at the standard size on the standard
+    // line, because that is exactly what you start the next one with.
     function drawHeir() {
         if (ascendT < A_HEIR) return;
         const raw = Math.min(1, (ascendT - A_HEIR) / A_HEIR_T);
@@ -1386,7 +1552,10 @@
         const sprite = shapeSprite('heir', HEIR_TINT, PADDLE_W, PADDLE_W / SHAPE_ASPECT, true);
         if (!sprite) return;
         const w = PADDLE_W, h = w / SHAPE_ASPECT;
-        ctx.drawImage(sprite, LW / 2 - w / 2, y - h / 2, w, h);
+        // clamped on his own width -- the paddle's clamp is still sized to
+        // whatever you were carrying when the boss went down, which is wider
+        const x = Math.max(w / 2, Math.min(LW - w / 2, paddle.x));
+        ctx.drawImage(sprite, x - w / 2, y - h / 2, w, h);
     }
 
     function drawPaddle() {
@@ -1398,8 +1567,8 @@
         if (ascendT > 0) {
             const raw = Math.min(1, ascendT / A_RISE);
             const k = raw * raw * (3 - 2 * raw);
-            const y = PADDLE_Y + (BOSS_Y - PADDLE_Y) * k;
-            const w = PADDLE_W + (ASCEND_W - PADDLE_W) * k;
+            const y = ascendFrom.y + (BOSS_Y - ascendFrom.y) * k;
+            const w = ascendFrom.w + (ASCEND_W - ascendFrom.w) * k;
             const artW = w / BODY_LEN_PER_W, artH = artW / PADDLE_ASPECT;
             ctx.save();
             ctx.translate(LW / 2 + (paddle.x - LW / 2) * (1 - k), y);
@@ -1421,7 +1590,7 @@
             const artW = sg.w / BODY_LEN_PER_W;
             const artH = artW / PADDLE_ASPECT;
             ctx.save();
-            ctx.translate(sg.cx, PADDLE_Y + o * JIG_PADDLE);
+            ctx.translate(sg.cx, padY() + o * JIG_PADDLE);
             ctx.rotate(PADDLE_LEVEL + o * 0.07 * (paddle.tilt || 0) + segWig(sg.i));
             if (ready(paddleImg)) {
                 ctx.drawImage(paddleImg,
@@ -1511,6 +1680,60 @@
         ctx.fillText(str, x, y);
     }
 
+    // the ten rows, drawn as a block from a given top edge. the hud scale is
+    // capped here -- at full mobile scale ten rows would run off the bottom.
+    function drawBoard(top, hudU) {
+        const u = Math.min(hudU, 1.25);
+        text('HIGH SCORES', LW / 2, top, 15 * u, '#6d685f', 'center');
+        if (!boardLive) {
+            text('leaderboard unreachable', LW / 2, top + 30 * u, 14 * u, '#4a453e', 'center');
+            return;
+        }
+        if (!board.length) {
+            text('nobody yet. be first.', LW / 2, top + 30 * u, 14 * u, '#6d685f', 'center');
+            return;
+        }
+        const rowH = 21 * u, size = 16 * u;
+        for (let i = 0; i < board.length; i++) {
+            const r = board[i];
+            const y = top + 28 * u + i * rowH;
+            const mine = i === entryRank;
+            const col = mine ? '#c9a94e' : i === 0 ? '#f2efe9' : '#9a958c';
+            text(String(i + 1).padStart(2, ' '), LW / 2 - 150, y, size, col);
+            text(r.ini, LW / 2 - 60, y, size, col);
+            ctx.textAlign = 'right';
+            text(String(r.score), LW / 2 + 160, y, size, col, 'right');
+        }
+    }
+
+    function drawInitials(u) {
+        ctx.fillStyle = 'rgba(0,0,0,0.86)';
+        ctx.fillRect(0, 0, LW, LH);
+
+        text('NEW HIGH SCORE', LW / 2, 150, 34 * u, '#c9a94e', 'center');
+        text('score ' + score, LW / 2, 182, 15 * u, '#9a958c', 'center');
+
+        // the three slots
+        for (let i = 0; i < 3; i++) {
+            const x = LW / 2 - 66 + i * 66;
+            const on = i === entry.length;
+            text(entry[i] || (on ? '_' : '-'), x, 250, 44, on ? '#f2efe9' : '#c9a94e', 'center');
+        }
+
+        for (const c of GRID) {
+            const ok = c.k === 'OK';
+            const live = !ok || entry.length === 3;
+            ctx.strokeStyle = live ? (ok ? '#c9a94e' : '#2e2a24') : '#1a1815';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(c.x, c.y, c.w, c.h);
+            text(c.k, c.x + c.w / 2, c.y + c.h / 2 + 6, c.k.length > 1 ? 13 : 18,
+                 live ? (ok ? '#c9a94e' : '#9a958c') : '#3a352f', 'center');
+        }
+
+        text(sending ? 'sending...' : 'type it, or tap the letters',
+             LW / 2, 520, 14 * u, '#6d685f', 'center');
+    }
+
     function draw() {
         ctx.clearRect(0, 0, LW, LH);
 
@@ -1594,11 +1817,37 @@
             }
         }
 
+        if (phase === 'initials') { drawInitials(u); return; }
+
+        // the table on its own, after a winning run has been recorded
+        if (phase === 'scores') {
+            ctx.fillStyle = 'rgba(0,0,0,0.86)';
+            ctx.fillRect(0, 0, LW, LH);
+            drawBoard(120, u);
+            text('tap to play again', LW / 2, 520, 15 * u, '#9a958c', 'center');
+            return;
+        }
+
+        // game over gets the table too, above the two choices. the dim goes on
+        // first and the choices and paddle are laid back over it, or the dim
+        // would bury the very thing you are meant to be picking.
+        if (phase === 'over' && BOARD_ON) {
+            ctx.fillStyle = 'rgba(0,0,0,0.82)';
+            ctx.fillRect(0, 0, LW, LH);
+            text('GAME OVER', LW / 2, 70, 30 * u, '#f2efe9', 'center');
+            text('final score ' + score, LW / 2, 96, 15 * u, '#9a958c', 'center');
+            drawBoard(126, u);
+            text('slide brandon onto a choice', LW / 2, 448, 14 * u, '#6d685f', 'center');
+            drawOverChoices(false);
+            drawPaddle();
+            drawOverChoices(true);
+            return;
+        }
+
         // the band stays away until the title beat, so the rise plays clean
         if (phase !== 'play' && phase !== 'entrance'
             && (phase !== 'ascend' || ascendT >= A_TITLE)) {
             const my = 424;
-            const over = phase === 'over';
             const bandH = 104 * u;
             ctx.fillStyle = 'rgba(0,0,0,0.72)';
             ctx.fillRect(0, my - bandH / 2, LW, bandH);
@@ -1608,15 +1857,11 @@
                       : banner;
             text(msg, LW / 2, my - 4 * u, 32 * u, '#f2efe9', 'center');
 
-            if (over) {
-                // the choices themselves live down at paddle height
-                text('final score ' + score + '   ·   slide brandon onto a choice',
-                     LW / 2, my + 26 * u, 15 * u, '#9a958c', 'center');
-            } else {
-                const sub = phase === 'ready' ? 'tap or space to serve'
-                          : phase === 'won' ? 'tap to play again' : 'tap to continue';
-                text(sub, LW / 2, my + 26 * u, 15 * u, '#9a958c', 'center');
-            }
+            const sub = phase === 'over' ? 'final score ' + score
+                            + '   ·   slide brandon onto a choice'
+                      : phase === 'ready' ? 'tap or space to serve'
+                      : phase === 'won' ? 'tap to play again' : 'tap to continue';
+            text(sub, LW / 2, my + 26 * u, 15 * u, '#9a958c', 'center');
         }
     }
 
