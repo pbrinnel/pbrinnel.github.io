@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Paul Brinnel</title>
+
+    <!-- not linked from anywhere, and kept out of search results -->
+    <meta name="robots" content="noindex, nofollow">
+
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon/favicon-16x16.png">
+    <meta name="theme-color" content="#000000">
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            background-color: #000;
+            color: #f2efe9;
+            font-family: 'Trebuchet MS', sans-serif;
+            padding: 20px;
+        }
+
+        #stage {
+            display: block;
+            background: #090908;
+            border: 1px solid #2e2a24;
+            border-radius: 3px;
+            touch-action: none;
+            cursor: none;
+            max-width: 100%;
+            box-shadow: inset 0 0 90px rgba(0, 0, 0, 0.85);
+        }
+
+        .hint {
+            font-size: 0.76rem;
+            font-style: italic;
+            color: #6d685f;
+            text-align: center;
+        }
+
+        #splash {
+            position: fixed;
+            inset: 0;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+            cursor: pointer;
+            transition: opacity 0.45s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        #splash.go {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #splash span {
+            font-size: clamp(3rem, 17vw, 13rem);
+            font-weight: bold;
+            letter-spacing: -0.03em;
+            line-height: 1;
+            color: #f2efe9;
+        }
+
+        /* the field is 4:3, which leaves a portrait phone showing a postage
+           stamp -- ask for landscape instead of shipping something unplayable */
+        #rotate { display: none; }
+
+        @media (max-width: 820px) and (orientation: portrait) {
+            #stage, .hint { display: none; }
+
+            #rotate {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 18px;
+                padding: 0 32px;
+                text-align: center;
+                color: #9a958c;
+                font-size: 1rem;
+                font-style: italic;
+                line-height: 1.5;
+            }
+
+            #rotate b {
+                font-size: 2.4rem;
+                font-style: normal;
+                letter-spacing: -0.02em;
+                color: #f2efe9;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="splash"><span>BRANDON</span></div>
+
+    <div id="rotate"><b>BRANDON</b>turn your phone sideways</div>
+
+    <canvas id="stage"></canvas>
+    <p class="hint">move to slide brandon &middot; click or space to serve</p>
+
+<script>
+(() => {
+    'use strict';
+
+    const LW = 800, LH = 600;
+
+    // ---- the shape ---------------------------------------------------------
+    // brandon lies along the diagonal of the source art at -34 degrees. rotate
+    // him level and his silhouette occupies the box below -- that box IS the
+    // brick, and the mask under it is his actual outline, sampled off the alpha
+    // channel. every number here was measured from paddle.webp, not guessed.
+    const PADDLE_LEVEL = 34 * Math.PI / 180;
+    const SHAPE = {
+        SW: 800, SH: 602,                 // source art
+        RW: 1000, RH: 948,                // its bounding box once rotated level
+        bx: 36, by: 382, bw: 896, bh: 316 // where he actually sits inside that
+    };
+    const SHAPE_ASPECT = SHAPE.bw / SHAPE.bh;     // 2.835 : 1
+
+    // 24 x 9 occupancy grid over that box. only 52% of it is solid, which is
+    // the whole point -- the ball threads between his legs and clips his boot.
+    const MASK = [
+        '......................##',
+        '.................#######',
+        '##........##############',
+        '#######################.',
+        '.######################.',
+        '........###############.',
+        '.........##############.',
+        '..........############..',
+        '...........###...####...'
+    ];
+    const MCOLS = 24, MROWS = 9;
+
+    // the paddle is the same art, drawn whole
+    const PADDLE_ASPECT  = SHAPE.SW / SHAPE.SH;
+    const BODY_LEN_PER_W = 1.1189;
+    const ART_OFF_X      = 0.0291;
+    const ART_OFF_Y      = 0.1052;
+    const BALL_ASPECT    = 141 / 209;
+
+    // ---- rules -------------------------------------------------------------
+    const MARGIN     = 44;
+    // his outline's own gaps are 4-12px, too tight for a 30px ball to thread,
+    // so the porosity has to come from the spacing instead -- that plus the
+    // empty corners of his bounding box makes real diagonal channels
+    const GAP        = 14;
+    const TOP        = 70;
+
+    const PADDLE_W   = 160;
+    const PADDLE_H   = 36;
+    const PADDLE_Y   = LH - 58;
+    const BALL_R     = 15;
+
+    const BASE_SPEED = 320;
+    const MAX_SPEED  = 620;
+    const MAX_ANGLE  = Math.PI / 3;
+
+    // pinball-bumper jiggle. purely visual -- hitboxes never move, so what you
+    // see wobbling is not what you are aiming at
+    const JIG_BRICK  = 5;     // px of throw on a direct hit
+    const JIG_NEIGH  = 0.75;  // how much of that a neighbour inherits
+    const JIG_PADDLE = 7;
+    const JIG_DECAY  = 3.4;   // units per second, so it settles in ~0.3s
+    const JIG_FREQ   = 15;    // radians across the decay, about two bounces
+
+    const SPIN_EDGE  = 11;
+    const SPIN_SWIPE = 0.045;
+    const SPIN_DECAY = 0.22;
+    const SPIN_MAX   = 40;
+    const ENGLISH_AT = 8;
+
+    const TIERS = {
+        R: { pts: 70, fill: '#9e4b3c' },
+        O: { pts: 50, fill: '#bd7f3f' },
+        G: { pts: 30, fill: '#6f7f4e' },
+        Y: { pts: 10, fill: '#c9a94e' }
+    };
+    // all mid-tone. nothing here darkens his face -- a damaged brick changes
+    // hue rather than getting a black wash over it
+    const SILVER     = '#b9bcc4';   // fresh multi-hit brick, bright steel
+    const SILVER_HIT = '#9c8f7d';   // once struck, worn to a dull taupe
+    const GOLD       = '#78767f';   // indestructible, cool slate
+
+    // ---- stages ------------------------------------------------------------
+    // 7 across puts each brandon at ~98px, about two thirds of the paddle.
+    // . empty   Y/G/O/R tiers   S silver, multi-hit   X gold, indestructible
+    const LEVELS = [
+        {
+            name: 'THE WALL', silverHp: 2,
+            rows: ['RRRRRRR',
+                   'OOOOOOO',
+                   'GGGGGGG',
+                   'YYYYYYY']
+        },
+        {
+            // a gold spine splits the field -- you have to work both halves
+            name: 'THE SPLIT', silverHp: 2,
+            rows: ['RRRRRRR',
+                   'OO.X.OO',
+                   'OO.X.OO',
+                   'GG.X.GG',
+                   '.YY.YY.']
+        },
+        {
+            name: 'THE MESH', silverHp: 2,
+            rows: ['S.S.S.S',
+                   '.R.R.R.',
+                   'S.S.S.S',
+                   '.O.O.O.',
+                   '.G.G.G.']
+        },
+        {
+            name: 'THE HAT', silverHp: 2,
+            rows: ['..RRR..',
+                   '..RRR..',
+                   '.OOOOO.',
+                   'YYYYYYY',
+                   '.YYYYY.']
+        }
+    ];
+
+    // ---- canvas ------------------------------------------------------------
+    const canvas = document.getElementById('stage');
+    const ctx = canvas.getContext('2d');
+
+    const paddleImg = Object.assign(new Image(), { src: 'images/brandon/paddle.webp' });
+    const ballImg   = Object.assign(new Image(), { src: 'images/brandon/ball.webp' });
+    const ready = img => img.complete && img.naturalWidth > 0;
+
+    // ---- state -------------------------------------------------------------
+    let bricks, stage, score, best, lives, combo, phase, banner;
+    let paddle, ball, popups, hits, tierSeen, halved, bw, bh;
+    let uiScale = 1;
+
+    function loadBest() {
+        try { return parseInt(localStorage.getItem('brandon.best'), 10) || 0; }
+        catch (e) { return 0; }
+    }
+    function saveBest() {
+        try { localStorage.setItem('brandon.best', String(best)); } catch (e) { /* private mode */ }
+    }
+
+    function buildStage(n) {
+        const lvl = LEVELS[n];
+        const cols = lvl.rows[0].length;
+        bw = (LW - MARGIN * 2 - GAP * (cols - 1)) / cols;
+        bh = bw / SHAPE_ASPECT;
+
+        bricks = [];
+        lvl.rows.forEach((row, r) => {
+            for (let c = 0; c < cols; c++) {
+                const ch = row[c];
+                if (!ch || ch === '.') continue;
+                const b = {
+                    x: MARGIN + c * (bw + GAP),
+                    y: TOP + r * (bh + GAP),
+                    kind: ch, alive: true, hp: 1, maxHp: 1, flash: 0,
+                    jt: 0, jnx: 0, jny: 0      // jiggle: energy, and which way
+                };
+                if (ch === 'S') { b.hp = b.maxHp = lvl.silverHp; }
+                bricks.push(b);
+            }
+        });
+        hits = 0;
+        tierSeen = {};
+        halved = false;
+        paddle.w = PADDLE_W;
+        resetBall();
+    }
+
+    function resetBall() {
+        ball.speed = BASE_SPEED;
+        ball.spin = 0;
+        ball.angle = 0;
+        combo = 0;
+        phase = 'ready';
+    }
+
+    function newGame() {
+        score = 0; lives = 3; stage = 0;
+        popups = [];
+        buildStage(0);
+        banner = '';
+    }
+
+    paddle = { x: LW / 2, prevX: LW / 2, vx: 0, w: PADDLE_W, jt: 0, tilt: 0 };
+    ball = { x: 0, y: 0, vx: 0, vy: 0, speed: BASE_SPEED, spin: 0, angle: 0 };
+    best = loadBest();
+    newGame();
+
+    // ---- splash ------------------------------------------------------------
+    // caught on the capture phase so the dismissing click or key does not also
+    // fall through and serve the ball
+    const splash = document.getElementById('splash');
+    let splashUp = true;
+    function dismissSplash(e) {
+        if (!splashUp) return;
+        splashUp = false;
+        splash.classList.add('go');
+        setTimeout(() => { splash.hidden = true; }, 500);
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    addEventListener('pointerdown', dismissSplash, true);
+    addEventListener('keydown', dismissSplash, true);
+
+    // ---- input -------------------------------------------------------------
+    const track = e => {
+        const r = canvas.getBoundingClientRect();
+        paddle.x = (e.clientX - r.left) / r.width * LW;
+    };
+    canvas.addEventListener('pointermove', track);
+    canvas.addEventListener('pointerdown', e => { track(e); action(); });
+    addEventListener('keydown', e => {
+        if (e.code === 'Space') { e.preventDefault(); action(); }
+        if (e.code === 'ArrowLeft')  paddle.x -= 34;
+        if (e.code === 'ArrowRight') paddle.x += 34;
+    });
+
+    function action() {
+        if (phase === 'ready') {
+            const a = -Math.PI / 2 + (Math.random() * 0.7 - 0.35);
+            ball.vx = Math.cos(a) * ball.speed;
+            ball.vy = Math.sin(a) * ball.speed;
+            phase = 'play';
+        } else if (phase === 'cleared') {
+            stage++;
+            buildStage(stage);
+            banner = '';
+        } else if (phase === 'over' || phase === 'won') {
+            newGame();
+        }
+    }
+
+    // ---- scoring -----------------------------------------------------------
+    function award(base, x, y) {
+        let pts = base + 0.5 * base * combo;
+        const spin = Math.abs(ball.spin);
+        const english = spin > ENGLISH_AT;
+        if (english) pts *= 1 + Math.min(spin, SPIN_MAX) / SPIN_MAX * 0.5;
+
+        pts = Math.round(pts);
+        score += pts;
+        if (score > best) { best = score; saveBest(); }
+        popups.push({ x, y, text: '+' + pts, english, life: 1 });
+        combo++;
+    }
+
+    function bumpSpeed(f) {
+        ball.speed = Math.min(ball.speed * f, MAX_SPEED);
+        const m = Math.hypot(ball.vx, ball.vy) || 1;
+        ball.vx = ball.vx / m * ball.speed;
+        ball.vy = ball.vy / m * ball.speed;
+    }
+
+    // one decaying bounce-back, used by everything that jiggles
+    function wobble(jt) { return Math.sin((1 - jt) * JIG_FREQ) * jt; }
+
+    function kick(b, nx, ny, power) {
+        if (power <= b.jt) return;          // a harder knock wins
+        b.jt = power; b.jnx = nx; b.jny = ny;
+    }
+
+    // knocking one loose shoves the ones around it -- makes the wall feel
+    // like a physical thing rather than a grid of independent tiles
+    function shockwave(src) {
+        const range = (bw + GAP) * 1.25;
+        for (const o of bricks) {
+            if (!o.alive || o === src) continue;
+            const dx = o.x - src.x, dy = o.y - src.y;
+            const d = Math.hypot(dx, dy);
+            if (d > range || d < 1e-4) continue;
+            kick(o, dx / d, dy / d, (1 - d / range) * JIG_NEIGH);
+        }
+    }
+
+    function hitBrick(b) {
+        b.flash = 1;
+        if (b.kind === 'X') return;
+
+        if (b.kind === 'S') {
+            if (--b.hp > 0) return;
+            b.alive = false;
+            shockwave(b);
+            award(25 * b.maxHp, b.x + bw / 2, b.y);
+        } else {
+            b.alive = false;
+            shockwave(b);
+            award(TIERS[b.kind].pts, b.x + bw / 2, b.y);
+            if (!tierSeen[b.kind] && (b.kind === 'O' || b.kind === 'R')) {
+                tierSeen[b.kind] = true;
+                bumpSpeed(1.1);
+            }
+        }
+
+        if (++hits === 4 || hits === 12) bumpSpeed(1.12);
+        if (!bricks.some(x => x.alive && x.kind !== 'X')) clearStage();
+    }
+
+    function clearStage() {
+        const bonus = 500 * (stage + 1);
+        score += bonus;
+        if (score > best) { best = score; saveBest(); }
+        if (stage === LEVELS.length - 1) {
+            phase = 'won';
+            banner = 'YOU BEAT BRANDON   +' + bonus;
+        } else {
+            phase = 'cleared';
+            banner = 'STAGE CLEAR   +' + bonus;
+        }
+    }
+
+    function loseLife() {
+        lives--;
+        combo = 0;
+        if (lives <= 0) { phase = 'over'; banner = 'GAME OVER'; return; }
+        paddle.w = PADDLE_W;
+        halved = false;
+        resetBall();
+    }
+
+    // ---- collision against his outline --------------------------------------
+    // average the solid mask cells the ball is touching, and bounce off the
+    // line from that centroid to the ball. flat where he is flat, and properly
+    // strange around his boot and the gap under his knees.
+    function contact(b) {
+        const cw = bw / MCOLS, chh = bh / MROWS;
+        const c0 = Math.max(0, Math.floor((ball.x - BALL_R - b.x) / cw));
+        const c1 = Math.min(MCOLS - 1, Math.floor((ball.x + BALL_R - b.x) / cw));
+        const r0 = Math.max(0, Math.floor((ball.y - BALL_R - b.y) / chh));
+        const r1 = Math.min(MROWS - 1, Math.floor((ball.y + BALL_R - b.y) / chh));
+
+        const reach = (BALL_R + Math.max(cw, chh) * 0.5) ** 2;
+        let sx = 0, sy = 0, n = 0;
+        for (let r = r0; r <= r1; r++) {
+            const line = MASK[r];
+            for (let c = c0; c <= c1; c++) {
+                if (line[c] !== '#') continue;
+                const px = b.x + (c + 0.5) * cw, py = b.y + (r + 0.5) * chh;
+                if ((px - ball.x) ** 2 + (py - ball.y) ** 2 > reach) continue;
+                sx += px; sy += py; n++;
+            }
+        }
+        return n ? { cx: sx / n, cy: sy / n } : null;
+    }
+
+    // ---- physics -----------------------------------------------------------
+    function stepPhysics(dt) {
+        const r = BALL_R, halfW = paddle.w / 2, halfH = PADDLE_H / 2;
+
+        ball.x += ball.vx * dt;
+        ball.y += ball.vy * dt;
+
+        if (ball.x - r < 0)  { ball.x = r;      ball.vx =  Math.abs(ball.vx); ball.spin *= -0.55; }
+        if (ball.x + r > LW) { ball.x = LW - r; ball.vx = -Math.abs(ball.vx); ball.spin *= -0.55; }
+        if (ball.y - r < 0)  {
+            ball.y = r; ball.vy = Math.abs(ball.vy); ball.spin *= -0.55;
+            if (!halved) { halved = true; paddle.w = PADDLE_W / 2; }
+        }
+        if (ball.y - r > LH) { loseLife(); return; }
+
+        for (const b of bricks) {
+            if (!b.alive) continue;
+            if (ball.x + r <= b.x || ball.x - r >= b.x + bw) continue;   // cheap reject
+            if (ball.y + r <= b.y || ball.y - r >= b.y + bh) continue;
+
+            const hit = contact(b);
+            if (!hit) continue;
+
+            let nx = ball.x - hit.cx, ny = ball.y - hit.cy;
+            let len = Math.hypot(nx, ny);
+            if (len < 1e-4) { nx = 0; ny = -1; len = 1; }
+            nx /= len; ny /= len;
+
+            const dot = ball.vx * nx + ball.vy * ny;
+            if (dot < 0) { ball.vx -= 2 * dot * nx; ball.vy -= 2 * dot * ny; }
+            ball.x += nx * 3; ball.y += ny * 3;          // nudge clear
+
+            // his contours can flatten a bounce out to nearly horizontal, which
+            // would leave the ball skating sideways forever
+            if (Math.abs(ball.vy) < ball.speed * 0.16) {
+                ball.vy = (ball.vy < 0 ? -1 : 1) * ball.speed * 0.16;
+                const m = Math.hypot(ball.vx, ball.vy) || 1;
+                ball.vx = ball.vx / m * ball.speed;
+                ball.vy = ball.vy / m * ball.speed;
+            }
+
+            kick(b, -nx, -ny, 1);       // shoved away from where the ball struck
+            hitBrick(b);
+            break;
+        }
+
+        if (ball.vy > 0 &&
+            ball.x + r > paddle.x - halfW && ball.x - r < paddle.x + halfW &&
+            ball.y + r > PADDLE_Y - halfH && ball.y - r < PADDLE_Y + halfH) {
+
+            ball.y = PADDLE_Y - halfH - r;
+
+            const off = Math.max(-1, Math.min(1, (ball.x - paddle.x) / halfW));
+            const a = off * MAX_ANGLE;
+            ball.vx =  Math.sin(a) * ball.speed;
+            ball.vy = -Math.cos(a) * ball.speed;
+
+            ball.spin += off * SPIN_EDGE + paddle.vx * SPIN_SWIPE;
+            ball.spin = Math.max(-SPIN_MAX, Math.min(SPIN_MAX, ball.spin));
+
+            paddle.jt = 1;              // recoil, tilting toward the end he took it on
+            paddle.tilt = off;
+
+            combo = 0;
+            if (++hits === 4 || hits === 12) bumpSpeed(1.12);
+        }
+    }
+
+    function update(dt) {
+        const halfW = paddle.w / 2;
+        paddle.x = Math.max(halfW, Math.min(LW - halfW, paddle.x));
+        paddle.vx = (paddle.x - paddle.prevX) / Math.max(dt, 1e-4);
+        paddle.prevX = paddle.x;
+
+        if (phase === 'ready') {
+            ball.x = paddle.x;
+            ball.y = PADDLE_Y - PADDLE_H / 2 - BALL_R - 2;
+        } else if (phase === 'play') {
+            const steps = Math.max(1, Math.ceil(Math.hypot(ball.vx, ball.vy) * dt / 7));
+            for (let i = 0; i < steps && phase === 'play'; i++) stepPhysics(dt / steps);
+        }
+
+        ball.spin -= ball.spin * SPIN_DECAY * dt;
+        ball.angle += ball.spin * dt;
+
+        for (const b of bricks) {
+            if (b.flash > 0) b.flash -= dt * 6;
+            if (b.jt > 0) b.jt = Math.max(0, b.jt - dt * JIG_DECAY);
+        }
+        if (paddle.jt > 0) paddle.jt = Math.max(0, paddle.jt - dt * JIG_DECAY);
+        popups = popups.filter(p => (p.life -= dt * 1.4) > 0);
+    }
+
+    // ---- drawing -----------------------------------------------------------
+    const SS = 3;
+    const spriteCache = new Map();
+
+    // t > 0 lifts a colour toward the page cream, t < 0 sinks it toward black
+    function shade(hex, t) {
+        const n = parseInt(hex.slice(1), 16);
+        const to = t > 0 ? [242, 239, 233] : [0, 0, 0];
+        const k = Math.abs(t);
+        const ch = i => {
+            const v = (n >> (16 - i * 8)) & 255;
+            return Math.round(v + (to[i] - v) * k);
+        };
+        return `rgb(${ch(0)},${ch(1)},${ch(2)})`;
+    }
+
+    // lay him into a w x h box, levelled, with his outline filling it exactly
+    function placeShape(g, w, h, grey) {
+        g.save();
+        g.scale(w / SHAPE.bw, h / SHAPE.bh);
+        g.translate(-SHAPE.bx, -SHAPE.by);
+        g.translate(SHAPE.RW / 2, SHAPE.RH / 2);
+        g.rotate(PADDLE_LEVEL);
+        if (grey) g.filter = 'grayscale(1) contrast(1.1) brightness(1.95)';
+        g.drawImage(paddleImg, -SHAPE.SW / 2, -SHAPE.SH / 2, SHAPE.SW, SHAPE.SH);
+        g.filter = 'none';
+        g.restore();
+    }
+
+    // kind 'flash' / 'dark' give flat silhouettes for the hit and damage states
+    function brickSprite(kind) {
+        const key = kind + '@' + Math.round(bw);
+        if (spriteCache.has(key)) return spriteCache.get(key);
+        if (!ready(paddleImg)) return null;
+
+        const c = document.createElement('canvas');
+        c.width = Math.round(bw * SS);
+        c.height = Math.round(bh * SS);
+        const g = c.getContext('2d');
+        g.scale(SS, SS);
+
+        if (kind === 'flash') {
+            placeShape(g, bw, bh, false);
+            g.globalCompositeOperation = 'source-in';
+            g.fillStyle = '#f2efe9';
+            g.fillRect(0, 0, bw, bh);
+        } else {
+            const color = kind === 'X'  ? GOLD
+                        : kind === 'S'  ? SILVER
+                        : kind === 'S2' ? SILVER_HIT
+                        : TIERS[kind].fill;
+            // he is nearly all black shirt and dark denim, so multiplying a
+            // colour through him just makes mud. lift him to near-white first,
+            // then wash the tier colour over only his own pixels -- that keeps
+            // the colour vivid and leaves his shading as texture underneath.
+            placeShape(g, bw, bh, true);
+
+            g.globalCompositeOperation = 'source-atop';
+            g.globalAlpha = 0.8;
+            g.fillStyle = shade(color, 0.12);
+            g.fillRect(0, 0, bw, bh);
+            g.globalAlpha = 1;
+        }
+
+        g.globalCompositeOperation = 'source-over';
+        spriteCache.set(key, c);
+        return c;
+    }
+
+    function drawBrick(b) {
+        // a struck silver brick swaps to its own worn tint, rather than taking
+        // a dark wash over the top of him
+        const worn = b.kind === 'S' && b.hp < b.maxHp;
+        const sprite = brickSprite(worn ? 'S2' : b.kind);
+        if (!sprite) return;
+
+        const o = b.jt > 0 ? wobble(b.jt) * JIG_BRICK : 0;
+        const x = b.x + b.jnx * o, y = b.y + b.jny * o;
+        ctx.drawImage(sprite, x, y, bw, bh);
+
+        if (b.flash > 0) {
+            ctx.globalAlpha = Math.min(1, b.flash) * 0.75;
+            ctx.drawImage(brickSprite('flash'), x, y, bw, bh);
+            ctx.globalAlpha = 1;
+        }
+    }
+
+    function drawPaddle() {
+        const artW = (paddle.w / BODY_LEN_PER_W);
+        const artH = artW / PADDLE_ASPECT;
+        const o = paddle.jt > 0 ? wobble(paddle.jt) : 0;
+        ctx.save();
+        ctx.translate(paddle.x, PADDLE_Y + o * JIG_PADDLE);
+        ctx.rotate(PADDLE_LEVEL + o * 0.07 * (paddle.tilt || 0));
+        if (ready(paddleImg)) {
+            ctx.drawImage(paddleImg,
+                -artW / 2 - ART_OFF_X * artW,
+                -artH / 2 - ART_OFF_Y * artH, artW, artH);
+        } else {
+            ctx.fillStyle = '#2b2b2e';
+            ctx.fillRect(-artW / 2, -artH * 0.15, artW, artH * 0.3);
+        }
+        ctx.restore();
+    }
+
+    function drawBall(x, y, r, angle) {
+        const w = r * 2, h = w / BALL_ASPECT;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        if (ready(ballImg)) ctx.drawImage(ballImg, -w / 2, -h / 2, w, h);
+        else { ctx.fillStyle = '#c8a08c'; ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.fill(); }
+        ctx.restore();
+    }
+
+    function text(str, x, y, size, color, align) {
+        ctx.fillStyle = color;
+        ctx.font = size + 'px "Trebuchet MS", sans-serif';
+        ctx.textAlign = align || 'left';
+        ctx.fillText(str, x, y);
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, LW, LH);
+
+        for (const b of bricks) if (b.alive) drawBrick(b);
+        drawPaddle();
+        if (phase !== 'over' && phase !== 'won') drawBall(ball.x, ball.y, BALL_R, ball.angle);
+
+        for (const p of popups) {
+            ctx.globalAlpha = Math.min(1, p.life);
+            text(p.text, p.x, p.y - 26 * (1 - p.life), 15,
+                 p.english ? '#c9a94e' : '#f2efe9', 'center');
+            ctx.globalAlpha = 1;
+        }
+
+        const u = uiScale;
+        text('SCORE ' + score, 15 * u, 27 * u, 15 * u, '#f2efe9');
+        text('BEST ' + best, 15 * u, 46 * u, 13 * u, '#6d685f');
+        text(LEVELS[stage].name, LW / 2, 27 * u, 14 * u, '#6d685f', 'center');
+        if (combo >= 2) {
+            text('x' + (1 + 0.5 * combo).toFixed(1), LW / 2, 48 * u, 16 * u, '#c9a94e', 'center');
+        }
+        for (let i = 0; i < lives; i++) drawBall(LW - (25 + i * 29) * u, 25 * u, 9 * u, 0);
+
+        if (phase !== 'play') {
+            const my = 424, bandH = 104 * u;
+            ctx.fillStyle = 'rgba(0,0,0,0.72)';
+            ctx.fillRect(0, my - bandH / 2, LW, bandH);
+            const msg = phase === 'ready' ? (stage === 0 && lives === 3 && score === 0
+                            ? 'BRANDON' : 'READY')
+                      : banner;
+            text(msg, LW / 2, my - 4 * u, 32 * u, '#f2efe9', 'center');
+
+            const sub = phase === 'ready' ? 'tap or space to serve'
+                      : phase === 'cleared' ? 'tap to continue'
+                      : 'final score ' + score + '   ·   tap to play again';
+            text(sub, LW / 2, my + 26 * u, 15 * u, '#9a958c', 'center');
+        }
+    }
+
+    // ---- loop --------------------------------------------------------------
+    function resize() {
+        const dpr = Math.min(devicePixelRatio || 1, 2);
+        // fit BOTH ways -- on a phone in landscape the height is what runs out
+        // first, and fitting only the width would push the paddle off-screen
+        const availW = document.body.clientWidth - 24;
+        const availH = innerHeight - 68;              // leaves room for the hint
+        const scale = Math.min(availW / LW, availH / LH, 1);
+        canvas.style.width = Math.floor(LW * scale) + 'px';
+        canvas.style.height = Math.floor(LH * scale) + 'px';
+
+        // the whole field shrinks on a phone, which would leave the hud at
+        // about 7px. draw it proportionally larger so it stays readable.
+        uiScale = Math.min(2.2, Math.max(1, 13 / (15 * scale)));
+        canvas.width = LW * dpr;
+        canvas.height = LH * dpr;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    addEventListener('resize', resize);
+    resize();
+
+    let last = performance.now();
+    (function frame(now) {
+        const dt = Math.min((now - last) / 1000, 0.05); // clamped so tab-outs don't teleport
+        last = now;
+        update(dt);
+        draw();
+        requestAnimationFrame(frame);
+    })(last);
+})();
+</script>
+</body>
+</html>
