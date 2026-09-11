@@ -212,6 +212,13 @@
     // with no made-up forces involved.
     const BALL_RX = 15, BALL_RY = 22;
     const BALL_MAX = Math.max(BALL_RX, BALL_RY);   // conservative, for cheap rejects
+    const BRAIN_MUL = 1.7;                         // how much BIG BRAIN swells it
+
+    // the player's ball can grow; the boss's phantoms never do, so they keep
+    // using the bare constants above
+    function bRX()  { return BALL_RX  * (fx.R > 0 ? BRAIN_MUL : 1); }
+    function bRY()  { return BALL_RY  * (fx.R > 0 ? BRAIN_MUL : 1); }
+    function bMAX() { return BALL_MAX * (fx.R > 0 ? BRAIN_MUL : 1); }
 
     const BASE_SPEED = 320;
     const MAX_SPEED  = 620;
@@ -329,15 +336,25 @@
     // and the KEY is the letter printed on the falling capsule -- so they
     // always agree
     const CAPS = {
-        B: { name: 'BIG BRANDON',     short: 'BIG',     color: '#5b8cab', secs: 10 },
-        D: { name: 'DOUBLE BRANDON',  short: 'DOUBLE',  color: '#8f7fc4', secs: 12 },
-        S: { name: 'SLOW BRANDON',    short: 'SLOW',    color: '#4f9d8c', secs: 8  },
-        M: { name: 'MULTI-BRANDON',   short: 'MULTI',   color: '#e0c060', secs: 0  },
-        W: { name: 'WIGGLY BRANDON',  short: 'WIGGLY',  color: '#c06a8f', secs: 9, bonus: true },
-        E: { name: 'ENGLISH BRANDON', short: 'ENGLISH', color: '#cf6b4e', secs: 9, bonus: true }
+        B: { name: 'BIG BRANDON',       short: 'BIG',     color: '#5b8cab', secs: 10 },
+        D: { name: 'DOUBLE BRANDON',    short: 'DOUBLE',  color: '#8f7fc4', secs: 12 },
+        S: { name: 'SLOW BRANDON',      short: 'SLOW',    color: '#4f9d8c', secs: 8  },
+        M: { name: 'MULTI-BRANDON',     short: 'MULTI',   color: '#e0c060', secs: 0  },
+        // R for bRain, because B was already spoken for
+        R: { name: 'BIG BRAIN BRANDON', short: 'BRAIN',   color: '#d98cc0', secs: 9  },
+        P: { name: 'PIERCING BRANDON',  short: 'PIERCE',  color: '#7fc4b0', secs: 6, noBoss: true },
+        W: { name: 'WIGGLY BRANDON',    short: 'WIGGLY',  color: '#c06a8f', secs: 9, bonus: true },
+        E: { name: 'ENGLISH BRANDON',   short: 'ENGLISH', color: '#cf6b4e', secs: 9, bonus: true }
     };
-    const TIMED = ['B', 'D', 'S', 'W', 'E'];     // M is instant
+    const TIMED = ['B', 'D', 'S', 'R', 'P', 'W', 'E'];     // M is instant
     const CAP_KEYS = Object.keys(CAPS);
+
+    // PIERCE would let you sit inside the boss racking up hits, so it simply
+    // never drops on his stage rather than needing a special case in the
+    // collision code
+    function capsulePool() {
+        return LEVELS[stage].boss ? CAP_KEYS.filter(k => !CAPS[k].noBoss) : CAP_KEYS;
+    }
     const CALLOUT_SECS = 1.15;
 
     const TIERS = {
@@ -350,7 +367,7 @@
     // hue rather than getting a black wash over it
     const SILVER     = '#b9bcc4';
     const SILVER_HIT = '#9c8f7d';
-    const GOLD       = '#78767f';
+    const GOLD       = '#7d776b';   // stone. the unbreakable ones are statues.
 
     // ---- stages ------------------------------------------------------------
     // 7 across puts each brandon at ~90px, about two thirds of the paddle.
@@ -409,7 +426,7 @@
     let paddle, balls, popups, hits, tierSeen, bw, bh;
     let speed, capsule, fx, callout, clock = 0, spreadT = 0, bossPhase = 0;
     let ascendT = 0, uiScale = 1;
-    let phantoms = [], phGap = 0, shout = null, enterT = 0;
+    let phantoms = [], phGap = 0, shout = null, enterT = 0, rings = [];
 
     function loadBest() {
         try { return parseInt(localStorage.getItem('brandon.best'), 10) || 0; }
@@ -423,11 +440,11 @@
     // half-extents of the rotated ellipse along each world axis
     function extX(b) {
         const c = Math.cos(b.angle), s = Math.sin(b.angle);
-        return Math.hypot(BALL_RX * c, BALL_RY * s);
+        return Math.hypot(bRX() * c, bRY() * s);
     }
     function extY(b) {
         const c = Math.cos(b.angle), s = Math.sin(b.angle);
-        return Math.hypot(BALL_RX * s, BALL_RY * c);
+        return Math.hypot(bRX() * s, bRY() * c);
     }
 
     // ---- the paddle, which may be one brandon or two ------------------------
@@ -478,17 +495,23 @@
     }
 
     function newBall(x, y) {
-        return { x, y, vx: 0, vy: 0, spin: 0, angle: 0, stuck: false, off: 0 };
+        // `pierced` remembers what this ball has already gone through on the
+        // current trip. a piercing ball overlaps a brick across several physics
+        // substeps, so without it one pass would drain a silver brick's whole
+        // health bar instead of a single point.
+        return { x, y, vx: 0, vy: 0, spin: 0, angle: 0, stuck: false, off: 0,
+                 pierced: new Set() };
     }
 
     function clearEffects() {
-        fx = { B: 0, D: 0, S: 0, W: 0, E: 0 };
+        fx = { B: 0, D: 0, S: 0, R: 0, P: 0, W: 0, E: 0 };
         paddle.w = PADDLE_W;
         capsule = null;
         callout = null;
         spreadT = 0;                      // a fresh ball starts as one brandon
         phantoms = [];
         shout = null;
+        rings = [];
         for (const b of bricks || []) b.wigA = 0;
     }
 
@@ -610,7 +633,7 @@
         speed = BASE_SPEED * (1 + 0.08 * stage);
         clearEffects();
         combo = 0;
-        const b = newBall(paddle.x, PADDLE_Y - padH() / 2 - BALL_RY - 2);
+        const b = newBall(paddle.x, PADDLE_Y - padH() / 2 - bRY() - 2);
         b.stuck = true;
         balls = [b];
         ascendT = 0;
@@ -625,7 +648,7 @@
     }
 
     paddle = { x: LW / 2, prevX: LW / 2, vx: 0, w: PADDLE_W, jt: 0, tilt: 0 };
-    fx = { B: 0, D: 0, S: 0, W: 0, E: 0 };
+    fx = { B: 0, D: 0, S: 0, R: 0, P: 0, W: 0, E: 0 };
     best = loadBest();
     newGame();
 
@@ -751,7 +774,8 @@
     function maybeDropCapsule(x, y) {
         if (capsule) return;                       // only one falling at a time
         if (Math.random() > CAP_CHANCE) return;
-        capsule = { x, y, kind: CAP_KEYS[(Math.random() * CAP_KEYS.length) | 0] };
+        const pool = capsulePool();
+        capsule = { x, y, kind: pool[(Math.random() * pool.length) | 0] };
     }
 
     function splitBalls() {
@@ -796,7 +820,7 @@
     function shockwave(src) {
         const range = (bw + GAP) * 1.25;
         for (const o of bricks) {
-            if (!o.alive || o === src) continue;
+            if (!o.alive || o === src || o.kind === 'X') continue;
             const dx = o.x - src.x, dy = o.y - src.y;
             const d = Math.hypot(dx, dy);
             if (d > range || d < 1e-4) continue;
@@ -805,8 +829,11 @@
     }
 
     function hitBrick(b, spin) {
-        b.flash = 1;
+        // the white flash is the "I hurt it" signal. a solid brick must not
+        // give it, or the game is telling you to keep swinging at something
+        // that will never break.
         if (b.kind === 'X') return;
+        b.flash = 1;
 
         if (b.kind === 'Z') {                        // the boss
             b.hp--;
@@ -818,8 +845,9 @@
             if (b.hp <= 0) { b.alive = false; clearStage(); return; }
             // he coughs up a capsule every few hits, so the fight has tools
             if (b.hp % BOSS_CAP === 0 && !capsule) {
+                const pool = capsulePool();
                 capsule = { x: b.x + bw / 2, y: b.y + bh / 2,
-                            kind: CAP_KEYS[(Math.random() * CAP_KEYS.length) | 0] };
+                            kind: pool[(Math.random() * pool.length) | 0] };
             }
             if (++hits === 4 || hits === 12) bumpSpeed(1.12);
             return;
@@ -941,10 +969,10 @@
         // a cell counts as touched if its centre falls inside the ball's
         // ellipse grown by half a cell
         const pad = Math.max(cw, chh) * 0.5;
-        const rx = BALL_RX + pad, ry = BALL_RY + pad;
+        const rx = bRX() + pad, ry = bRY() + pad;
         const ang = -(ball.angle - a);          // head's facing, in this frame
         const ca = Math.cos(ang), sa = Math.sin(ang);
-        const span = BALL_MAX + pad;
+        const span = bMAX() + pad;
 
         const c0 = Math.max(0, Math.floor((bx - span - br.x) / cw));
         const c1 = Math.min(MCOLS - 1, Math.floor((bx + span - br.x) / cw));
@@ -998,11 +1026,24 @@
             if (!br.alive) continue;
             // cheap reject, padded out to the wiggled bounding box
             const pad = br.wigA ? bh * 0.35 : 0;
-            if (b.x + BALL_MAX <= br.x - pad || b.x - BALL_MAX >= br.x + bw + pad) continue;
-            if (b.y + BALL_MAX <= br.y - pad || b.y - BALL_MAX >= br.y + bh + pad) continue;
+            const bm = bMAX();
+            if (b.x + bm <= br.x - pad || b.x - bm >= br.x + bw + pad) continue;
+            if (b.y + bm <= br.y - pad || b.y - bm >= br.y + bh + pad) continue;
 
             const hit = contact(br, b);
             if (!hit) continue;
+
+            // PIERCE: plough straight on through the breakable ones, taking
+            // as many as lie in the path. `continue` rather than `break`, so a
+            // single step can clear a whole run of them. The solid ones still
+            // turn you -- being able to pass through those would gut THE SPLIT.
+            if (fx.P > 0 && br.kind !== 'X' && br.kind !== 'Z') {
+                if (!b.pierced.has(br)) {     // one point of damage each, per trip
+                    b.pierced.add(br);
+                    hitBrick(br, b.spin);
+                }
+                continue;
+            }
 
             let nx = b.x - hit.cx, ny = b.y - hit.cy;
             let len = Math.hypot(nx, ny);
@@ -1021,7 +1062,10 @@
                 b.vx = b.vx / q * s; b.vy = b.vy / q * s;
             }
 
-            kick(br, -nx, -ny, 1);       // shoved away from where the ball struck
+            // a solid one does not budge, and does not pretend to. it gets a
+            // ring of impact at the contact point instead of a damage flash.
+            if (br.kind === 'X') rings.push({ x: hit.cx, y: hit.cy, t: 1 });
+            else kick(br, -nx, -ny, 1);   // shoved away from where the ball struck
             hitBrick(br, b.spin);
             break;
         }
@@ -1048,6 +1092,7 @@
                 paddle.tilt = off;
 
                 combo = 0;                  // the run ends when it comes home
+                b.pierced.clear();          // ...and so does what it has been through
                 if (++hits === 4 || hits === 12) bumpSpeed(1.12);
                 break;
             }
@@ -1076,6 +1121,7 @@
         }
         stepPhantoms(dt);
         if (shout && (shout.life -= dt) <= 0) shout = null;
+        rings = rings.filter(r => (r.t -= dt * 2.6) > 0);
 
         // the takeover. when it finishes, the banner finally lands.
         if (phase === 'ascend') {
@@ -1100,12 +1146,15 @@
         // through an edge that rotated out from under it
         const amp = wigAmp();
         for (const b of bricks) {
-            b.wigA = amp ? Math.sin(clock * WIG_FREQ * b.wigF + b.wigP) * amp : 0;
+            // what cannot be broken also cannot be moved -- the solid ones
+            // stay rigid while the whole wall sways around them
+            b.wigA = (amp && b.kind !== 'X')
+                ? Math.sin(clock * WIG_FREQ * b.wigF + b.wigP) * amp : 0;
         }
 
         for (const b of balls) if (b.stuck) {
             b.x = paddle.x + b.off;
-            b.y = PADDLE_Y - padH() / 2 - BALL_RY - 2;
+            b.y = PADDLE_Y - padH() / 2 - bRY() - 2;
         }
 
         if (phase === 'play') {
@@ -1187,8 +1236,10 @@
         g.restore();
     }
 
-    // one tinted brandon at a given size, cached. `flat` gives a solid
-    // silhouette, used for the white hit flash.
+    // one tinted brandon at a given size, cached. `flat` true gives a solid
+    // silhouette (the white hit flash); 'statue' gives stone with a whisper of
+    // carved relief, which is how the unbreakable ones read as a different
+    // material rather than just a different colour.
     function shapeSprite(key, color, w, h, flat) {
         const k = key + '@' + Math.round(w);
         if (spriteCache.has(k)) return spriteCache.get(k);
@@ -1207,6 +1258,14 @@
             g.globalCompositeOperation = 'source-in';
             g.fillStyle = color;
             g.fillRect(0, 0, w, h);
+            if (flat === 'statue') {
+                // a faint pass of his own shading back over the stone, so it
+                // reads as carved rather than as a missing texture
+                g.globalCompositeOperation = 'source-atop';
+                g.globalAlpha = 0.18;
+                placeShape(g, w, h, true);
+                g.globalAlpha = 1;
+            }
         } else {
             // he is nearly all black shirt and dark denim, so multiplying a
             // colour through him just makes mud. lift him to near-white first,
@@ -1273,7 +1332,8 @@
         // a struck silver brick swaps to its own worn tint, rather than taking
         // a dark wash over the top of him
         const kind = (b.kind === 'S' && b.hp < b.maxHp) ? 'S2' : b.kind;
-        const sprite = shapeSprite(kind, brickColor(kind), bw, bh, false);
+        const sprite = shapeSprite(kind, brickColor(kind), bw, bh,
+                                   kind === 'X' ? 'statue' : false);
         if (!sprite) return;
 
         const o = b.jt > 0 ? wobble(b.jt) * JIG_BRICK : 0;
@@ -1393,6 +1453,22 @@
         return w > maxW ? size * (maxW / w) : size;
     }
 
+    // the clang off an unbreakable brick: a ring spreading from the point of
+    // contact. deliberately nothing like the damage flash -- it says "solid",
+    // not "nearly".
+    function drawRings() {
+        if (!rings.length) return;
+        ctx.lineWidth = 2;
+        for (const r of rings) {
+            ctx.globalAlpha = r.t * 0.7;
+            ctx.strokeStyle = '#cfc7b6';
+            ctx.beginPath();
+            ctx.arc(r.x, r.y, 7 + (1 - r.t) * 26, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+    }
+
     // his phantoms, drawn under the real ball so the one that matters stays
     // the most solid thing on screen
     function drawPhantoms() {
@@ -1439,6 +1515,7 @@
         ctx.clearRect(0, 0, LW, LH);
 
         for (const b of bricks) if (b.alive) drawBrick(b);
+        drawRings();
         drawCapsule();
         drawOverChoices(false);   // boxes under him -- he is the cursor
         drawPaddle();
@@ -1448,7 +1525,7 @@
 
         // no ball once the fight is settled, the takeover included
         if (phase === 'ready' || phase === 'play' || phase === 'cleared') {
-            for (const b of balls) drawBall(b.x, b.y, BALL_RX, b.angle);
+            for (const b of balls) drawBall(b.x, b.y, bRX(), b.angle);
         }
 
         for (const p of popups) {
