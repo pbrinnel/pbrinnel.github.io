@@ -112,31 +112,6 @@
             text-align: center;
         }
 
-        /* the way back into fullscreen once you have left it, and the only way
-           in at all on a desktop, where a click going fullscreen unasked would
-           be startling. it hides itself while fullscreen is up, so it never
-           sits over the field during the part that matters. */
-        #fs {
-            position: fixed;
-            top: 0; right: 0;
-            z-index: 5;
-            width: 44px; height: 44px;      /* a real target, not just a glyph */
-            margin: max(0px, env(safe-area-inset-top)) max(0px, env(safe-area-inset-right)) 0 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: none;
-            border: 0;
-            color: #4a453e;
-            font-size: 17px;
-            line-height: 1;
-            cursor: pointer;
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        #fs:hover { color: #9a958c; }
-        #fs[hidden] { display: none; }
-
         #splash {
             position: fixed;
             inset: 0;
@@ -263,8 +238,6 @@
     <div id="rotate"><b>BRANDON</b>turn your phone sideways</div>
 
     <div id="debug" hidden><h2>STAGE SELECT</h2></div>
-
-    <button id="fs" type="button" hidden aria-label="Fullscreen" title="Fullscreen">&#9974;</button>
 
     <canvas id="stage"></canvas>
     <p class="hint">move to slide brandon &middot; click or space to serve</p>
@@ -867,23 +840,30 @@
     fetchBoard();                 // async; the game never waits on it
     newGame();
 
-    // ---- fullscreen ----------------------------------------------------------
-    // The address bar is the single biggest thing between a phone and a playable
-    // field. The field scales off the HEIGHT -- it is 4:3 on a screen that is
-    // nearer 21:9 -- so a 90px bar on a 390px-tall landscape phone is not 23% of
-    // the screen, it is 23% off every dimension and closer to 40% of the area.
+    // ---- getting rid of the address bar --------------------------------------
+    // The bar is the single biggest thing between a phone and a playable field.
+    // The field scales off the HEIGHT -- it is 4:3 on a screen nearer 21:9 -- so
+    // a 90px bar on a 390px-tall landscape phone is not 23% of the screen, it is
+    // 23% off every dimension and closer to 40% of the area.
     //
-    // Android honours the Fullscreen API and hands the whole panel back. iPhone
-    // Safari does not implement it on the phone at all (iPad does), so there the
-    // fallback is the apple-mobile-web-app meta tags up top: added to the home
-    // screen, the page opens with no chrome at all. Everything below fails soft.
+    // Requesting fullscreen is the ONLY lever for this. There is no separate
+    // "hide the bar" control, and the old scrollTo(0,1) trick that used to
+    // collapse Safari's has not worked since iOS 8 -- since then the bar only
+    // minimises for a real scroll gesture, which here is the swipe that steers
+    // brandon. So: no button, no prompt, nothing to read. The tap that dismisses
+    // the splash is the tap that starts the game, and it asks for fullscreen on
+    // the way through.
+    //
+    // Android and iPad hand the panel over. iPhone Safari implements none of
+    // this, so the request is a silent no-op there and the bar stays -- Add to
+    // Home Screen is the only route on that phone, which is what the
+    // apple-mobile-web-app tags up top are for. Every call here fails soft.
     const root = document.documentElement;
     const rawFS = root.requestFullscreen || root.webkitRequestFullscreen;
-    const rawExit = document.exitFullscreen || document.webkitExitFullscreen;
-    const fsBtn = document.getElementById('fs');
     // (hover: none) rather than (pointer: coarse), matching cardsforcowboys: a
     // touchscreen laptop is coarse-capable but still has a mouse, and a click
-    // there should not go fullscreen unasked
+    // there should not take over the whole monitor unasked. A desktop has room
+    // for the field at full size anyway -- the bar costs it nothing.
     const touchOnly = matchMedia('(hover: none)').matches;
 
     function fsOn() {
@@ -901,23 +881,10 @@
         const so = screen.orientation;
         if (so && so.lock) { try { so.lock('landscape').catch(() => {}); } catch (e) {} }
     }
-    function exitFS() {
-        if (!rawExit || !fsOn()) return;
-        try {
-            const p = rawExit.call(document);
-            if (p && p.catch) p.catch(() => {});
-        } catch (e) {}
-    }
 
-    // no button where it would do nothing
-    fsBtn.hidden = !rawFS;
-    fsBtn.addEventListener('click', () => { fsOn() ? exitFS() : enterFS(); });
-    function syncFS() {
-        fsBtn.hidden = !rawFS || fsOn();
-        resize();
-    }
-    document.addEventListener('fullscreenchange', syncFS);
-    document.addEventListener('webkitfullscreenchange', syncFS);
+    // entering or leaving changes how much room there is, so refit the field
+    document.addEventListener('fullscreenchange', () => resize());
+    document.addEventListener('webkitfullscreenchange', () => resize());
 
     // ---- keeping the screen on -----------------------------------------------
     // A phone dims and then sleeps when it decides nothing is happening, and a
@@ -960,7 +927,7 @@
     // fat black margin down each side -- which is exactly where a thumb rests
     // when you hold the thing. Touching there used to do nothing at all. The
     // whole screen steers him now; update() clamps him to the field either way.
-    const onUI = e => e.target && e.target.closest && e.target.closest('#fs, #debug');
+    const onUI = e => e.target && e.target.closest && e.target.closest('#debug');
 
     const track = e => {
         const r = canvas.getBoundingClientRect();
