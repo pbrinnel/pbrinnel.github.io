@@ -127,7 +127,7 @@
     const SHAPE_ASPECT = SHAPE.bw / SHAPE.bh;     // 2.835 : 1
 
     // 24 x 9 occupancy grid over that box. only 52% of it is solid, which is
-    // the whole point -- the ball threads between his legs and clips his boot.
+    // the whole point -- the ball clips his boot and threads the gaps.
     const MASK = [
         '......................##',
         '.................#######',
@@ -141,7 +141,6 @@
     ];
     const MCOLS = 24, MROWS = 9;
 
-    // the paddle is the same art, drawn whole
     const PADDLE_ASPECT  = SHAPE.SW / SHAPE.SH;
     const BODY_LEN_PER_W = 1.1189;
     const ART_OFF_X      = 0.0291;
@@ -150,9 +149,6 @@
 
     // ---- rules -------------------------------------------------------------
     const MARGIN     = 44;
-    // his outline's own gaps are 4-12px, too tight for a 30px ball to thread,
-    // so the porosity has to come from the spacing instead -- that plus the
-    // empty corners of his bounding box makes real diagonal channels
     const GAP        = 14;
     const TOP        = 70;
 
@@ -165,19 +161,40 @@
     const MAX_SPEED  = 620;
     const MAX_ANGLE  = Math.PI / 3;
 
-    // pinball-bumper jiggle. purely visual -- hitboxes never move, so what you
-    // see wobbling is not what you are aiming at
-    const JIG_BRICK  = 5;     // px of throw on a direct hit
-    const JIG_NEIGH  = 0.75;  // how much of that a neighbour inherits
-    const JIG_PADDLE = 7;
-    const JIG_DECAY  = 3.4;   // units per second, so it settles in ~0.3s
-    const JIG_FREQ   = 15;    // radians across the decay, about two bounces
-
     const SPIN_EDGE  = 11;
     const SPIN_SWIPE = 0.045;
     const SPIN_DECAY = 0.22;
     const SPIN_MAX   = 40;
     const ENGLISH_AT = 8;
+
+    const JIG_BRICK  = 5;
+    const JIG_NEIGH  = 0.75;
+    const JIG_PADDLE = 7;
+    const JIG_DECAY  = 3.4;
+    const JIG_FREQ   = 15;
+
+    // ---- capsules ----------------------------------------------------------
+    // arkanoid, 1986. bricks drop a capsule you have to catch with the paddle,
+    // and only one may be falling at a time -- that one-at-a-time rule was a
+    // deliberate constraint in the original, and it keeps this readable too.
+    // the letters are arkanoid's own: E enlarge, S slow, C catch, D disruption.
+    const CAP_CHANCE = 0.14;   // per brick destroyed, if none is already falling
+    const CAP_FALL   = 130;    // px per second
+    const CAP_W      = 58;
+    const CAP_H      = CAP_W / SHAPE_ASPECT;
+    const CAP_SCORE  = 250;
+    const MAX_BALLS  = 6;
+    const SLOW_MUL   = 0.68;
+
+    // `name` is shouted across the screen on pickup, `short` is the hud tag
+    const CAPS = {
+        E: { name: 'WIDE BRANDON',  short: 'WIDE',  color: '#5b8cab', secs: 10 },
+        S: { name: 'SLOW BRANDON',  short: 'SLOW',  color: '#4f9d8c', secs: 8  },
+        D: { name: 'MULTI-BRANDON', short: 'MULTI', color: '#e0c060', secs: 0  }  // instant
+    };
+    const TIMED = ['E', 'S'];
+    const CALLOUT_SECS = 1.15;
+    const CAP_KEYS = Object.keys(CAPS);
 
     const TIERS = {
         R: { pts: 70, fill: '#9e4b3c' },
@@ -187,12 +204,12 @@
     };
     // all mid-tone. nothing here darkens his face -- a damaged brick changes
     // hue rather than getting a black wash over it
-    const SILVER     = '#b9bcc4';   // fresh multi-hit brick, bright steel
-    const SILVER_HIT = '#9c8f7d';   // once struck, worn to a dull taupe
-    const GOLD       = '#78767f';   // indestructible, cool slate
+    const SILVER     = '#b9bcc4';
+    const SILVER_HIT = '#9c8f7d';
+    const GOLD       = '#78767f';
 
     // ---- stages ------------------------------------------------------------
-    // 7 across puts each brandon at ~98px, about two thirds of the paddle.
+    // 7 across puts each brandon at ~90px, about two thirds of the paddle.
     // . empty   Y/G/O/R tiers   S silver, multi-hit   X gold, indestructible
     const LEVELS = [
         {   // a plain wall, one row per tier
@@ -238,8 +255,8 @@
 
     // ---- state -------------------------------------------------------------
     let bricks, stage, score, best, lives, combo, phase, banner;
-    let paddle, ball, popups, hits, tierSeen, halved, bw, bh;
-    let uiScale = 1;
+    let paddle, balls, popups, hits, tierSeen, bw, bh;
+    let speed, capsule, fx, callout, uiScale = 1;
 
     function loadBest() {
         try { return parseInt(localStorage.getItem('brandon.best'), 10) || 0; }
@@ -247,6 +264,27 @@
     }
     function saveBest() {
         try { localStorage.setItem('brandon.best', String(best)); } catch (e) { /* private mode */ }
+    }
+
+    // every ball shares one speed, so the progression stays fair once the
+    // board has several of them in play
+    function effSpeed() { return speed * (fx.S > 0 ? SLOW_MUL : 1); }
+
+    function aim(b, angle) {
+        const s = effSpeed();
+        b.vx = Math.sin(angle) * s;
+        b.vy = -Math.cos(angle) * s;
+    }
+
+    function newBall(x, y) {
+        return { x, y, vx: 0, vy: 0, spin: 0, angle: 0, stuck: false, off: 0 };
+    }
+
+    function clearEffects() {
+        fx = { E: 0, S: 0 };
+        paddle.w = PADDLE_W;
+        capsule = null;
+        callout = null;
     }
 
     function buildStage(n) {
@@ -272,16 +310,16 @@
         });
         hits = 0;
         tierSeen = {};
-        halved = false;
-        paddle.w = PADDLE_W;
         resetBall();
     }
 
     function resetBall() {
-        ball.speed = BASE_SPEED;
-        ball.spin = 0;
-        ball.angle = 0;
+        speed = BASE_SPEED;
+        clearEffects();
         combo = 0;
+        const b = newBall(paddle.x, PADDLE_Y - PADDLE_H / 2 - BALL_R - 2);
+        b.stuck = true;
+        balls = [b];
         phase = 'ready';
     }
 
@@ -293,7 +331,7 @@
     }
 
     paddle = { x: LW / 2, prevX: LW / 2, vx: 0, w: PADDLE_W, jt: 0, tilt: 0 };
-    ball = { x: 0, y: 0, vx: 0, vy: 0, speed: BASE_SPEED, spin: 0, angle: 0 };
+    fx = { E: 0, S: 0 };
     best = loadBest();
     newGame();
 
@@ -323,11 +361,19 @@
         if (e.code === 'ArrowRight') paddle.x += 34;
     });
 
+    // the ball rides the paddle until you serve it
+    function releaseStuck() {
+        for (const b of balls) {
+            if (!b.stuck) continue;
+            b.stuck = false;
+            const off = Math.max(-1, Math.min(1, b.off / (paddle.w / 2)));
+            aim(b, off * MAX_ANGLE * 0.8 + (Math.random() * 0.2 - 0.1));
+        }
+    }
+
     function action() {
         if (phase === 'ready') {
-            const a = -Math.PI / 2 + (Math.random() * 0.7 - 0.35);
-            ball.vx = Math.cos(a) * ball.speed;
-            ball.vy = Math.sin(a) * ball.speed;
+            releaseStuck();
             phase = 'play';
         } else if (phase === 'cleared') {
             stage++;
@@ -339,27 +385,60 @@
     }
 
     // ---- scoring -----------------------------------------------------------
-    function award(base, x, y) {
+    function award(base, x, y, spin) {
         let pts = base + 0.5 * base * combo;
-        const spin = Math.abs(ball.spin);
-        const english = spin > ENGLISH_AT;
-        if (english) pts *= 1 + Math.min(spin, SPIN_MAX) / SPIN_MAX * 0.5;
+        const s = Math.abs(spin);
+        const english = s > ENGLISH_AT;
+        if (english) pts *= 1 + Math.min(s, SPIN_MAX) / SPIN_MAX * 0.5;
 
         pts = Math.round(pts);
         score += pts;
         if (score > best) { best = score; saveBest(); }
-        popups.push({ x, y, text: '+' + pts, english, life: 1 });
+        popups.push({ x, y, text: '+' + pts, color: english ? '#c9a94e' : '#f2efe9', life: 1 });
         combo++;
     }
 
     function bumpSpeed(f) {
-        ball.speed = Math.min(ball.speed * f, MAX_SPEED);
-        const m = Math.hypot(ball.vx, ball.vy) || 1;
-        ball.vx = ball.vx / m * ball.speed;
-        ball.vy = ball.vy / m * ball.speed;
+        speed = Math.min(speed * f, MAX_SPEED);
     }
 
-    // one decaying bounce-back, used by everything that jiggles
+    // ---- capsules ----------------------------------------------------------
+    function maybeDropCapsule(x, y) {
+        if (capsule) return;                       // only one falling at a time
+        if (Math.random() > CAP_CHANCE) return;
+        capsule = { x, y, kind: CAP_KEYS[(Math.random() * CAP_KEYS.length) | 0] };
+    }
+
+    function splitBalls() {
+        const extra = [];
+        for (const b of balls) {
+            for (let k = 0; k < 2; k++) {
+                if (balls.length + extra.length >= MAX_BALLS) break;
+                const a = Math.atan2(b.vy, b.vx) + (k ? 0.42 : -0.42);
+                const nb = newBall(b.x, b.y);
+                const s = effSpeed();
+                nb.vx = Math.cos(a) * s;
+                nb.vy = Math.sin(a) * s;
+                nb.spin = b.spin;
+                extra.push(nb);
+            }
+        }
+        balls.push(...extra);
+    }
+
+    function applyCapsule(kind) {
+        const cap = CAPS[kind];
+        score += CAP_SCORE;
+        if (score > best) { best = score; saveBest(); }
+        popups.push({ x: paddle.x, y: PADDLE_Y - 40, text: '+' + CAP_SCORE, color: cap.color, life: 1 });
+        callout = { text: cap.name, color: cap.color, life: CALLOUT_SECS };
+
+        if (kind === 'D') { splitBalls(); return; }
+        fx[kind] = cap.secs;
+        if (kind === 'E') paddle.w = PADDLE_W * 1.5;
+    }
+
+    // ---- bricks ------------------------------------------------------------
     function wobble(jt) { return Math.sin((1 - jt) * JIG_FREQ) * jt; }
 
     function kick(b, nx, ny, power) {
@@ -380,7 +459,7 @@
         }
     }
 
-    function hitBrick(b) {
+    function hitBrick(b, spin) {
         b.flash = 1;
         if (b.kind === 'X') return;
 
@@ -388,16 +467,17 @@
             if (--b.hp > 0) return;
             b.alive = false;
             shockwave(b);
-            award(25 * b.maxHp, b.x + bw / 2, b.y);
+            award(25 * b.maxHp, b.x + bw / 2, b.y, spin);
         } else {
             b.alive = false;
             shockwave(b);
-            award(TIERS[b.kind].pts, b.x + bw / 2, b.y);
+            award(TIERS[b.kind].pts, b.x + bw / 2, b.y, spin);
             if (!tierSeen[b.kind] && (b.kind === 'O' || b.kind === 'R')) {
                 tierSeen[b.kind] = true;
                 bumpSpeed(1.1);
             }
         }
+        maybeDropCapsule(b.x + bw / 2, b.y + bh / 2);
 
         if (++hits === 4 || hits === 12) bumpSpeed(1.12);
         if (!bricks.some(x => x.alive && x.kind !== 'X')) clearStage();
@@ -407,6 +487,7 @@
         const bonus = 500 * (stage + 1);
         score += bonus;
         if (score > best) { best = score; saveBest(); }
+        capsule = null;
         if (stage === LEVELS.length - 1) {
             phase = 'won';
             banner = 'BRANDON WINS   +' + bonus;
@@ -420,8 +501,6 @@
         lives--;
         combo = 0;
         if (lives <= 0) { phase = 'over'; banner = 'GAME OVER'; return; }
-        paddle.w = PADDLE_W;
-        halved = false;
         resetBall();
     }
 
@@ -429,12 +508,12 @@
     // average the solid mask cells the ball is touching, and bounce off the
     // line from that centroid to the ball. flat where he is flat, and properly
     // strange around his boot and the gap under his knees.
-    function contact(b) {
+    function contact(br, x, y) {
         const cw = bw / MCOLS, chh = bh / MROWS;
-        const c0 = Math.max(0, Math.floor((ball.x - BALL_R - b.x) / cw));
-        const c1 = Math.min(MCOLS - 1, Math.floor((ball.x + BALL_R - b.x) / cw));
-        const r0 = Math.max(0, Math.floor((ball.y - BALL_R - b.y) / chh));
-        const r1 = Math.min(MROWS - 1, Math.floor((ball.y + BALL_R - b.y) / chh));
+        const c0 = Math.max(0, Math.floor((x - BALL_R - br.x) / cw));
+        const c1 = Math.min(MCOLS - 1, Math.floor((x + BALL_R - br.x) / cw));
+        const r0 = Math.max(0, Math.floor((y - BALL_R - br.y) / chh));
+        const r1 = Math.min(MROWS - 1, Math.floor((y + BALL_R - br.y) / chh));
 
         const reach = (BALL_R + Math.max(cw, chh) * 0.5) ** 2;
         let sx = 0, sy = 0, n = 0;
@@ -442,8 +521,8 @@
             const line = MASK[r];
             for (let c = c0; c <= c1; c++) {
                 if (line[c] !== '#') continue;
-                const px = b.x + (c + 0.5) * cw, py = b.y + (r + 0.5) * chh;
-                if ((px - ball.x) ** 2 + (py - ball.y) ** 2 > reach) continue;
+                const px = br.x + (c + 0.5) * cw, py = br.y + (r + 0.5) * chh;
+                if ((px - x) ** 2 + (py - y) ** 2 > reach) continue;
                 sx += px; sy += py; n++;
             }
         }
@@ -451,71 +530,72 @@
     }
 
     // ---- physics -----------------------------------------------------------
-    function stepPhysics(dt) {
+    // returns false if this ball drained off the bottom
+    function stepBall(b, dt) {
         const r = BALL_R, halfW = paddle.w / 2, halfH = PADDLE_H / 2;
+        const s = effSpeed();
 
-        ball.x += ball.vx * dt;
-        ball.y += ball.vy * dt;
+        // hold the shared speed, so SLOW and the ramps apply to every ball
+        const m = Math.hypot(b.vx, b.vy);
+        if (m > 1e-4) { b.vx = b.vx / m * s; b.vy = b.vy / m * s; }
 
-        if (ball.x - r < 0)  { ball.x = r;      ball.vx =  Math.abs(ball.vx); ball.spin *= -0.55; }
-        if (ball.x + r > LW) { ball.x = LW - r; ball.vx = -Math.abs(ball.vx); ball.spin *= -0.55; }
-        if (ball.y - r < 0)  {
-            ball.y = r; ball.vy = Math.abs(ball.vy); ball.spin *= -0.55;
-            if (!halved) { halved = true; paddle.w = PADDLE_W / 2; }
-        }
-        if (ball.y - r > LH) { loseLife(); return; }
+        b.x += b.vx * dt;
+        b.y += b.vy * dt;
 
-        for (const b of bricks) {
-            if (!b.alive) continue;
-            if (ball.x + r <= b.x || ball.x - r >= b.x + bw) continue;   // cheap reject
-            if (ball.y + r <= b.y || ball.y - r >= b.y + bh) continue;
+        if (b.x - r < 0)  { b.x = r;      b.vx =  Math.abs(b.vx); b.spin *= -0.55; }
+        if (b.x + r > LW) { b.x = LW - r; b.vx = -Math.abs(b.vx); b.spin *= -0.55; }
+        if (b.y - r < 0)  { b.y = r;      b.vy =  Math.abs(b.vy); b.spin *= -0.55; }
+        if (b.y - r > LH) return false;
 
-            const hit = contact(b);
+        for (const br of bricks) {
+            if (!br.alive) continue;
+            if (b.x + r <= br.x || b.x - r >= br.x + bw) continue;   // cheap reject
+            if (b.y + r <= br.y || b.y - r >= br.y + bh) continue;
+
+            const hit = contact(br, b.x, b.y);
             if (!hit) continue;
 
-            let nx = ball.x - hit.cx, ny = ball.y - hit.cy;
+            let nx = b.x - hit.cx, ny = b.y - hit.cy;
             let len = Math.hypot(nx, ny);
             if (len < 1e-4) { nx = 0; ny = -1; len = 1; }
             nx /= len; ny /= len;
 
-            const dot = ball.vx * nx + ball.vy * ny;
-            if (dot < 0) { ball.vx -= 2 * dot * nx; ball.vy -= 2 * dot * ny; }
-            ball.x += nx * 3; ball.y += ny * 3;          // nudge clear
+            const dot = b.vx * nx + b.vy * ny;
+            if (dot < 0) { b.vx -= 2 * dot * nx; b.vy -= 2 * dot * ny; }
+            b.x += nx * 3; b.y += ny * 3;          // nudge clear
 
             // his contours can flatten a bounce out to nearly horizontal, which
             // would leave the ball skating sideways forever
-            if (Math.abs(ball.vy) < ball.speed * 0.16) {
-                ball.vy = (ball.vy < 0 ? -1 : 1) * ball.speed * 0.16;
-                const m = Math.hypot(ball.vx, ball.vy) || 1;
-                ball.vx = ball.vx / m * ball.speed;
-                ball.vy = ball.vy / m * ball.speed;
+            if (Math.abs(b.vy) < s * 0.16) {
+                b.vy = (b.vy < 0 ? -1 : 1) * s * 0.16;
+                const q = Math.hypot(b.vx, b.vy) || 1;
+                b.vx = b.vx / q * s; b.vy = b.vy / q * s;
             }
 
-            kick(b, -nx, -ny, 1);       // shoved away from where the ball struck
-            hitBrick(b);
+            kick(br, -nx, -ny, 1);       // shoved away from where the ball struck
+            hitBrick(br, b.spin);
             break;
         }
 
-        if (ball.vy > 0 &&
-            ball.x + r > paddle.x - halfW && ball.x - r < paddle.x + halfW &&
-            ball.y + r > PADDLE_Y - halfH && ball.y - r < PADDLE_Y + halfH) {
+        if (b.vy > 0 &&
+            b.x + r > paddle.x - halfW && b.x - r < paddle.x + halfW &&
+            b.y + r > PADDLE_Y - halfH && b.y - r < PADDLE_Y + halfH) {
 
-            ball.y = PADDLE_Y - halfH - r;
+            b.y = PADDLE_Y - halfH - r;
 
-            const off = Math.max(-1, Math.min(1, (ball.x - paddle.x) / halfW));
-            const a = off * MAX_ANGLE;
-            ball.vx =  Math.sin(a) * ball.speed;
-            ball.vy = -Math.cos(a) * ball.speed;
+            const off = Math.max(-1, Math.min(1, (b.x - paddle.x) / halfW));
+            aim(b, off * MAX_ANGLE);
 
-            ball.spin += off * SPIN_EDGE + paddle.vx * SPIN_SWIPE;
-            ball.spin = Math.max(-SPIN_MAX, Math.min(SPIN_MAX, ball.spin));
+            b.spin += off * SPIN_EDGE + paddle.vx * SPIN_SWIPE;
+            b.spin = Math.max(-SPIN_MAX, Math.min(SPIN_MAX, b.spin));
 
             paddle.jt = 1;              // recoil, tilting toward the end he took it on
             paddle.tilt = off;
 
-            combo = 0;
+            combo = 0;                  // the run ends when it comes home
             if (++hits === 4 || hits === 12) bumpSpeed(1.12);
         }
+        return true;
     }
 
     function update(dt) {
@@ -524,22 +604,53 @@
         paddle.vx = (paddle.x - paddle.prevX) / Math.max(dt, 1e-4);
         paddle.prevX = paddle.x;
 
-        if (phase === 'ready') {
-            ball.x = paddle.x;
-            ball.y = PADDLE_Y - PADDLE_H / 2 - BALL_R - 2;
-        } else if (phase === 'play') {
-            const steps = Math.max(1, Math.ceil(Math.hypot(ball.vx, ball.vy) * dt / 7));
-            for (let i = 0; i < steps && phase === 'play'; i++) stepPhysics(dt / steps);
+        // timed effects
+        for (const k of TIMED) {
+            if (fx[k] <= 0) continue;
+            fx[k] = Math.max(0, fx[k] - dt);
+            if (fx[k] === 0 && k === 'E') paddle.w = PADDLE_W;
         }
 
-        ball.spin -= ball.spin * SPIN_DECAY * dt;
-        ball.angle += ball.spin * dt;
+        for (const b of balls) if (b.stuck) { b.x = paddle.x + b.off; b.y = PADDLE_Y - PADDLE_H / 2 - BALL_R - 2; }
+
+        if (phase === 'play') {
+            const fast = Math.max(...balls.map(b => Math.hypot(b.vx, b.vy)), effSpeed());
+            const steps = Math.max(1, Math.ceil(fast * dt / 7));
+            for (let i = 0; i < steps && phase === 'play'; i++) {
+                for (let j = balls.length - 1; j >= 0; j--) {
+                    if (balls[j].stuck) continue;
+                    if (!stepBall(balls[j], dt / steps)) balls.splice(j, 1);
+                }
+                if (balls.length === 0) { loseLife(); break; }
+            }
+        }
+
+        for (const b of balls) {
+            b.spin -= b.spin * SPIN_DECAY * dt;
+            b.angle += b.spin * dt;
+        }
+
+        // the falling capsule
+        if (capsule) {
+            capsule.y += CAP_FALL * dt;
+            const halfH = PADDLE_H / 2;
+            if (capsule.y + CAP_H / 2 > PADDLE_Y - halfH &&
+                capsule.y - CAP_H / 2 < PADDLE_Y + halfH &&
+                capsule.x + CAP_W / 2 > paddle.x - halfW &&
+                capsule.x - CAP_W / 2 < paddle.x + halfW) {
+                applyCapsule(capsule.kind);
+                capsule = null;
+            } else if (capsule.y - CAP_H > LH) {
+                capsule = null;
+            }
+        }
 
         for (const b of bricks) {
             if (b.flash > 0) b.flash -= dt * 6;
             if (b.jt > 0) b.jt = Math.max(0, b.jt - dt * JIG_DECAY);
         }
         if (paddle.jt > 0) paddle.jt = Math.max(0, paddle.jt - dt * JIG_DECAY);
+        if (callout && (callout.life -= dt) <= 0) callout = null;
         popups = popups.filter(p => (p.life -= dt * 1.4) > 0);
     }
 
@@ -572,51 +683,53 @@
         g.restore();
     }
 
-    // kind 'flash' / 'dark' give flat silhouettes for the hit and damage states
-    function brickSprite(kind) {
-        const key = kind + '@' + Math.round(bw);
-        if (spriteCache.has(key)) return spriteCache.get(key);
+    // one tinted brandon at a given size, cached. `flat` gives a solid
+    // silhouette, used for the white hit flash.
+    function shapeSprite(key, color, w, h, flat) {
+        const k = key + '@' + Math.round(w);
+        if (spriteCache.has(k)) return spriteCache.get(k);
         if (!ready(paddleImg)) return null;
 
         const c = document.createElement('canvas');
-        c.width = Math.round(bw * SS);
-        c.height = Math.round(bh * SS);
+        c.width = Math.round(w * SS);
+        c.height = Math.round(h * SS);
         const g = c.getContext('2d');
         g.scale(SS, SS);
 
-        if (kind === 'flash') {
-            placeShape(g, bw, bh, false);
+        if (flat) {
+            placeShape(g, w, h, false);
             g.globalCompositeOperation = 'source-in';
-            g.fillStyle = '#f2efe9';
-            g.fillRect(0, 0, bw, bh);
+            g.fillStyle = color;
+            g.fillRect(0, 0, w, h);
         } else {
-            const color = kind === 'X'  ? GOLD
-                        : kind === 'S'  ? SILVER
-                        : kind === 'S2' ? SILVER_HIT
-                        : TIERS[kind].fill;
             // he is nearly all black shirt and dark denim, so multiplying a
             // colour through him just makes mud. lift him to near-white first,
-            // then wash the tier colour over only his own pixels -- that keeps
-            // the colour vivid and leaves his shading as texture underneath.
-            placeShape(g, bw, bh, true);
-
+            // then wash the colour over only his own pixels.
+            placeShape(g, w, h, true);
             g.globalCompositeOperation = 'source-atop';
             g.globalAlpha = 0.8;
             g.fillStyle = shade(color, 0.12);
-            g.fillRect(0, 0, bw, bh);
+            g.fillRect(0, 0, w, h);
             g.globalAlpha = 1;
         }
 
         g.globalCompositeOperation = 'source-over';
-        spriteCache.set(key, c);
+        spriteCache.set(k, c);
         return c;
+    }
+
+    function brickColor(kind) {
+        return kind === 'X'  ? GOLD
+             : kind === 'S'  ? SILVER
+             : kind === 'S2' ? SILVER_HIT
+             : TIERS[kind].fill;
     }
 
     function drawBrick(b) {
         // a struck silver brick swaps to its own worn tint, rather than taking
         // a dark wash over the top of him
-        const worn = b.kind === 'S' && b.hp < b.maxHp;
-        const sprite = brickSprite(worn ? 'S2' : b.kind);
+        const kind = (b.kind === 'S' && b.hp < b.maxHp) ? 'S2' : b.kind;
+        const sprite = shapeSprite(kind, brickColor(kind), bw, bh, false);
         if (!sprite) return;
 
         const o = b.jt > 0 ? wobble(b.jt) * JIG_BRICK : 0;
@@ -624,10 +737,20 @@
         ctx.drawImage(sprite, x, y, bw, bh);
 
         if (b.flash > 0) {
+            const f = shapeSprite('flash', '#f2efe9', bw, bh, true);
             ctx.globalAlpha = Math.min(1, b.flash) * 0.75;
-            ctx.drawImage(brickSprite('flash'), x, y, bw, bh);
+            ctx.drawImage(f, x, y, bw, bh);
             ctx.globalAlpha = 1;
         }
+    }
+
+    // the capsule is just a small brandon in the effect's colour, falling
+    function drawCapsule() {
+        if (!capsule) return;
+        const cap = CAPS[capsule.kind];
+        const sprite = shapeSprite('cap' + capsule.kind, cap.color, CAP_W, CAP_H, false);
+        if (sprite) ctx.drawImage(sprite, capsule.x - CAP_W / 2, capsule.y - CAP_H / 2, CAP_W, CAP_H);
+        text(capsule.kind, capsule.x, capsule.y + 5, 15, '#f2efe9', 'center');
     }
 
     function drawPaddle() {
@@ -669,19 +792,41 @@
         ctx.clearRect(0, 0, LW, LH);
 
         for (const b of bricks) if (b.alive) drawBrick(b);
+        drawCapsule();
         drawPaddle();
-        if (phase !== 'over' && phase !== 'won') drawBall(ball.x, ball.y, BALL_R, ball.angle);
+        if (phase !== 'over' && phase !== 'won') {
+            for (const b of balls) drawBall(b.x, b.y, BALL_R, b.angle);
+        }
 
         for (const p of popups) {
             ctx.globalAlpha = Math.min(1, p.life);
-            text(p.text, p.x, p.y - 26 * (1 - p.life), 15,
-                 p.english ? '#c9a94e' : '#f2efe9', 'center');
+            text(p.text, p.x, p.y - 26 * (1 - p.life), 15, p.color, 'center');
             ctx.globalAlpha = 1;
         }
 
         const u = uiScale;
+
+        // the pickup shout -- punches in oversized and settles as it fades,
+        // in the open space between the wall and the paddle
+        if (callout) {
+            const k = callout.life / CALLOUT_SECS;          // 1 -> 0
+            ctx.globalAlpha = Math.min(1, k * 3);           // hold, then fade out
+            text(callout.text, LW / 2, 392, (34 + 10 * k) * u, callout.color, 'center');
+            ctx.globalAlpha = 1;
+        }
+
         text('SCORE ' + score, 15 * u, 27 * u, 15 * u, '#f2efe9');
         text('BEST ' + best, 15 * u, 46 * u, 13 * u, '#6d685f');
+
+        // whatever is currently running, with its time left
+        let row = 66 * u;
+        for (const k of TIMED) {
+            if (fx[k] <= 0) continue;
+            text(CAPS[k].short + ' ' + Math.ceil(fx[k]), 15 * u, row, 12 * u, CAPS[k].color);
+            row += 16 * u;
+        }
+        if (balls.length > 1) text(balls.length + ' BALLS', 15 * u, row, 12 * u, CAPS.D.color);
+
         // top centre is left empty for the combo, which is the only thing up
         // there worth looking at mid-rally
         if (combo >= 2) {
@@ -715,13 +860,13 @@
         const scale = Math.min(availW / LW, availH / LH, 1);
         canvas.style.width = Math.floor(LW * scale) + 'px';
         canvas.style.height = Math.floor(LH * scale) + 'px';
+        canvas.width = LW * dpr;
+        canvas.height = LH * dpr;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
         // the whole field shrinks on a phone, which would leave the hud at
         // about 7px. draw it proportionally larger so it stays readable.
         uiScale = Math.min(2.2, Math.max(1, 13 / (15 * scale)));
-        canvas.width = LW * dpr;
-        canvas.height = LH * dpr;
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
     addEventListener('resize', resize);
     resize();
