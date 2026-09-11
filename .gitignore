@@ -2,5 +2,6 @@
 .DS_Store
 **/.DS_Store
 
-# Claude Code local settings, machine-specific
-.claude/settings.local.json
+# Claude Code local tooling. machine-specific, and launch.json points at
+# temp paths that do not survive a reboot.
+.claude/
