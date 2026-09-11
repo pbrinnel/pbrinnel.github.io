@@ -649,30 +649,20 @@
     };
     canvas.addEventListener('pointermove', track);
     canvas.addEventListener('pointerdown', e => {
-        if (phase === 'over') {                 // pick a box, or nothing happens
-            const r = canvas.getBoundingClientRect();
-            const px = (e.clientX - r.left) / r.width * LW;
-            const py = (e.clientY - r.top) / r.height * LH;
-            for (const b of overButtons(uiScale)) {
-                if (px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h) {
-                    b.key === 'continue' ? continueGame() : newGame();
-                    return;
-                }
-            }
-            return;
-        }
-        track(e);
+        track(e);                               // wherever you tap, he goes
+        if (phase === 'over') { overCommit(); return; }
         action();
     });
     addEventListener('keydown', e => {
-        if (phase === 'over') {                 // C to re-up, N to start clean
-            if (e.code === 'KeyC') continueGame();
+        if (e.code === 'ArrowLeft')  paddle.x -= 34;    // steer him either way
+        if (e.code === 'ArrowRight') paddle.x += 34;
+        if (phase === 'over') {
+            if (e.code === 'Space') { e.preventDefault(); overCommit(); }
+            if (e.code === 'KeyC') continueGame();       // still direct, if you know
             if (e.code === 'KeyN') newGame();
             return;
         }
         if (e.code === 'Space') { e.preventDefault(); action(); }
-        if (e.code === 'ArrowLeft')  paddle.x -= 34;
-        if (e.code === 'ArrowRight') paddle.x += 34;
     });
 
     // the ball rides the paddle until you serve it
@@ -880,15 +870,47 @@
     }
 
     // ---- game over: another quarter, or start clean --------------------------
-    // the two boxes are laid out here so the hit test and the drawing can never
-    // disagree about where they are
-    function overButtons(u) {
-        const w = 200 * u, h = 40 * u, gap = 16 * u, y = 424 + 14 * u;
+    // The cursor is hidden during play, so clicking a button meant aiming an
+    // invisible pointer. Instead the choices sit at paddle height and BRANDON
+    // is the cursor: slide him over one and commit. Which side he is on always
+    // decides it, so there is never a dead zone between them.
+    function overButtons() {
+        const w = 300, h = 58, y = PADDLE_Y - h / 2;
         return [
             { key: 'continue', label: 'CONTINUE  -' + Math.round((1 - CONTINUE_KEEP) * 100) + '%',
-              x: LW / 2 - w - gap / 2, y, w, h },
-            { key: 'new', label: 'NEW GAME', x: LW / 2 + gap / 2, y, w, h }
+              x: 56, y, w, h },
+            { key: 'new', label: 'NEW GAME', x: LW - 56 - w, y, w, h }
         ];
+    }
+
+    function overPick() { return paddle.x < LW / 2 ? 'continue' : 'new'; }
+    function overCommit() { overPick() === 'continue' ? continueGame() : newGame(); }
+
+    // Two passes: the boxes go UNDER the paddle so he stands on his choice,
+    // the labels go OVER him so his body cannot hide what he is standing on.
+    function drawOverChoices(labels) {
+        if (phase !== 'over') return;
+        const sel = overPick();
+        for (const b of overButtons()) {
+            const on = b.key === sel;
+            if (!labels) {
+                ctx.fillStyle = on ? 'rgba(201,169,78,0.14)' : 'rgba(0,0,0,0.6)';
+                ctx.fillRect(b.x, b.y, b.w, b.h);
+                ctx.strokeStyle = on ? '#c9a94e' : '#2e2a24';
+                ctx.lineWidth = on ? 2 : 1;
+                ctx.strokeRect(b.x, b.y, b.w, b.h);
+                continue;
+            }
+            const size = fitSize(b.label, 17 * uiScale, b.w - 24);
+            const x = b.x + b.w / 2, y = b.y + b.h / 2 + size * 0.35;
+            ctx.font = size + 'px "Trebuchet MS", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.lineWidth = 5;                       // knocked out of him
+            ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+            ctx.strokeText(b.label, x, y);
+            ctx.fillStyle = on ? '#f2efe9' : '#8d877d';
+            ctx.fillText(b.label, x, y);
+        }
     }
 
     function continueGame() {
@@ -1418,7 +1440,9 @@
 
         for (const b of bricks) if (b.alive) drawBrick(b);
         drawCapsule();
+        drawOverChoices(false);   // boxes under him -- he is the cursor
         drawPaddle();
+        drawOverChoices(true);    // labels over him, so they stay readable
         drawPhantoms();
         drawShout();
 
@@ -1498,24 +1522,19 @@
             && (phase !== 'ascend' || ascendT >= A_TITLE)) {
             const my = 424;
             const over = phase === 'over';
-            const bandH = (over ? 150 : 104) * u;
+            const bandH = 104 * u;
             ctx.fillStyle = 'rgba(0,0,0,0.72)';
             ctx.fillRect(0, my - bandH / 2, LW, bandH);
 
             const msg = phase === 'ready' ? (stage === 0 && lives === 3 && score === 0
                             ? 'BRANDON' : 'READY')
                       : banner;
-            text(msg, LW / 2, my - (over ? 30 : 4) * u, 32 * u, '#f2efe9', 'center');
+            text(msg, LW / 2, my - 4 * u, 32 * u, '#f2efe9', 'center');
 
             if (over) {
-                text('final score ' + score, LW / 2, my - 6 * u, 15 * u, '#9a958c', 'center');
-                for (const b of overButtons(u)) {
-                    ctx.strokeStyle = b.key === 'continue' ? '#c9a94e' : '#2e2a24';
-                    ctx.lineWidth = 1;
-                    ctx.strokeRect(b.x, b.y, b.w, b.h);
-                    text(b.label, b.x + b.w / 2, b.y + b.h / 2 + 5 * u,
-                         14 * u, b.key === 'continue' ? '#c9a94e' : '#9a958c', 'center');
-                }
+                // the choices themselves live down at paddle height
+                text('final score ' + score + '   ·   slide brandon onto a choice',
+                     LW / 2, my + 26 * u, 15 * u, '#9a958c', 'center');
             } else {
                 const sub = phase === 'ready' ? 'tap or space to serve'
                           : phase === 'won' ? 'tap to play again' : 'tap to continue';
