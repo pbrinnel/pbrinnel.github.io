@@ -55,14 +55,12 @@
             justify-content: center;
             background: #000;
             cursor: pointer;
-            transition: opacity 0.45s ease;
             -webkit-tap-highlight-color: transparent;
         }
 
-        #splash.go {
-            opacity: 0;
-            pointer-events: none;
-        }
+        /* the id selector above outranks the browser's own [hidden] rule, so
+           this has to be spelled out or hiding it would do nothing */
+        #splash[hidden] { display: none; }
 
         #splash span {
             font-size: clamp(3rem, 17vw, 13rem);
@@ -197,32 +195,31 @@
     // 7 across puts each brandon at ~98px, about two thirds of the paddle.
     // . empty   Y/G/O/R tiers   S silver, multi-hit   X gold, indestructible
     const LEVELS = [
-        {
-            name: 'THE WALL', silverHp: 2,
+        {   // a plain wall, one row per tier
+            silverHp: 2,
             rows: ['RRRRRRR',
                    'OOOOOOO',
                    'GGGGGGG',
                    'YYYYYYY']
         },
-        {
-            // a gold spine splits the field -- you have to work both halves
-            name: 'THE SPLIT', silverHp: 2,
+        {   // a gold spine splits the field -- you have to work both halves
+            silverHp: 2,
             rows: ['RRRRRRR',
                    'OO.X.OO',
                    'OO.X.OO',
                    'GG.X.GG',
                    '.YY.YY.']
         },
-        {
-            name: 'THE MESH', silverHp: 2,
+        {   // a mesh of silver, so most of it takes two passes
+            silverHp: 2,
             rows: ['S.S.S.S',
                    '.R.R.R.',
                    'S.S.S.S',
                    '.O.O.O.',
                    '.G.G.G.']
         },
-        {
-            name: 'THE HAT', silverHp: 2,
+        {   // a cowboy hat, deliberately easy, to end on the joke
+            silverHp: 2,
             rows: ['..RRR..',
                    '..RRR..',
                    '.OOOOO.',
@@ -304,12 +301,9 @@
     // caught on the capture phase so the dismissing click or key does not also
     // fall through and serve the ball
     const splash = document.getElementById('splash');
-    let splashUp = true;
     function dismissSplash(e) {
-        if (!splashUp) return;
-        splashUp = false;
-        splash.classList.add('go');
-        setTimeout(() => { splash.hidden = true; }, 500);
+        if (splash.hidden) return;
+        splash.hidden = true;          // hard cut, no fade
         e.preventDefault();
         e.stopPropagation();
     }
@@ -688,9 +682,10 @@
         const u = uiScale;
         text('SCORE ' + score, 15 * u, 27 * u, 15 * u, '#f2efe9');
         text('BEST ' + best, 15 * u, 46 * u, 13 * u, '#6d685f');
-        text(LEVELS[stage].name, LW / 2, 27 * u, 14 * u, '#6d685f', 'center');
+        // top centre is left empty for the combo, which is the only thing up
+        // there worth looking at mid-rally
         if (combo >= 2) {
-            text('x' + (1 + 0.5 * combo).toFixed(1), LW / 2, 48 * u, 16 * u, '#c9a94e', 'center');
+            text('x' + (1 + 0.5 * combo).toFixed(1), LW / 2, 30 * u, 17 * u, '#c9a94e', 'center');
         }
         for (let i = 0; i < lives; i++) drawBall(LW - (25 + i * 29) * u, 25 * u, 9 * u, 0);
 
