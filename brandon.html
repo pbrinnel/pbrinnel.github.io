@@ -154,6 +154,10 @@
 
     const PADDLE_W   = 160;
     const PADDLE_H   = 36;
+    // he is drawn proportionally, so growing him makes him taller as well as
+    // longer -- the hitbox has to grow with him or a BIG brandon would have
+    // the ball passing through his chest
+    const padH = () => PADDLE_H * (paddle.w / PADDLE_W);
     const PADDLE_Y   = LH - 58;
     const BALL_R     = 15;
 
@@ -177,7 +181,7 @@
     // arkanoid, 1986. bricks drop a capsule you have to catch with the paddle,
     // and only one may be falling at a time -- that one-at-a-time rule was a
     // deliberate constraint in the original, and it keeps this readable too.
-    // the letters are arkanoid's own: E enlarge, S slow, C catch, D disruption.
+    // the letters are arkanoid's own: E enlarge, S slow, D disruption.
     const CAP_CHANCE = 0.14;   // per brick destroyed, if none is already falling
     const CAP_FALL   = 130;    // px per second
     const CAP_W      = 58;
@@ -188,7 +192,7 @@
 
     // `name` is shouted across the screen on pickup, `short` is the hud tag
     const CAPS = {
-        E: { name: 'WIDE BRANDON',  short: 'WIDE',  color: '#5b8cab', secs: 10 },
+        E: { name: 'BIG BRANDON',   short: 'BIG',   color: '#5b8cab', secs: 10 },
         S: { name: 'SLOW BRANDON',  short: 'SLOW',  color: '#4f9d8c', secs: 8  },
         D: { name: 'MULTI-BRANDON', short: 'MULTI', color: '#e0c060', secs: 0  }  // instant
     };
@@ -317,7 +321,7 @@
         speed = BASE_SPEED;
         clearEffects();
         combo = 0;
-        const b = newBall(paddle.x, PADDLE_Y - PADDLE_H / 2 - BALL_R - 2);
+        const b = newBall(paddle.x, PADDLE_Y - padH() / 2 - BALL_R - 2);
         b.stuck = true;
         balls = [b];
         phase = 'ready';
@@ -532,7 +536,7 @@
     // ---- physics -----------------------------------------------------------
     // returns false if this ball drained off the bottom
     function stepBall(b, dt) {
-        const r = BALL_R, halfW = paddle.w / 2, halfH = PADDLE_H / 2;
+        const r = BALL_R, halfW = paddle.w / 2, halfH = padH() / 2;
         const s = effSpeed();
 
         // hold the shared speed, so SLOW and the ramps apply to every ball
@@ -611,7 +615,7 @@
             if (fx[k] === 0 && k === 'E') paddle.w = PADDLE_W;
         }
 
-        for (const b of balls) if (b.stuck) { b.x = paddle.x + b.off; b.y = PADDLE_Y - PADDLE_H / 2 - BALL_R - 2; }
+        for (const b of balls) if (b.stuck) { b.x = paddle.x + b.off; b.y = PADDLE_Y - padH() / 2 - BALL_R - 2; }
 
         if (phase === 'play') {
             const fast = Math.max(...balls.map(b => Math.hypot(b.vx, b.vy)), effSpeed());
@@ -633,7 +637,7 @@
         // the falling capsule
         if (capsule) {
             capsule.y += CAP_FALL * dt;
-            const halfH = PADDLE_H / 2;
+            const halfH = padH() / 2;
             if (capsule.y + CAP_H / 2 > PADDLE_Y - halfH &&
                 capsule.y - CAP_H / 2 < PADDLE_Y + halfH &&
                 capsule.x + CAP_W / 2 > paddle.x - halfW &&
