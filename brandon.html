@@ -1,6 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-2ZPJKVJDMD"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        // the tab keeps saying Paul Brinnel like every other page here, but GA4
+        // groups its default report by TITLE rather than path -- so without an
+        // explicit one this page would be reported as the homepage
+        gtag('config', 'G-2ZPJKVJDMD', { page_title: 'Brandon (game)' });
+    </script>
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Paul Brinnel</title>
