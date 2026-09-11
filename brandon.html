@@ -277,6 +277,27 @@
     const BOSS_BOB    = 20;
     const BOSS_PTS    = 60;
     const BOSS_CAP    = 4;      // force a capsule out of him every N hits
+
+    // his attack: phantom heads flung out at random. they carry no hitbox at
+    // all and never touch anything -- they exist purely to make you doubt
+    // which head you are actually meant to be tracking. the transparency is
+    // the tell, so the trick stays fair.
+    const PH_ALPHA  = 0.45;
+    const PH_START  = 0.15;     // damage before he starts throwing them
+    const PH_GAP0   = 2.2;      // seconds between them at first
+    const PH_GAP1   = 0.45;     // ...and when he is nearly finished
+    const PH_LIFE   = 4.5;
+    const PH_CAP    = 10;       // never more than this many on screen
+    const PH_SPEED  = 300;
+
+    const SHOUT_ODDS = 0.1;     // how often a hit makes him say something
+    const SHOUT_SECS = 1.3;
+
+    // his entrance: an empty screen for a beat, then he lowers in from above
+    // while the health bar grows out from nothing, so the size of the problem
+    // arrives gradually rather than all at once
+    const ENTER_WAIT = 0.7;
+    const ENTER_SECS = 2.6;
     const CONTINUE_KEEP = 0.5;  // what survives of your score when you re-up
 
     // ---- the ending ---------------------------------------------------------
@@ -388,6 +409,7 @@
     let paddle, balls, popups, hits, tierSeen, bw, bh;
     let speed, capsule, fx, callout, clock = 0, spreadT = 0, bossPhase = 0;
     let ascendT = 0, uiScale = 1;
+    let phantoms = [], phGap = 0, shout = null, enterT = 0;
 
     function loadBest() {
         try { return parseInt(localStorage.getItem('brandon.best'), 10) || 0; }
@@ -465,6 +487,8 @@
         capsule = null;
         callout = null;
         spreadT = 0;                      // a fresh ball starts as one brandon
+        phantoms = [];
+        shout = null;
         for (const b of bricks || []) b.wigA = 0;
     }
 
@@ -491,6 +515,8 @@
             bricks = [newBrick((LW - bw) / 2, BOSS_Y0 - bh / 2, 'Z', BOSS_HP)];
             bossPhase = 0;
             resetBall();
+            enterT = 0;
+            phase = 'entrance';      // he is not here yet
             return;
         }
 
@@ -510,11 +536,25 @@
         resetBall();
     }
 
+    // 0 while the screen is still empty, then 0 -> 1 as he lowers into frame
+    function enterK() {
+        return Math.min(1, Math.max(0, (enterT - ENTER_WAIT) / ENTER_SECS));
+    }
+
     // once a quarter of him is gone he starts patrolling, and he shrinks and
     // speeds up the whole way down
     function bossUpdate(dt) {
         const b = bricks[0];
         if (!b || b.kind !== 'Z' || !b.alive) return;
+
+        if (phase === 'entrance') {
+            const raw = enterK();
+            const k = raw * raw * (3 - 2 * raw);               // settles, not thuds
+            const from = -(bh + 40);                           // wholly out of sight
+            b.x = LW / 2 - bw / 2;
+            b.y = from + (BOSS_Y0 - bh / 2 - from) * k;
+            return;
+        }
 
         const dmg = 1 - b.hp / b.maxHp;                       // 0 -> 1
         const p = Math.pow(dmg, BOSS_CURVE);                  // shared by size and height
@@ -531,6 +571,37 @@
         const amp = Math.max(0, (LW - bw) / 2) * k;
         b.x = LW / 2 + Math.sin(bossPhase) * amp - bw / 2;
         b.y = cy + Math.sin(bossPhase * 1.7) * BOSS_BOB * k - bh / 2;
+
+        // the barrage, thickening as he weakens
+        if (dmg < PH_START) return;
+        phGap -= dt;
+        if (phGap > 0 || phantoms.length >= PH_CAP) return;
+        const t = (dmg - PH_START) / (1 - PH_START);
+        phGap = PH_GAP0 + (PH_GAP1 - PH_GAP0) * t;
+        const a = Math.PI * (0.15 + Math.random() * 0.7);     // always downward-ish
+        phantoms.push({
+            x: b.x + bw / 2, y: b.y + bh / 2,
+            vx: Math.cos(a) * PH_SPEED * (Math.random() < 0.5 ? -1 : 1),
+            vy: Math.sin(a) * PH_SPEED,
+            angle: Math.random() * 6.28,
+            spin: (Math.random() - 0.5) * 18,
+            life: PH_LIFE
+        });
+    }
+
+    function stepPhantoms(dt) {
+        for (let i = phantoms.length - 1; i >= 0; i--) {
+            const p = phantoms[i];
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.angle += p.spin * dt;
+            // they bounce off the sides like the real thing, which is the
+            // whole point, but nothing else in the game knows they exist
+            if (p.x < BALL_RX && p.vx < 0) p.vx = -p.vx;
+            if (p.x > LW - BALL_RX && p.vx > 0) p.vx = -p.vx;
+            if (p.y < BALL_RY && p.vy < 0) p.vy = -p.vy;
+            if ((p.life -= dt) <= 0 || p.y - BALL_RY > LH) phantoms.splice(i, 1);
+        }
     }
 
     function resetBall() {
@@ -655,7 +726,7 @@
 
     function action() {
         if (!debugEl.hidden) return;              // ignore taps behind the menu
-        if (phase === 'ascend') return;           // let the takeover finish
+        if (phase === 'ascend' || phase === 'entrance') return;   // let it play
         if (phase === 'ready') {
             releaseStuck();
             phase = 'play';
@@ -750,6 +821,10 @@
         if (b.kind === 'Z') {                        // the boss
             b.hp--;
             award(BOSS_PTS * (b.hp > 0 ? 1 : 5), b.x + bw / 2, b.y, spin);
+            // now and then he has something to say about it
+            if (b.hp > 0 && Math.random() < SHOUT_ODDS) {
+                shout = { x: b.x + bw * 0.88, y: b.y + bh + 8, life: SHOUT_SECS };
+            }
             if (b.hp <= 0) { b.alive = false; clearStage(); return; }
             // he coughs up a capsule every few hits, so the fight has tools
             if (b.hp % BOSS_CAP === 0 && !capsule) {
@@ -973,6 +1048,13 @@
 
         bossUpdate(dt);          // before the physics, so his box is current
 
+        if (phase === 'entrance') {
+            enterT += dt;
+            if (enterT >= ENTER_WAIT + ENTER_SECS) phase = 'ready';
+        }
+        stepPhantoms(dt);
+        if (shout && (shout.life -= dt) <= 0) shout = null;
+
         // the takeover. when it finishes, the banner finally lands.
         if (phase === 'ascend') {
             ascendT += dt;
@@ -1150,9 +1232,12 @@
         }
         ctx.restore();
 
-        // his health, riding just above him
+        // his health, riding just above him. during the entrance it grows out
+        // from nothing, so you learn how big the problem is as he arrives.
         const frac = Math.max(0, b.hp / b.maxHp);
-        const barW = Math.min(bw * 0.72, LW - 120);
+        const grow = phase === 'entrance' ? enterK() : 1;
+        if (grow <= 0.001) return;
+        const barW = Math.min(bw * 0.72, LW - 120) * grow;
         const barX = Math.max(12, Math.min(LW - 12 - barW, b.x + bw / 2 - barW / 2));
         const barY = Math.max(10, b.y - 16);
         ctx.fillStyle = 'rgba(242,239,233,0.14)';
@@ -1286,6 +1371,41 @@
         return w > maxW ? size * (maxW / w) : size;
     }
 
+    // his phantoms, drawn under the real ball so the one that matters stays
+    // the most solid thing on screen
+    function drawPhantoms() {
+        if (!phantoms.length) return;
+        for (const p of phantoms) {
+            ctx.globalAlpha = PH_ALPHA * Math.min(1, p.life / 0.5);   // fade as they die
+            drawBall(p.x, p.y, BALL_RX, p.angle);
+        }
+        ctx.globalAlpha = 1;
+    }
+
+    function drawShout() {
+        if (!shout) return;
+        const txt = 'BRANDON!';
+        const size = 22;
+        ctx.font = 'bold ' + size + 'px "Trebuchet MS", sans-serif';
+        const w = ctx.measureText(txt).width + 30, h = size + 18;
+        const x = Math.max(12 + w / 2, Math.min(LW - 12 - w / 2, shout.x));
+        const y = Math.max(20, Math.min(LH - h - 90, shout.y));
+
+        ctx.globalAlpha = Math.min(1, shout.life / 0.35);
+        ctx.fillStyle = '#f2efe9';
+        ctx.beginPath();
+        ctx.roundRect(x - w / 2, y, w, h, 9);
+        ctx.fill();
+        ctx.beginPath();                       // the tail, pointing back at him
+        ctx.moveTo(x - 10, y + 3);
+        ctx.lineTo(x + 10, y + 3);
+        ctx.lineTo(x + 1, y - 14);
+        ctx.closePath();
+        ctx.fill();
+        text(txt, x, y + h / 2 + 8, size, '#12100e', 'center');
+        ctx.globalAlpha = 1;
+    }
+
     function text(str, x, y, size, color, align) {
         ctx.fillStyle = color;
         ctx.font = size + 'px "Trebuchet MS", sans-serif';
@@ -1299,6 +1419,9 @@
         for (const b of bricks) if (b.alive) drawBrick(b);
         drawCapsule();
         drawPaddle();
+        drawPhantoms();
+        drawShout();
+
         // no ball once the fight is settled, the takeover included
         if (phase === 'ready' || phase === 'play' || phase === 'cleared') {
             for (const b of balls) drawBall(b.x, b.y, BALL_RX, b.angle);
@@ -1371,7 +1494,8 @@
         }
 
         // the band stays away until the title beat, so the rise plays clean
-        if (phase !== 'play' && (phase !== 'ascend' || ascendT >= A_TITLE)) {
+        if (phase !== 'play' && phase !== 'entrance'
+            && (phase !== 'ascend' || ascendT >= A_TITLE)) {
             const my = 424;
             const over = phase === 'over';
             const bandH = (over ? 150 : 104) * u;
