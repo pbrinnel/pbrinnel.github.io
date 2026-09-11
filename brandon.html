@@ -14,21 +14,56 @@
     </script>
 
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- viewport-fit=cover lets the field run under the notch and the home
+         indicator; the padding below hands that space back where it matters -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Paul Brinnel</title>
 
     <!-- not linked from anywhere, and kept out of search results -->
     <meta name="robots" content="noindex, nofollow">
 
+    <!-- an iPhone will not give up its address bar for the Fullscreen API --
+         Safari does not implement it on the phone at all. Added to the home
+         screen with these, though, the page opens with no browser chrome
+         whatsoever, which is the only route to a genuinely full screen there.
+         Android honours the API, so it never needs this path. -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Brandon">
+
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon/favicon-16x16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-icon-180x180.png">
     <meta name="theme-color" content="#000000">
 
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
+        html {
+            background: #000;
+            /* safari inflates text of its own accord in landscape, which was
+               pushing the hint line taller and stealing it back off the field */
+            -webkit-text-size-adjust: 100%;
+            /* body's copies of these only reach the viewport while html leaves
+               them alone, so say it in both places and stop guessing */
+            overflow: hidden;
+            overscroll-behavior: none;
+        }
+
         body {
+            /* svh, not vh -- same reason as cardsforcowboys (see its
+               css/theme.css): iOS pins `vh` to the LARGE viewport, the one with
+               the chrome already retracted, so 100vh is about a toolbar taller
+               than what you can actually see and the bottom of the field --
+               where brandon stands -- ends up under the ribbon.
+               svh rather than dvh on purpose, too: dvh tracks the ribbon as it
+               slides away, and every one of those changes would re-scale the
+               field mid-rally. svh is the stable, conservative height, and
+               fullscreen makes the two identical anyway. Keep both lines; the
+               vh fallback covers pre-iOS-15.4 / pre-Chrome-108. */
             min-height: 100vh;
+            min-height: 100svh;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -37,7 +72,26 @@
             background-color: #000;
             color: #f2efe9;
             font-family: 'Trebuchet MS', sans-serif;
-            padding: 20px;
+            /* the notch and the home indicator sit inside the viewport now that
+               it is cover-fit, so keep clear of them -- but only by as much as
+               the device actually asks for */
+            padding: 20px max(20px, env(safe-area-inset-right))
+                     max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+
+            /* nothing here scrolls, so a drag that runs past the edge of the
+               field should not rubber-band the page or pull down a refresh */
+            overflow: hidden;
+            overscroll-behavior: none;
+            /* kills double-tap-to-zoom. the canvas already had its own
+               touch-action, so taps ON the field were always safe -- but the
+               splash and the black margins either side were not, and those
+               margins now steer him, so they are somewhere you tap in earnest.
+               pinch zoom is deliberately left alone: nothing here needs a whole
+               gesture taken away from someone who wants a closer look. */
+            touch-action: manipulation;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
         }
 
         #stage {
@@ -57,6 +111,31 @@
             color: #6d685f;
             text-align: center;
         }
+
+        /* the way back into fullscreen once you have left it, and the only way
+           in at all on a desktop, where a click going fullscreen unasked would
+           be startling. it hides itself while fullscreen is up, so it never
+           sits over the field during the part that matters. */
+        #fs {
+            position: fixed;
+            top: 0; right: 0;
+            z-index: 5;
+            width: 44px; height: 44px;      /* a real target, not just a glyph */
+            margin: max(0px, env(safe-area-inset-top)) max(0px, env(safe-area-inset-right)) 0 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: none;
+            border: 0;
+            color: #4a453e;
+            font-size: 17px;
+            line-height: 1;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        #fs:hover { color: #9a958c; }
+        #fs[hidden] { display: none; }
 
         #splash {
             position: fixed;
@@ -126,11 +205,34 @@
             color: #4a453e;
         }
 
+        /* a landscape phone is about 390px tall and the field scales off the
+           height, so every pixel of page furniture costs real playfield. the
+           hint is a mouse instruction and there is no mouse down here. */
+        @media (max-height: 560px) {
+            body {
+                gap: 0;
+                /* vertically, give back exactly what the hardware asks for and
+                   not one pixel more -- in landscape that is the home indicator
+                   at the bottom and usually nothing at the top. the 20px either
+                   side stays, since width is never the binding constraint on a
+                   screen this shape. */
+                padding-top: env(safe-area-inset-top, 0px);
+                padding-bottom: env(safe-area-inset-bottom, 0px);
+            }
+            .hint { display: none; }
+            /* at this size the screen's own edge is the border */
+            #stage { border-color: transparent; }
+        }
+
         /* the field is 4:3, which leaves a portrait phone showing a postage
-           stamp -- ask for landscape instead of shipping something unplayable */
+           stamp -- ask for landscape instead of shipping something unplayable.
+           820px used to be the cut, which caught tablets too; an iPad in
+           portrait renders the field at nearly full size and was being turned
+           away from a screen it fits perfectly well. 700px is the real line:
+           above it is a tablet, below it a phone. */
         #rotate { display: none; }
 
-        @media (max-width: 820px) and (orientation: portrait) {
+        @media (max-width: 700px) and (orientation: portrait) {
             #stage, .hint { display: none; }
 
             #rotate {
@@ -161,6 +263,8 @@
     <div id="rotate"><b>BRANDON</b>turn your phone sideways</div>
 
     <div id="debug" hidden><h2>STAGE SELECT</h2></div>
+
+    <button id="fs" type="button" hidden aria-label="Fullscreen" title="Fullscreen">&#9974;</button>
 
     <canvas id="stage"></canvas>
     <p class="hint">move to slide brandon &middot; click or space to serve</p>
@@ -763,6 +867,73 @@
     fetchBoard();                 // async; the game never waits on it
     newGame();
 
+    // ---- fullscreen ----------------------------------------------------------
+    // The address bar is the single biggest thing between a phone and a playable
+    // field. The field scales off the HEIGHT -- it is 4:3 on a screen that is
+    // nearer 21:9 -- so a 90px bar on a 390px-tall landscape phone is not 23% of
+    // the screen, it is 23% off every dimension and closer to 40% of the area.
+    //
+    // Android honours the Fullscreen API and hands the whole panel back. iPhone
+    // Safari does not implement it on the phone at all (iPad does), so there the
+    // fallback is the apple-mobile-web-app meta tags up top: added to the home
+    // screen, the page opens with no chrome at all. Everything below fails soft.
+    const root = document.documentElement;
+    const rawFS = root.requestFullscreen || root.webkitRequestFullscreen;
+    const rawExit = document.exitFullscreen || document.webkitExitFullscreen;
+    const fsBtn = document.getElementById('fs');
+    // (hover: none) rather than (pointer: coarse), matching cardsforcowboys: a
+    // touchscreen laptop is coarse-capable but still has a mouse, and a click
+    // there should not go fullscreen unasked
+    const touchOnly = matchMedia('(hover: none)').matches;
+
+    function fsOn() {
+        return !!(document.fullscreenElement || document.webkitFullscreenElement);
+    }
+    function enterFS() {
+        if (!rawFS || fsOn()) return;
+        try {
+            const p = rawFS.call(root, { navigationUI: 'hide' });
+            if (p && p.catch) p.catch(() => {});
+        } catch (e) { /* refused. the game plays in a tab, just smaller. */ }
+        // and while we are in there, pin the orientation the field wants.
+        // Only phones allow this, and only from inside fullscreen -- which is
+        // why a portrait android never has to read the rotate screen at all.
+        const so = screen.orientation;
+        if (so && so.lock) { try { so.lock('landscape').catch(() => {}); } catch (e) {} }
+    }
+    function exitFS() {
+        if (!rawExit || !fsOn()) return;
+        try {
+            const p = rawExit.call(document);
+            if (p && p.catch) p.catch(() => {});
+        } catch (e) {}
+    }
+
+    // no button where it would do nothing
+    fsBtn.hidden = !rawFS;
+    fsBtn.addEventListener('click', () => { fsOn() ? exitFS() : enterFS(); });
+    function syncFS() {
+        fsBtn.hidden = !rawFS || fsOn();
+        resize();
+    }
+    document.addEventListener('fullscreenchange', syncFS);
+    document.addEventListener('webkitfullscreenchange', syncFS);
+
+    // ---- keeping the screen on -----------------------------------------------
+    // A phone dims and then sleeps when it decides nothing is happening, and a
+    // thumb resting on the glass waiting for the ball to come down does not
+    // count as something happening.
+    let wake = null;
+    function keepAwake() {
+        if (!navigator.wakeLock || wake || document.visibilityState !== 'visible') return;
+        navigator.wakeLock.request('screen').then(w => {
+            wake = w;
+            w.addEventListener('release', () => { wake = null; });
+        }).catch(() => { /* denied, or the battery is low. not ours to argue. */ });
+    }
+    // the lock is dropped whenever the tab goes away, so take it again on return
+    document.addEventListener('visibilitychange', keepAwake);
+
     // ---- splash ------------------------------------------------------------
     // caught on the capture phase so the dismissing click or key does not also
     // fall through and serve the ball
@@ -770,6 +941,13 @@
     function dismissSplash(e) {
         if (splash.hidden) return;
         splash.hidden = true;          // hard cut, no fade
+        // the first tap is the one real user gesture we are guaranteed, and both
+        // of these need one. On a touch screen the splash reads as a start
+        // button, so going fullscreen off it is what you would expect; on a
+        // desktop a click doing that unasked would be startling, so there it
+        // stays on the button in the corner.
+        if (touchOnly) enterFS();
+        keepAwake();
         e.preventDefault();
         e.stopPropagation();
     }
@@ -777,18 +955,29 @@
     addEventListener('keydown', dismissSplash, true);
 
     // ---- input -------------------------------------------------------------
+    // These sit on the window rather than the canvas. The field is 4:3 on a
+    // screen that is much wider, so a landscape phone letterboxes it with a
+    // fat black margin down each side -- which is exactly where a thumb rests
+    // when you hold the thing. Touching there used to do nothing at all. The
+    // whole screen steers him now; update() clamps him to the field either way.
+    const onUI = e => e.target && e.target.closest && e.target.closest('#fs, #debug');
+
     const track = e => {
         const r = canvas.getBoundingClientRect();
         paddle.x = (e.clientX - r.left) / r.width * LW;
     };
-    canvas.addEventListener('pointermove', e => { if (phase !== 'initials') track(e); });
-    canvas.addEventListener('pointerdown', e => {
+    addEventListener('pointermove', e => {
+        if (phase === 'initials' || onUI(e)) return;
+        track(e);
+    });
+    addEventListener('pointerdown', e => {
+        if (onUI(e)) return;
         if (phase === 'initials') {
             const r = canvas.getBoundingClientRect();
             const px = (e.clientX - r.left) / r.width * LW;
             const py = (e.clientY - r.top) / r.height * LH;
             for (const c of GRID) {
-                if (px >= c.x && px <= c.x + c.w && py >= c.y && py <= c.y + c.h) {
+                if (px >= c.hx && px <= c.hx + c.hw && py >= c.hy && py <= c.hy + c.hh) {
                     entryKey(c.k); return;
                 }
             }
@@ -870,14 +1059,22 @@
     // ---- initials ------------------------------------------------------------
     // 26 letters plus DEL and OK across seven columns. Tappable for phones and
     // typeable everywhere else, so neither input is second class.
+    // Two rects per key: the box that gets DRAWN, and the pitch it sits in,
+    // which is what a tap is tested against. The field renders at about
+    // two-thirds size on a landscape phone, so the old 59x39 box came out
+    // 38x25 css px -- under every touch-target guideline going -- and the
+    // gutters between them were dead strips you could put a thumb in and have
+    // nothing happen. On the pitch below a key is ~48x42 css px on that same
+    // phone, and the keys tile, so there is nowhere left to miss.
     const GRID = (() => {
         const cells = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').concat(['DEL', 'OK']);
-        const cw = 66, chh = 46, cols = 7;
-        const x0 = LW / 2 - (cols * cw) / 2, y0 = 300;
-        return cells.map((k, i) => ({
-            k, x: x0 + (i % cols) * cw, y: y0 + ((i / cols) | 0) * chh,
-            w: cw - 7, h: chh - 7
-        }));
+        const cw = 74, chh = 64, cols = 7;
+        const x0 = LW / 2 - (cols * cw) / 2, y0 = 268;
+        return cells.map((k, i) => {
+            const hx = x0 + (i % cols) * cw, hy = y0 + ((i / cols) | 0) * chh;
+            return { k, hx, hy, hw: cw, hh: chh,
+                     x: hx + 4, y: hy + 7, w: cw - 8, h: chh - 14 };
+        });
     })();
 
     function entryKey(k) {
@@ -1743,8 +1940,9 @@
                  live ? (ok ? '#c9a94e' : '#9a958c') : '#3a352f', 'center');
         }
 
+        // the keypad grew downward to 524, so this moved out from under it
         text(sending ? 'sending...' : 'type it, or tap the letters',
-             LW / 2, 520, 14 * u, '#6d685f', 'center');
+             LW / 2, 556, 14 * u, '#6d685f', 'center');
     }
 
     function draw() {
@@ -1879,13 +2077,61 @@
     }
 
     // ---- loop --------------------------------------------------------------
+    // What you can actually SEE. iOS reports innerHeight as the layout viewport
+    // -- the tall one, as if the address bar were already gone -- so sizing the
+    // field off it hides the bottom of the field, and brandon with it, behind
+    // the toolbar. visualViewport is the visible part. It also shrinks under a
+    // pinch, though, and a zoom should not re-scale the game, so only trust it
+    // while the page is at rest.
+    function seenH() {
+        const vv = window.visualViewport;
+        return vv && Math.abs(vv.scale - 1) < 0.01
+             ? Math.min(vv.height, innerHeight) : innerHeight;
+    }
+    function seenW() {
+        const vv = window.visualViewport;
+        return vv && Math.abs(vv.scale - 1) < 0.01
+             ? Math.min(vv.width, innerWidth) : innerWidth;
+    }
+
+    const hintEl = document.querySelector('.hint');
+    let lastFit = '';
+
     function resize() {
         const dpr = Math.min(devicePixelRatio || 1, 2);
+        // Measure the furniture rather than guessing at it. The old fixed 24/68
+        // was wrong on most phones in both directions: the safe-area padding is
+        // a different size on every handset, and the hint line takes itself out
+        // of the layout entirely on a short screen.
+        const cs = getComputedStyle(document.body);
+        const px = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+        const py = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+        const gap = parseFloat(cs.rowGap) || 0;
+        // offsetParent is null exactly when it is display:none
+        const hintH = hintEl.offsetParent ? hintEl.offsetHeight + gap : 0;
+
+        // The body box is 100svh, which is the stable number; the visible
+        // viewport is what a retracted address bar or an overlay has actually
+        // left showing. Take whichever is SMALLER and the field can never end
+        // up bigger than either its own box or the part of the screen you can
+        // see -- which is the two ways it used to go wrong.
+        const box = document.body;
+        const availW = Math.min(box.clientWidth, seenW()) - px;
+        const availH = Math.min(box.clientHeight, seenH()) - py - hintH;
+
         // fit BOTH ways -- on a phone in landscape the height is what runs out
         // first, and fitting only the width would push the paddle off-screen
-        const availW = document.body.clientWidth - 24;
-        const availH = innerHeight - 68;
         const scale = Math.min(availW / LW, availH / LH, 1);
+
+        // Assigning canvas.width reallocates the bitmap even when the value is
+        // identical, and resize now hangs off visualViewport too, which on iOS
+        // chatters as the address bar moves. draw() repaints from scratch every
+        // frame so nothing would look wrong, but there is no reason to throw a
+        // 1600x1200 buffer away forty times while a phone settles.
+        const fit = scale.toFixed(4) + ':' + dpr;
+        if (fit === lastFit) return;
+        lastFit = fit;
+
         canvas.style.width = Math.floor(LW * scale) + 'px';
         canvas.style.height = Math.floor(LH * scale) + 'px';
         canvas.width = LW * dpr;
@@ -1897,6 +2143,14 @@
         uiScale = Math.min(2.2, Math.max(1, 13 / (15 * scale)));
     }
     addEventListener('resize', resize);
+    // the window `resize` above does not fire when only the address bar moves,
+    // which is exactly the case that used to leave brandon under the toolbar
+    if (window.visualViewport) {
+        visualViewport.addEventListener('resize', resize);
+        visualViewport.addEventListener('scroll', resize);
+    }
+    // iOS fires this before the new metrics have settled, so ask twice
+    addEventListener('orientationchange', () => { resize(); setTimeout(resize, 150); });
     resize();
 
     let last = performance.now();
