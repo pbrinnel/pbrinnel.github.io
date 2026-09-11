@@ -200,6 +200,7 @@
     const WIG_FREQ   = 3.2;                // rad/s -- a slow sway, not a buzz
     const WIG_EASE   = 0.6;                // seconds of fade-out at the end
     const DBL_GAP    = 0.45;               // hole between the pair, as a fraction of width
+    const DBL_SPLIT  = 0.38;               // seconds to come apart, and to rejoin
     const ENG_MAX    = 55;                 // spin ceiling while english is up
     const ENG_PUMP   = 45;                 // rad/s^2 to get there
     const BONUS      = 0.25;               // score kicker per chaos capsule
@@ -279,7 +280,7 @@
     // ---- state -------------------------------------------------------------
     let bricks, stage, score, best, lives, combo, phase, banner;
     let paddle, balls, popups, hits, tierSeen, bw, bh;
-    let speed, capsule, fx, callout, clock = 0, uiScale = 1;
+    let speed, capsule, fx, callout, clock = 0, spreadT = 0, uiScale = 1;
 
     function loadBest() {
         try { return parseInt(localStorage.getItem('brandon.best'), 10) || 0; }
@@ -301,18 +302,25 @@
     }
 
     // ---- the paddle, which may be one brandon or two ------------------------
+    // `spreadT` runs 0 -> 1 when DOUBLE comes up and back down when it lapses,
+    // so the pair slides apart and rejoins instead of snapping. at rest the
+    // two are exactly on top of each other, which is indistinguishable from
+    // the single brandon -- so there is no pop at either end.
+    function spread() {
+        const t = spreadT;
+        return t * t * (3 - 2 * t);        // smoothstep, no overshoot either way
+    }
     function segs() {
         const w = paddle.w;
-        if (fx.D > 0) {
-            const g = w * DBL_GAP;
-            return [{ cx: paddle.x - (w + g) / 2, w, i: 0 },
-                    { cx: paddle.x + (w + g) / 2, w, i: 1 }];
-        }
-        return [{ cx: paddle.x, w, i: 0 }];
+        const k = spread();
+        if (k < 0.001) return [{ cx: paddle.x, w, i: 0 }];
+        const off = (w + w * DBL_GAP) / 2 * k;
+        return [{ cx: paddle.x - off, w, i: 0 },
+                { cx: paddle.x + off, w, i: 1 }];
     }
     function halfSpan() {
         const w = paddle.w;
-        return fx.D > 0 ? w * (2 + DBL_GAP) / 2 : w / 2;
+        return w / 2 + (w + w * DBL_GAP) / 2 * spread();
     }
 
     // ---- the wiggle ---------------------------------------------------------
@@ -349,6 +357,7 @@
         paddle.w = PADDLE_W;
         capsule = null;
         callout = null;
+        spreadT = 0;                      // a fresh ball starts as one brandon
         for (const b of bricks || []) b.wigA = 0;
     }
 
@@ -710,6 +719,16 @@
 
     function update(dt) {
         clock += dt;
+
+        // drive the split open when DOUBLE is up and closed when it lapses.
+        // done before the clamp below so the widening span is what keeps him
+        // on screen as he comes apart.
+        const want = fx.D > 0 ? 1 : 0;
+        if (spreadT !== want) {
+            const step = dt / DBL_SPLIT;
+            spreadT = want > spreadT ? Math.min(want, spreadT + step)
+                                     : Math.max(want, spreadT - step);
+        }
 
         const hs = halfSpan();
         paddle.x = Math.max(hs, Math.min(LW - hs, paddle.x));
