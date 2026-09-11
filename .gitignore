@@ -1,0 +1,6 @@
+# macOS writes these into every folder it opens in Finder
+.DS_Store
+**/.DS_Store
+
+# Claude Code local settings, machine-specific
+.claude/settings.local.json
