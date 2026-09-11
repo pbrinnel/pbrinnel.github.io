@@ -70,6 +70,50 @@
             color: #f2efe9;
         }
 
+        /* stage select, unlocked with the konami code */
+        #debug {
+            position: fixed;
+            inset: 0;
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            background: rgba(0, 0, 0, 0.92);
+        }
+
+        #debug[hidden] { display: none; }
+
+        #debug h2 {
+            font-size: 0.78rem;
+            font-weight: normal;
+            letter-spacing: 0.22em;
+            color: #6d685f;
+        }
+
+        #debug button {
+            width: 210px;
+            padding: 9px 0;
+            background: #090908;
+            border: 1px solid #2e2a24;
+            border-radius: 3px;
+            color: #f2efe9;
+            font-family: inherit;
+            font-size: 0.92rem;
+            letter-spacing: 0.06em;
+            cursor: pointer;
+        }
+
+        #debug button:hover { border-color: #6d685f; }
+
+        #debug p {
+            margin-top: 6px;
+            font-size: 0.72rem;
+            font-style: italic;
+            color: #4a453e;
+        }
+
         /* the field is 4:3, which leaves a portrait phone showing a postage
            stamp -- ask for landscape instead of shipping something unplayable */
         #rotate { display: none; }
@@ -103,6 +147,8 @@
     <div id="splash"><span>BRANDON</span></div>
 
     <div id="rotate"><b>BRANDON</b>turn your phone sideways</div>
+
+    <div id="debug" hidden><h2>STAGE SELECT</h2></div>
 
     <canvas id="stage"></canvas>
     <p class="hint">move to slide brandon &middot; click or space to serve</p>
@@ -205,6 +251,25 @@
     const ENG_PUMP   = 45;                 // rad/s^2 to get there
     const BONUS      = 0.25;               // score kicker per chaos capsule
 
+    // ---- the boss -----------------------------------------------------------
+    // the real brandon, at last. he takes 25 hits, shrinks with every one, and
+    // once a quarter of him is gone he starts moving -- faster and smaller the
+    // closer he gets to finished.
+    const BOSS_HP     = 25;
+    const BOSS_W      = 470;    // full size, against an 800 wide field
+    const BOSS_SHRINK = 0.62;   // how much of himself he loses by the end
+    const BOSS_Y      = 158;    // centre of his patrol
+    const BOSS_STILL  = 0.25;   // fraction of damage before he bothers to move
+    const BOSS_SWEEP0 = 0.35;   // rad/s once he gets going
+    const BOSS_SWEEP1 = 0.65;   // extra rad/s by the end. the pair is capped so
+                                // his top speed lands near 310px/s -- fast, but
+                                // under the ball's, and slow enough to hit
+    const BOSS_BOB    = 20;
+    const BOSS_PTS    = 60;
+    const BOSS_CAP    = 4;      // force a capsule out of him every N hits
+    const ASCEND_SECS = 2.2;    // your brandon's slow rise into his vacancy
+    const CONTINUE_KEEP = 0.5;  // what survives of your score when you re-up
+
     // `name` is shouted across the screen on pickup, `short` is the hud tag,
     // and the KEY is the letter printed on the falling capsule -- so they
     // always agree
@@ -235,37 +300,44 @@
     // ---- stages ------------------------------------------------------------
     // 7 across puts each brandon at ~90px, about two thirds of the paddle.
     // . empty   Y/G/O/R tiers   S silver, multi-hit   X gold, indestructible
+    // Each stage adds a RULE rather than just a new picture, and the workload
+    // climbs -- 22, 26, 33 hits -- then deliberately dips for the hat before
+    // the boss. `dbg` names them for the stage-select only; nothing shows a
+    // stage name during play.
     const LEVELS = [
-        {   // a plain wall, one row per tier
+        {   dbg: 'WALL',   // plain. a short opener, to teach the paddle angle
             silverHp: 2,
-            rows: ['RRRRRRR',
-                   'OOOOOOO',
+            rows: ['.RRRRR.',
+                   '.OOOOO.',
                    'GGGGGGG',
-                   'YYYYYYY']
+                   '.YYYYY.']
         },
-        {   // a gold spine splits the field -- you have to work both halves
+        {   dbg: 'SPLIT',  // gold: immovable geometry, worked around not through
             silverHp: 2,
             rows: ['RRRRRRR',
                    'OO.X.OO',
                    'OO.X.OO',
-                   'GG.X.GG',
+                   'GGGGGGG',
                    '.YY.YY.']
         },
-        {   // a mesh of silver, so most of it takes two passes
+        {   dbg: 'MESH',   // silver: things that refuse to die in one hit
             silverHp: 2,
             rows: ['S.S.S.S',
-                   '.R.R.R.',
-                   'S.S.S.S',
-                   '.O.O.O.',
-                   '.G.G.G.']
+                   'RRRRRRR',
+                   '.S.S.S.',
+                   'OOOOOOO',
+                   '.GGGGG.']
         },
-        {   // a cowboy hat, deliberately easy, to end on the joke
+        {   dbg: 'HAT',    // the joke, and a deliberate breather before the boss
             silverHp: 2,
             rows: ['..RRR..',
                    '..RRR..',
                    '.OOOOO.',
                    'YYYYYYY',
                    '.YYYYY.']
+        },
+        {   dbg: 'BOSS',   // one enormous brandon, no bricks at all
+            boss: true
         }
     ];
 
@@ -280,7 +352,8 @@
     // ---- state -------------------------------------------------------------
     let bricks, stage, score, best, lives, combo, phase, banner;
     let paddle, balls, popups, hits, tierSeen, bw, bh;
-    let speed, capsule, fx, callout, clock = 0, spreadT = 0, uiScale = 1;
+    let speed, capsule, fx, callout, clock = 0, spreadT = 0, bossPhase = 0;
+    let ascend = 0, uiScale = 1;
 
     function loadBest() {
         try { return parseInt(localStorage.getItem('brandon.best'), 10) || 0; }
@@ -361,8 +434,32 @@
         for (const b of bricks || []) b.wigA = 0;
     }
 
+    function newBrick(x, y, kind, hp) {
+        return {
+            x, y, kind, alive: true, hp, maxHp: hp, flash: 0,
+            jt: 0, jnx: 0, jny: 0,        // jiggle: energy, and which way
+            // each one sways on its own phase and slightly its own tempo, so
+            // the wall never moves as one mechanical block
+            wigP: Math.random() * Math.PI * 2,
+            wigF: 0.82 + Math.random() * 0.36,
+            wigA: 0
+        };
+    }
+
     function buildStage(n) {
         const lvl = LEVELS[n];
+        hits = 0;
+        tierSeen = {};
+
+        if (lvl.boss) {
+            bw = BOSS_W;
+            bh = bw / SHAPE_ASPECT;
+            bricks = [newBrick((LW - bw) / 2, BOSS_Y - bh / 2, 'Z', BOSS_HP)];
+            bossPhase = 0;
+            resetBall();
+            return;
+        }
+
         const cols = lvl.rows[0].length;
         bw = (LW - MARGIN * 2 - GAP * (cols - 1)) / cols;
         bh = bw / SHAPE_ASPECT;
@@ -372,33 +469,44 @@
             for (let c = 0; c < cols; c++) {
                 const ch = row[c];
                 if (!ch || ch === '.') continue;
-                const b = {
-                    x: MARGIN + c * (bw + GAP),
-                    y: TOP + r * (bh + GAP),
-                    kind: ch, alive: true, hp: 1, maxHp: 1, flash: 0,
-                    jt: 0, jnx: 0, jny: 0,        // jiggle: energy, and which way
-                    // each one sways on its own phase and slightly its own
-                    // tempo, so the wall never moves as one mechanical block
-                    wigP: Math.random() * Math.PI * 2,
-                    wigF: 0.82 + Math.random() * 0.36,
-                    wigA: 0
-                };
-                if (ch === 'S') { b.hp = b.maxHp = lvl.silverHp; }
-                bricks.push(b);
+                bricks.push(newBrick(MARGIN + c * (bw + GAP), TOP + r * (bh + GAP),
+                                     ch, ch === 'S' ? lvl.silverHp : 1));
             }
         });
-        hits = 0;
-        tierSeen = {};
         resetBall();
     }
 
+    // once a quarter of him is gone he starts patrolling, and he shrinks and
+    // speeds up the whole way down
+    function bossUpdate(dt) {
+        const b = bricks[0];
+        if (!b || b.kind !== 'Z' || !b.alive) return;
+
+        const dmg = 1 - b.hp / b.maxHp;                       // 0 -> 1
+        bw = BOSS_W * (1 - BOSS_SHRINK * dmg);
+        bh = bw / SHAPE_ASPECT;
+
+        const k = Math.max(0, (dmg - BOSS_STILL) / (1 - BOSS_STILL));
+        bossPhase += (BOSS_SWEEP0 + k * BOSS_SWEEP1) * dt;    // integrated, so
+                                                              // speeding up never
+                                                              // jumps his phase
+        // amplitude grows FROM zero, so he is genuinely motionless until a
+        // quarter of him is gone and then eases into the patrol
+        const amp = (LW - bw) / 2 * k;
+        b.x = LW / 2 + Math.sin(bossPhase) * amp - bw / 2;
+        b.y = BOSS_Y + Math.sin(bossPhase * 1.7) * BOSS_BOB * k - bh / 2;
+    }
+
     function resetBall() {
-        speed = BASE_SPEED;
+        // the one thing that made every stage feel identical: this used to be
+        // a flat BASE_SPEED, so stage five opened exactly as slow as stage one
+        speed = BASE_SPEED * (1 + 0.08 * stage);
         clearEffects();
         combo = 0;
         const b = newBall(paddle.x, PADDLE_Y - padH() / 2 - BALL_RY - 2);
         b.stuck = true;
         balls = [b];
+        ascend = 0;
         phase = 'ready';
     }
 
@@ -433,8 +541,28 @@
         paddle.x = (e.clientX - r.left) / r.width * LW;
     };
     canvas.addEventListener('pointermove', track);
-    canvas.addEventListener('pointerdown', e => { track(e); action(); });
+    canvas.addEventListener('pointerdown', e => {
+        if (phase === 'over') {                 // pick a box, or nothing happens
+            const r = canvas.getBoundingClientRect();
+            const px = (e.clientX - r.left) / r.width * LW;
+            const py = (e.clientY - r.top) / r.height * LH;
+            for (const b of overButtons(uiScale)) {
+                if (px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h) {
+                    b.key === 'continue' ? continueGame() : newGame();
+                    return;
+                }
+            }
+            return;
+        }
+        track(e);
+        action();
+    });
     addEventListener('keydown', e => {
+        if (phase === 'over') {                 // C to re-up, N to start clean
+            if (e.code === 'KeyC') continueGame();
+            if (e.code === 'KeyN') newGame();
+            return;
+        }
         if (e.code === 'Space') { e.preventDefault(); action(); }
         if (e.code === 'ArrowLeft')  paddle.x -= 34;
         if (e.code === 'ArrowRight') paddle.x += 34;
@@ -450,7 +578,48 @@
         }
     }
 
+    // ---- stage select, on the konami code -----------------------------------
+    const KONAMI = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft',
+                    'ArrowRight', 'ArrowLeft', 'ArrowRight', 'KeyB', 'KeyA'];
+    const debugEl = document.getElementById('debug');
+    let konami = [];
+
+    LEVELS.forEach((lvl, i) => {
+        const btn = document.createElement('button');
+        btn.textContent = (i + 1) + '  ·  ' + lvl.dbg;
+        btn.addEventListener('click', () => startAt(i));
+        debugEl.appendChild(btn);
+    });
+    debugEl.appendChild(Object.assign(document.createElement('p'),
+        { textContent: 'esc to go back' }));
+
+    function startAt(n) {
+        score = 0; lives = 3; stage = n;
+        popups = [];
+        buildStage(n);
+        banner = '';
+        debugEl.hidden = true;
+    }
+
+    addEventListener('keydown', e => {
+        if (!debugEl.hidden) {                    // menu is open
+            if (e.code === 'Escape') debugEl.hidden = true;
+            const n = '12345'.indexOf(e.key);
+            if (n >= 0 && n < LEVELS.length) startAt(n);
+            e.stopPropagation();
+            return;
+        }
+        konami.push(e.code);
+        if (konami.length > KONAMI.length) konami.shift();
+        if (konami.length === KONAMI.length && KONAMI.every((k, i) => konami[i] === k)) {
+            konami = [];
+            debugEl.hidden = false;
+        }
+    }, true);
+
     function action() {
+        if (!debugEl.hidden) return;              // ignore taps behind the menu
+        if (phase === 'ascend') return;           // let the takeover finish
         if (phase === 'ready') {
             releaseStuck();
             phase = 'play';
@@ -458,9 +627,10 @@
             stage++;
             buildStage(stage);
             banner = '';
-        } else if (phase === 'over' || phase === 'won') {
+        } else if (phase === 'won') {
             newGame();
         }
+        // 'over' is handled by the CONTINUE / NEW GAME boxes, not by a stray tap
     }
 
     // ---- scoring -----------------------------------------------------------
@@ -541,6 +711,19 @@
         b.flash = 1;
         if (b.kind === 'X') return;
 
+        if (b.kind === 'Z') {                        // the boss
+            b.hp--;
+            award(BOSS_PTS * (b.hp > 0 ? 1 : 5), b.x + bw / 2, b.y, spin);
+            if (b.hp <= 0) { b.alive = false; clearStage(); return; }
+            // he coughs up a capsule every few hits, so the fight has tools
+            if (b.hp % BOSS_CAP === 0 && !capsule) {
+                capsule = { x: b.x + bw / 2, y: b.y + bh / 2,
+                            kind: CAP_KEYS[(Math.random() * CAP_KEYS.length) | 0] };
+            }
+            if (++hits === 4 || hits === 12) bumpSpeed(1.12);
+            return;
+        }
+
         if (b.kind === 'S') {
             if (--b.hp > 0) return;
             b.alive = false;
@@ -567,7 +750,10 @@
         if (score > best) { best = score; saveBest(); }
         capsule = null;
         if (stage === LEVELS.length - 1) {
-            phase = 'won';
+            // you do not get to just win. your brandon rises into the space
+            // the last one occupied, and swells to fill it.
+            phase = 'ascend';
+            ascend = 0;
             banner = 'BRANDON WINS   +' + bonus;
         } else {
             phase = 'cleared';
@@ -580,6 +766,25 @@
         combo = 0;
         if (lives <= 0) { phase = 'over'; banner = 'GAME OVER'; return; }
         resetBall();
+    }
+
+    // ---- game over: another quarter, or start clean --------------------------
+    // the two boxes are laid out here so the hit test and the drawing can never
+    // disagree about where they are
+    function overButtons(u) {
+        const w = 200 * u, h = 40 * u, gap = 16 * u, y = 424 + 14 * u;
+        return [
+            { key: 'continue', label: 'CONTINUE  -' + Math.round((1 - CONTINUE_KEEP) * 100) + '%',
+              x: LW / 2 - w - gap / 2, y, w, h },
+            { key: 'new', label: 'NEW GAME', x: LW / 2 + gap / 2, y, w, h }
+        ];
+    }
+
+    function continueGame() {
+        score = Math.floor(score * CONTINUE_KEEP);   // the cost of the quarter
+        lives = 3;
+        buildStage(stage);                           // retry the stage you died on
+        banner = '';
     }
 
     // ---- collision against his outline --------------------------------------
@@ -730,6 +935,14 @@
                                      : Math.max(want, spreadT - step);
         }
 
+        bossUpdate(dt);          // before the physics, so his box is current
+
+        // the takeover. when it finishes, the banner finally lands.
+        if (phase === 'ascend') {
+            ascend = Math.min(1, ascend + dt / ASCEND_SECS);
+            if (ascend >= 1) phase = 'won';
+        }
+
         const hs = halfSpan();
         paddle.x = Math.max(hs, Math.min(LW - hs, paddle.x));
         paddle.vx = (paddle.x - paddle.prevX) / Math.max(dt, 1e-4);
@@ -847,7 +1060,9 @@
         const g = c.getContext('2d');
         g.scale(SS, SS);
 
-        if (flat) {
+        if (color === null) {
+            placeShape(g, w, h, false);        // raw: the actual photograph
+        } else if (flat) {
             placeShape(g, w, h, false);
             g.globalCompositeOperation = 'source-in';
             g.fillStyle = color;
@@ -876,7 +1091,40 @@
              : TIERS[kind].fill;
     }
 
+    // The boss is drawn from the untinted photograph -- every brick so far has
+    // been a coloured copy of him, so the real one showing up in full colour
+    // reads as the genuine article. He is cached once at full size and scaled
+    // down as he shrinks, rather than re-baking a sprite at every width.
+    const BOSS_H = BOSS_W / SHAPE_ASPECT;
+
+    function drawBoss(b) {
+        const sprite = shapeSprite('boss', null, BOSS_W, BOSS_H, false);
+        if (!sprite) return;
+        const o = b.jt > 0 ? wobble(b.jt) * JIG_BRICK : 0;
+
+        ctx.save();
+        ctx.translate(b.x + b.jnx * o + bw / 2, b.y + b.jny * o + bh / 2);
+        if (b.wigA) ctx.rotate(b.wigA);
+        ctx.drawImage(sprite, -bw / 2, -bh / 2, bw, bh);
+        if (b.flash > 0) {
+            ctx.globalAlpha = Math.min(1, b.flash) * 0.7;
+            ctx.drawImage(shapeSprite('flash', '#f2efe9', BOSS_W, BOSS_H, true),
+                          -bw / 2, -bh / 2, bw, bh);
+            ctx.globalAlpha = 1;
+        }
+        ctx.restore();
+
+        // his health, riding just above him
+        const frac = Math.max(0, b.hp / b.maxHp);
+        const barW = bw * 0.72, barX = b.x + bw / 2 - barW / 2, barY = b.y - 16;
+        ctx.fillStyle = 'rgba(242,239,233,0.14)';
+        ctx.fillRect(barX, barY, barW, 5);
+        ctx.fillStyle = '#c4703c';
+        ctx.fillRect(barX, barY, barW * frac, 5);
+    }
+
     function drawBrick(b) {
+        if (b.kind === 'Z') { drawBoss(b); return; }
         // a struck silver brick swaps to its own worn tint, rather than taking
         // a dark wash over the top of him
         const kind = (b.kind === 'S' && b.hp < b.maxHp) ? 'S2' : b.kind;
@@ -909,6 +1157,26 @@
 
     function drawPaddle() {
         const o = paddle.jt > 0 ? wobble(paddle.jt) : 0;
+
+        // the takeover: he climbs into the dead boss's place and swells to
+        // fill it. drawn as one brandon regardless of DOUBLE -- whatever you
+        // were carrying, only one of you gets the throne.
+        if (ascend > 0) {
+            const k = ascend * ascend * (3 - 2 * ascend);
+            const y = PADDLE_Y + (BOSS_Y - PADDLE_Y) * k;
+            const w = PADDLE_W + (BOSS_W - PADDLE_W) * k;
+            const artW = w / BODY_LEN_PER_W, artH = artW / PADDLE_ASPECT;
+            ctx.save();
+            ctx.translate(LW / 2 + (paddle.x - LW / 2) * (1 - k), y);
+            ctx.rotate(PADDLE_LEVEL);
+            if (ready(paddleImg)) {
+                ctx.drawImage(paddleImg, -artW / 2 - ART_OFF_X * artW,
+                              -artH / 2 - ART_OFF_Y * artH, artW, artH);
+            }
+            ctx.restore();
+            return;
+        }
+
         for (const sg of segs()) {
             const artW = sg.w / BODY_LEN_PER_W;
             const artH = artW / PADDLE_ASPECT;
@@ -950,7 +1218,8 @@
         for (const b of bricks) if (b.alive) drawBrick(b);
         drawCapsule();
         drawPaddle();
-        if (phase !== 'over' && phase !== 'won') {
+        // no ball once the fight is settled, the takeover included
+        if (phase === 'ready' || phase === 'play' || phase === 'cleared') {
             for (const b of balls) drawBall(b.x, b.y, BALL_RX, b.angle);
         }
 
@@ -997,19 +1266,32 @@
         const mul = scoreMul();
         if (mul > 1) text('SCORE x' + mul.toFixed(2), x, by, 12 * u, '#f2efe9');
 
-        if (phase !== 'play') {
-            const my = 424, bandH = 104 * u;
+        // nothing over the top of the takeover -- let it play out clean
+        if (phase !== 'play' && phase !== 'ascend') {
+            const my = 424;
+            const over = phase === 'over';
+            const bandH = (over ? 150 : 104) * u;
             ctx.fillStyle = 'rgba(0,0,0,0.72)';
             ctx.fillRect(0, my - bandH / 2, LW, bandH);
+
             const msg = phase === 'ready' ? (stage === 0 && lives === 3 && score === 0
                             ? 'BRANDON' : 'READY')
                       : banner;
-            text(msg, LW / 2, my - 4 * u, 32 * u, '#f2efe9', 'center');
+            text(msg, LW / 2, my - (over ? 30 : 4) * u, 32 * u, '#f2efe9', 'center');
 
-            const sub = phase === 'ready' ? 'tap or space to serve'
-                      : phase === 'cleared' ? 'tap to continue'
-                      : 'final score ' + score + '   ·   tap to play again';
-            text(sub, LW / 2, my + 26 * u, 15 * u, '#9a958c', 'center');
+            if (over) {
+                text('final score ' + score, LW / 2, my - 6 * u, 15 * u, '#9a958c', 'center');
+                for (const b of overButtons(u)) {
+                    ctx.strokeStyle = b.key === 'continue' ? '#c9a94e' : '#2e2a24';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(b.x, b.y, b.w, b.h);
+                    text(b.label, b.x + b.w / 2, b.y + b.h / 2 + 5 * u,
+                         14 * u, b.key === 'continue' ? '#c9a94e' : '#9a958c', 'center');
+                }
+            } else {
+                const sub = phase === 'ready' ? 'tap or space to serve' : 'tap to continue';
+                text(sub, LW / 2, my + 26 * u, 15 * u, '#9a958c', 'center');
+            }
         }
     }
 
