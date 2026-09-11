@@ -860,31 +860,39 @@
     // apple-mobile-web-app tags up top are for. Every call here fails soft.
     const root = document.documentElement;
     const rawFS = root.requestFullscreen || root.webkitRequestFullscreen;
-    // (hover: none) rather than (pointer: coarse), matching cardsforcowboys: a
-    // touchscreen laptop is coarse-capable but still has a mouse, and a click
-    // there should not take over the whole monitor unasked. A desktop has room
-    // for the field at full size anyway -- the bar costs it nothing.
-    const touchOnly = matchMedia('(hover: none)').matches;
 
     function fsOn() {
         return !!(document.fullscreenElement || document.webkitFullscreenElement);
     }
+
+    // the field wants landscape, and a phone will give it -- but ONLY from
+    // inside fullscreen. Asking before the request settles is asking too early
+    // and just gets refused, which is what used to happen here.
+    function lockLandscape() {
+        const so = screen.orientation;
+        if (!so || !so.lock) return;
+        try { const p = so.lock('landscape'); if (p && p.catch) p.catch(() => {}); }
+        catch (e) { /* desktop, or a phone that will not. no matter. */ }
+    }
+
     function enterFS() {
         if (!rawFS || fsOn()) return;
         try {
             const p = rawFS.call(root, { navigationUI: 'hide' });
-            if (p && p.catch) p.catch(() => {});
+            if (p && p.then) p.then(lockLandscape, () => {});
+            else setTimeout(lockLandscape, 60);        // old webkit, no promise
         } catch (e) { /* refused. the game plays in a tab, just smaller. */ }
-        // and while we are in there, pin the orientation the field wants.
-        // Only phones allow this, and only from inside fullscreen -- which is
-        // why a portrait android never has to read the rotate screen at all.
-        const so = screen.orientation;
-        if (so && so.lock) { try { so.lock('landscape').catch(() => {}); } catch (e) {} }
     }
 
-    // entering or leaving changes how much room there is, so refit the field
-    document.addEventListener('fullscreenchange', () => resize());
-    document.addEventListener('webkitfullscreenchange', () => resize());
+    // Once we have been fullscreen even briefly, stop asking. If you then leave
+    // deliberately, the next tap should not haul you straight back in.
+    let fsSettled = false;
+    function onFsChange() {
+        if (fsOn()) fsSettled = true;
+        resize();               // the room available just changed
+    }
+    document.addEventListener('fullscreenchange', onFsChange);
+    document.addEventListener('webkitfullscreenchange', onFsChange);
 
     // ---- keeping the screen on -----------------------------------------------
     // A phone dims and then sleeps when it decides nothing is happening, and a
@@ -908,18 +916,39 @@
     function dismissSplash(e) {
         if (splash.hidden) return;
         splash.hidden = true;          // hard cut, no fade
-        // the first tap is the one real user gesture we are guaranteed, and both
-        // of these need one. On a touch screen the splash reads as a start
-        // button, so going fullscreen off it is what you would expect; on a
-        // desktop a click doing that unasked would be startling, so there it
-        // stays on the button in the corner.
-        if (touchOnly) enterFS();
         keepAwake();
         e.preventDefault();
         e.stopPropagation();
     }
     addEventListener('pointerdown', dismissSplash, true);
     addEventListener('keydown', dismissSplash, true);
+
+    // THE ORDER HERE MATTERS AND IT IS NOT OBVIOUS.
+    //
+    // Fullscreen needs transient user activation, and the HTML spec is exact
+    // about which events confer it:
+    //     pointerdown -- only when pointerType IS "mouse"
+    //     pointerup   -- only when pointerType is NOT "mouse"
+    // A finger on glass gets you nothing on the way down, because until it
+    // lifts the browser cannot tell a tap from the start of a scroll. The
+    // request used to sit in dismissSplash, on pointerdown, so it worked with a
+    // mouse and was refused by every phone on earth -- "API can only be
+    // initiated by a user gesture" -- which is precisely backwards from what it
+    // is for. The splash still hides on the way down, where it feels instant;
+    // the request rides the way back up.
+    //
+    // pointerup rather than click, because the preventDefault above suppresses
+    // the click that would otherwise follow.
+    //
+    // Asking the event for its pointerType also beats asking a media query.
+    // This used to gate on (hover: none), and some android browsers answer that
+    // with a flat no -- skipping fullscreen entirely on the devices it exists
+    // for. The event knows what actually touched the screen; a media query is
+    // guessing about the device.
+    addEventListener('pointerup', e => {
+        if (fsSettled || !splash.hidden || e.pointerType === 'mouse') return;
+        enterFS();      // keeps offering on later taps until one lands
+    }, true);
 
     // ---- input -------------------------------------------------------------
     // These sit on the window rather than the canvas. The field is 4:3 on a
