@@ -1,16 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <!-- THE WORKBENCH COPY. brandon.html is the live game and is not to be
-         touched until everything here is finished and approved.
+    <!-- TOUCH TEST BUILD. A throwaway page for trying the gauntlet's controls on
+         a real phone, which is the one surface the whole mode has never run on.
 
-         Three things are deliberately unplugged so that testing cannot reach
-         anything real:
-           - no analytics tag, so a hundred test runs do not land in GA
-           - BOARD_URL is empty, so no score is ever posted to the live board
-           - the best-score key is namespaced, so a debug run cannot overwrite
-             the real one in localStorage
-         Everything else is brandon.html as it stands, plus the work in hand. -->
+         It boots straight into the gauntlet -- nobody is playing five stages on
+         a handset to reach the bit under test -- and when you die it puts you
+         back in rather than going near the initials screen. BOARD_URL is empty
+         and the best-score key is namespaced, so it cannot touch anything real,
+         and there is no analytics tag on it.
+
+         Delete this file once the controls are settled. -->
 
     <meta charset="UTF-8">
     <!-- viewport-fit=cover lets the field run under the notch and the home
@@ -239,7 +239,7 @@
     <div id="debug" hidden><h2>STAGE SELECT</h2></div>
 
     <canvas id="stage"></canvas>
-    <p class="hint">move to slide brandon &middot; click or space to serve</p>
+    <p class="hint">drag to dodge &middot; tap to throw a head</p>
 
 <script>
 (() => {
@@ -900,7 +900,7 @@
 
     // namespaced away from the live game's key -- a stage-select run must not
     // be able to overwrite a real best score
-    const BEST_KEY = 'brandon2.best';
+    const BEST_KEY = 'touchtest.best';
     function loadBest() {
         try { return parseInt(localStorage.getItem(BEST_KEY), 10) || 0; }
         catch (e) { return 0; }
@@ -1281,6 +1281,8 @@
         phase = 'ready';
     }
 
+    // TOUCH TEST: every new game IS the gauntlet. Five stages on a phone to
+    // reach the thing under test is not a test, it is a chore.
     function newGame() {
         score = 0; lives = 3; stage = 0;
         popups = [];
@@ -1293,6 +1295,17 @@
         setHint(HINT_PLAY);
         buildStage(0);
         banner = '';
+        gauntletOnly();
+    }
+
+    // stand up the last stage, kill its boss outright, and hand over. `lives`
+    // is left alone so the overheal ceremony still plays -- it is part of what
+    // needs eyes on a phone.
+    function gauntletOnly() {
+        stage = LEVELS.length - 1;
+        buildStage(stage);
+        bricks[0].alive = false;
+        startGauntlet();
     }
 
     // tx is where the pointer wants him, x is where he has got to. they are the
@@ -1687,7 +1700,12 @@
         if (phase === 'gauntlet') { throwHead(); return; }
         if (phase === 'absorb') return;
         if (phase === 'fall') {
-            if (fallT > F_AGAIN) endRun();        // no continue from the throne
+            // TOUCH TEST: back in, rather than off to the initials screen --
+            // the point here is repetitions of the controls
+            // one life on a retry rather than three: the absorb beat still
+            // plays, but five seconds of ceremony between every attempt is
+            // the wrong tax on a controls test
+            if (fallT > F_AGAIN) { score = 0; lives = 1; gauntletOnly(); }
             return;
         }
         if (phase === 'ascend' || phase === 'entrance' || phase === 'initials') return;
@@ -3638,7 +3656,7 @@
             }
             if (fallT > F_AGAIN) {
                 ctx.globalAlpha = fade(F_AGAIN);
-                text('tap to end the run', LW / 2, 472, 14 * u, '#6d685f', 'center');
+                text('tap to go again', LW / 2, 472, 14 * u, '#6d685f', 'center');
                 ctx.globalAlpha = 1;
             }
         }
