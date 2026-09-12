@@ -1481,8 +1481,31 @@
         btn.addEventListener('click', () => startAt(i));
         debugEl.appendChild(btn);
     });
+    // The throne is not a LEVEL -- it has no bricks and no entry in the table
+    // above -- so it needs its own way in. Without one the only route to half
+    // the game is landing thirty-three hits on him first, which is a poor way
+    // to look at something twice.
+    (() => {
+        const btn = document.createElement('button');
+        btn.textContent = (LEVELS.length + 1) + '  ·  GAUNTLET';
+        btn.addEventListener('click', startGauntletAt);
+        debugEl.appendChild(btn);
+    })();
     debugEl.appendChild(Object.assign(document.createElement('p'),
         { textContent: 'esc to go back' }));
+
+    // stand his stage up, take him off the board, and hand over -- the same
+    // handover the takeover performs, minus the fight and the ceremony
+    function startGauntletAt() {
+        score = 0; lives = 3;
+        popups = [];
+        stage = LEVELS.length - 1;
+        buildStage(stage);
+        bricks[0].alive = false;
+        startGauntlet();
+        banner = '';
+        debugEl.hidden = true;
+    }
 
     function startAt(n) {
         score = 0; lives = 3; stage = n;
@@ -1497,6 +1520,8 @@
             if (e.code === 'Escape') debugEl.hidden = true;
             const n = '12345'.indexOf(e.key);
             if (n >= 0 && n < LEVELS.length) startAt(n);
+            // ...and one past the last stage for the throne
+            if (e.key === String(LEVELS.length + 1)) startGauntletAt();
             e.stopPropagation();
             return;
         }
@@ -3623,8 +3648,11 @@
         // sideways every time a capsule lands or lapses. The transient ones can
         // do the moving; they are transient.
         const by = LH - 12;
+        // BONUS, not MULT: the combo counter at the top of the screen is the
+        // other multiplier, and two numbers both calling themselves the
+        // multiplier is one more thing to work out mid-rally.
         const mul = scoreMul() * liveSpinMul();
-        const mulLabel = 'MULT x' + mul.toFixed(2);
+        const mulLabel = 'BONUS x' + mul.toFixed(2);
         text(mulLabel, 15 * u, by, 12 * u, mul > 1.001 ? '#c9a94e' : '#6d685f');
         let x = 15 * u + ctx.measureText(mulLabel).width + 18 * u;
 
