@@ -413,6 +413,11 @@
     const ENTER_WAIT = 0.7;
     const ENTER_SECS = 2.6;
     const CONTINUE_KEEP = 0.5;  // what survives of your score when you re-up
+    // The clock is on the OFFER, not on the ceremony. Ten seconds to decide
+    // whether to spend another quarter, and if you let it run out the run is
+    // over and the initials screen that follows takes as long as it takes.
+    // Nobody should be hurried through typing their own name.
+    const CONTINUE_SECS = 10;
 
     // ---- the ending ---------------------------------------------------------
     // a clock in seconds rather than a 0..1 ramp, because the beats are keyed
@@ -536,9 +541,9 @@
     // where the fight left him when he started for the throne -- the takeover
     // rises from there, not from the line he opened the fight on
     let ascendFrom = { y: PADDLE_Y, w: PADDLE_W };
-    let phantoms = [], phGap = 0, shout = null, enterT = 0, rings = [];
+    let phantoms = [], phGap = 0, shout = null, enterT = 0, rings = [], overT = 0;
     let board = [], boardLive = false;
-    let entry = '', entryRank = -1, endedWon = false, sending = false;
+    let entry = '', entryRank = -1, sending = false;
 
     function loadBest() {
         try { return parseInt(localStorage.getItem('brandon.best'), 10) || 0; }
@@ -1007,7 +1012,7 @@
         if (phase === 'over') {
             if (e.code === 'Space') { e.preventDefault(); overCommit(); }
             if (e.code === 'KeyC') continueGame();       // still direct, if you know
-            if (e.code === 'KeyN') newGame();
+            if (e.code === 'KeyN') endRun();             // n for no, another go
             return;
         }
         if (e.code === 'Space') { e.preventDefault(); action(); }
@@ -1091,21 +1096,26 @@
             sending = true;
             submitScore(entry, score).then(() => {
                 sending = false;
-                phase = endedWon ? 'scores' : 'over';
+                phase = 'scores';
             });
         } else if (entry.length < 3) entry += k;
     }
 
-    // a run has ended: take initials if it made the table, else carry straight on
-    function finishRun(won) {
-        endedWon = won;
-        climb = 0;              // the choices sit on the original line; so does he
+    // the run is over for good -- either you won, or you turned down another go.
+    // this is the only place a score is ever recorded, so one run leaves one row
+    // however many times you continued along the way.
+    function endRun() {
+        climb = 0;
         if (qualifies(score)) {
             entry = ''; entryRank = -1;
             phase = 'initials';
-        } else {
+        } else if (BOARD_ON) {
             fetchBoard();                 // refresh it for the screen that follows
-            if (won) newGame(); else phase = 'over';
+            phase = 'scores';
+        } else {
+            // no board to end on -- straight back to the start, exactly as it
+            // behaved before one existed
+            newGame();
         }
     }
 
@@ -1121,9 +1131,9 @@
             buildStage(stage);
             banner = '';
         } else if (phase === 'won') {
-            finishRun(true);
+            endRun();               // you won. there is nothing left to continue.
         }
-        // 'over' is handled by the CONTINUE / NEW GAME boxes, not by a stray tap
+        // 'over' is handled by the CONTINUE / END RUN boxes, not by a stray tap
     }
 
     // ---- scoring -----------------------------------------------------------
@@ -1269,26 +1279,39 @@
     function loseLife() {
         lives--;
         combo = 0;
-        if (lives <= 0) { banner = 'GAME OVER'; finishRun(false); return; }
+        if (lives <= 0) {
+            // out of lives is not the end of the run -- the choice is. nothing
+            // is recorded until you decline another go.
+            banner = 'GAME OVER';
+            climb = 0;          // the choices sit on the original line; so does he
+            fetchBoard();       // so the table you are deciding against is current
+            overT = CONTINUE_SECS;
+            phase = 'over';
+            return;
+        }
         resetBall();
     }
 
-    // ---- game over: another quarter, or start clean --------------------------
+    // ---- game over: another quarter, or let it stand -------------------------
     // The cursor is hidden during play, so clicking a button meant aiming an
     // invisible pointer. Instead the choices sit at paddle height and BRANDON
     // is the cursor: slide him over one and commit. Which side he is on always
     // decides it, so there is never a dead zone between them.
+    //
+    // The continue's price is not printed on it. You find out what it costs by
+    // paying it -- the score halves in the HUD on the way back in, which is the
+    // honest moment to learn it, and it keeps the choice a gamble rather than a
+    // sum you can do in advance.
     function overButtons() {
         const w = 300, h = 58, y = PADDLE_Y - h / 2;
         return [
-            { key: 'continue', label: 'CONTINUE  -' + Math.round((1 - CONTINUE_KEEP) * 100) + '%',
-              x: 56, y, w, h },
-            { key: 'new', label: 'NEW GAME', x: LW - 56 - w, y, w, h }
+            { key: 'continue', label: 'CONTINUE', x: 56, y, w, h },
+            { key: 'end',      label: 'END RUN',  x: LW - 56 - w, y, w, h }
         ];
     }
 
-    function overPick() { return paddle.x < LW / 2 ? 'continue' : 'new'; }
-    function overCommit() { overPick() === 'continue' ? continueGame() : newGame(); }
+    function overPick() { return paddle.x < LW / 2 ? 'continue' : 'end'; }
+    function overCommit() { overPick() === 'continue' ? continueGame() : endRun(); }
 
     // Two passes: the boxes go UNDER the paddle so he stands on his choice,
     // the labels go OVER him so his body cannot hide what he is standing on.
@@ -1496,6 +1519,13 @@
         if (phase === 'entrance') {
             enterT += dt;
             if (enterT >= ENTER_WAIT + ENTER_SECS) phase = 'ready';
+        }
+
+        // the continue clock. dt is clamped and rAF sleeps in a hidden tab, so
+        // this only ever runs down while someone is actually looking at it.
+        if (phase === 'over' && (overT -= dt) <= 0) {
+            overT = 0;
+            endRun();           // silence is a no. the run stands as it is.
         }
         stepPhantoms(dt);
         if (shout && (shout.life -= dt) <= 0) shout = null;
@@ -2054,6 +2084,9 @@
             text('GAME OVER', LW / 2, 70, 30 * u, '#f2efe9', 'center');
             text('final score ' + score, LW / 2, 96, 15 * u, '#9a958c', 'center');
             drawBoard(126, u);
+            // the clock, steady rather than pulsing -- the digit changing once
+            // a second is motion enough, and nothing here should flash
+            text(String(Math.ceil(overT)), LW / 2, 414, 40 * u, '#c9a94e', 'center');
             text('slide brandon onto a choice', LW / 2, 448, 14 * u, '#6d685f', 'center');
             drawOverChoices(false);
             drawPaddle();
@@ -2075,7 +2108,8 @@
             text(msg, LW / 2, my - 4 * u, 32 * u, '#f2efe9', 'center');
 
             const sub = phase === 'over' ? 'final score ' + score
-                            + '   ·   slide brandon onto a choice'
+                            + '   ·   slide brandon onto a choice   ·   '
+                            + Math.ceil(overT)
                       : phase === 'ready' ? 'tap or space to serve'
                       : phase === 'won' ? 'tap to play again' : 'tap to continue';
             text(sub, LW / 2, my + 26 * u, 15 * u, '#9a958c', 'center');
