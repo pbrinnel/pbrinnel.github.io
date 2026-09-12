@@ -710,7 +710,10 @@
 
     // the score. deliberately modest against a full run -- this is a coda, not
     // a second game, and the table should still be won in the five stages.
-    const G_PTS_KILL = 750;       // times how many hits it took
+    // Times how many hits it took, so a three-rung one pays three times -- it
+    // cost you three throws. Deliberately modest against a full run: the
+    // gauntlet is a coda, and the table should still be won in the five stages.
+    const G_PTS_KILL = 50;
     const G_PTS_SEC  = 10;        // paid once, at the end, on the title
     // what the board can actually hold -- see killShip
     const SCORE_CAP  = 9999999;
