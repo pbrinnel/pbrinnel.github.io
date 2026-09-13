@@ -3359,29 +3359,34 @@
         ctx.fillText(str, x, y);
     }
 
-    // the ten rows, drawn as a block from a given top edge. the hud scale is
-    // capped here -- at full mobile scale ten rows would run off the bottom.
-    function drawBoard(top, hudU) {
-        const u = Math.min(hudU, 1.25);
-        text('HIGH SCORES', LW / 2, top, 15 * u, '#6d685f', 'center');
+    // The ten rows, fitted between a top edge (the title's baseline) and the
+    // lowest point the last row may reach. They come out at BOARD_PITCH, or at
+    // the biggest pitch that fits if that is smaller. A fixed size was small
+    // on a desktop, where the table is the whole point of the screen, and at
+    // phone scale it ran the tenth row straight through the game-over clock.
+    const BOARD_PITCH = 32;       // row to row at full size
+    function drawBoard(top, bottom, hudU) {
+        // title baseline to the foot of the tenth row is 10.5 pitches
+        const pitch = Math.min(BOARD_PITCH * Math.min(hudU, 1.25), (bottom - top) / 10.5);
+        const size = pitch * 0.76, k = size / 16;
+        text('HIGH SCORES', LW / 2, top, pitch * 0.62, '#6d685f', 'center');
         if (!boardLive) {
-            text('leaderboard unreachable', LW / 2, top + 30 * u, 14 * u, '#4a453e', 'center');
+            text('leaderboard unreachable', LW / 2, top + pitch * 1.43, pitch * 0.67, '#4a453e', 'center');
             return;
         }
         if (!board.length) {
-            text('nobody yet. be first.', LW / 2, top + 30 * u, 14 * u, '#6d685f', 'center');
+            text('nobody yet. be first.', LW / 2, top + pitch * 1.43, pitch * 0.67, '#6d685f', 'center');
             return;
         }
-        const rowH = 21 * u, size = 16 * u;
         for (let i = 0; i < board.length; i++) {
             const r = board[i];
-            const y = top + 28 * u + i * rowH;
+            const y = top + pitch * (1.33 + i);
             const mine = i === entryRank;
             const col = mine ? '#c9a94e' : i === 0 ? '#f2efe9' : '#9a958c';
-            text(String(i + 1).padStart(2, ' '), LW / 2 - 150, y, size, col);
-            text(r.ini, LW / 2 - 60, y, size, col);
-            ctx.textAlign = 'right';
-            text(String(r.score), LW / 2 + 160, y, size, col, 'right');
+            // right-aligned, so 9 and 10 end in the same column
+            text(String(i + 1), LW / 2 - 128 * k, y, size, col, 'right');
+            text(r.ini, LW / 2 - 60 * k, y, size, col);
+            text(String(r.score), LW / 2 + 160 * k, y, size, col, 'right');
         }
     }
 
@@ -3920,7 +3925,8 @@
         if (phase === 'scores') {
             ctx.fillStyle = 'rgba(0,0,0,0.86)';
             ctx.fillRect(0, 0, LW, LH);
-            drawBoard(120, u);
+            // down to just above the line under it
+            drawBoard(120, 520 - 15 * u - 16, u);
             text('tap to play again', LW / 2, 520, 15 * u, '#9a958c', 'center');
             return;
         }
@@ -3933,11 +3939,14 @@
             ctx.fillRect(0, 0, LW, LH);
             text('GAME OVER', LW / 2, 70, 30 * u, '#f2efe9', 'center');
             text('final score ' + score, LW / 2, 96, 15 * u, '#9a958c', 'center');
-            drawBoard(126, u);
+            // the clock and its caption sit down against the choices, and the
+            // table gets everything above the clock's digits
+            const clockY = 452, clockSize = 40 * u;
+            drawBoard(126, clockY - clockSize * 0.72 - 14, u);
             // the clock, steady rather than pulsing -- the digit changing once
             // a second is motion enough, and nothing here should flash
-            text(String(Math.ceil(overT)), LW / 2, 414, 40 * u, '#c9a94e', 'center');
-            text('click or tap a choice', LW / 2, 448, 14 * u, '#6d685f', 'center');
+            text(String(Math.ceil(overT)), LW / 2, clockY, clockSize, '#c9a94e', 'center');
+            text('click or tap a choice', LW / 2, 480, 14 * u, '#6d685f', 'center');
             drawOverChoices(false);
             drawPaddle();
             drawOverChoices(true);
