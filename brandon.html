@@ -1424,6 +1424,99 @@
     // whole screen steers him now; update() clamps him to the field either way.
     const onUI = e => e.target && e.target.closest && e.target.closest('#debug');
 
+    // ---- the mouse, captured -------------------------------------------------
+    // A mouse used to steer by where the pointer WAS, with the pointer hidden.
+    // Nothing kept it on the page, so a rally that drifted upward walked it
+    // off the top of the window without anyone seeing it go, and the moment it
+    // crossed the edge he stopped answering. Desktop games fix that by
+    // capturing the mouse, and browsers offer the same thing as pointer lock:
+    // the pointer is held, there is no position and so no edge, and movement
+    // arrives as a stream of deltas. The arcade Arkanoid's free-spinning knob
+    // worked the same way.
+    //
+    // It is taken by a mouse click that goes into play -- the serve, most of
+    // the time -- and held through lost lives and cleared stages, because a
+    // READY screen needs no pointer. It is let go on purpose on the screens
+    // that DO need one: game over, the initials, the table, the stage menu.
+    // That costs nothing on the way back -- Chrome re-locks quietly, without
+    // its "press Esc" notice, when it was the page that let go.
+    //
+    // If it is lost any other way -- Esc, Cmd-Tab, another window jumping in
+    // front -- while something can still hurt you, the game stops and waits
+    // for a click. Losing the mouse is never allowed to cost a life.
+    //
+    // Touch never asks for any of this. A finger has no edge to fall off.
+    const LOCK_OK   = 'requestPointerLock' in canvas;
+    const LOCK_GAIN = 1;          // travel per px of mouse, as a multiple of the old feel
+    const PLAYING = new Set(['ready', 'play', 'cleared', 'entrance', 'ascend',
+                             'absorb', 'gauntlet', 'fall']);
+    let paused = false;           // the mouse got away mid-rally
+    let lockLetGo = false;        // ...unless WE let it go, which is not an accident
+    let lockMissed = false;       // the browser said no to the click on PAUSED
+
+    function locked() { return document.pointerLockElement === canvas; }
+
+    function grabMouse(e) {
+        if (!LOCK_OK || locked() || !e || e.pointerType !== 'mouse') return;
+        if (!PLAYING.has(phase) || !debugEl.hidden) return;
+        try {
+            const p = canvas.requestPointerLock();
+            if (p && p.catch) p.catch(() => {});     // refusals land in pointerlockerror
+        } catch (err) { /* older engines throw instead of rejecting */ }
+    }
+
+    function freeMouse() {
+        if (!locked() || lockLetGo) return;   // not held, or already on its way back
+        lockLetGo = true;
+        document.exitPointerLock();
+    }
+
+    // what can still hurt you while you are not holding the mouse
+    function pausable() { return phase === 'play' || (phase === 'gauntlet' && !gReady); }
+
+    // stopped, the pointer comes back, so you can see what you are clicking on
+    function hold(on) {
+        paused = on;
+        lockMissed = false;
+        showCursor(on);
+    }
+
+    document.addEventListener('pointerlockchange', () => {
+        if (locked()) { lockLetGo = false; if (paused) hold(false); return; }
+        if (lockLetGo) { lockLetGo = false; return; }
+        if (pausable()) hold(true);
+    });
+    // Refused. Chrome turns down a request made too soon after Esc, click or
+    // no click, so one refusal just leaves PAUSED up. The click after that
+    // resumes whether the lock comes back or not: a game without the lock is
+    // only the game as it always was, and one stuck waiting on it is broken.
+    document.addEventListener('pointerlockerror', () => { if (paused) lockMissed = true; });
+
+    // the click on PAUSED. a mouse asks for the lock back, and play restarts
+    // when pointerlockchange says it landed. a finger has no lock to ask for,
+    // and a mouse that has already been refused once has waited long enough.
+    function resume(e) {
+        if (e.pointerType === 'mouse' && !lockMissed) { grabMouse(e); return; }
+        hold(false);
+        grabMouse(e);
+    }
+
+    // captured steering: the same travel per inch of desk it always had
+    function steerBy(dx) {
+        if (king && (phase === 'gauntlet' || phase === 'absorb' || phase === 'fall')) {
+            const edge = kingEdge();
+            king.tx = Math.max(edge, Math.min(LW - edge, king.tx + dx));
+            return;
+        }
+        const hs = halfSpan();
+        paddle.tx = Math.max(hs, Math.min(LW - hs, paddle.tx + dx));
+    }
+    addEventListener('mousemove', e => {
+        if (!locked() || paused) return;
+        const r = canvas.getBoundingClientRect();
+        steerBy(e.movementX * LW / r.width * LOCK_GAIN);
+    });
+
     // the pointer sets where he is HEADED. with nothing dragging on him
     // update() copies that straight into where he is, which is what this line
     // used to do on its own.
@@ -1448,6 +1541,12 @@
 
     addEventListener('pointermove', e => {
         if (phase === 'initials' || onUI(e)) return;
+        // captured, the pointer's position is frozen where the lock began and
+        // movement comes through mousemove instead. reading clientX here would
+        // snap him straight back to that spot. PAUSED does not steer either:
+        // walking the pointer over to click would slide him there the instant
+        // play restarts.
+        if (locked() || paused) return;
         track(e);
         if (phase === 'over') {
             const p = fieldAt(e);
@@ -1457,6 +1556,9 @@
     });
     addEventListener('pointerdown', e => {
         if (onUI(e)) return;
+        // paused because the mouse got away: this click only takes it back. it
+        // must not also serve, throw, or move him.
+        if (paused) { resume(e); return; }
         if (phase === 'initials') {
             const r = canvas.getBoundingClientRect();
             const px = (e.clientX - r.left) / r.width * LW;
@@ -1473,7 +1575,7 @@
         // tap is the fire button, and a fire button that also teleports you is
         // no fire button at all. Dragging still steers, because a drag is a
         // pointermove and that handler is untouched.
-        if (!(king && (phase === 'gauntlet' || phase === 'absorb' || phase === 'fall'))) {
+        if (!locked() && !(king && (phase === 'gauntlet' || phase === 'absorb' || phase === 'fall'))) {
             track(e);                           // wherever you tap, he goes
         }
         // on the game-over screen a press only ARMS a box; see pointerup
@@ -1484,15 +1586,21 @@
             return;
         }
         action();
+        grabMouse(e);                           // a mouse click into play takes the mouse
     });
     addEventListener('pointerup', e => {
         if (phase !== 'over' || overPress === null || onUI(e)) { overPress = null; return; }
         const p = fieldAt(e);
-        if (overAt(p.x, p.y) === overPress) overChoose(overPress);
-        else overPress = null;           // slid off before letting go
+        if (overAt(p.x, p.y) === overPress) {
+            overChoose(overPress);
+            grabMouse(e);                    // CONTINUE goes straight back into play
+        } else overPress = null;             // slid off before letting go
     });
     addEventListener('pointercancel', () => { overPress = null; });
     addEventListener('keydown', e => {
+        // PAUSED asks for a click. a key would throw into a frozen field, or
+        // steer him somewhere to lurch off to when it thaws.
+        if (paused) { if (e.code === 'Space') e.preventDefault(); return; }
         if (phase === 'initials') {
             if (/^[a-zA-Z]$/.test(e.key)) entryKey(e.key.toUpperCase());
             else if (e.code === 'Backspace') { e.preventDefault(); entryKey('DEL'); }
@@ -1586,6 +1694,7 @@
         if (konami.length > KONAMI.length) konami.shift();
         if (konami.length === KONAMI.length && KONAMI.every((k, i) => konami[i] === k)) {
             konami = [];
+            freeMouse();                          // the menu is all buttons
             debugEl.hidden = false;
         }
     }, true);
@@ -1643,6 +1752,7 @@
     // this is the only place a score is ever recorded, so one run leaves one row
     // however many times you continued along the way.
     function endRun() {
+        freeMouse();                  // the initials and the table both want a pointer
         climb = 0;
         if (qualifies(score)) {
             entry = ''; entryRank = -1;
@@ -1851,6 +1961,7 @@
             dragT = 0; phantoms = [];
             overPress = null; overHover = null; overKeys = false;
             // the one screen besides the initials with something to click
+            freeMouse();
             showCursor(true);
             fetchBoard();       // so the table you are deciding against is current
             overT = CONTINUE_SECS;
@@ -3920,12 +4031,30 @@
     addEventListener('orientationchange', () => { resize(); setTimeout(resize, 150); });
     resize();
 
+    // the READY screen's own band, saying the one thing you need to know
+    function drawPaused() {
+        const u = uiScale, my = 424, bandH = 104 * u;
+        ctx.fillStyle = 'rgba(0,0,0,0.72)';
+        ctx.fillRect(0, my - bandH / 2, LW, bandH);
+        text('PAUSED', LW / 2, my - 4 * u, 32 * u, '#f2efe9', 'center');
+        text('click to resume', LW / 2, my + 26 * u, 15 * u, '#9a958c', 'center');
+    }
+
     let last = performance.now();
     (function frame(now) {
         const dt = Math.min((now - last) / 1000, 0.05); // clamped so tab-outs don't teleport
         last = now;
-        update(dt);
+        // the lock belongs to the field. one that landed just as the game moved
+        // on to a screen with buttons -- or under the stage menu -- goes back.
+        if (locked() && (!PLAYING.has(phase) || !debugEl.hidden)) freeMouse();
+        // held still while the mouse has got away from you -- see
+        // pointerlockchange. the picture keeps drawing; the world does not move.
+        // the stage menu can move you on from under a pause, and then there is
+        // nothing left to hold.
+        if (paused && !pausable()) hold(false);
+        if (!paused) update(dt);
         draw();
+        if (paused) drawPaused();
         requestAnimationFrame(frame);
     })(last);
 })();
