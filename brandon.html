@@ -22,6 +22,29 @@
     <!-- not linked from anywhere, and kept out of search results -->
     <meta name="robots" content="noindex, nofollow">
 
+    <!-- What a link to this page turns into when it is pasted into a message.
+         These belong to this page alone: every page on the site carries its
+         own head, so none of this reaches the homepage or anything else. The
+         noindex above does not stop any of it -- it keeps the page out of
+         search, and message previews are not search.
+
+         It gives nothing away, on purpose. The picture is the splash, the one
+         word you see before you tap, and there is no description at all,
+         because any accurate sentence about this page is a spoiler. The image
+         URL is absolute because most scrapers will not resolve a relative one.
+         The tab title stays Paul Brinnel, as the analytics note up top says. -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://paulbrinnel.com/brandon.html">
+    <meta property="og:title" content="BRANDON">
+    <meta property="og:image" content="https://paulbrinnel.com/images/brandon/share.jpg">
+    <meta property="og:image:type" content="image/jpeg">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="The word BRANDON on a black screen.">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="BRANDON">
+    <meta name="twitter:image" content="https://paulbrinnel.com/images/brandon/share.jpg">
+
     <!-- an iPhone will not give up its address bar for the Fullscreen API --
          Safari does not implement it on the phone at all. Added to the home
          screen with these, though, the page opens with no browser chrome
@@ -32,9 +55,13 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Brandon">
 
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="/favicon/favicon-16x16.png">
-    <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-icon-180x180.png">
+    <!-- his head, the one you serve, in place of the site's icon. these sit
+         with the game's other art, so the site's own favicons are untouched.
+         the touch icon is what a home-screen shortcut shows, so that is his
+         head too. -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/images/brandon/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/images/brandon/favicon-16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/images/brandon/apple-touch-icon.png">
     <meta name="theme-color" content="#000000">
 
     <style>
@@ -1411,9 +1438,21 @@
         }
         paddle.tx = x;
     };
+    // a pointer event in field coordinates
+    const fieldAt = e => {
+        const r = canvas.getBoundingClientRect();
+        return { x: (e.clientX - r.left) / r.width * LW,
+                 y: (e.clientY - r.top) / r.height * LH };
+    };
+
     addEventListener('pointermove', e => {
         if (phase === 'initials' || onUI(e)) return;
         track(e);
+        if (phase === 'over') {
+            const p = fieldAt(e);
+            overHover = overAt(p.x, p.y);
+            overKeys = false;
+        }
     });
     addEventListener('pointerdown', e => {
         if (onUI(e)) return;
@@ -1436,9 +1475,22 @@
         if (!(king && (phase === 'gauntlet' || phase === 'absorb' || phase === 'fall'))) {
             track(e);                           // wherever you tap, he goes
         }
-        if (phase === 'over') { overCommit(); return; }
+        // on the game-over screen a press only ARMS a box; see pointerup
+        if (phase === 'over') {
+            const p = fieldAt(e);
+            overPress = overHover = overAt(p.x, p.y);
+            overKeys = false;
+            return;
+        }
         action();
     });
+    addEventListener('pointerup', e => {
+        if (phase !== 'over' || overPress === null || onUI(e)) { overPress = null; return; }
+        const p = fieldAt(e);
+        if (overAt(p.x, p.y) === overPress) overChoose(overPress);
+        else overPress = null;           // slid off before letting go
+    });
+    addEventListener('pointercancel', () => { overPress = null; });
     addEventListener('keydown', e => {
         if (phase === 'initials') {
             if (/^[a-zA-Z]$/.test(e.key)) entryKey(e.key.toUpperCase());
@@ -1451,9 +1503,13 @@
         if (e.code === 'ArrowLeft')  paddle.tx -= 34;   // steer him either way
         if (e.code === 'ArrowRight') paddle.tx += 34;
         if (phase === 'over') {
-            if (e.code === 'Space') { e.preventDefault(); overCommit(); }
-            if (e.code === 'KeyC') continueGame();       // still direct, if you know
-            if (e.code === 'KeyN') endRun();             // n for no, another go
+            if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') overKeys = true;
+            if (e.code === 'Space') {
+                e.preventDefault();
+                overChoose(overKeys || !overHover ? overKeyPick() : overHover);
+            }
+            if (e.code === 'KeyC') overChoose('continue');   // still direct, if you know
+            if (e.code === 'KeyN') overChoose('end');        // n for no, another go
             return;
         }
         if (e.code === 'Space') { e.preventDefault(); action(); }
@@ -1789,9 +1845,12 @@
             // is recorded until you decline another go.
             banner = 'GAME OVER';
             climb = 0;          // the choices sit on the original line; so does he
-            // he is the cursor on that screen. picking CONTINUE must not be
-            // the last thing the boss gets to make difficult.
+            // he follows the pointer on that screen, and a lag on him there
+            // would only read as the screen being slow
             dragT = 0; phantoms = [];
+            overPress = null; overHover = null; overKeys = false;
+            // the one screen besides the initials with something to click
+            showCursor(true);
             fetchBoard();       // so the table you are deciding against is current
             overT = CONTINUE_SECS;
             phase = 'over';
@@ -1801,10 +1860,18 @@
     }
 
     // ---- game over: another quarter, or let it stand -------------------------
-    // The cursor is hidden during play, so clicking a button meant aiming an
-    // invisible pointer. Instead the choices sit at paddle height and BRANDON
-    // is the cursor: slide him over one and commit. Which side he is on always
-    // decides it, so there is never a dead zone between them.
+    // Two real buttons. They used to be one gesture: BRANDON was the cursor,
+    // and whichever side he stood on was what a tap committed. On a phone that
+    // made the tap you used to START dragging him a commit in its own right --
+    // to whatever he happened to be standing on -- so the screen could choose
+    // for you before you had moved him an inch. Now a tap on a box is the only
+    // thing that chooses, and he just follows your finger around underneath.
+    //
+    // A choice is made on the way UP, and only if the pointer went down on the
+    // same box, which is what any button does: press, think better of it, slide
+    // off, and nothing happens. It also means a finger that was already down
+    // when the ball got away cannot pick anything by lifting, because it never
+    // pressed anything on this screen.
     //
     // The continue's price is not printed on it. You find out what it costs by
     // paying it -- the score halves in the HUD on the way back in, which is the
@@ -1818,14 +1885,39 @@
         ];
     }
 
-    function overPick() { return paddle.x < LW / 2 ? 'continue' : 'end'; }
-    function overCommit() { overPick() === 'continue' ? continueGame() : endRun(); }
+    // The drawn box is 58 tall, which a landscape phone renders under 40 css
+    // px -- short of every touch guideline. The pitch a tap is tested against
+    // runs well above and below it. The gap between the two stays dead.
+    const OVER_PAD = 26;
+    function overAt(px, py) {
+        for (const b of overButtons()) {
+            if (px >= b.x && px <= b.x + b.w &&
+                py >= b.y - OVER_PAD && py <= b.y + b.h + OVER_PAD) return b.key;
+        }
+        return null;
+    }
 
-    // Two passes: the boxes go UNDER the paddle so he stands on his choice,
-    // the labels go OVER him so his body cannot hide what he is standing on.
+    let overPress = null;          // the box a pointer went down on, if any
+    let overHover = null;          // the box under the pointer right now
+    let overKeys = false;          // steering with the arrows instead
+
+    // With the keyboard there is nothing to aim, so the old rule still stands
+    // there: the arrows walk him across, and space takes the side he is on.
+    function overKeyPick() { return paddle.x < LW / 2 ? 'continue' : 'end'; }
+
+    function overChoose(key) {
+        overPress = null;
+        showCursor(false);             // endRun brings it back for the initials
+        key === 'continue' ? continueGame() : endRun();
+    }
+
+    // Two passes: the boxes go UNDER the paddle, the labels go OVER him so his
+    // body can never hide a choice. What lights up is what a commit would
+    // take: the box under the pointer, or his side if you are on the arrows.
+    // With neither, nothing is lit -- nothing is chosen yet, and it says so.
     function drawOverChoices(labels) {
         if (phase !== 'over') return;
-        const sel = overPick();
+        const sel = overKeys ? overKeyPick() : (overPress || overHover);
         for (const b of overButtons()) {
             const on = b.key === sel;
             if (!labels) {
@@ -2057,7 +2149,7 @@
         // this only ever runs down while someone is actually looking at it.
         if (phase === 'over' && (overT -= dt) <= 0) {
             overT = 0;
-            endRun();           // silence is a no. the run stands as it is.
+            overChoose('end');  // silence is a no. the run stands as it is.
         }
         stepPhantoms(dt);
         if (shout && (shout.life -= dt) <= 0) shout = null;
@@ -3598,7 +3690,7 @@
         if (phase === 'ascend') { drawBossFall(); drawImpact(); }
         drawRings();
         drawCapsule();
-        drawOverChoices(false);   // boxes under him -- he is the cursor
+        drawOverChoices(false);   // boxes under him
         drawPaddle();
         drawOverChoices(true);    // labels over him, so they stay readable
         drawPhantoms();
@@ -3718,7 +3810,7 @@
             // the clock, steady rather than pulsing -- the digit changing once
             // a second is motion enough, and nothing here should flash
             text(String(Math.ceil(overT)), LW / 2, 414, 40 * u, '#c9a94e', 'center');
-            text('slide brandon onto a choice', LW / 2, 448, 14 * u, '#6d685f', 'center');
+            text('click or tap a choice', LW / 2, 448, 14 * u, '#6d685f', 'center');
             drawOverChoices(false);
             drawPaddle();
             drawOverChoices(true);
@@ -3741,7 +3833,7 @@
             // nothing to tap during the takeover any more -- it no longer ends
             // the run, it hands over, and an instruction here would be a lie
             const sub = phase === 'over' ? 'final score ' + score
-                            + '   ·   slide brandon onto a choice   ·   '
+                            + '   ·   click or tap a choice   ·   '
                             + Math.ceil(overT)
                       : phase === 'ready' ? 'tap or space to serve'
                       : phase === 'ascend' ? ''
