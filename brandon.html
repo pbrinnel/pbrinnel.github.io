@@ -7,9 +7,9 @@
         window.dataLayer = window.dataLayer || [];
         function gtag(){dataLayer.push(arguments);}
         gtag('js', new Date());
-        // the tab keeps saying Paul Brinnel like every other page here, but GA4
-        // groups its default report by TITLE rather than path -- so without an
-        // explicit one this page would be reported as the homepage
+        // GA4 groups its default report by TITLE rather than path, so this page
+        // names itself for the report explicitly. the tab just says BRANDON,
+        // which would not tell anyone reading the numbers what the page is.
         gtag('config', 'G-2ZPJKVJDMD', { page_title: 'Brandon (game)' });
     </script>
 
@@ -17,7 +17,9 @@
     <!-- viewport-fit=cover lets the field run under the notch and the home
          indicator; the padding below hands that space back where it matters -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Paul Brinnel</title>
+    <!-- the same one word as the splash and the link preview. every page on
+         the site carries its own head, so no other page's title changes. -->
+    <title>BRANDON</title>
 
     <!-- not linked from anywhere, and kept out of search results -->
     <meta name="robots" content="noindex, nofollow">
@@ -31,8 +33,7 @@
          It gives nothing away, on purpose. The picture is the splash, the one
          word you see before you tap, and there is no description at all,
          because any accurate sentence about this page is a spoiler. The image
-         URL is absolute because most scrapers will not resolve a relative one.
-         The tab title stays Paul Brinnel, as the analytics note up top says. -->
+         URL is absolute because most scrapers will not resolve a relative one. -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://paulbrinnel.com/brandon.html">
     <meta property="og:title" content="BRANDON">
