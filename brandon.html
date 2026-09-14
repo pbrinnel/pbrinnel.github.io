@@ -688,8 +688,9 @@
     // is the good thing that happens in an otherwise quiet rally; here the
     // screen is already full and a line of type across it is one more thing to
     // see through.
-    const G_DROPS    = { S: { color: '#4fa9c4' }, B: { color: '#d2683f' },
-                         R: { color: '#c96aa8' } };
+    const G_DROPS    = { S: { short: 'SPREAD', color: '#4fa9c4' },
+                         B: { short: 'BURST',  color: '#d2683f' },
+                         R: { short: 'RAPID',  color: '#c96aa8' } };
     const G_DROP_K   = Object.keys(G_DROPS);
     const G_DROP_ODDS= 0.28;
     // ...and one serve in fifty is a powerup instead of a head. It arrives on
@@ -3742,6 +3743,20 @@
         // numbers instead of the screen. The screen already says how bad it is.
         text('SCORE ' + Math.floor(score), 15 * u, 27 * u, 15 * u, '#f2efe9');
 
+        // What you are carrying, in the same words and colours the stages
+        // print their capsules in. The stages keep that row along the bottom,
+        // under the paddle; up here you ARE the top of the screen, so it sits
+        // under the score.
+        if (phase === 'gauntlet') {
+            let x = 15 * u;
+            for (const [k, left] of [['S', gSpread], ['B', gBurst], ['R', gRapid]]) {
+                if (left <= 0) continue;
+                const label = G_DROPS[k].short + ' ' + Math.ceil(left);
+                text(label, x, 46 * u, 12 * u, G_DROPS[k].color);
+                x += ctx.measureText(label).width + 14 * u;
+            }
+        }
+
 
         // ...and, once, the fact that you can throw at all. nothing moves until
         // you do, so this can sit there as long as it needs to.
@@ -3757,8 +3772,7 @@
         }
 
         // the throw cooldown, drawn where your hands are rather than in a
-        // corner, with what is loaded into it directly under it as short bars
-        // rather than as a word
+        // corner
         if (phase === 'gauntlet') {
             const cw = 90, cx = king.x - cw / 2, cy = LH - 26;
             const green = PH_LOOK.color || '#f2efe9';
@@ -3767,20 +3781,6 @@
             ctx.fillRect(cx, cy, cw, 4);
             ctx.fillStyle = gCool <= 0 ? green : '#5a6b46';
             ctx.fillRect(cx, cy, cw * (1 - gCool / Math.max(0.001, cool0)), 4);
-
-            const on = [];
-            if (gSpread > 0) on.push([gSpread / G_SPREAD_S, G_DROPS.S.color]);
-            if (gBurst > 0) on.push([gBurst / G_BURST_S, G_DROPS.B.color]);
-            if (gRapid > 0) on.push([gRapid / G_RAPID_S, G_DROPS.R.color]);
-            on.forEach(([frac, col], i) => {
-                const bw2 = 42, gap2 = 6;
-                const x2 = king.x - (on.length * bw2 + (on.length - 1) * gap2) / 2
-                         + i * (bw2 + gap2);
-                ctx.fillStyle = 'rgba(242,239,233,0.10)';
-                ctx.fillRect(x2, cy + 8, bw2, 3);
-                ctx.fillStyle = col;
-                ctx.fillRect(x2, cy + 8, bw2 * Math.max(0, Math.min(1, frac)), 3);
-            });
         }
 
 
