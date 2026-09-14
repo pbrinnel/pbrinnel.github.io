@@ -1074,6 +1074,10 @@
         return m;
     }
 
+    // the run: every brick since the head last came home adds another half
+    // to what the next one pays
+    function comboMul() { return 1 + 0.5 * combo; }
+
     // How fast the head is turning, as money. It used to be a cliff -- nothing
     // at all until the spin passed a threshold, then a jump -- which meant the
     // thing you could feel happening to the ball had no reading on the screen
@@ -1815,7 +1819,7 @@
 
     // ---- scoring -----------------------------------------------------------
     function award(base, x, y, spin) {
-        let pts = base + 0.5 * base * combo;
+        let pts = base * comboMul();       // the run it is part of
         const sm = spinMul(spin);          // how fast the head was turning
         pts *= sm;
         pts *= scoreMul();                 // chaos capsules pay for themselves
@@ -3879,11 +3883,6 @@
         text('SCORE ' + score, 15 * u, 27 * u, 15 * u, '#f2efe9');
         text('BEST ' + best, 15 * u, 46 * u, 13 * u, '#6d685f');
 
-        // top centre is left free for the combo, the only thing up there worth
-        // looking at mid-rally
-        if (combo >= 2) {
-            text('x' + (1 + 0.5 * combo).toFixed(1), LW / 2, 30 * u, 17 * u, '#c9a94e', 'center');
-        }
         // no lives counter over the ending -- it is meaningless by then, and it
         // was landing squarely on the new king's face
         if (phase !== 'ascend') {
@@ -3892,18 +3891,27 @@
 
         // active effects along the bottom, out of the playfield.
         //
-        // MULT is nailed to the left edge and everything else queues up behind
+        // BONUS is nailed to the left edge and everything else queues up behind
         // it. It is the only one of these that is ALWAYS there, and a number
         // you are meant to watch cannot be a number that slides two inches
         // sideways every time a capsule lands or lapses. The transient ones can
         // do the moving; they are transient.
         const by = LH - 12;
-        // BONUS, not MULT: the combo counter at the top of the screen is the
-        // other multiplier, and two numbers both calling themselves the
-        // multiplier is one more thing to work out mid-rally.
-        const mul = scoreMul() * liveSpinMul();
-        const mulLabel = 'BONUS x' + mul.toFixed(2);
-        text(mulLabel, 15 * u, by, 12 * u, mul > 1.001 ? '#c9a94e' : '#6d685f');
+        // ONE number for everything the next hit is multiplied by: the run of
+        // hits, the spin, and the chaos capsules. The run used to be its own
+        // x2.0 at the top of the screen, and two multipliers to multiply in
+        // your head mid-rally was one too many. What a jump in it came from is
+        // in the row behind it.
+        // to a tenth, and everything below reads the rounded number, so the
+        // size can never disagree with the digits about which whole x it is on
+        const mul = Math.round(comboMul() * liveSpinMul() * scoreMul() * 10) / 10;
+        const mulLabel = 'x' + mul.toFixed(1) + ' BONUS';
+        // a size up from the rest of the row, since it is the one to watch,
+        // and a point bigger again for every whole x past the first, so x2.0
+        // is the first step up. it stops growing at x11.0, past which it would
+        // climb into him and shove the rest of the row off the screen
+        const mulSize = 15 + Math.min(10, Math.max(0, Math.floor(mul) - 1));
+        text(mulLabel, 15 * u, by, mulSize * u, mul > 1 ? '#c9a94e' : '#6d685f');
         let x = 15 * u + ctx.measureText(mulLabel).width + 18 * u;
 
         for (const k of TIMED) {
@@ -3920,6 +3928,13 @@
         if (balls.length > 1) {
             const label = balls.length + ' BALLS';
             text(label, x, by, 12 * u, CAPS.M.color);
+            x += ctx.measureText(label).width + 14 * u;
+        }
+        // the run, last in the row: it comes and goes every rally, and the
+        // capsules' clocks should not jump sideways every time it does
+        if (combo > 0) {
+            const label = 'COMBO ' + combo;
+            text(label, x, by, 12 * u, '#c9a94e');
             x += ctx.measureText(label).width + 14 * u;
         }
 
