@@ -699,21 +699,22 @@
     const G_SERVE_DROP_V= 0.55;   // of a head's speed -- catchable, not a taunt
     // A run of them makes the next one less likely. Every powerup that has
     // turned up in the last G_DROP_WINDOW seconds -- off a corpse or out of a
-    // serve, caught or not -- halves the odds that the next corpse leaves one,
-    // and the odds come back as those age out. Drops used to scale with kills
-    // and kills with drops, so a quick enough hand never saw a timer run out:
-    // all three up for good, and every arrival dead before its first serve. A
-    // quiet stretch still pays out exactly as it always did.
+    // serve, caught or not -- takes a quarter off the odds that the next corpse
+    // leaves one, and the odds come back as those age out. Drops used to scale
+    // with kills and kills with drops, so a quick enough hand never saw a timer
+    // run out: all three up for good, and every arrival dead before its first
+    // serve. A quiet stretch still pays out exactly as it always did.
     const G_DROP_WINDOW = 5;      // seconds a drop keeps counting against the next
-    const G_DROP_DAMP   = 0.5;    // what each of those multiplies the odds by
+    const G_DROP_DAMP   = 0.75;   // what each of those multiplies the odds by. was 0.5,
+                                  // until RAPID and BURST came down and it bit too hard
     const G_DROP_RISE= 118;
     const G_DROP_R   = 12;
     const G_DROP_LIFE= 9;
     const G_SPREAD_S = 12, G_BURST_S = 10, G_RAPID_S = 11;   // how long each lasts
-    const G_RAPID_MUL= 0.25;      // RAPID: a quarter of the wait between throws
+    const G_RAPID_MUL= 0.35;      // RAPID: about a third of the wait between throws
     // A hit ship's white knock fades in a quarter of a second, and under RAPID
-    // a stream lands every 0.21s. Restarted on every hit, that is the ship
-    // pulsing white nearly five times a second, and nothing in this game
+    // a stream lands every 0.3s. Restarted on every hit, that is the ship
+    // pulsing white more than three times a second, and nothing in this game
     // flashes more than three. So a hit closer than G_KNOCK_HOLD behind the
     // last one holds the knock where it is instead of knocking again, and a
     // knock never starts over until G_KNOCK_GAP after it last started. A
@@ -722,9 +723,9 @@
     const G_KNOCK_GAP  = 1 / 3;
     // SPREAD is spatial and BURST is temporal, so they compose rather than
     // collide: BURST decides how many volleys leave you, SPREAD how wide each
-    // one is. Fifteen heads with both up.
+    // one is. Nine heads with both up.
     const G_SPREAD_N = 3, G_SPREAD_ARC = 0.22;
-    const G_BURST_N  = 5, G_BURST_GAP = 0.09;
+    const G_BURST_N  = 3, G_BURST_GAP = 0.09;
 
     // Straight down, from wherever you are. It swept on a timer once and hung
     // off you like a pendulum once, and both were the same mistake: an aim you
