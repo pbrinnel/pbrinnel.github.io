@@ -2076,7 +2076,11 @@
     function continueGame() {
         score = Math.floor(score * CONTINUE_KEEP);   // the cost of the quarter
         lives = 3;
-        buildStage(stage);                           // retry the stage you died on
+        // Back in exactly where you went out: the same wall with the same
+        // holes in it, the boss on whatever health you left him. It used to
+        // rebuild the stage, which on the last one handed him back all 27.
+        // Only the ball is new, served the way any lost life serves it.
+        resetBall();
         banner = '';
     }
 
