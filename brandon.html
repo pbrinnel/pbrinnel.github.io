@@ -340,6 +340,17 @@
     const CLIMB_EASE = 0.8;     // seconds to catch up, near enough
     const padY = () => PADDLE_Y - CLIMB_RISE * climb;
 
+    // A head that has got below his top near one end, still coming down, makes
+    // that end dip toward it -- up to DIP_MAX, most of the way there in about
+    // DIP_EASE -- so there is a slope to meet it with. Run into it and it goes
+    // up off that slope, square to the angle you can see him at. It used to
+    // warp up on top of him and get served from there, which was a free save
+    // that looked like a glitch; knocking it straight down was fair and no fun.
+    const DIP_MAX   = 30 * Math.PI / 180;
+    const DIP_REACH = 70;       // px out past his end that a head still gets a dip
+    const DIP_LEAD  = 30;       // ...from this far above his top
+    const DIP_EASE  = 0.06;
+
     // the ball is a HEAD, 141 x 209, so it is an ellipse and not a circle.
     // colliding against its real shape means rotation changes how far it
     // reaches -- 15px across the narrow axis, 22px across the long one. that
@@ -360,11 +371,23 @@
     const MAX_ANGLE  = Math.PI / 3;
     const STEER_CAP  = 1.3;    // never launch flatter than this, wiggle included
 
-    const SPIN_EDGE  = 11;
-    const SPIN_SWIPE = 0.045;
-    const SPIN_DECAY = 0.22;
-    const SPIN_MAX   = 40;
-    const ENGLISH_AT = 8;
+    // Spin, in rad/s. A hit off the end of him, or with him on the move, is a
+    // shove on the edge of the head, and what a shove does depends on how
+    // heavy the head is to turn: SPIN_INERTIA divides every shove AND the
+    // drag, so a heavier head is slower to wind up and slower to run down. A
+    // shove the way it is already turning adds to it, one the other way takes
+    // off, and a wall leaves it turning the way it was -- so it is BUILT, hit
+    // on hit, by taking it on the same end and moving the same way.
+    const SPIN_EDGE    = 11;      // off the very end of him
+    const SPIN_SWIPE   = 0.045;   // ...and this much per px/s he is moving
+    const SPIN_KICK    = 65;      // the most one hit can shove, both together
+    const SPIN_INERTIA = 2;
+    const SPIN_DRAG    = 0.3;     // what the air takes off it
+    const SPIN_WALL    = 0.85;    // what a wall leaves of it
+    const SPIN_MAX     = 60;      // it will not turn faster than this on its own
+    const SPIN_FULL    = 60;      // how fast it has to turn to pay the most...
+    const SPIN_MUL     = 2;       // ...which is double
+    const ENGLISH_AT   = 8;
 
     const JIG_BRICK  = 5;
     const JIG_NEIGH  = 0.75;
@@ -389,8 +412,8 @@
     const WIG_EASE   = 0.6;                // seconds of fade-out at the end
     const DBL_GAP    = 0.45;               // hole between the pair, as a fraction of width
     const DBL_SPLIT  = 0.38;               // seconds to come apart, and to rejoin
-    const ENG_MAX    = 55;                 // spin ceiling while english is up
-    const ENG_PUMP   = 45;                 // rad/s^2 to get there
+    const ENG_BOOST  = 0.3;                // ENGLISH: this share of SPIN_FULL on top, always
+    const ENG_ACCEL  = 60;                 // ...reached, or turned round, at this many rad/s^2
     const BONUS      = 0.25;               // score kicker per chaos capsule
 
     // ---- the boss -----------------------------------------------------------
@@ -809,10 +832,11 @@
         R: { name: 'BIG BRAIN BRANDON', short: 'BRAIN',   color: '#d98cc0', secs: 9  },
         P: { name: 'PIERCING BRANDON',  short: 'PIERCE',  color: '#7fc4b0', secs: 6, noBoss: true },
         W: { name: 'WIGGLY BRANDON',    short: 'WIGGLY',  color: '#c06a8f', secs: 9, bonus: true },
-        // ENGLISH has no flat bonus any more. It does not need one: it pumps
-        // the ball's spin to the ceiling, and spin is now paid for directly by
-        // the multiplier below. What the capsule buys you is the TOP of a curve
-        // you have been riding the whole game without being told.
+        // ENGLISH has no flat bonus. It does not need one: spin is paid for
+        // directly by the multiplier below, and ENGLISH is a steady spin of its
+        // own on top of whatever the head already has. It turns whichever way
+        // your last hit pushed the head, so it is yours to steer: send the head
+        // back the other way and ENGLISH comes round after it, at ENG_ACCEL.
         E: { name: 'ENGLISH BRANDON',   short: 'ENGLISH', color: '#cf6b4e', secs: 9 }
     };
     const TIMED = ['B', 'D', 'S', 'R', 'P', 'W', 'E'];     // M is instant
@@ -1081,20 +1105,23 @@
     // How fast the head is turning, as money. It used to be a cliff -- nothing
     // at all until the spin passed a threshold, then a jump -- which meant the
     // thing you could feel happening to the ball had no reading on the screen
-    // most of the time. Now it is continuous from a dead-flat 1.00, and the
-    // ceiling is exactly what ENGLISH winds you up to. So there is always a
-    // little english on, and chasing it is a thing you can do on purpose with
-    // no capsule at all: take it on the edge of him, take it off a corner,
-    // take it anywhere that sets the head spinning.
+    // most of the time. Now it is continuous from a dead-flat 1.00 up to
+    // SPIN_MUL at SPIN_FULL. So there is always a little english on, and
+    // chasing the rest is a thing you can do on purpose with no capsule at
+    // all: keep taking it on the same end, moving the same way, and it builds.
     function spinMul(spin) {
-        const m = 1 + BONUS * Math.min(1, Math.abs(spin) / ENG_MAX);
+        const m = 1 + (SPIN_MUL - 1) * Math.min(1, Math.abs(spin) / SPIN_FULL);
         return Math.round(m * 100) / 100;      // to the hundredth, as shown
     }
+
+    // what a head is actually turning at: the spin it has been given, plus
+    // whatever ENGLISH has put on it
+    function turnOf(b) { return b.spin + b.eng; }
 
     // the fastest-turning ball in play, for the readout
     function liveSpinMul() {
         let s = 0;
-        for (const b of balls) s = Math.max(s, Math.abs(b.spin));
+        for (const b of balls) s = Math.max(s, Math.abs(turnOf(b)));
         return spinMul(s);
     }
 
@@ -1110,7 +1137,7 @@
         // current trip. a piercing ball overlaps a brick across several physics
         // substeps, so without it one pass would drain a silver brick's whole
         // health bar instead of a single point.
-        return { x, y, vx: 0, vy: 0, spin: 0, angle: 0, stuck: false, off: 0,
+        return { x, y, vx: 0, vy: 0, spin: 0, eng: 0, kickDir: 0, angle: 0, stuck: false, off: 0,
                  pierced: new Set() };
     }
 
@@ -1123,6 +1150,7 @@
         capsule = null;
         callout = null;
         spreadT = 0;                      // a fresh ball starts as one brandon
+        paddle.dip = [0, 0];              // ...lying level
         phantoms = [];
         shout = null;
         rings = [];
@@ -1315,7 +1343,7 @@
 
     // tx is where the pointer wants him, x is where he has got to. they are the
     // same number unless something is dragging on him.
-    paddle = { x: LW / 2, tx: LW / 2, prevX: LW / 2, vx: 0, w: PADDLE_W, jt: 0, tilt: 0 };
+    paddle = { x: LW / 2, tx: LW / 2, prevX: LW / 2, vx: 0, w: PADDLE_W, jt: 0, tilt: 0, dip: [0, 0] };
     fx = { B: 0, D: 0, S: 0, R: 0, P: 0, W: 0, E: 0 };
     best = loadBest();
     fetchBoard();                 // async; the game never waits on it
@@ -1854,6 +1882,8 @@
                 nb.vx = Math.cos(a) * s;
                 nb.vy = Math.sin(a) * s;
                 nb.spin = b.spin;
+                nb.eng = b.eng;
+                nb.kickDir = b.kickDir;
                 extra.push(nb);
             }
         }
@@ -2155,11 +2185,13 @@
         b.x += b.vx * dt;
         b.y += b.vy * dt;
 
-        // walls, against the ellipse's reach along each axis
+        // walls, against the ellipse's reach along each axis. they scrub a
+        // little spin off and leave the rest turning the way it was -- one that
+        // reversed it would undo whatever the last hit built, half the time
         const rx = extX(b), ry = extY(b);
-        if (b.x - rx < 0)  { b.x = rx;      b.vx =  Math.abs(b.vx); b.spin *= -0.55; }
-        if (b.x + rx > LW) { b.x = LW - rx; b.vx = -Math.abs(b.vx); b.spin *= -0.55; }
-        if (b.y - ry < 0)  { b.y = ry;      b.vy =  Math.abs(b.vy); b.spin *= -0.55; }
+        if (b.x - rx < 0)  { b.x = rx;      b.vx =  Math.abs(b.vx); b.spin *= SPIN_WALL; }
+        if (b.x + rx > LW) { b.x = LW - rx; b.vx = -Math.abs(b.vx); b.spin *= SPIN_WALL; }
+        if (b.y - ry < 0)  { b.y = ry;      b.vy =  Math.abs(b.vy); b.spin *= SPIN_WALL; }
         if (b.y - ry > LH) return false;
 
         for (const br of bricks) {
@@ -2180,7 +2212,7 @@
             if (fx.P > 0 && br.kind !== 'X' && br.kind !== 'Z') {
                 if (!b.pierced.has(br)) {     // one point of damage each, per trip
                     b.pierced.add(br);
-                    hitBrick(br, b.spin);
+                    hitBrick(br, turnOf(b));
                 }
                 continue;
             }
@@ -2206,28 +2238,74 @@
             // ring of impact at the contact point instead of a damage flash.
             if (br.kind === 'X') rings.push({ x: hit.cx, y: hit.cy, t: 1 });
             else kick(br, -nx, -ny, 1);   // shoved away from where the ball struck
-            hitBrick(br, b.spin);
+            hitBrick(br, turnOf(b));
             break;
         }
 
-        // the paddle, which may be one brandon or a pair with a hole between
+        // the paddle, which may be one brandon or a pair with a hole between,
+        // and either of which may have an end dipped (see DIP_MAX). each is
+        // met in his own frame, where he is level and a plain box.
         const halfH = padH() / 2;
         const py = padY();
-        if (b.vy > 0 && b.y + ry > py - halfH && b.y - ry < py + halfH) {
+        if (b.vy > 0) {
             for (const sg of segs()) {
                 const hw = sg.w / 2;
-                if (b.x + rx <= sg.cx - hw || b.x - rx >= sg.cx + hw) continue;
+                const a = paddle.dip[sg.i], ca = Math.cos(a), sa = Math.sin(a);
+                const dx = b.x - sg.cx, dy = b.y - py;
+                const lx = dx * ca + dy * sa, ly = dy * ca - dx * sa;
+                const tc = Math.cos(b.angle - a), ts = Math.sin(b.angle - a);
+                const lrx = Math.hypot(bRX() * tc, bRY() * ts);
+                const lry = Math.hypot(bRX() * ts, bRY() * tc);
+                if (Math.abs(lx) >= hw + lrx || Math.abs(ly) >= halfH + lry) continue;
+                // Out past a corner, the box around the head reaches further than
+                // the head does -- far enough that a dipped end, its corner swung
+                // in under a head going past, would catch one it never touched.
+                // There, measure the head's own reach toward that corner instead.
+                const kx = Math.abs(lx) - hw, ky = Math.abs(ly) - halfH;
+                if (kx > 0 && ky > 0) {
+                    const d = Math.hypot(kx, ky);
+                    const ux = Math.sign(lx) * kx / d, uy = Math.sign(ly) * ky / d;
+                    const ex = ux * tc + uy * ts, ey = uy * tc - ux * ts;   // in the head's frame
+                    if (d >= Math.hypot(bRX() * ex, bRY() * ey)) continue;
+                }
 
-                b.y = py - halfH - ry;
+                // Only a head coming down ONTO him gets sent back up. One whose
+                // middle has sunk past his top, or that is further out past his
+                // end than it is above him, is beside him, and running into it
+                // there is a glancing knock away with it still falling. With an
+                // end dipped, most of what would be beside him is on the slope.
+                const above = -halfH - ly;
+                const out = Math.max(0, Math.abs(lx) - hw);
+                if (above <= 0 || above / lry < out / lrx) {
+                    const dir = lx < 0 ? -1 : 1;
+                    const push = Math.max(Math.abs(b.vx), s * 0.25, Math.min(s, dir * paddle.vx));
+                    const nx = dir * (hw + lrx);
+                    b.x = sg.cx + nx * ca - ly * sa;
+                    b.y = py + nx * sa + ly * ca;
+                    b.vx = dir * push;
+                    b.vy = Math.max(b.vy, push * 0.5);
+                    break;
+                }
+
+                const ny = -halfH - lry;               // set down on his top, or on the slope
+                b.x = sg.cx + lx * ca - ny * sa;
+                b.y = py + lx * sa + ny * ca;
 
                 // where it lands on him sets the angle, and if he is wiggling
-                // then the lean he happens to be at goes into the shot too
-                const off = Math.max(-1, Math.min(1, (b.x - sg.cx) / hw));
-                aim(b, off * MAX_ANGLE + segWig(sg.i));
+                // then the lean he happens to be at goes into the shot too. the
+                // further an end is dipped, the more the shot leaves square off
+                // that slope instead, so it goes where he visibly sends it
+                const off = Math.max(-1, Math.min(1, lx / hw));
+                const dipped = DIP_MAX > 0 ? Math.min(1, Math.abs(a) / DIP_MAX) : 0;
+                aim(b, off * MAX_ANGLE * (1 - dipped) + a + segWig(sg.i));
 
-                b.spin += off * SPIN_EDGE + paddle.vx * SPIN_SWIPE;
-                const cap = fx.E > 0 ? ENG_MAX : SPIN_MAX;
-                b.spin = Math.max(-cap, Math.min(cap, b.spin));
+                // the shove, capped, then what it does to a head this heavy.
+                // the way it is already turning, it builds; against it, it
+                // unwinds.
+                const kick = Math.max(-SPIN_KICK, Math.min(SPIN_KICK,
+                                      off * SPIN_EDGE + paddle.vx * SPIN_SWIPE));
+                b.spin = Math.max(-SPIN_MAX, Math.min(SPIN_MAX, b.spin + kick / SPIN_INERTIA));
+                if (kick) b.kickDir = Math.sign(kick);   // ENGLISH turns whichever way this was
 
                 paddle.jt = 1;              // recoil, tilting toward the end he took it on
                 paddle.tilt = off;
@@ -2337,6 +2415,14 @@
             if (fx[k] <= 0) continue;
             fx[k] = Math.max(0, fx[k] - dt);
             if (fx[k] === 0 && k === 'B') paddle.w = PADDLE_W;
+            // when ENGLISH lets go the head keeps what it was turning at, and
+            // runs down from there like any other spin instead of stopping dead
+            if (fx[k] === 0 && k === 'E') {
+                for (const b of balls) {
+                    b.spin = Math.max(-SPIN_MAX, Math.min(SPIN_MAX, b.spin + b.eng));
+                    b.eng = 0;
+                }
+            }
         }
 
         // each brick's lean is sampled ONCE per frame and held across every
@@ -2355,6 +2441,22 @@
             b.y = padY() - padH() / 2 - bRY() - 2;
         }
 
+        // each end of him dips toward a head that is getting past it (see
+        // DIP_MAX). set once a frame and held across the substeps below, the
+        // same as the bricks' lean.
+        const lip = padY() - padH() / 2;
+        for (const sg of segs()) {
+            let want = 0, near = Infinity;
+            for (const b of phase === 'play' ? balls : []) {
+                if (b.stuck || b.vy <= 0 || b.y + extY(b) < lip - DIP_LEAD) continue;
+                const gap = Math.abs(b.x - sg.cx) - sg.w / 2;      // out past his end
+                if (gap > DIP_REACH || gap >= near || (gap <= 0 && b.y < lip)) continue;
+                near = gap;
+                want = (b.x < sg.cx ? -1 : 1) * DIP_MAX;
+            }
+            paddle.dip[sg.i] += (want - paddle.dip[sg.i]) * (1 - Math.exp(-dt / DIP_EASE));
+        }
+
         if (phase === 'play') {
             const fast = Math.max(...balls.map(b => Math.hypot(b.vx, b.vy)), effSpeed());
             const steps = Math.max(1, Math.ceil(fast * dt / 7));
@@ -2368,16 +2470,19 @@
         }
 
         for (const b of balls) {
+            // the ball is an ellipse, so a fast enough spin means its facing at
+            // any impact is anyone's guess -- that is the whole
+            // unpredictability, no invented force. what hits and walls put on
+            // runs down; ENGLISH's share does not. that share heads for the
+            // way the last hit pushed, and gets there at ENG_ACCEL rather than
+            // all at once, so bringing it round takes a moment.
+            b.spin -= b.spin * SPIN_DRAG / SPIN_INERTIA * dt;
             if (fx.E > 0) {
-                // wind him up and hold him there. the ball is an ellipse, so a
-                // fast enough spin means its facing at any impact is anyone's
-                // guess -- that is the whole unpredictability, no invented force
-                b.spin += (b.spin >= 0 ? 1 : -1) * ENG_PUMP * dt;
-                b.spin = Math.max(-ENG_MAX, Math.min(ENG_MAX, b.spin));
-            } else {
-                b.spin -= b.spin * SPIN_DECAY * dt;
+                const want = (b.kickDir || Math.sign(turnOf(b)) || 1) * ENG_BOOST * SPIN_FULL;
+                const step = ENG_ACCEL * dt;
+                b.eng += Math.max(-step, Math.min(step, want - b.eng));
             }
-            b.angle += b.spin * dt;
+            b.angle += turnOf(b) * dt;
         }
 
         // the falling capsule
@@ -3207,7 +3312,7 @@
                     if (Math.abs(dx) < 1.5) continue;     // standing still, no tail
                     ctx.save();
                     ctx.translate(sg.cx + dx, padY() + o * JIG_PADDLE);
-                    ctx.rotate(segWig(sg.i));
+                    ctx.rotate(segWig(sg.i) + paddle.dip[sg.i]);
                     ctx.globalAlpha = e.a;
                     ctx.drawImage(ghost, -tw / 2, -th / 2, tw, th);
                     ctx.globalAlpha = 1;
@@ -3221,7 +3326,7 @@
             const artH = artW / PADDLE_ASPECT;
             ctx.save();
             ctx.translate(sg.cx, padY() + o * JIG_PADDLE);
-            ctx.rotate(PADDLE_LEVEL + o * 0.07 * (paddle.tilt || 0) + segWig(sg.i));
+            ctx.rotate(PADDLE_LEVEL + o * 0.07 * (paddle.tilt || 0) + segWig(sg.i) + paddle.dip[sg.i]);
             if (ready(paddleImg)) {
                 ctx.drawImage(paddleImg,
                     -artW / 2 - ART_OFF_X * artW,
@@ -3245,7 +3350,7 @@
                 if (tint) {
                     ctx.save();
                     ctx.translate(sg.cx, padY() + o * JIG_PADDLE);
-                    ctx.rotate(segWig(sg.i));      // the sprite is already level
+                    ctx.rotate(segWig(sg.i) + paddle.dip[sg.i]);   // the sprite is already level
                     ctx.globalAlpha = dragAlpha();
                     ctx.drawImage(tint, -tw / 2, -th / 2, tw, th);
                     ctx.globalAlpha = 1;
