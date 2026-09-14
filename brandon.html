@@ -697,6 +697,15 @@
     // thing it is trying to kill, and neither of you meant it.
     const G_SERVE_DROP  = 0.02;
     const G_SERVE_DROP_V= 0.55;   // of a head's speed -- catchable, not a taunt
+    // A run of them makes the next one less likely. Every powerup that has
+    // turned up in the last G_DROP_WINDOW seconds -- off a corpse or out of a
+    // serve, caught or not -- halves the odds that the next corpse leaves one,
+    // and the odds come back as those age out. Drops used to scale with kills
+    // and kills with drops, so a quick enough hand never saw a timer run out:
+    // all three up for good, and every arrival dead before its first serve. A
+    // quiet stretch still pays out exactly as it always did.
+    const G_DROP_WINDOW = 5;      // seconds a drop keeps counting against the next
+    const G_DROP_DAMP   = 0.5;    // what each of those multiplies the odds by
     const G_DROP_RISE= 118;
     const G_DROP_R   = 12;
     const G_DROP_LIFE= 9;
@@ -912,6 +921,7 @@
     let king = null, ships = [], gBul = [], gThrow = [], sparks = [], gDrop = [];
     let gVolley = [], gRunT = 0, gSpawnT = 0, gCool = 0, gShake = 0;
     let gSpread = 0, gBurst = 0, gRapid = 0;
+    let gDropAt = [];             // when each recent powerup turned up, oldest first
     let gAbsorbT = 0, gAbsorbLeft = 0;
     let gReady = false, kingShown = 0, gLead = 0, gTimeBonus = 0;
     let fallT = 0, kingFall = null, victor = null, impact = null;
@@ -1288,7 +1298,7 @@
         score = 0; lives = 3; stage = 0;
         popups = [];
         king = null; ships = []; gBul = []; gThrow = []; gDrop = []; sparks = [];
-        gVolley = []; kingFall = null; bossFall = null; victor = null; ascendT = 0;
+        gVolley = []; gDropAt = []; kingFall = null; bossFall = null; victor = null; ascendT = 0;
         impact = null;
         gReady = false; gSpread = 0; gBurst = 0; gRapid = 0;
         showCursor(false);
@@ -2394,7 +2404,7 @@
         king = { x: LW / 2, tx: LW / 2, hp: G_HP, hpMax: G_HP, hpBase: G_HP,
                  hits: 0, hurt: 0, flash: 0, grow: 0 };
         kingShown = G_W0;
-        ships = []; gBul = []; gThrow = []; sparks = []; gDrop = []; gVolley = [];
+        ships = []; gBul = []; gThrow = []; sparks = []; gDrop = []; gVolley = []; gDropAt = [];
         gRunT = 0; gSpawnT = 0; gCool = 0; gShake = 0;
         gSpread = 0; gBurst = 0; gRapid = 0;
         fallT = 0; kingFall = null; victor = null; bossFall = null; impact = null;
@@ -2549,7 +2559,7 @@
         // catching is not a gift, it is a taunt.
         if (Math.random() < G_SERVE_DROP) {
             const speed = gRamp(G_BULL0, G_BULL1) * G_SERVE_DROP_V;
-            gDrop.push({
+            addDrop({
                 x: s.x, y,
                 vx: Math.sin(a) * speed, vy: -Math.cos(a) * speed,
                 kind: G_DROP_K[(Math.random() * G_DROP_K.length) | 0],
@@ -2569,6 +2579,13 @@
             spin: (Math.random() - 0.5) * 9,
             life: G_BALL_LIFE
         });
+    }
+
+    // a powerup turning up, from either source, and a note of when -- see
+    // G_DROP_DAMP
+    function addDrop(d) {
+        gDrop.push(d);
+        gDropAt.push(clock);
     }
 
     // one of yours landing. it takes a rung off; only the last rung kills.
@@ -2591,9 +2608,13 @@
         // ends: you have run the number out, and there is nothing above this.
         if (score >= SCORE_CAP) { score = SCORE_CAP; startFall(); }
         // ...and is likelier to leave something, as though each rung had
-        // rolled for it separately
-        if (Math.random() < 1 - Math.pow(1 - G_DROP_ODDS, s.maxHp)) {
-            gDrop.push({
+        // rolled for it separately -- and less likely again for every powerup
+        // that has turned up in the last few seconds
+        while (gDropAt.length && clock - gDropAt[0] >= G_DROP_WINDOW) gDropAt.shift();
+        const odds = (1 - Math.pow(1 - G_DROP_ODDS, s.maxHp))
+                   * Math.pow(G_DROP_DAMP, gDropAt.length);
+        if (Math.random() < odds) {
+            addDrop({
                 x: s.x, y: s.y - G_SHIP_H * 0.3,
                 kind: G_DROP_K[(Math.random() * G_DROP_K.length) | 0],
                 angle: Math.random() * 6.28,
