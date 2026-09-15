@@ -341,12 +341,15 @@
     const padY = () => PADDLE_Y - CLIMB_RISE * climb;
 
     // A head that has got below his top near one end, still coming down, makes
-    // that end dip toward it -- up to DIP_MAX, most of the way there in about
-    // DIP_EASE -- so there is a slope to meet it with. Run into it and it goes
-    // up off that slope, square to the angle you can see him at. It used to
-    // warp up on top of him and get served from there, which was a free save
-    // that looked like a glitch; knocking it straight down was fair and no fun.
+    // that end dip toward it -- DIP_MAX straight away, most of the way there in
+    // about DIP_EASE -- so there is a slope to meet it with, and as the head
+    // sinks the end follows it down, as far as it takes to keep that slope under
+    // it, up to DIP_LIMIT: on end, if it comes to that. Run into it and it goes
+    // off the slope, square to the angle you can see him at. It used to warp up
+    // on top of him and get served from there, which was a free save that
+    // looked like a glitch; knocking it straight down was fair and no fun.
     const DIP_MAX   = 30 * Math.PI / 180;
+    const DIP_LIMIT = 90 * Math.PI / 180;
     const DIP_REACH = 70;       // px out past his end that a head still gets a dip
     const DIP_LEAD  = 30;       // ...from this far above his top
     const DIP_EASE  = 0.06;
@@ -2495,6 +2498,58 @@
     }
 
     // ---- physics -----------------------------------------------------------
+    // Where a head is in one brandon's own frame, turned `a`, and whether it is
+    // touching him there: null if not. He is a plain box in that frame. Out
+    // past a corner, though, the box around the head reaches further than the
+    // head does -- far enough that a dipped end, its corner swung in under a
+    // head going past, would catch one it never touched -- so there the head's
+    // own reach toward that corner is measured instead.
+    function touching(b, sg, a) {
+        const hw = sg.w / 2, halfH = padH() / 2;
+        const ca = Math.cos(a), sa = Math.sin(a);
+        const dx = b.x - sg.cx, dy = b.y - padY();
+        const lx = dx * ca + dy * sa, ly = dy * ca - dx * sa;
+        const tc = Math.cos(b.angle - a), ts = Math.sin(b.angle - a);
+        const lrx = Math.hypot(bRX() * tc, bRY() * ts);
+        const lry = Math.hypot(bRX() * ts, bRY() * tc);
+        if (Math.abs(lx) >= hw + lrx || Math.abs(ly) >= halfH + lry) return null;
+        const kx = Math.abs(lx) - hw, ky = Math.abs(ly) - halfH;
+        if (kx > 0 && ky > 0) {
+            const d = Math.hypot(kx, ky);
+            const ux = Math.sign(lx) * kx / d, uy = Math.sign(ly) * ky / d;
+            const ex = ux * tc + uy * ts, ey = uy * tc - ux * ts;   // in the head's frame
+            if (d >= Math.hypot(bRX() * ex, bRY() * ey)) return null;
+        }
+        return { hw, ca, sa, lx, ly, lrx, lry };
+    }
+
+    // How far an end turns for a head getting past it (see DIP_LIMIT): DIP_MAX,
+    // or more once the head has sunk below where that leaves his top -- far
+    // enough that the line of his top passes under the head's reach, aimed at
+    // where the head will be by the time he has turned. A head UNDER him rather
+    // than out past his end gets no more than DIP_MAX: turning further would
+    // only bring his underside down on it.
+    function dipFor(b, sg) {
+        const side = b.x < sg.cx ? -1 : 1;
+        const now = Math.sign(paddle.dip[sg.i]) === side ? Math.abs(paddle.dip[sg.i]) : 0;
+        const dx = Math.abs(b.x - sg.cx), dy = b.y - padY();
+        if (dy * Math.cos(now) - dx * Math.sin(now) >= 0
+            && dx * Math.cos(now) + dy * Math.sin(now) <= sg.w / 2) return DIP_MAX;
+        const hx = Math.max(0, side * (b.x + b.vx * DIP_EASE - sg.cx));
+        const hy = b.y + b.vy * DIP_EASE - padY();
+        const r = Math.max(1e-6, Math.hypot(hx, hy));
+        const need = Math.atan2(hy, hx) + Math.asin(Math.min(1, (padH() / 2 + bRY()) / r));
+        return Math.max(DIP_MAX, Math.min(DIP_LIMIT, need));
+    }
+
+    // the deepest any end of him can reach below his middle, turned as far as
+    // he ever turns
+    function reachBelow() {
+        const hw = padW() / 2, halfH = padH() / 2;
+        const a = Math.min(Math.max(DIP_MAX, DIP_LIMIT), Math.atan2(hw, halfH));
+        return hw * Math.sin(a) + halfH * Math.cos(a);
+    }
+
     // returns false if this ball drained off the bottom
     function stepBall(b, dt) {
         const s = effSpeed() * (b.boost || 1);    // one he handed back on a fake goes slower
@@ -2589,25 +2644,10 @@
         const py = padY();
         if (b.vy > 0) {
             for (const sg of segs()) {
-                const hw = sg.w / 2;
-                const a = paddle.dip[sg.i], ca = Math.cos(a), sa = Math.sin(a);
-                const dx = b.x - sg.cx, dy = b.y - py;
-                const lx = dx * ca + dy * sa, ly = dy * ca - dx * sa;
-                const tc = Math.cos(b.angle - a), ts = Math.sin(b.angle - a);
-                const lrx = Math.hypot(bRX() * tc, bRY() * ts);
-                const lry = Math.hypot(bRX() * ts, bRY() * tc);
-                if (Math.abs(lx) >= hw + lrx || Math.abs(ly) >= halfH + lry) continue;
-                // Out past a corner, the box around the head reaches further than
-                // the head does -- far enough that a dipped end, its corner swung
-                // in under a head going past, would catch one it never touched.
-                // There, measure the head's own reach toward that corner instead.
-                const kx = Math.abs(lx) - hw, ky = Math.abs(ly) - halfH;
-                if (kx > 0 && ky > 0) {
-                    const d = Math.hypot(kx, ky);
-                    const ux = Math.sign(lx) * kx / d, uy = Math.sign(ly) * ky / d;
-                    const ex = ux * tc + uy * ts, ey = uy * tc - ux * ts;   // in the head's frame
-                    if (d >= Math.hypot(bRX() * ex, bRY() * ey)) continue;
-                }
+                const a = paddle.dip[sg.i];
+                const c = touching(b, sg, a);
+                if (!c) continue;
+                const { hw, ca, sa, lx, ly, lrx, lry } = c;
 
                 // Only a head coming down ONTO him gets sent back up. One whose
                 // middle has sunk past his top, or that is further out past his
@@ -2664,10 +2704,11 @@
         // anyone watching is concerned, because the only thing that ends a
         // ball is leaving the bottom and a horizontal one never does. The
         // brick bounce already refuses to go flatter than 0.16 of the speed,
-        // but nothing was watching the space beneath him. Once his top edge is
-        // under the paddle's bottom edge there is no save left to make, so it
-        // goes straight down and the life is lost cleanly.
-        if (b.y - ry > py + halfH) {
+        // but nothing was watching the space beneath him. So once a head is
+        // lower than any end of him could reach down to, turned as far as he
+        // ever turns, it goes straight down and the life is lost cleanly -- and
+        // never before that: a head he can still touch is still in play.
+        if (b.y - ry > py + reachBelow()) {
             const sp = Math.hypot(b.vx, b.vy) || s;
             b.vx = 0;
             b.vy = sp;
@@ -2797,8 +2838,10 @@
         }
 
         // each end of him dips toward a head that is getting past it (see
-        // DIP_MAX). set once a frame and held across the substeps below, the
-        // same as the bricks' lean.
+        // DIP_MAX), and follows it down. set once a frame and held across the
+        // substeps below, the same as the bricks' lean. he never turns INTO a
+        // head: a turn that would start him touching one waits until it has
+        // moved, so no turn can shove a head through him
         const lip = padY() - padH() / 2;
         for (const sg of segs()) {
             let want = 0, near = Infinity;
@@ -2807,9 +2850,11 @@
                 const gap = Math.abs(b.x - sg.cx) - sg.w / 2;      // out past his end
                 if (gap > DIP_REACH || gap >= near || (gap <= 0 && b.y < lip)) continue;
                 near = gap;
-                want = (b.x < sg.cx ? -1 : 1) * DIP_MAX;
+                want = (b.x < sg.cx ? -1 : 1) * dipFor(b, sg);
             }
-            paddle.dip[sg.i] += (want - paddle.dip[sg.i]) * (1 - Math.exp(-dt / DIP_EASE));
+            const was = paddle.dip[sg.i];
+            const next = was + (want - was) * (1 - Math.exp(-dt / DIP_EASE));
+            if (!balls.some(b => !b.stuck && !touching(b, sg, was) && touching(b, sg, next))) paddle.dip[sg.i] = next;
         }
 
         if (phase === 'play') {
