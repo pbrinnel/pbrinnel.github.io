@@ -420,12 +420,12 @@
     const BONUS      = 0.25;               // score kicker per chaos capsule
 
     // ---- the boss -----------------------------------------------------------
-    // the real brandon, at last. he takes 25 hits, shrinks with every one, and
-    // once a quarter of him is gone he starts moving -- faster and smaller the
-    // closer he gets to finished.
+    // the real brandon, at last. he shrinks as he takes damage, and once
+    // BOSS_STILL of his health is gone he starts moving -- faster and smaller
+    // the closer he gets to finished.
     const BOSS_HP     = 27;
     // he arrives too big for the screen -- 1060 wide against an 800 field, so
-    // he hangs 130px off each side and cannot be seen whole. five hits bring
+    // he hangs 130px off each side and cannot be seen whole. a few hits bring
     // him inside the frame. the 0.6 exponent front-loads the shrink so those
     // early hits visibly contract him rather than nibbling.
     const BOSS_W0     = 1060;   // as he arrives
@@ -458,6 +458,10 @@
     // it was dramatic and into where it was just slow. The health came off the
     // end rather than the beginning, so what is gone is the part that had
     // stopped earning its time.
+    //
+    // That count is his health bar alone. His second wind cuts in three hits
+    // from the end and puts him back to half health (see SIPHON_AT), so the
+    // whole fight runs longer.
     const BOSS_HALF   = 4;      // hp at or below which a hit is worth half
     const BOSS_LAST   = 1;      // ...and at or below which it is worth a quarter
     const BOSS_D_HALF = 0.5;
@@ -859,8 +863,7 @@
     // the score. deliberately modest against a full run -- this is a coda, not
     // a second game, and the table should still be won in the five stages.
     // Times how many hits it took, so a three-rung one pays three times -- it
-    // cost you three throws. Deliberately modest against a full run: the
-    // gauntlet is a coda, and the table should still be won in the five stages.
+    // cost you three throws.
     const G_PTS_KILL = 50;
     // Paid once, at the end, on the title. Four times what it was: the lump
     // has to feel like a result when it lands next to the words, and at ten
@@ -1065,7 +1068,7 @@
 
     // ---- the leaderboard -----------------------------------------------------
     // One shared table for everyone, held by a small Cloudflare Worker (its
-    // source is brandon-leaderboard-worker.js next to this file). Everything
+    // source is _worker/brandon-leaderboard-worker.js). Everything
     // here fails soft: if the board is unreachable the game plays exactly as it
     // did before, just without a table. It is never awaited on a hot path.
     // Paste the deployed worker's URL here to switch the board on. While it is
@@ -1314,8 +1317,8 @@
         return Math.min(1, Math.max(0, (enterT - ENTER_WAIT) / ENTER_SECS));
     }
 
-    // once a quarter of him is gone he starts patrolling, and he shrinks and
-    // speeds up the whole way down
+    // once BOSS_STILL of his health is gone he starts patrolling, and he
+    // shrinks and speeds up the whole way down
     function bossUpdate(dt) {
         const b = bricks[0];
         if (!b || b.kind !== 'Z' || !b.alive) return;
@@ -1342,8 +1345,8 @@
         bossPhase += (BOSS_SWEEP0 + k * BOSS_SWEEP1) * pdt;   // integrated, so
                                                               // speeding up never
                                                               // jumps his phase
-        // amplitude grows FROM zero, so he is genuinely motionless until a
-        // quarter of him is gone and then eases into the patrol
+        // amplitude grows FROM zero, so he is genuinely motionless until
+        // BOSS_STILL of his health is gone and then eases into the patrol
         const amp = Math.max(0, (LW - bw) / 2) * k;
         b.x = LW / 2 + Math.sin(bossPhase) * amp - bw / 2;
         b.y = cy + Math.sin(bossPhase * 1.7) * BOSS_BOB * k - bh / 2 + (lunge ? lunge.off : 0);
@@ -3169,8 +3172,9 @@
     function volley() {
         const n = gSpread > 0 ? G_SPREAD_N : 1;
         const y = kingY() + kingH() / 2;
-        // every volley leaves on whatever the sweep is pointing at right now --
-        // including the later ones in a burst, which is why a burst fans itself
+        // every volley leaves from wherever he is when it fires -- including
+        // the later ones in a burst, which is why a burst thrown on the move
+        // lays itself across the floor (see throwHead)
         const base = 0;                 // straight down
         for (let i = 0; i < n; i++) {
             const a = base + (n === 1 ? 0 : (i - (n - 1) / 2) * G_SPREAD_ARC);
@@ -3238,12 +3242,11 @@
         };
     }
 
-    // scale the drift with the body, or a 1060-wide boss comes apart in the
-    // same tiny increments a 200-wide one does and looks glued together
-    // Struck. Returns true while the world is held -- callers use that to stop
-    // advancing everything else, which is the entire trick.
+    // Struck: the freeze and the white cut-out start here -- see HIT_HOLD.
     function hitStop(x, y, w, rot) { impact = { t: 0, x, y, w, rot: rot || 0 }; }
 
+    // Returns true while the world is held -- callers use that to stop
+    // advancing everything else, which is the entire trick.
     function stepImpact(dt) {
         if (!impact) return false;
         impact.t += dt;
@@ -3279,6 +3282,8 @@
     function stepCrumble(c, dt, from) {
         if (!c) return;
         c.t += dt;
+        // scale the drift with the body, or a big one comes apart in the same
+        // tiny increments a small one does and looks glued together
         const s = c.w / 300;
         for (const p of c.pieces) {
             if (c.t < from + p.wait) continue;
@@ -4396,11 +4401,10 @@
         }
 
 
-        // ...and, once, the fact that you can throw at all. nothing moves until
-        // you do, so this can sit there as long as it needs to.
         // ...and, once, the fact that you can throw at all -- but only after he
         // has walked on and stood there a moment. the first thing that happens
-        // should be somebody arriving, not a caption.
+        // should be somebody arriving, not a caption. nothing moves until you
+        // throw, so it can sit there as long as it needs to.
         if (gReady && gLead <= 0 && phase === 'gauntlet') {
             ctx.globalAlpha = 0.65 + 0.35 * Math.sin(clock * 2.2);
             // clear of the front rank, which sits at LH-78 -- the prompt was
