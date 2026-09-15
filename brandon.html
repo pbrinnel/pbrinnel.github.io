@@ -324,7 +324,7 @@
     // field has, and the clamp would answer by pinning him at dead centre,
     // unable to move, during the tightest part of the fight. so BIG keeps
     // winning for most of the climb and simply stops compounding at the end.
-    const padW = () => Math.max(paddle.w, PADDLE_W * (1 + CLIMB_GROW * climb));
+    const padW = () => Math.max(paddle.w, PADDLE_W * (1 + CLIMB_GROW * climb)) * lifeScale();
     const padH = () => PADDLE_H * (padW() / PADDLE_W);
     const PADDLE_Y   = LH - 58;
 
@@ -465,16 +465,81 @@
     // is exactly where the fight is supposed to be at its slowest. A plain
     // minimum gap between wounds fixes that whatever the cause.
     //
-    // Deliberately invisible: no flash, no flicker, nothing. A visible
-    // invulnerability would read as a mechanic he has, and this is a
-    // correction, not a rule. Half a second is under the time it takes the ball
+    // A hit that lands inside it shows the way a hit on a solid brick does: a
+    // ring where the ball struck and no flinch, because a hit that does nothing
+    // should look like one. Half a second is under the time it takes the ball
     // to come back off him anyway, so a legitimate second hit never waits.
     const BOSS_IF = 0.5;
+
+    // From a third of his health down he flushes red, in a slow swell that
+    // deepens the closer he gets to finished -- and it ebbs again if his second
+    // wind takes him back above a third. Well under three swells a second, and
+    // colour laid over him, never a darkening of his face.
+    const RAGE_AT    = 1 / 3;
+    const RAGE_A     = 0.45;      // how red he gets at the very end
+    const RAGE_HZ    = 0.9;       // swells a second
+    const RAGE_COLOR = '#cc3322';
+    // if a turn to meet the ball has him at an angle when he dies, he eases back
+    // level over this as he goes, rather than snapping straight
+    const LEVEL_SECS = 0.6;
 
     function bossBite(hp) {
         return hp <= BOSS_LAST ? BOSS_D_LAST
              : hp <= BOSS_HALF ? BOSS_D_HALF : 1;
     }
+
+    // how many more hits he takes from here, the smaller bites included
+    function bossHitsLeft(hp) {
+        let n = 0;
+        while (hp > 1e-6) { hp -= bossBite(hp); n++; }
+        return n;
+    }
+
+    // ---- his second wind ------------------------------------------------------
+    // Three hits from the end, he stops taking it. Everything holds -- you cannot
+    // steer, the ball is gone -- and he drinks the life out of you, both of you
+    // shouting, until he is back to half his health and you are half of
+    // yourself, growing back over REBOUND_SECS of play. Then the ball goes
+    // straight back at him. After that he fights differently: he moves more,
+    // and as the ball comes up at him he may turn to meet it at an angle, or
+    // draw back, turn to an angle of his choosing, and put it back at you off
+    // that -- or draw back, catch it, and hand it back so gently that you are
+    // early for it.
+    const SIPHON_AT    = 3;       // hits left in him when it happens
+    const SIPHON_HP    = 0.5;     // of his health he takes back
+    const SIPHON_IN    = 0.5;     // the stand-off before he drinks
+    const SIPHON_DRINK = 4.5;     // the drinking itself
+    const SIPHON_OUT   = 0.8;     // the last of it reaching him, before the ball goes
+    const SHRINK       = 0.5;     // how much of you he takes
+    const SIPHON_PULSE = 1.1;     // red swells a second on you while he drinks
+    const REBOUND_SECS = 15;      // seconds of play to grow back into yourself
+    const MOTE_RATE    = 26;      // life leaving you, specks a second
+    const MOTE_SECS    = 0.7;     // ...each one's trip up to him
+    const TWO_MOVE     = 0.85;    // the least of his full patrol he keeps to after
+    const NOTICE_PX    = 170;     // how far below him an incoming ball gets a reaction
+    const TILT_ODDS    = 1 / 4;
+    const TILT_MIN     = 15 * Math.PI / 180;
+    const TILT_MAX     = 25 * Math.PI / 180;
+    const TILT_IN      = 0.18;    // seconds to turn to it
+    const TILT_OUT     = 0.4;     // ...and back once it has gone
+    const LUNGE_ODDS   = 1 / 2;
+    const REAR_PX      = 40;      // how far he draws back
+    const LUNGE_PX     = 30;      // ...and how far past his line he comes at it
+    const REAR_SPEED   = 260;     // px/s drawing back, and settling again after
+    const LUNGE_SPEED  = 900;     // px/s coming forward. he starts when the gap left
+                                  // is what the swing needs, so he is past his line
+                                  // as the ball arrives, however fast it is coming
+    // the angles a draw-back sends it back at, off straight down. he turns to
+    // his pick as he draws back, and it leaves square off his face, no faster
+    const SLAM_ANGLES  = [-45, 45, -30, 30, -15, 15].map(d => d * Math.PI / 180);
+    // one draw-back in FAKE_ODDS is a fake: he catches it instead, holds on to it,
+    // and hands it back at a crawl -- and it stays that slow until you touch it
+    const FAKE_ODDS    = 1 / 3;
+    const FAKE_MIN     = 1;       // seconds he holds on to it, at least...
+    const FAKE_MAX     = 2;       // ...and at most
+    const TOUCH_SPEED  = 70;      // px/s coming forward with it
+    const TOUCH_PX     = 20;      // ...and how far past his line
+    const TOUCH_MUL    = 0.4;     // the speed it leaves him at, of the rally's
 
     // his attack: phantom heads flung out at random. The transparency is the
     // tell -- you can always see which head is the real one, and that is what
@@ -493,7 +558,7 @@
     // he just takes his time about it. Nothing is ever put out of reach, which
     // matters on a phone, where the finger IS the paddle and a clamp on how
     // fast he may travel would read as the game ignoring you.
-    const DRAG_LAG   = 0.13;     // seconds of lag while it is up
+    const DRAG_LAG   = 0.15;     // seconds of lag while it is up. 0.13 was 15% too light
     const DRAG_SECS  = 3.0;      // what one head adds to the clock
     // ...and a ceiling on the clock. Without one, the end of the fight throws
     // a head every 0.45s and the total would run away to something that is
@@ -531,7 +596,7 @@
     // this colour exists to prevent.
     const PH_LOOK = { color: '#6faf3a', wash: 0.55, glow: 0.34 };
 
-    const PH_START  = 0.15;     // damage before he starts throwing them
+    const PH_START  = 0.2;      // damage before he starts throwing them: 80% of him left
     const PH_GAP0   = 2.2;      // seconds between them at first
     // ...and when he is nearly finished. Renormalised when the tail was cut
     // from thirteen hits to ten: the barrage is paced off his DAMAGE, so a
@@ -541,6 +606,9 @@
     // window. It does mean the very end is DENSER than it was -- same heads,
     // less time -- which is the honest consequence of asking for both.
     const PH_GAP1   = 0.35;
+    // ...and all of that thrown 35% less often, because the fight had that many
+    // too many of them in the air
+    const PH_RATE   = 0.65;
     const PH_LIFE   = 4.5;
     const PH_CAP    = 13;       // never more than this many on screen. raised
                                 // with the rate, or the cap would eat exactly
@@ -549,6 +617,26 @@
 
     const SHOUT_ODDS = 0.1;     // how often a hit makes him say something
     const SHOUT_SECS = 1.3;
+
+    // The hat stage runs away. Once it is down to its last few, each of them
+    // tosses a coin about saying his piece -- in a little bubble over his head
+    // -- and walking off the edge of the screen rather than wait for you, and
+    // the ones still standing toss again every few seconds. One who gets away
+    // is gone for good; the stage ends when nobody is left, however they went.
+    // A hit used to make one of them say something now and then, too. That
+    // went, and the running stayed.
+    const TALK_SECS   = 1.8;
+    const TALK_MAX    = 3;
+    const TALK_LINES  = ['The Chosen One...', 'Ouch', '...', 'Brandon?'];
+    const FLEE_AT     = 3;       // how few are left before they start running
+    const FLEE_ODDS   = 0.5;     // each one's chance, every time they decide
+    const FLEE_REROLL = 5;       // seconds before the ones still there decide again
+    const FLEE_WAIT   = 1.0;     // seconds one spends saying it before he goes
+    const FLEE_SECS   = 8;       // ...then getting all the way off the screen, at a dawdle
+    const FLEE_RAMP   = 0.8;     // seconds of that spent getting up to pace
+    const TODDLE_HZ   = 2.2;     // rocks a second, left and back
+    const TODDLE_LEAN = 7 * Math.PI / 180;
+    const TODDLE_HOP  = 3;       // px he lifts at the end of each step
 
     // his entrance: an empty screen for a beat, then he lowers in from above
     // while the health bar grows out from nothing, so the size of the problem
@@ -723,14 +811,15 @@
     const G_SERVE_DROP_V= 0.55;   // of a head's speed -- catchable, not a taunt
     // A run of them makes the next one less likely. Every powerup that has
     // turned up in the last G_DROP_WINDOW seconds -- off a corpse or out of a
-    // serve, caught or not -- takes a quarter off the odds that the next corpse
-    // leaves one, and the odds come back as those age out. Drops used to scale
-    // with kills and kills with drops, so a quick enough hand never saw a timer
-    // run out: all three up for good, and every arrival dead before its first
-    // serve. A quiet stretch still pays out exactly as it always did.
+    // serve, caught or not -- takes three eighths off the odds that the next
+    // corpse leaves one, and the odds come back as those age out. Drops used to
+    // scale with kills and kills with drops, so a quick enough hand never saw a
+    // timer run out: all three up for good, and every arrival dead before its
+    // first serve. A quiet stretch still pays out exactly as it always did.
     const G_DROP_WINDOW = 5;      // seconds a drop keeps counting against the next
-    const G_DROP_DAMP   = 0.75;   // what each of those multiplies the odds by. was 0.5,
-                                  // until RAPID and BURST came down and it bit too hard
+    const G_DROP_DAMP   = 0.625;  // what each of those multiplies the odds by. 0.5 bit
+                                  // too hard once RAPID and BURST came down, 0.75 let
+                                  // too many through, so: halfway
     const G_DROP_RISE= 118;
     const G_DROP_R   = 12;
     const G_DROP_LIFE= 9;
@@ -900,6 +989,7 @@
         },
         {   dbg: 'HAT',    // the joke, and a deliberate breather before the boss
             silverHp: 2,
+            talks: true,   // see FLEE_AT
             rows: ['..RRR..',
                    '..RRR..',
                    '.OOOOO.',
@@ -934,12 +1024,18 @@
     let paddle, balls, popups, hits, tierSeen, bw, bh;
     let speed, capsule, fx, callout, clock = 0, spreadT = 0, bossPhase = 0;
     let bossHits = 0;             // landed on him, however much each was worth
+    let bossTwo = false;          // he has had his second wind
+    let siphon = null;            // the scene itself, while it plays
+    let shrinkT = 0;              // seconds of play before you are yourself again
+    let motes = [], yell = null;  // the life leaving you, and your own shout
+    let tilt = null, lunge = null;  // his answers to an incoming ball
     let bossIF = 0;               // ...and the gap before another one can
     let ascendT = 0, uiScale = 1, climb = 0;
     // where the fight left him when he started for the throne -- the takeover
     // rises from there, not from the line he opened the fight on
     let ascendFrom = { y: PADDLE_Y, w: PADDLE_W };
     let phantoms = [], phGap = 0, shout = null, enterT = 0, rings = [], overT = 0;
+    let talk = [], fleeRoll = -1; // the hat stage's voices, and seconds to its next coin toss
     let dragT = 0;                // seconds of sluggish left on him
     let padTrail = [];            // recent positions, for the ghosted tail
 
@@ -1153,6 +1249,8 @@
         paddle.dip = [0, 0];              // ...lying level
         phantoms = [];
         shout = null;
+        talk = [];                        // ...though one that is running keeps running
+        shrinkT = 0; yell = null; motes = [];   // a fresh ball, and all of you back
         rings = [];
         for (const b of bricks || []) b.wigA = 0;
     }
@@ -1165,7 +1263,8 @@
             // the wall never moves as one mechanical block
             wigP: Math.random() * Math.PI * 2,
             wigF: 0.82 + Math.random() * 0.36,
-            wigA: 0
+            wigA: 0,
+            flee: null                    // his run for the edge, on the hat stage
         };
     }
 
@@ -1173,6 +1272,7 @@
         const lvl = LEVELS[n];
         hits = 0;
         tierSeen = {};
+        talk = []; fleeRoll = -1;          // -1: nobody has started deciding yet
         climb = 0;              // a fresh stage puts him back on his own line
 
         if (lvl.boss) {
@@ -1182,6 +1282,8 @@
             bossPhase = 0;
             bossHits = 0;
             bossIF = 0;
+            bossTwo = false; siphon = null; shrinkT = 0;
+            motes = []; yell = null; tilt = null; lunge = null;
             resetBall();
             enterT = 0;
             phase = 'entrance';      // he is not here yet
@@ -1230,22 +1332,25 @@
         bh = bw / SHAPE_ASPECT;
         const cy = BOSS_Y0 + (BOSS_Y - BOSS_Y0) * p;          // descends as he shrinks
 
-        const k = Math.max(0, (dmg - BOSS_STILL) / (1 - BOSS_STILL));
-        bossPhase += (BOSS_SWEEP0 + k * BOSS_SWEEP1) * dt;    // integrated, so
+        // after his second wind he never settles back into the lazy patrol his
+        // health alone would give him; over the drain itself he holds still
+        const k = Math.max(bossTwo ? TWO_MOVE : 0, (dmg - BOSS_STILL) / (1 - BOSS_STILL));
+        const pdt = phase === 'siphon' ? 0 : dt;
+        bossPhase += (BOSS_SWEEP0 + k * BOSS_SWEEP1) * pdt;   // integrated, so
                                                               // speeding up never
                                                               // jumps his phase
         // amplitude grows FROM zero, so he is genuinely motionless until a
         // quarter of him is gone and then eases into the patrol
         const amp = Math.max(0, (LW - bw) / 2) * k;
         b.x = LW / 2 + Math.sin(bossPhase) * amp - bw / 2;
-        b.y = cy + Math.sin(bossPhase * 1.7) * BOSS_BOB * k - bh / 2;
+        b.y = cy + Math.sin(bossPhase * 1.7) * BOSS_BOB * k - bh / 2 + (lunge ? lunge.off : 0);
 
-        // the barrage, thickening as he weakens
-        if (dmg < PH_START) return;
+        // the barrage, thickening as he weakens -- though not over the drain
+        if (dmg < PH_START || phase === 'siphon') return;
         phGap -= dt;
         if (phGap > 0 || phantoms.length >= PH_CAP) return;
         const t = (dmg - PH_START) / (1 - PH_START);
-        phGap = PH_GAP0 + (PH_GAP1 - PH_GAP0) * t;
+        phGap = (PH_GAP0 + (PH_GAP1 - PH_GAP0) * t) / PH_RATE;
         const a = Math.PI * (0.15 + Math.random() * 0.7);     // always downward-ish
         phantoms.push({
             x: b.x + bw / 2, y: b.y + bh / 2,
@@ -1255,6 +1360,159 @@
             spin: (Math.random() - 0.5) * 18,
             life: PH_LIFE
         });
+    }
+
+    // ---- the second wind -------------------------------------------------------
+    // The balls are left where they are, only hidden -- emptying the list here
+    // would read to the physics loop as the last ball lost, and cost a life.
+    function startSiphon(b) {
+        bossTwo = true;
+        siphon = { t: 0, hp0: b.hp, acc: 0, said: {} };
+        phase = 'siphon';
+        capsule = null; phantoms = []; dragT = 0;
+        shout = null; yell = null; motes = [];
+        tilt = null; lunge = null;
+    }
+
+    const ease01 = k => { k = Math.max(0, Math.min(1, k)); return k * k * (3 - 2 * k); };
+
+    // how far through his drinking he is
+    function siphonHad() {
+        return siphon ? ease01((siphon.t - SIPHON_IN) / SIPHON_DRINK) : 0;
+    }
+
+    // you, pulsing red while he drinks: whole swells across the drink, so the
+    // first rises from nothing and the last is gone as he stops. about one a
+    // second -- a pulse, never a flash
+    function siphonRed() {
+        if (!siphon) return 0;
+        const p = (siphon.t - SIPHON_IN) / SIPHON_DRINK;
+        if (p <= 0 || p >= 1) return 0;
+        const n = Math.max(1, Math.round(SIPHON_DRINK * SIPHON_PULSE));
+        return 0.5 - 0.5 * Math.cos(p * n * Math.PI * 2);
+    }
+
+    // how much of yourself you have: taken down across the siphon, then grown
+    // back over REBOUND_SECS of play
+    function lifeScale() {
+        if (siphon) return 1 - SHRINK * siphonHad();
+        return 1 - SHRINK * Math.min(1, shrinkT / REBOUND_SECS);
+    }
+
+    // the scene. nothing you do moves anything -- see update()
+    function stepSiphon(dt) {
+        const b = bricks[0];
+        siphon.t += dt;
+        const t = siphon.t;
+        const once = (key, at, fn) => { if (!siphon.said[key] && t >= at) { siphon.said[key] = true; fn(); } };
+        once('his',   0.15,             () => { shout = { follow: true, text: 'BRANDON!', life: 1.2 }; });
+        once('yours', SIPHON_IN + 0.05, () => { yell = { text: 'BRANDON!', life: 1.2 }; });
+        if (yell && (yell.life -= dt) <= 0) yell = null;
+
+        // he fills back up as you go down
+        b.hp = siphon.hp0 + (b.maxHp * SIPHON_HP - siphon.hp0) * siphonHad();
+        if (t >= SIPHON_IN && t < SIPHON_IN + SIPHON_DRINK) {
+            const spread = padW() * 0.4;
+            for (siphon.acc += dt * MOTE_RATE; siphon.acc >= 1; siphon.acc--) {
+                motes.push({ t: 0, sx: paddle.x + (Math.random() * 2 - 1) * spread, sy: padY(),
+                             sway: (Math.random() - 0.5) * 80 });
+            }
+        }
+        motes = motes.filter(m => (m.t += dt) < MOTE_SECS);
+
+        if (t >= SIPHON_IN + SIPHON_DRINK + SIPHON_OUT) {
+            siphon = null;
+            b.hp = b.maxHp * SIPHON_HP;
+            resetBall();                  // everything the scene left lying about goes...
+            shrinkT = REBOUND_SECS;       // ...but you stay half of yourself
+            // and it is back on without waiting for you: the ball leaves you
+            // aimed straight at him
+            const ball = balls[0];
+            ball.y = padY() - padH() / 2 - bRY() - 2;
+            ball.stuck = false;
+            aim(ball, Math.atan2((b.x + bw / 2) - ball.x, ball.y - (b.y + bh / 2)));
+            phase = 'play';
+        }
+    }
+
+    // After his second wind, an incoming ball gets an answer, rolled once for
+    // each trip up at him: a turn to meet it at an angle, a draw back to hit it
+    // harder, both, or neither. Each lets go once its ball has turned back.
+    function reactToBall(dt) {
+        const b = bricks && bricks[0];
+        const live = bossTwo && phase === 'play' && b && b.kind === 'Z' && b.alive;
+        if (live) {
+            for (const ball of balls) {
+                if (ball.stuck) continue;
+                if (ball.vy >= 0) { ball.noticed = false; continue; }
+                const gap = ball.y - (b.y + bh);
+                if (ball.noticed || gap < 0 || gap > NOTICE_PX) continue;
+                ball.noticed = true;
+                if (!tilt && Math.random() < TILT_ODDS) {
+                    const a = TILT_MIN + Math.random() * (TILT_MAX - TILT_MIN);
+                    tilt = { ball, a: Math.random() < 0.5 ? -a : a, k: 0, out: false };
+                }
+                if (!lunge && Math.random() < LUNGE_ODDS) {
+                    const aim = SLAM_ANGLES[(Math.random() * SLAM_ANGLES.length) | 0];
+                    lunge = { ball, off: 0, stage: 'rear', fake: Math.random() < FAKE_ODDS, aim };
+                    // turned to it as he draws back -- unless he is already turned for another ball
+                    if (!tilt || tilt.ball === ball) tilt = { ball, a: aim, k: tilt ? tilt.k : 0, out: false };
+                }
+            }
+        }
+        if (tilt) {
+            if (!live || !balls.includes(tilt.ball) || (tilt.ball.vy >= 0 && !caught(tilt.ball))) tilt.out = true;
+            tilt.k = tilt.out ? tilt.k - dt / TILT_OUT : Math.min(1, tilt.k + dt / TILT_IN);
+            if (tilt.out && tilt.k <= 0) tilt = null;
+        }
+        if (lunge) {
+            const ball = lunge.ball;
+            const gone = !live || !balls.includes(ball);
+            if (caught(ball)) {
+                // the one he caught stays his -- see holdCaught -- until he lets go of it
+                if (gone) lunge.stage = 'back';
+                if (lunge.stage === 'hold' && (lunge.wait -= dt) <= 0) lunge.stage = 'touch';
+            } else if (lunge.stage !== 'back' && (gone || ball.vy >= 0)) {
+                lunge.stage = 'back';
+            }
+            if (lunge.stage === 'rear' && !lunge.fake) {
+                // forward once the gap left is what the rest of the swing takes
+                const swing = (LUNGE_PX - lunge.off) / LUNGE_SPEED;             // seconds
+                const gap = ball.y - extY(ball) - (b.y + bh);
+                if (gap <= (Math.abs(ball.vy) + LUNGE_SPEED) * swing) lunge.stage = 'lunge';
+            }
+            // a fake stays drawn back through the catch and the hold, then comes
+            // forward at a crawl
+            const st = lunge.stage;
+            const want = st === 'rear' || st === 'hold' ? -REAR_PX
+                       : st === 'lunge' ? LUNGE_PX : st === 'touch' ? TOUCH_PX : 0;
+            const rate = (st === 'lunge' ? LUNGE_SPEED : st === 'touch' ? TOUCH_SPEED : REAR_SPEED) * dt;
+            lunge.off += Math.max(-rate, Math.min(rate, want - lunge.off));
+            if (st === 'touch' && lunge.off >= TOUCH_PX - 0.5) {
+                // let go at the end of the reach, barely moving, off the angle he
+                // turned to -- whatever part of him it was caught on
+                const m = Math.hypot(ball.vx, ball.vy) || 1;
+                ball.vx = -Math.sin(lunge.aim) * m;
+                ball.vy = Math.cos(lunge.aim) * m;
+                ball.boost = TOUCH_MUL;
+                lunge.stage = 'back';
+            }
+            if (lunge.stage === 'back' && Math.abs(lunge.off) < 0.5) lunge = null;
+        }
+    }
+
+    // a ball he caught on a fake draw-back: held, then walked forward, and not
+    // the physics' to move until he lets go of it
+    function caught(ball) {
+        return !!lunge && lunge.ball === ball && (lunge.stage === 'hold' || lunge.stage === 'touch');
+    }
+
+    // ...and sits where he has just got to, so it is placed after he moves
+    function holdCaught() {
+        const b = bricks && bricks[0];
+        if (!b || !lunge || !caught(lunge.ball)) return;
+        lunge.ball.x = b.x + bw / 2 + lunge.dx;
+        lunge.ball.y = b.y + bh / 2 + lunge.dy;
     }
 
     // the same forgiving box the ball is caught on, tested against the
@@ -1501,7 +1759,7 @@
     // Touch never asks for any of this. A finger has no edge to fall off.
     const LOCK_OK   = 'requestPointerLock' in canvas;
     const LOCK_GAIN = 1;          // travel per px of mouse, as a multiple of the old feel
-    const PLAYING = new Set(['ready', 'play', 'cleared', 'entrance', 'ascend',
+    const PLAYING = new Set(['ready', 'play', 'cleared', 'entrance', 'siphon', 'ascend',
                              'absorb', 'gauntlet', 'fall']);
     let paused = false;           // the mouse got away mid-rally
     let lockLetGo = false;        // ...unless WE let it go, which is not an accident
@@ -1557,6 +1815,7 @@
     // captured steering: the same travel per inch of desk it always had
     function steerBy(dx) {
         if (king && (phase === 'gauntlet' || phase === 'absorb' || phase === 'fall')) {
+            if (gReady) return;               // not a step until the first throw
             const edge = kingEdge();
             king.tx = Math.max(edge, Math.min(LW - edge, king.tx + dx));
             return;
@@ -1580,7 +1839,7 @@
         // on it -- you are the thing that used to be unkillable and it should
         // feel like it
         if (king && (phase === 'gauntlet' || phase === 'absorb' || phase === 'fall')) {
-            king.tx = x;
+            if (!gReady) king.tx = x;         // ...once you have thrown the first one
             return;
         }
         paddle.tx = x;
@@ -1946,6 +2205,8 @@
                 shout = { x: b.x + bw * 0.88, y: b.y + bh + 8, life: SHOUT_SECS };
             }
             if (done) { b.alive = false; clearStage(); return; }
+            // three from the end, the first time round: his second wind
+            if (!bossTwo && bossHitsLeft(b.hp) <= SIPHON_AT) { startSiphon(b); return; }
             // he coughs up a capsule every few hits, so the fight has tools.
             // counted in HITS rather than off his health, which no longer
             // steps by one.
@@ -1975,7 +2236,12 @@
         maybeDropCapsule(b.x + bw / 2, b.y + bh / 2);
 
         if (++hits === 4 || hits === 12) bumpSpeed(1.12);
-        if (!bricks.some(x => x.alive && x.kind !== 'X')) clearStage();
+        const left = bricks.filter(x => x.alive && x.kind !== 'X');
+        if (!left.length) clearStage();
+        else if (LEVELS[stage].talks && left.length <= FLEE_AT && fleeRoll < 0) {
+            fleeRoll = FLEE_REROLL;             // the first toss is right now
+            tossForFlight();
+        }
     }
 
     function clearStage() {
@@ -1992,7 +2258,8 @@
             ascendT = 0;
             const b = bricks[0];
             bossFall = shatter(b.x + bw / 2, b.y + bh / 2, bw, A_DIE_T);
-            hitStop(b.x + bw / 2, b.y + bh / 2, bw);   // the blow lands first
+            bossFall.tilt = b.wigA || 0;   // the angle he died at, eased out -- see LEVEL_SECS
+            hitStop(b.x + bw / 2, b.y + bh / 2, bw, b.wigA || 0);   // the blow lands first
             // he sets off from wherever the fight left him -- by now that is
             // most of the way up the screen already, and half again as big
             ascendFrom = { y: padY(), w: padW() };
@@ -2001,6 +2268,60 @@
             phase = 'cleared';
             banner = 'STAGE CLEAR   +' + bonus;
         }
+    }
+
+    // ---- the hat stage talks back ----------------------------------------------
+    function say(b) {
+        talk = talk.filter(t => t.brick !== b);        // one thing at a time each
+        talk.push({ brick: b, text: TALK_LINES[(Math.random() * TALK_LINES.length) | 0],
+                    life: TALK_SECS });
+        if (talk.length > TALK_MAX) talk.shift();
+    }
+
+    // every brandon still standing, and not already on his way, tosses a coin
+    function tossForFlight() {
+        for (const b of bricks) {
+            if (b.alive && b.kind !== 'X' && !b.flee && Math.random() < FLEE_ODDS) startFlee(b);
+        }
+    }
+
+    // he says his piece, then heads for whichever edge is nearer, and all the
+    // way off it
+    function startFlee(b) {
+        say(b);
+        const dir = b.x + bw / 2 < LW / 2 ? -1 : 1;
+        b.flee = { t: 0, x0: b.x, y0: b.y, dir, dist: dir < 0 ? b.x + bw : LW - b.x };
+    }
+
+    // only while a ball is in play: a lost life or a pause holds everybody
+    // where they are, so nobody gets away -- or decides to -- while you are
+    // waiting to serve
+    function stepFlee(dt) {
+        if (phase !== 'play') return;
+        if ((fleeRoll -= dt) <= 0) {
+            fleeRoll += FLEE_REROLL;
+            tossForFlight();
+        }
+        let gone = false;
+        for (const b of bricks) {
+            const f = b.flee;
+            if (!f || !b.alive) continue;
+            f.t += dt;
+            const t = f.t - FLEE_WAIT;
+            if (t <= 0) continue;
+            // up to walking pace over FLEE_RAMP, then steady, so the trip takes
+            // FLEE_SECS all told however far he has to go
+            const v = f.dist / (FLEE_SECS - FLEE_RAMP / 2);
+            const d = Math.min(f.dist, t < FLEE_RAMP ? v * t * t / (2 * FLEE_RAMP)
+                                                     : v * (t - FLEE_RAMP / 2));
+            const step = t * TODDLE_HZ * Math.PI * 2;
+            b.x = f.x0 + f.dir * d;
+            b.y = f.y0 - Math.abs(Math.sin(step)) * TODDLE_HOP;
+            b.wigA += Math.sin(step) * TODDLE_LEAN;    // on top of any WIGGLY sway
+            if (d >= f.dist) { b.alive = false; b.flee = null; gone = true; }
+        }
+        // the stage ends when nobody is left, whether they were hit or ran
+        if (gone && !bricks.some(x => x.alive && x.kind !== 'X')) clearStage();
     }
 
     function loseLife() {
@@ -2176,7 +2497,7 @@
     // ---- physics -----------------------------------------------------------
     // returns false if this ball drained off the bottom
     function stepBall(b, dt) {
-        const s = effSpeed();
+        const s = effSpeed() * (b.boost || 1);    // one he handed back on a fake goes slower
 
         // hold the shared speed, so SLOW and the ramps apply to every ball
         const m = Math.hypot(b.vx, b.vy);
@@ -2197,7 +2518,8 @@
         for (const br of bricks) {
             if (!br.alive) continue;
             // cheap reject, padded out to the wiggled bounding box
-            const pad = br.wigA ? bh * 0.35 : 0;
+            // enough for the corners of a boss turned 45 degrees, too
+            const pad = br.wigA ? Math.max(bh * 0.35, Math.abs(Math.sin(br.wigA)) * (bw + bh) / 2) : 0;
             const bm = bMAX();
             if (b.x + bm <= br.x - pad || b.x - bm >= br.x + bw + pad) continue;
             if (b.y + bm <= br.y - pad || b.y - bm >= br.y + bh + pad) continue;
@@ -2235,10 +2557,28 @@
             }
 
             // a solid one does not budge, and does not pretend to. it gets a
-            // ring of impact at the contact point instead of a damage flash.
-            if (br.kind === 'X') rings.push({ x: hit.cx, y: hit.cy, t: 1 });
+            // ring of impact at the contact point instead of a damage flash --
+            // and so does the boss inside his half second of invincibility,
+            // because that hit is not going to hurt him either
+            const glances = br.kind === 'X' || (br.kind === 'Z' && bossIF > 0);
+            if (glances) rings.push({ x: hit.cx, y: hit.cy, t: 1 });
             else kick(br, -nx, -ny, 1);   // shoved away from where the ball struck
             hitBrick(br, turnOf(b));
+            // he came forward into this one: it goes back off the angle he turned
+            // to, square off his face, at the rally's speed. on a fake he only
+            // catches it -- see caught()
+            if (br.kind === 'Z' && lunge && lunge.ball === b && lunge.stage !== 'back') {
+                if (!lunge.fake) {
+                    b.vx = -Math.sin(lunge.aim) * s;
+                    b.vy = Math.cos(lunge.aim) * s;
+                    lunge.stage = 'back';
+                } else if (lunge.stage === 'rear') {
+                    lunge.stage = 'hold';
+                    lunge.wait = FAKE_MIN + Math.random() * (FAKE_MAX - FAKE_MIN);
+                    lunge.dx = b.x - (br.x + bw / 2);     // from his middle, which stays put
+                    lunge.dy = b.y - (br.y + bh / 2);     // as he shrinks from the hit
+                }
+            }
             break;
         }
 
@@ -2312,6 +2652,7 @@
 
                 combo = 0;                  // the run ends when it comes home
                 b.pierced.clear();          // ...and so does what it has been through
+                b.boost = 1;                // ...and the crawl a fake left it at
                 if (++hits === 4 || hits === 12) bumpSpeed(1.12);
                 break;
             }
@@ -2356,7 +2697,10 @@
                                      : Math.max(want, spreadT - step);
         }
 
+        if (siphon) stepSiphon(dt);
+        reactToBall(dt);         // his second-wind answers, before his box is placed
         bossUpdate(dt);          // before the physics, so his box is current
+        holdCaught();            // ...and whatever he has caught goes where he went
         stepClimb(dt);           // and before the clamp, so his span is too
 
         if (phase === 'entrance') {
@@ -2372,6 +2716,7 @@
         }
         stepPhantoms(dt);
         if (shout && (shout.life -= dt) <= 0) shout = null;
+        talk = talk.filter(t => (t.life -= dt) > 0);
         rings = rings.filter(r => (r.t -= dt * 2.6) > 0);
 
         // the takeover. when it finishes, the banner finally lands.
@@ -2392,6 +2737,7 @@
         // vx falls out of where he ACTUALLY got to, so a dragged brandon also
         // puts less swipe on the ball. That is not a second penalty bolted on,
         // it is the same one seen from the ball's side.
+        if (phase === 'siphon') paddle.tx = paddle.x;   // he is not yours to move while it happens
         const hs = halfSpan();
         paddle.tx = Math.max(hs, Math.min(LW - hs, paddle.tx));
         const lag = dragLag();
@@ -2404,6 +2750,9 @@
 
         if (dragT > 0) dragT = Math.max(0, dragT - dt);
         if (bossIF > 0) bossIF = Math.max(0, bossIF - dt);
+        // growing back only counts while you are playing, or waiting to serve
+        // would hand you your size back for free
+        if (shrinkT > 0 && phase === 'play') shrinkT = Math.max(0, shrinkT - dt);
 
         // kept whether or not he is dragged, so the tail never pops into
         // existence with a hole in the middle of it
@@ -2435,6 +2784,12 @@
             b.wigA = (amp && b.kind !== 'X')
                 ? Math.sin(clock * WIG_FREQ * b.wigF + b.wigP) * amp : 0;
         }
+        // the hat stage's last few, deciding to run for it and running. after
+        // the lean above so a waddle rides on top of any wiggle, and before
+        // the physics so the ball meets them where they have got to
+        if (fleeRoll >= 0) stepFlee(dt);
+        // and the boss, turned to meet a ball -- see TILT_ODDS
+        if (tilt && bricks[0]) bricks[0].wigA += tilt.a * tilt.k * tilt.k * (3 - 2 * tilt.k);
 
         for (const b of balls) if (b.stuck) {
             b.x = paddle.x + b.off;
@@ -2462,7 +2817,7 @@
             const steps = Math.max(1, Math.ceil(fast * dt / 7));
             for (let i = 0; i < steps && phase === 'play'; i++) {
                 for (let j = balls.length - 1; j >= 0; j--) {
-                    if (balls[j].stuck) continue;
+                    if (balls[j].stuck || caught(balls[j])) continue;
                     if (!stepBall(balls[j], dt / steps)) balls.splice(j, 1);
                 }
                 if (balls.length === 0) { loseLife(); break; }
@@ -2517,7 +2872,7 @@
 
     function startGauntlet() {
         king = { x: LW / 2, tx: LW / 2, hp: G_HP, hpMax: G_HP, hpBase: G_HP,
-                 hits: 0, hurt: 0, flash: 0, grow: 0 };
+                 hits: 0, hurt: 0, flash: 0, grow: 0, jt: 0, jnx: 0, jny: 0 };
         kingShown = G_W0;
         ships = []; gBul = []; gThrow = []; sparks = []; gDrop = []; gVolley = []; gDropAt = [];
         gRunT = 0; gSpawnT = 0; gCool = 0; gShake = 0;
@@ -2842,7 +3197,7 @@
     // same tiny increments a 200-wide one does and looks glued together
     // Struck. Returns true while the world is held -- callers use that to stop
     // advancing everything else, which is the entire trick.
-    function hitStop(x, y, w) { impact = { t: 0, x, y, w }; }
+    function hitStop(x, y, w, rot) { impact = { t: 0, x, y, w, rot: rot || 0 }; }
 
     function stepImpact(dt) {
         if (!impact) return false;
@@ -2868,7 +3223,11 @@
         if (!s) return;
         const h = impact.w / SHAPE_ASPECT;
         ctx.globalAlpha = a;
-        ctx.drawImage(s, impact.x - impact.w / 2, impact.y - h / 2, impact.w, h);
+        ctx.save();
+        ctx.translate(impact.x, impact.y);
+        ctx.rotate((impact.rot || 0) * levelLeft());   // at whatever angle he was struck
+        ctx.drawImage(s, -impact.w / 2, -h / 2, impact.w, h);
+        ctx.restore();
         ctx.globalAlpha = 1;
     }
 
@@ -2953,10 +3312,13 @@
                      (1 - Math.exp(-dt / G_SHRINK_EASE));
 
         if (king.hurt > 0) king.hurt = Math.max(0, king.hurt - dt);
+        if (king.jt > 0) king.jt = Math.max(0, king.jt - dt * JIG_DECAY);
         if (gCool > 0) gCool = Math.max(0, gCool - dt);
 
-        // the king still steers and the sight still swings before the clock
-        // starts, so both can be discovered while nothing is shooting at you
+        // He does not steer until the first throw. The throw is the surprise,
+        // and finding out that you are the one at the top comes with it -- being
+        // able to slide him about first gave that away. The pointer is ignored
+        // until then (see steerBy and track), so this only holds him in place.
         const edge0 = kingEdge();
         king.x = Math.max(edge0, Math.min(LW - edge0, king.tx));
 
@@ -3046,6 +3408,10 @@
             }
 
             if (hitsKing(b.x, b.y)) {
+                // he takes the knock the old boss took off your ball: shoved away
+                // from where it struck, the same wobble at the same size
+                const kd = Math.hypot(king.x - b.x, kingY() - b.y) || 1;
+                kick(king, (king.x - b.x) / kd, (kingY() - b.y) / kd, 1);
                 const s = Math.hypot(b.vx, b.vy) || 1;
                 const off = Math.max(-1, Math.min(1, (b.x - king.x) / Math.max(1, half)));
                 const a = off * MAX_ANGLE;
@@ -3197,6 +3563,16 @@
         ctx.translate(b.x + b.jnx * o + bw / 2, b.y + b.jny * o + bh / 2);
         if (b.wigA) ctx.rotate(b.wigA);
         ctx.drawImage(sprite, -bw / 2, -bh / 2, bw, bh);
+        // the red swell, under the hit flash -- see RAGE_AT
+        const rage = Math.max(0, Math.min(1, (RAGE_AT - b.hp / b.maxHp) / RAGE_AT));
+        const swell = 0.5 - 0.5 * Math.cos(clock * RAGE_HZ * Math.PI * 2);
+        const redA = rage * swell * RAGE_A;
+        const red = redA > 0.002 && shapeSprite('rage', RAGE_COLOR, BOSS_W0, BOSS_H, true);
+        if (red) {
+            ctx.globalAlpha = redA;
+            ctx.drawImage(red, -bw / 2, -bh / 2, bw, bh);
+            ctx.globalAlpha = 1;
+        }
         if (b.flash > 0) {
             ctx.globalAlpha = Math.min(1, b.flash) * 0.7;
             ctx.drawImage(shapeSprite('flash', '#f2efe9', BOSS_W0, BOSS_H, true),
@@ -3345,14 +3721,29 @@
             // cached canvases.
             if (dragT > 0) {
                 const tw = sg.w, th = tw / SHAPE_ASPECT;
-                const tint = shapeSprite('drag', DRAG_TINT, DRAG_BAKE,
-                                         DRAG_BAKE / SHAPE_ASPECT, false);
+                const tint = shapeSprite('drag', DRAG_TINT, DRAG_BAKE, DRAG_BAKE / SHAPE_ASPECT, false);
                 if (tint) {
                     ctx.save();
                     ctx.translate(sg.cx, padY() + o * JIG_PADDLE);
                     ctx.rotate(segWig(sg.i) + paddle.dip[sg.i]);   // the sprite is already level
                     ctx.globalAlpha = dragAlpha();
                     ctx.drawImage(tint, -tw / 2, -th / 2, tw, th);
+                    ctx.globalAlpha = 1;
+                    ctx.restore();
+                }
+            }
+            // ...and while his second wind drinks from you, you pulse red: the same
+            // flat red he swells with, see RAGE_AT
+            const redA = siphonRed() * RAGE_A;
+            if (redA > 0.002) {
+                const red = shapeSprite('rage', RAGE_COLOR, BOSS_W0, BOSS_H, true);
+                if (red) {
+                    const tw = sg.w, th = tw / SHAPE_ASPECT;
+                    ctx.save();
+                    ctx.translate(sg.cx, padY() + o * JIG_PADDLE);
+                    ctx.rotate(segWig(sg.i) + paddle.dip[sg.i]);
+                    ctx.globalAlpha = redA;
+                    ctx.drawImage(red, -tw / 2, -th / 2, tw, th);
                     ctx.globalAlpha = 1;
                     ctx.restore();
                 }
@@ -3466,12 +3857,16 @@
 
     function drawShout() {
         if (!shout) return;
-        const txt = 'BRANDON!';
+        const txt = shout.text || 'BRANDON!';
         const size = 22;
         ctx.font = 'bold ' + size + 'px "Trebuchet MS", sans-serif';
         const w = ctx.measureText(txt).width + 30, h = size + 18;
-        const x = Math.max(12 + w / 2, Math.min(LW - 12 - w / 2, shout.x));
-        const y = Math.max(20, Math.min(LH - h - 90, shout.y));
+        // one shouted during the drain rides on him, since he grows under it
+        const boss = bricks && bricks[0];
+        const sx = shout.follow && boss ? boss.x + bw * 0.88 : shout.x;
+        const sy = shout.follow && boss ? boss.y + bh + 8 : shout.y;
+        const x = Math.max(12 + w / 2, Math.min(LW - 12 - w / 2, sx));
+        const y = Math.max(20, Math.min(LH - h - 90, sy));
 
         ctx.globalAlpha = Math.min(1, shout.life / 0.35);
         ctx.fillStyle = '#f2efe9';
@@ -3485,6 +3880,87 @@
         ctx.closePath();
         ctx.fill();
         text(txt, x, y + h / 2 + 8, size, '#12100e', 'center');
+        ctx.globalAlpha = 1;
+    }
+
+    // a shout over someone, its tail pointing down at them; `top` is the top of
+    // whoever is shouting. the tail keeps pointing at them when the bubble has
+    // to shift to stay on screen
+    function shoutDown(txt, x, top, life) {
+        const size = 22;
+        ctx.font = 'bold ' + size + 'px "Trebuchet MS", sans-serif';
+        const w = ctx.measureText(txt).width + 30, h = size + 18;
+        const bx = Math.max(12 + w / 2, Math.min(LW - 12 - w / 2, x));
+        const tx = Math.max(bx - w / 2 + 14, Math.min(bx + w / 2 - 14, x));
+        const y = top - 18 - h;
+        ctx.globalAlpha = Math.min(1, life / 0.35);
+        ctx.fillStyle = '#f2efe9';
+        ctx.beginPath();
+        ctx.roundRect(bx - w / 2, y, w, h, 9);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(tx - 10, y + h - 3);
+        ctx.lineTo(tx + 10, y + h - 3);
+        ctx.lineTo(tx - 1, y + h + 14);
+        ctx.closePath();
+        ctx.fill();
+        text(txt, bx, y + h / 2 + 8, size, '#12100e', 'center');
+        ctx.globalAlpha = 1;
+    }
+
+    // yours during his second wind, over you
+    function drawYell() {
+        if (yell) shoutDown(yell.text || 'BRANDON!', paddle.x, padY() - padH() / 2, yell.life);
+    }
+
+    // life on its way out of you and up into him: small, soft, pale specks on
+    // a bowed path. nothing flashes -- each one only fades in and out as it goes
+    function drawMotes() {
+        const b = bricks && bricks[0];
+        if (!motes.length || !b) return;
+        const bx = b.x + bw / 2, by = b.y + bh / 2;
+        for (const m of motes) {
+            const p = m.t / MOTE_SECS;
+            const e = p * p * (3 - 2 * p);
+            const x = m.sx + (bx - m.sx) * e + Math.sin(p * Math.PI) * m.sway;
+            const y = m.sy + (by - m.sy) * e;
+            const a = Math.sin(p * Math.PI);
+            ctx.globalAlpha = 0.25 * a;
+            ctx.fillStyle = DRAG_TINT;
+            ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2); ctx.fill();
+            ctx.globalAlpha = 0.85 * a;
+            ctx.fillStyle = '#e8f2f7';
+            ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+    }
+
+    // a hat-stage brandon getting a word in: the boss's bubble, shrunk to his
+    // size, over his head -- which is the right-hand end of him. it stays put
+    // over the gap if the hit finished him, and follows him if he is walking.
+    function drawTalk() {
+        const size = 12 * uiScale;
+        for (const t of talk) {
+            const b = t.brick;
+            ctx.font = size + 'px "Trebuchet MS", sans-serif';
+            const w = ctx.measureText(t.text).width + size, h = size * 1.7;
+            const hx = b.x + bw * 0.84;
+            const x = Math.max(8 + w / 2, Math.min(LW - 8 - w / 2, hx));
+            const y = Math.max(6, b.y - 7 - h);           // top of the bubble
+            ctx.globalAlpha = Math.min(1, t.life / 0.35);
+            ctx.fillStyle = '#f2efe9';
+            ctx.beginPath();
+            ctx.roundRect(x - w / 2, y, w, h, 6);
+            ctx.fill();
+            const tx = Math.max(x - w / 2 + 8, Math.min(x + w / 2 - 8, hx));
+            ctx.beginPath();                              // the tail, down at him
+            ctx.moveTo(tx - 5, y + h - 2);
+            ctx.lineTo(tx + 5, y + h - 2);
+            ctx.lineTo(tx, y + h + 6);
+            ctx.closePath();
+            ctx.fill();
+            text(t.text, x, y + h / 2 + size * 0.36, size, '#12100e', 'center');
+        }
         ctx.globalAlpha = 1;
     }
 
@@ -3804,14 +4280,18 @@
         if (phase === 'fall') { drawFall(); drawImpact(); drawVictor(); }
         else {
             const a = king.hurt > 0 ? 0.62 + 0.3 * Math.sin(clock * 13) : 1;
-            drawFigure(king.x, kingY(), kingShown, a, 0, 0);
+            // the knock, drawn the way the boss's is: the picture moves, the
+            // bar over him does not
+            const o = king.jt > 0 ? wobble(king.jt) * JIG_BRICK : 0;
+            const kx = king.x + king.jnx * o, ky = kingY() + king.jny * o;
+            drawFigure(kx, ky, kingShown, a, 0, 0);
             if (king.flash > 0) {
                 const w = kingShown, h = kingH();
                 const s = shapeSprite('gkflash', '#f2efe9', 900,
                                       900 / SHAPE_ASPECT, true);
                 if (s) {
                     ctx.globalAlpha = Math.min(1, king.flash) * 0.42;
-                    ctx.drawImage(s, king.x - w / 2, kingY() - h / 2, w, h);
+                    ctx.drawImage(s, kx - w / 2, ky - h / 2, w, h);
                     ctx.globalAlpha = 1;
                 }
             }
@@ -3923,13 +4403,24 @@
         }
     }
 
+    // how much of the angle the boss died at is still on him: all of it through
+    // the freeze, since ascendT does not run during that, then easing to none
+    // over LEVEL_SECS. his figure and the white cut-out of the blow share it,
+    // so the two straighten together.
+    function levelLeft() {
+        const k = Math.max(0, 1 - ascendT / LEVEL_SECS);
+        return k * k * (3 - 2 * k);
+    }
+
     // the old one letting go, during the takeover. identical to what happens to
     // you at the end -- hold, drain, then peel boot-first with his face last.
     function drawBossFall() {
         if (!bossFall) return;
         const wilt = Math.max(0, Math.min(1, ascendT / A_DIE));
         const e = wilt * wilt * (3 - 2 * wilt);
-        const sag = e * F_SAG, lean = e * F_LEAN;
+        const sag = e * F_SAG;
+        // any angle a turn left him at eases back out as he goes -- see levelLeft
+        const lean = e * F_LEAN + (bossFall.tilt || 0) * levelLeft();
         if (ascendT < A_DIE) {
             drawFigure(bossFall.x, bossFall.y + sag, bossFall.w, 1, e, lean);
             return;
@@ -3961,7 +4452,10 @@
         drawPaddle();
         drawOverChoices(true);    // labels over him, so they stay readable
         drawPhantoms();
+        drawMotes();
         drawShout();
+        drawYell();
+        drawTalk();
 
         // no ball once the fight is settled, the takeover included
         if (phase === 'ready' || phase === 'play' || phase === 'cleared') {
@@ -4099,8 +4593,10 @@
             return;
         }
 
-        // the band stays away until the title beat, so the rise plays clean
-        if (phase !== 'play' && phase !== 'entrance'
+        // the band stays away until the title beat, so the rise plays clean --
+        // and out of his second wind entirely, which has nothing to tap and
+        // plays out right where the band would sit
+        if (phase !== 'play' && phase !== 'entrance' && phase !== 'siphon'
             && (phase !== 'ascend' || ascendT >= A_TITLE)) {
             const my = 424;
             const bandH = 104 * u;
