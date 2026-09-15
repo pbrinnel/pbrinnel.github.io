@@ -3,5 +3,7 @@
 **/.DS_Store
 
 # Claude Code local tooling. machine-specific, and launch.json points at
-# temp paths that do not survive a reboot.
-.claude/
+# temp paths that do not survive a reboot. CLAUDE.md is the exception: it
+# carries this repo's rules into every Claude session, on any machine.
+.claude/*
+!.claude/CLAUDE.md
