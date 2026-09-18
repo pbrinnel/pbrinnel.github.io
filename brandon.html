@@ -353,6 +353,9 @@
     const DIP_REACH = 70;       // px out past his end that a head still gets a dip
     const DIP_LEAD  = 30;       // ...from this far above his top
     const DIP_EASE  = 0.06;
+    // an end swings further in one frame than a head is wide, so a turn is
+    // checked at DIP_ARC points along it and not only at its two ends
+    const DIP_ARC   = 8;
 
     // the ball is a HEAD, 141 x 209, so it is an ellipse and not a circle.
     // colliding against its real shape means rotation changes how far it
@@ -2526,6 +2529,25 @@
         return { hw, ca, sa, lx, ly, lrx, lry };
     }
 
+    // The turns he must not make: one that ends up touching a head he was
+    // clear of, and one that lifts his top past the middle of a head already
+    // resting on him -- the second is how a head ended up inside his chest
+    // with him having moved and it having not, and got knocked on down from
+    // there as though it had been beside him all along. Both are looked for
+    // along the turn rather than at its ends, because an end can cross a
+    // whole head in one frame and land clear of it on the far side.
+    function turnBites(b, sg, was, next) {
+        const halfH = padH() / 2;
+        const c0 = touching(b, sg, was);
+        for (let k = 1; k <= DIP_ARC; k++) {
+            const c = touching(b, sg, was + (next - was) * (k / DIP_ARC));
+            if (!c) continue;
+            if (!c0) return true;
+            if (-halfH - c0.ly > 0 && -halfH - c.ly <= 0) return true;
+        }
+        return false;
+    }
+
     // How far an end turns for a head getting past it (see DIP_LIMIT): DIP_MAX,
     // or more once the head has sunk below where that leaves his top -- far
     // enough that the line of his top passes under the head's reach, aimed at
@@ -2842,9 +2864,9 @@
 
         // each end of him dips toward a head that is getting past it (see
         // DIP_MAX), and follows it down. set once a frame and held across the
-        // substeps below, the same as the bricks' lean. he never turns INTO a
-        // head: a turn that would start him touching one waits until it has
-        // moved, so no turn can shove a head through him
+        // substeps below, the same as the bricks' lean. a turn that would take
+        // a head, or scoop one already on him into his chest, waits until it
+        // has moved -- see turnBites
         const lip = padY() - padH() / 2;
         for (const sg of segs()) {
             let want = 0, near = Infinity;
@@ -2857,7 +2879,7 @@
             }
             const was = paddle.dip[sg.i];
             const next = was + (want - was) * (1 - Math.exp(-dt / DIP_EASE));
-            if (!balls.some(b => !b.stuck && !touching(b, sg, was) && touching(b, sg, next))) paddle.dip[sg.i] = next;
+            if (!balls.some(b => !b.stuck && turnBites(b, sg, was, next))) paddle.dip[sg.i] = next;
         }
 
         if (phase === 'play') {
