@@ -2503,30 +2503,103 @@
         return { cx, cy };
     }
 
+    // ---- his outline --------------------------------------------------------
+    // He used to collide as a plain box, PADDLE_W x PADDLE_H, the same bar all
+    // the way along him. He is not a bar. He is a man lying at PADDLE_LEVEL:
+    // his head stands proud at one end, his boot tapers away at the other, and
+    // his middle is thicker than either. The box missed both ways at once -- a
+    // head could meet his drawn head and carry straight on through it, and be
+    // sent back off empty air a third of a head above his legs.
+    //
+    // These are his real edges, read off paddle.webp's alpha at BODY_COLS
+    // points across him, each sampled AT that point rather than averaged over a
+    // slice -- which is where the straight lines between them meet, so the edge
+    // he collides on lands within a fifth of a pixel of the one you see. In
+    // thousandths of his width, so they scale with him.
+    const BODY_TOP = [
+        -110,-106,-103, -93, -82, -73, -69, -68, -64, -64, -61, -60, -58, -57, -59, -58,
+         -57, -58, -58, -58, -58, -60, -59, -57, -65, -73, -72, -72, -75, -78, -82, -85,
+         -89, -94, -95, -94, -89, -81, -78, -76, -74, -78, -91,-103,-115,-125,-133,-139,
+        -142,-146,-148,-149,-146,-133,-122,-118,-136,-154,-167,-174,-175,-172,-166,-147
+    ];
+    const BODY_BOT = [
+         -55, -24, -13,  17,  19,  12,   9,   5,  22,  23,  24,  25,  26,  26,  27,  28,
+          29,  28,  28,  28,  30,  29,  31,  76,  93, 110, 122, 133, 142, 147, 152, 154,
+         156, 155, 154, 153, 151, 150, 147, 145, 144, 145, 146, 144, 140, 143, 154, 164,
+         173, 171, 170, 171, 171, 168, 161, 151, 134, 119, 103,  90,  85, -43, -66, -90
+    ];
+    const BODY_COLS  = BODY_TOP.length;
+    const BODY_TAPER = 1;      // 45 degrees, where his ends run out to nothing
+
+    // how far he reaches above and below his middle, at his real proportions
+    const bodyHalfH = w => w / SHAPE_ASPECT / 2;
+
+    // His top and his underside at one point along him, in his own frame, or
+    // null where there is no more of him.
+    function bodyAt(x, hw) {
+        const w = hw * 2, cw = w / BODY_COLS;
+        const top = c => BODY_TOP[c] / 1000 * w;
+        const bot = c => BODY_BOT[c] / 1000 * w;
+        const first = -hw + cw / 2, last = hw - cw / 2;
+        if (x < first || x > last) {
+            // past his outermost reading the two edges close on each other, so
+            // his ends come to a point rather than a cliff a head could catch
+            const c = x < first ? 0 : BODY_COLS - 1;
+            const d = (x < first ? first - x : x - last) * BODY_TAPER;
+            const t = top(c) + d, u = bot(c) - d;
+            return t >= u ? null : { top: t, bot: u };
+        }
+        const f = (x + hw) / cw - 0.5;
+        const c0 = Math.max(0, Math.min(BODY_COLS - 2, Math.floor(f))), k = f - c0;
+        return { top: top(c0) + (top(c0 + 1) - top(c0)) * k,
+                 bot: bot(c0) + (bot(c0 + 1) - bot(c0)) * k };
+    }
+
+    // Where a head's middle comes to rest on him. A head is an ellipse, so when
+    // it lands off to one side what meets him is the part of its underside out
+    // there, which sits well above its lowest point. Setting it down a whole
+    // radius under his top would float it as much as half a head clear of him.
+    function restOn(lx, hw, rx, ry) {
+        let low = null;
+        for (let dx = -rx; dx <= rx; dx += 0.5) {
+            const e = bodyAt(lx + dx, hw);
+            if (!e) continue;
+            const y = e.top - ry * Math.sqrt(Math.max(0, 1 - (dx / rx) ** 2));
+            if (low === null || y < low) low = y;
+        }
+        return low;
+    }
+
+    // the lowest of him anywhere under a head that wide
+    function bodyUnder(lx, rx, hw) {
+        let deep = null;
+        for (let dx = -rx; dx <= rx; dx += 0.5) {
+            const e = bodyAt(lx + dx, hw);
+            if (e && (deep === null || e.bot > deep)) deep = e.bot;
+        }
+        return deep;
+    }
+
     // ---- physics -----------------------------------------------------------
     // Where a head is in one brandon's own frame, turned `a`, and whether it is
-    // touching him there: null if not. He is a plain box in that frame. Out
-    // past a corner, though, the box around the head reaches further than the
-    // head does -- far enough that a dipped end, its corner swung in under a
-    // head going past, would catch one it never touched -- so there the head's
-    // own reach toward that corner is measured instead.
+    // touching him there: null if not. `rest` comes back with it -- where that
+    // head would sit on his outline -- because finding it is the expensive part
+    // and stepBall needs the same number to set it down.
     function touching(b, sg, a) {
-        const hw = sg.w / 2, halfH = padH() / 2;
+        const hw = sg.w / 2;
         const ca = Math.cos(a), sa = Math.sin(a);
         const dx = b.x - sg.cx, dy = b.y - padY();
         const lx = dx * ca + dy * sa, ly = dy * ca - dx * sa;
         const tc = Math.cos(b.angle - a), ts = Math.sin(b.angle - a);
         const lrx = Math.hypot(bRX() * tc, bRY() * ts);
         const lry = Math.hypot(bRX() * ts, bRY() * tc);
-        if (Math.abs(lx) >= hw + lrx || Math.abs(ly) >= halfH + lry) return null;
-        const kx = Math.abs(lx) - hw, ky = Math.abs(ly) - halfH;
-        if (kx > 0 && ky > 0) {
-            const d = Math.hypot(kx, ky);
-            const ux = Math.sign(lx) * kx / d, uy = Math.sign(ly) * ky / d;
-            const ex = ux * tc + uy * ts, ey = uy * tc - ux * ts;   // in the head's frame
-            if (d >= Math.hypot(bRX() * ex, bRY() * ey)) return null;
-        }
-        return { hw, ca, sa, lx, ly, lrx, lry };
+        // cheap reject against the box his outline lives in
+        if (Math.abs(lx) >= hw + lrx || Math.abs(ly) >= bodyHalfH(sg.w) + lry) return null;
+        const rest = restOn(lx, hw, lrx, lry);
+        if (rest === null || ly < rest) return null;           // still clear above him
+        const under = bodyUnder(lx, lrx, hw);
+        if (under === null || ly - lry > under) return null;   // gone by underneath
+        return { hw, ca, sa, lx, ly, lrx, lry, rest };
     }
 
     // The turns he must not make: one that ends up touching a head he was
@@ -2570,7 +2643,7 @@
     // the deepest any end of him can reach below his middle, turned as far as
     // he ever turns
     function reachBelow() {
-        const hw = padW() / 2, halfH = padH() / 2;
+        const hw = padW() / 2, halfH = bodyHalfH(padW());
         const a = Math.min(Math.max(DIP_MAX, DIP_LIMIT), Math.atan2(hw, halfH));
         return hw * Math.sin(a) + halfH * Math.cos(a);
     }
@@ -2664,22 +2737,23 @@
 
         // the paddle, which may be one brandon or a pair with a hole between,
         // and either of which may have an end dipped (see DIP_MAX). each is
-        // met in his own frame, where he is level and a plain box.
-        const halfH = padH() / 2;
+        // met in his own frame, where he lies level -- see BODY_TOP.
         const py = padY();
         if (b.vy > 0) {
             for (const sg of segs()) {
                 const a = paddle.dip[sg.i];
                 const c = touching(b, sg, a);
                 if (!c) continue;
-                const { hw, ca, sa, lx, ly, lrx, lry } = c;
+                const { hw, ca, sa, lx, ly, lrx, lry, rest } = c;
 
                 // Only a head coming down ONTO him gets sent back up. One whose
                 // middle has sunk past his top, or that is further out past his
                 // end than it is above him, is beside him, and running into it
                 // there is a glancing knock away with it still falling. With an
                 // end dipped, most of what would be beside him is on the slope.
-                const above = -halfH - ly;
+                // measured off where it would come to rest, so at the moment it
+                // lands this is exactly its own radius, as it was off his top
+                const above = rest + lry - ly;
                 const out = Math.max(0, Math.abs(lx) - hw);
                 if (above <= 0 || above / lry < out / lrx) {
                     const dir = lx < 0 ? -1 : 1;
@@ -2692,7 +2766,7 @@
                     break;
                 }
 
-                const ny = -halfH - lry;               // set down on his top, or on the slope
+                const ny = rest;                       // set down on his outline
                 b.x = sg.cx + lx * ca - ny * sa;
                 b.y = py + lx * sa + ny * ca;
 
