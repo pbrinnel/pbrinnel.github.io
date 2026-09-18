@@ -395,6 +395,13 @@
     const SPIN_MUL     = 2;       // ...which is double
     const ENGLISH_AT   = 8;
 
+    // the rule under BONUS that reads the spin out. it hangs below the label's
+    // baseline, which is safe because the label is digits and capitals and so
+    // has nothing descending into it.
+    const SPIN_RULE_DROP = 5;
+    const SPIN_RULE_H    = 3;
+    const SPIN_RULE_BED  = '#2e2a24';
+
     const JIG_BRICK  = 5;
     const JIG_NEIGH  = 0.75;
     const JIG_PADDLE = 7;
@@ -4656,7 +4663,27 @@
         // climb into him and shove the rest of the row off the screen
         const mulSize = 15 + Math.min(10, Math.max(0, Math.floor(mul) - 1));
         text(mulLabel, 15 * u, by, mulSize * u, mul > 1 ? '#c9a94e' : '#6d685f');
-        let x = 15 * u + ctx.measureText(mulLabel).width + 18 * u;
+        const mulW = ctx.measureText(mulLabel).width;
+
+        // What the spin is contributing to that number, as a rule under it.
+        //
+        // Of the three things feeding BONUS, spin is the only one with a
+        // ceiling -- SPIN_MUL once the head is turning at SPIN_FULL -- so it is
+        // the only one a gauge fits. The run of hits and the capsules are a
+        // count and a clock, they have no full, and they already say what they
+        // are in the row behind. Spin was the one you could feel in your hands
+        // with nothing on screen keeping score of it.
+        //
+        // It reads liveSpinMul rather than the raw spin, so the rule and the
+        // digits are working off one number and can never disagree.
+        const spinK = (liveSpinMul() - 1) / (SPIN_MUL - 1);
+        const ruleY = by + SPIN_RULE_DROP;
+        ctx.fillStyle = SPIN_RULE_BED;
+        ctx.fillRect(15 * u, ruleY, mulW, SPIN_RULE_H);
+        ctx.fillStyle = '#c9a94e';
+        ctx.fillRect(15 * u, ruleY, mulW * spinK, SPIN_RULE_H);
+
+        let x = 15 * u + mulW + 18 * u;
 
         for (const k of TIMED) {
             if (fx[k] <= 0) continue;
