@@ -7,6 +7,7 @@ Paul's site, paulbrinnel.com. GitHub Pages serves `master` directly, so whatever
 - Pages builds with Jekyll. Folders starting with `_` and dotfiles are not published. Everything else is, Markdown included.
 - The repo is public, so anything committed can be read on GitHub even where the site doesn't serve it.
 - Dev-only files (notes, test pages, tools) go in `.claude/`, which git ignores apart from this file.
+- Reference docs that should reach every session on any machine go in `_ref/`, tracked. Like `_worker/`, the leading underscore keeps Jekyll from publishing it, so it is on GitHub but never on the site.
 - Paul pushes. Commit when he asks, then tell him it's ready to push.
 - Other Claude sessions may be working in this folder at the same time. Before committing, check `git status` and `git diff`, and commit only your own changes.
 
@@ -14,6 +15,8 @@ Paul's site, paulbrinnel.com. GitHub Pages serves `master` directly, so whatever
 
 A game with a shared online leaderboard.
 
+- **Read `_ref/BRANDON.md` before you open the game.** It is the map: the phase machine, the shape of a frame, and how to find a section. It is short on purpose. Keep it true — it tells you when it needs updating.
+- Navigate by section, not by reading the file. `grep -n "// ---- " brandon.html` lists all 41 in order. Line numbers shift under edits from other sessions; section names don't.
 - **The leaderboard is live and public.** `BOARD_URL` points at a Cloudflare Worker (source in `_worker/`). Any test that reaches the initials screen and presses OK posts a real row.
   - Before testing anything near the end of a run, override `window.fetch` for `workers.dev` URLs. The game looks `fetch` up at call time, so overriding it after the page loads works.
 - Throwaway copies of the game go in `.claude/`. In each copy, empty `BOARD_URL`, rename `BEST_KEY` and remove the analytics tag, then delete the copy when done.
