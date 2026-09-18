@@ -1243,12 +1243,18 @@
     // whatever ENGLISH has put on it
     function turnOf(b) { return b.spin + b.eng; }
 
-    // the fastest-turning ball in play, for the readout
-    function liveSpinMul() {
+    // The fastest-turning ball in play, whichever one that is. Both the gauge
+    // and the money read this, so what the bar promises is what a hit pays even
+    // when six heads are up and only one of them is really turning. Direction
+    // does not come into it: a head winding up anticlockwise is worth what one
+    // winding up clockwise is.
+    function liveTurn() {
         let s = 0;
         for (const b of balls) s = Math.max(s, Math.abs(turnOf(b)));
-        return spinMul(s);
+        return s;
     }
+
+    function liveSpinMul() { return spinMul(liveTurn()); }
 
     function aim(b, angle) {
         const a = Math.max(-STEER_CAP, Math.min(STEER_CAP, angle));
@@ -2134,17 +2140,21 @@
     }
 
     // ---- scoring -----------------------------------------------------------
-    function award(base, x, y, spin) {
+    // No spin is passed in. It is read here, off the fastest head on the field
+    // rather than off whichever one happened to land the hit -- the bar under
+    // BONUS shows that same number, and a bar that can promise double while the
+    // hit in front of you pays flat is worse than no bar at all.
+    function award(base, x, y) {
+        const turn = liveTurn();           // how fast the quickest head is turning
         let pts = base * comboMul();       // the run it is part of
-        const sm = spinMul(spin);          // how fast the head was turning
-        pts *= sm;
+        pts *= spinMul(turn);
         pts *= scoreMul();                 // chaos capsules pay for themselves
 
         pts = Math.round(pts);
         score += pts;
         if (score > best) { best = score; saveBest(); }
         popups.push({ x, y, text: '+' + pts,
-                      color: Math.abs(spin) > ENGLISH_AT ? '#c9a94e' : '#f2efe9',
+                      color: turn > ENGLISH_AT ? '#c9a94e' : '#f2efe9',
                       life: 1 });
         combo++;
     }
@@ -2211,7 +2221,7 @@
         }
     }
 
-    function hitBrick(b, spin) {
+    function hitBrick(b) {
         // the white flash is the "I hurt it" signal. a solid brick must not
         // give it, or the game is telling you to keep swinging at something
         // that will never break.
@@ -2228,7 +2238,7 @@
             // hp is fractional now, so "finished" needs a tolerance rather
             // than an exact zero -- five subtractions of 0.2 do not land on it
             const done = b.hp <= 1e-6;
-            award(BOSS_PTS * (done ? 5 : 1), b.x + bw / 2, b.y, spin);
+            award(BOSS_PTS * (done ? 5 : 1), b.x + bw / 2, b.y);
             // now and then he has something to say about it
             if (!done && Math.random() < SHOUT_ODDS) {
                 shout = { x: b.x + bw * 0.88, y: b.y + bh + 8, life: SHOUT_SECS };
@@ -2252,11 +2262,11 @@
             if (--b.hp > 0) return;
             b.alive = false;
             shockwave(b);
-            award(25 * b.maxHp, b.x + bw / 2, b.y, spin);
+            award(25 * b.maxHp, b.x + bw / 2, b.y);
         } else {
             b.alive = false;
             shockwave(b);
-            award(TIERS[b.kind].pts, b.x + bw / 2, b.y, spin);
+            award(TIERS[b.kind].pts, b.x + bw / 2, b.y);
             if (!tierSeen[b.kind] && (b.kind === 'O' || b.kind === 'R')) {
                 tierSeen[b.kind] = true;
                 bumpSpeed(1.1);
@@ -2707,7 +2717,7 @@
             if (fx.P > 0 && br.kind !== 'X' && br.kind !== 'Z') {
                 if (!b.pierced.has(br)) {     // one point of damage each, per trip
                     b.pierced.add(br);
-                    hitBrick(br, turnOf(b));
+                    hitBrick(br);
                 }
                 continue;
             }
@@ -2736,7 +2746,7 @@
             const glances = br.kind === 'X' || (br.kind === 'Z' && bossIF > 0);
             if (glances) rings.push({ x: hit.cx, y: hit.cy, t: 1 });
             else kick(br, -nx, -ny, 1);   // shoved away from where the ball struck
-            hitBrick(br, turnOf(b));
+            hitBrick(br);
             // he came forward into this one: it goes back off the angle he turned
             // to, square off his face, at the rally's speed. on a fake he only
             // catches it -- see caught()
@@ -4712,8 +4722,10 @@
         // are in the row behind. Spin was the one you could feel in your hands
         // with nothing on screen keeping score of it.
         //
-        // It reads liveSpinMul rather than the raw spin, so the rule and the
-        // digits are working off one number and can never disagree.
+        // It reads liveSpinMul, which is what award pays out of too, so the
+        // rule, the digits and the money are all one number. During multiball
+        // that number is the quickest head on the field and not the one that
+        // struck, which is the only way the bar can be believed.
         const spinK = (liveSpinMul() - 1) / (SPIN_MUL - 1);
         const ruleY = by + SPIN_RULE_DROP;
         const ruleX = 15 * u;
