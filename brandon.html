@@ -397,10 +397,23 @@
 
     // the rule under BONUS that reads the spin out. it hangs below the label's
     // baseline, which is safe because the label is digits and capitals and so
-    // has nothing descending into it.
-    const SPIN_RULE_DROP = 5;
-    const SPIN_RULE_H    = 3;
+    // has nothing descending into it. fixed rather than scaled by uiScale: the
+    // label's baseline is pinned to the bottom of the field, and a rule that
+    // grew with the type would hang off the edge at the top of uiScale's range.
+    const SPIN_RULE_DROP = 3;
+    const SPIN_RULE_H    = 7;
     const SPIN_RULE_BED  = '#2e2a24';
+
+    // the word spelled the whole way along the rule, in two inks: SPIN_WORD_INK
+    // where the gold has reached and SPIN_WORD_DIM on the bed it has not. The
+    // rule's height is what caps the lettering, so the two are tuned together.
+    const SPIN_WORD       = 'SPIN';
+    const SPIN_WORD_SIZE  = 6.6;
+    const SPIN_WORD_BOLD  = true;
+    const SPIN_WORD_INK   = '#f2efe9';
+    const SPIN_WORD_DIM   = '#12100e';   // barely off the bed, so it only murmurs
+    const SPIN_WORD_INSET = 6;    // clear of each end of the rule
+    const SPIN_WORD_DROP  = 1;    // its baseline, up from the rule's bottom
 
     const JIG_BRICK  = 5;
     const JIG_NEIGH  = 0.75;
@@ -4124,6 +4137,31 @@
         ctx.fillText(str, x, y);
     }
 
+    // One pass of SPIN along the rule under BONUS, clipped to a slice of it.
+    // Drawn twice, once for the gold and once for the bed, which is what splits
+    // a letter sitting on the fill's edge down the middle. The letters are laid
+    // out from the rule's own origin and not from the slice, so the two passes
+    // land on exactly the same glyphs.
+    function spinWord(x, y, w, ink, clipX, clipW) {
+        if (clipW <= 0.01) return;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(clipX, y, clipW, SPIN_RULE_H);
+        ctx.clip();
+        ctx.fillStyle = ink;
+        ctx.font = (SPIN_WORD_BOLD ? 'bold ' : '') + SPIN_WORD_SIZE + 'px "Trebuchet MS", sans-serif';
+        ctx.textAlign = 'center';
+        // the outer two letters pin to the ends and the rest space evenly
+        // between, so the word stretches over the whole bar however wide the
+        // label above it has grown
+        const span = w - SPIN_WORD_INSET * 2, last = SPIN_WORD.length - 1;
+        for (let i = 0; i <= last; i++) {
+            ctx.fillText(SPIN_WORD[i], x + SPIN_WORD_INSET + span * (i / last),
+                         y + SPIN_RULE_H - SPIN_WORD_DROP);
+        }
+        ctx.restore();
+    }
+
     // The ten rows, fitted between a top edge (the title's baseline) and the
     // lowest point the last row may reach. They come out at BOARD_PITCH, or at
     // the biggest pitch that fits if that is smaller. A fixed size was small
@@ -4678,12 +4716,21 @@
         // digits are working off one number and can never disagree.
         const spinK = (liveSpinMul() - 1) / (SPIN_MUL - 1);
         const ruleY = by + SPIN_RULE_DROP;
+        const ruleX = 15 * u;
         ctx.fillStyle = SPIN_RULE_BED;
-        ctx.fillRect(15 * u, ruleY, mulW, SPIN_RULE_H);
+        ctx.fillRect(ruleX, ruleY, mulW, SPIN_RULE_H);
         ctx.fillStyle = '#c9a94e';
-        ctx.fillRect(15 * u, ruleY, mulW * spinK, SPIN_RULE_H);
+        ctx.fillRect(ruleX, ruleY, mulW * spinK, SPIN_RULE_H);
 
-        let x = 15 * u + mulW + 18 * u;
+        // SPIN spelled the whole way along the rule, so the bar names itself
+        // even at rest. What the fill changes is how loudly: near-black on the
+        // bed, where it is barely there, and bone on the gold, where it is
+        // meant to be read. Topping the bar out is what makes the word plain.
+        const fillW = mulW * spinK;
+        spinWord(ruleX, ruleY, mulW, SPIN_WORD_DIM, ruleX + fillW, mulW - fillW);
+        spinWord(ruleX, ruleY, mulW, SPIN_WORD_INK, ruleX, fillW);
+
+        let x = ruleX + mulW + 18 * u;
 
         for (const k of TIMED) {
             if (fx[k] <= 0) continue;
