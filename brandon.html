@@ -1196,10 +1196,10 @@
     // number and there is no filter in the path at all.
     function dragLag() { return dragT > 0 ? DRAG_LAG : 0; }
 
-    function addDrag(fromX) {
+    function addDrag(sg, fromX) {
         dragT = Math.min(DRAG_CAP, dragT + DRAG_SECS);
-        paddle.jt = 1;                        // he wears it like any other knock
-        paddle.tilt = Math.max(-1, Math.min(1, (fromX - paddle.x) / Math.max(1, padW() / 2)));
+        paddle.jt[sg.i] = 1;                  // he wears it like any other knock
+        paddle.tilt[sg.i] = Math.max(-1, Math.min(1, (fromX - sg.cx) / Math.max(1, sg.w / 2)));
     }
 
     // how strongly the tint sits on him this frame -- a slow breath rather
@@ -1553,16 +1553,17 @@
     // the same forgiving box the ball is caught on, tested against the
     // phantom's real ellipse -- phantoms never grow, so they use the bare
     // constants rather than the player ball's BIG BRAIN ones
+    // which of him it came down on, so only that one wears it
     function phantomOnPaddle(p) {
         const c = Math.cos(p.angle), s = Math.sin(p.angle);
         const rx = Math.hypot(BALL_RX * c, BALL_RY * s);
         const ry = Math.hypot(BALL_RX * s, BALL_RY * c);
         const halfH = padH() / 2, py = padY();
-        if (p.y + ry < py - halfH || p.y - ry > py + halfH) return false;
+        if (p.y + ry < py - halfH || p.y - ry > py + halfH) return null;
         for (const sg of segs()) {
-            if (p.x + rx > sg.cx - sg.w / 2 && p.x - rx < sg.cx + sg.w / 2) return true;
+            if (p.x + rx > sg.cx - sg.w / 2 && p.x - rx < sg.cx + sg.w / 2) return sg;
         }
-        return false;
+        return null;
     }
 
     function stepPhantoms(dt) {
@@ -1579,8 +1580,9 @@
             // one that lands on him is SPENT landing on him. only during the
             // rally: nothing should be able to stick to him while he is
             // holding a serve, or standing on a CONTINUE.
-            if (phase === 'play' && phantomOnPaddle(p)) {
-                addDrag(p.x);
+            const landed = phase === 'play' ? phantomOnPaddle(p) : null;
+            if (landed) {
+                addDrag(landed, p.x);
                 phantoms.splice(i, 1);
                 continue;
             }
@@ -1635,8 +1637,10 @@
     }
 
     // tx is where the pointer wants him, x is where he has got to. they are the
-    // same number unless something is dragging on him.
-    paddle = { x: LW / 2, tx: LW / 2, prevX: LW / 2, vx: 0, w: PADDLE_W, jt: 0, tilt: 0, dip: [0, 0] };
+    // same number unless something is dragging on him. jt, tilt and dip are one
+    // entry per segment, because under DOUBLE a knock lands on one of the two.
+    paddle = { x: LW / 2, tx: LW / 2, prevX: LW / 2, vx: 0, w: PADDLE_W,
+               jt: [0, 0], tilt: [0, 0], dip: [0, 0] };
     fx = { B: 0, D: 0, S: 0, R: 0, P: 0, W: 0, E: 0 };
     best = loadBest();
     fetchBoard();                 // async; the game never waits on it
@@ -2816,8 +2820,8 @@
                 b.spin = Math.max(-SPIN_MAX, Math.min(SPIN_MAX, b.spin + kick / SPIN_INERTIA));
                 if (kick) b.kickDir = Math.sign(kick);   // ENGLISH turns whichever way this was
 
-                paddle.jt = 1;              // recoil, tilting toward the end he took it on
-                paddle.tilt = off;
+                paddle.jt[sg.i] = 1;        // recoil, tilting toward the end he took it on
+                paddle.tilt[sg.i] = off;
 
                 combo = 0;                  // the run ends when it comes home
                 b.pierced.clear();          // ...and so does what it has been through
@@ -3034,7 +3038,9 @@
             if (b.flash > 0) b.flash -= dt * 6;
             if (b.jt > 0) b.jt = Math.max(0, b.jt - dt * JIG_DECAY);
         }
-        if (paddle.jt > 0) paddle.jt = Math.max(0, paddle.jt - dt * JIG_DECAY);
+        for (let i = 0; i < paddle.jt.length; i++) {
+            if (paddle.jt[i] > 0) paddle.jt[i] = Math.max(0, paddle.jt[i] - dt * JIG_DECAY);
+        }
         if (callout && (callout.life -= dt) <= 0) callout = null;
         popups = popups.filter(p => (p.life -= dt * 1.4) > 0);
     }
@@ -3823,7 +3829,9 @@
     }
 
     function drawPaddle() {
-        const o = paddle.jt > 0 ? wobble(paddle.jt) : 0;
+        // the recoil is his own: under DOUBLE only the one the ball landed on
+        // shakes, and he shakes for as long as his own knock lasts
+        const jig = i => paddle.jt[i] > 0 ? wobble(paddle.jt[i]) : 0;
 
         // the takeover: he climbs into the dead boss's place and swells to
         // fill it. drawn as one brandon regardless of DOUBLE -- whatever you
@@ -3857,6 +3865,7 @@
             const ghost = shapeSprite('dragflat', DRAG_TINT, DRAG_BAKE,
                                       DRAG_BAKE / SHAPE_ASPECT, true);
             if (ghost) for (const sg of segs()) {
+                const o = jig(sg.i);
                 for (const e of TRAIL) {
                     const tx = trailAt(e.back);
                     if (tx === null) continue;
@@ -3874,11 +3883,12 @@
         }
 
         for (const sg of segs()) {
+            const o = jig(sg.i);
             const artW = sg.w / BODY_LEN_PER_W;
             const artH = artW / PADDLE_ASPECT;
             ctx.save();
             ctx.translate(sg.cx, padY() + o * JIG_PADDLE);
-            ctx.rotate(PADDLE_LEVEL + o * 0.07 * (paddle.tilt || 0) + segWig(sg.i) + paddle.dip[sg.i]);
+            ctx.rotate(PADDLE_LEVEL + o * 0.07 * paddle.tilt[sg.i] + segWig(sg.i) + paddle.dip[sg.i]);
             if (ready(paddleImg)) {
                 ctx.drawImage(paddleImg,
                     -artW / 2 - ART_OFF_X * artW,
