@@ -377,6 +377,12 @@
     const MAX_ANGLE  = Math.PI / 3;
     const STEER_CAP  = 1.3;    // never launch flatter than this, wiggle included
 
+    // How far anything is allowed to travel between two collision checks, and
+    // the most checks one frame will buy. The cap only bites on a pointer jump
+    // across most of the field, which is not a shot anyone was aiming.
+    const SUBSTEP_PX  = 7;
+    const SUBSTEP_CAP = 48;
+
     // Spin, in rad/s. A hit off the end of him, or with him on the move, is a
     // shove on the edge of the head, and what a shove does depends on how
     // heavy the head is to turn: SPIN_INERTIA divides every shove AND the
@@ -2912,6 +2918,7 @@
         // puts less swipe on the ball. That is not a second penalty bolted on,
         // it is the same one seen from the ball's side.
         if (phase === 'siphon') paddle.tx = paddle.x;   // he is not yours to move while it happens
+        const padFrom = paddle.x;                      // where the physics below starts him
         const hs = halfSpan();
         paddle.tx = Math.max(hs, Math.min(LW - hs, paddle.tx));
         const lag = dragLag();
@@ -2990,16 +2997,28 @@
             if (!balls.some(b => !b.stuck && turnBites(b, sg, was, next))) paddle.dip[sg.i] = next;
         }
 
+        // Nothing crosses more than SUBSTEP_PX between checks, and his own
+        // travel counts toward that as much as a head's does. He used to be set
+        // down once and held there for the whole frame, which meant a flick
+        // could carry him most of his own length through the gap between two
+        // tests -- so the first time anyone looked, he was already under a head
+        // that had sunk past his top, and that reads as beside him rather than
+        // on him. Carried across the substeps he meets it on the way instead.
         if (phase === 'play') {
             const fast = Math.max(...balls.map(b => Math.hypot(b.vx, b.vy)), effSpeed());
-            const steps = Math.max(1, Math.ceil(fast * dt / 7));
+            const slid = Math.abs(paddle.x - padFrom);
+            const steps = Math.max(1, Math.min(SUBSTEP_CAP,
+                          Math.ceil(Math.max(fast * dt, slid) / SUBSTEP_PX)));
+            const padTo = paddle.x;
             for (let i = 0; i < steps && phase === 'play'; i++) {
+                paddle.x = padFrom + (padTo - padFrom) * ((i + 1) / steps);
                 for (let j = balls.length - 1; j >= 0; j--) {
                     if (balls[j].stuck || caught(balls[j])) continue;
                     if (!stepBall(balls[j], dt / steps)) balls.splice(j, 1);
                 }
                 if (balls.length === 0) { loseLife(); break; }
             }
+            paddle.x = padTo;      // however it went, he ends where the hand put him
         }
 
         for (const b of balls) {
