@@ -350,7 +350,7 @@
     // looked like a glitch; knocking it straight down was fair and no fun.
     const DIP_MAX   = 30 * Math.PI / 180;
     const DIP_LIMIT = 90 * Math.PI / 180;
-    const DIP_REACH = 70;       // px out past his end that a head still gets a dip
+    const DIP_REACH = 70;       // px past his end a head's EDGE gets a dip from
     const DIP_LEAD  = 30;       // ...from this far above his top
     const DIP_EASE  = 0.06;
     // an end swings further in one frame than a head is wide, so a turn is
@@ -2882,20 +2882,35 @@
         return false;
     }
 
+    // How far past his end a head really is, and where it will be by the time
+    // it has fallen to him. Measured from its NEAR EDGE, not its middle: a head
+    // is bRX() * 2 across, so one whose centre is a few pixels past his end
+    // still overlaps that end and would land on his top untouched. Measuring
+    // from the middle called that out of reach, he leaned, and the lean took
+    // the top out from under a head that was about to land on it. And measured
+    // where it will have fallen to rather than where it is now, because a head
+    // out past him but travelling back inward is over him by the time it
+    // arrives. Both readings are what dipFor then aims at.
+    function dipGap(b, sg, lip) {
+        const t = b.vy > 0 ? Math.max(0, (lip - (b.y + extY(b))) / b.vy) : 0;
+        const px = b.x + b.vx * t, py = b.y + b.vy * t;
+        return { gap: Math.abs(px - sg.cx) - sg.w / 2 - extX(b), px, py };
+    }
+
     // How far an end turns for a head getting past it (see DIP_LIMIT): DIP_MAX,
     // or more once the head has sunk below where that leaves his top -- far
     // enough that the line of his top passes under the head's reach, aimed at
     // where the head will be by the time he has turned. A head UNDER him rather
     // than out past his end gets no more than DIP_MAX: turning further would
     // only bring his underside down on it.
-    function dipFor(b, sg) {
-        const side = b.x < sg.cx ? -1 : 1;
+    function dipFor(b, sg, px, py) {
+        const side = px < sg.cx ? -1 : 1;
         const now = Math.sign(paddle.dip[sg.i]) === side ? Math.abs(paddle.dip[sg.i]) : 0;
-        const dx = Math.abs(b.x - sg.cx), dy = b.y - padY();
+        const dx = Math.abs(px - sg.cx), dy = py - padY();
         if (dy * Math.cos(now) - dx * Math.sin(now) >= 0
             && dx * Math.cos(now) + dy * Math.sin(now) <= sg.w / 2) return DIP_MAX;
-        const hx = Math.max(0, side * (b.x + b.vx * DIP_EASE - sg.cx));
-        const hy = b.y + b.vy * DIP_EASE - padY();
+        const hx = Math.max(0, side * (px + b.vx * DIP_EASE - sg.cx));
+        const hy = py + b.vy * DIP_EASE - padY();
         const r = Math.max(1e-6, Math.hypot(hx, hy));
         const need = Math.atan2(hy, hx) + Math.asin(Math.min(1, (padH() / 2 + bRY()) / r));
         return Math.max(DIP_MAX, Math.min(DIP_LIMIT, need));
@@ -3224,10 +3239,10 @@
             let want = 0, near = Infinity;
             for (const b of phase === 'play' ? balls : []) {
                 if (b.stuck || b.vy <= 0 || b.y + extY(b) < lip - DIP_LEAD) continue;
-                const gap = Math.abs(b.x - sg.cx) - sg.w / 2;      // out past his end
+                const { gap, px, py } = dipGap(b, sg, lip);        // out past his end
                 if (gap > DIP_REACH || gap >= near || (gap <= 0 && b.y < lip)) continue;
                 near = gap;
-                want = (b.x < sg.cx ? -1 : 1) * dipFor(b, sg);
+                want = (px < sg.cx ? -1 : 1) * dipFor(b, sg, px, py);
             }
             const was = paddle.dip[sg.i];
             const next = was + (want - was) * (1 - Math.exp(-dt / DIP_EASE));
