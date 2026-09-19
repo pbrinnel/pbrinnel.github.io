@@ -485,6 +485,10 @@
     const EOR_FADE   = 0.22;    // how long one takes to come up
     const EOR_GAP    = 0.45;    // the beat before the total lands, and is paid
     const EOR_LINGER = 0.8;     // ...and how long it stands before a tap moves on
+    // ...and how long it takes to go again on the takeover, where there is no
+    // tap. Long enough that the last of it is gone before the throne changes
+    // hands, so the two do not happen on the same frame.
+    const EOR_OUT    = 1.1;
 
     // The room it is laid out in. The pitch is whatever fits the whole list
     // between these, so a round that earned everything shrinks rather than
@@ -792,6 +796,16 @@
     const G_MERCY    = 0.7;       // seconds of it after a hit
     const G_OVERHEAL = 4;         // health per unspent life
     const G_GROW     = 26;        // ...and how much bigger each one makes you
+
+    // The handover. The takeover ends with you grey and dead still -- the
+    // colour has been draining out of you since you started climbing, and the
+    // throne does not bob. This mode had you in full colour and already
+    // breathing on its very first frame, which swapped one picture for a
+    // different one between two frames of the same man. Everything that
+    // differs between the two now arrives over this: the colour comes back
+    // into you, the bob winds up from nothing, and the bar fades in. It is
+    // short -- you have just sat down, you have not changed seats.
+    const G_IN       = 1.4;
 
     // the army. no waves: one number climbs the whole time you are alive and
     // everything reads off it, so nothing steps and nothing announces itself.
@@ -1137,6 +1151,7 @@
     let gDropAt = [];             // when each recent powerup turned up, oldest first
     let gAbsorbT = 0, gAbsorbLeft = 0;
     let gReady = false, kingShown = 0, gLead = 0, gTimeBonus = 0;
+    let gIn = 0;                  // seconds since the throne became yours -- see G_IN
     let fallT = 0, kingFall = null, victor = null, impact = null;
     let bossFall = null;          // the old one coming apart, during the takeover
     let board = [], boardLive = false;
@@ -2423,6 +2438,15 @@
     // ...and when the screen has been up long enough to have been read
     function bonusRead() { return !eor || eor.t >= eorTotalAt(eor) + EOR_FADE + EOR_LINGER; }
 
+    // How much of it is still on screen. It only leaves on the takeover, which
+    // is the one place nothing is waiting for a tap; a stage clear holds at 1.
+    function eorOut() {
+        if (!eor || phase !== 'ascend') return 1;
+        const gone = (eor.t - eorTotalAt(eor) - EOR_FADE - EOR_LINGER) / EOR_OUT;
+        return Math.max(0, Math.min(1, 1 - gone));
+    }
+    function bonusGone() { return eorOut() <= 0; }
+
     function payBonus() {
         if (!eor || eor.paid) return;
         eor.paid = true;
@@ -3062,10 +3086,11 @@
                 ascendT += dt;
                 stepCrumble(bossFall, dt, A_DIE);
             }
-            // ...and the handover waits on the screen as well as the clock,
-            // because the boss round's is the longest one and SPARE BALL has
-            // to be paid before startGauntlet spends the lives it counts
-            if (ascendT >= A_END && bonusRead()) startGauntlet();
+            // ...and the handover waits for the screen to have gone as well as
+            // for the clock. SPARE BALL has to be paid before startGauntlet
+            // spends the lives it counts, and a full list blinking out on the
+            // same frame the throne changes hands is two cuts at once.
+            if (ascendT >= A_END && bonusGone()) startGauntlet();
         }
 
         // where he is headed, then how much of that he has managed. the lag is
@@ -3248,6 +3273,7 @@
         // caption. gLead is that pause before the prompt.
         gReady = true;
         gLead = G_INTRO_RISE + 1;
+        gIn = 0;                        // you have only just sat down -- see G_IN
         gAbsorbLeft = spares();
         gAbsorbT = F_ABSORB;
         ascendT = 0;                    // the takeover is over; it drew its last
@@ -3263,6 +3289,10 @@
     function gPressure() { return Math.min(1, gRunT / G_RAMP); }
     const gRamp = (a, b) => a + (b - a) * gPressure();
 
+    // how far the world has come back to you since the handover. eased, so the
+    // colour and the breath arrive rather than switch on.
+    function gInK() { return ease01(gIn / G_IN); }
+
     function kingW() {
         const w0 = G_W0 + king.grow;
         return G_W1 + (w0 - G_W1) * Math.exp(-king.hits / G_SHRINK);
@@ -3271,7 +3301,9 @@
     // exponentially, so losing 160px of yourself is a second of visibly
     // contracting rather than one frame of being a different size
     function kingH() { return kingShown / SHAPE_ASPECT; }
-    function kingY() { return G_Y + Math.sin(clock * 0.9) * G_BOB; }
+    // the bob winds up out of nothing over the handover -- he was sitting
+    // perfectly still a frame ago, and starting mid-breath is a jump
+    function kingY() { return G_Y + Math.sin(clock * 0.9) * G_BOB * gInK(); }
 
     // the mask test, in his own frame. the ball used to thread the gaps in his
     // outline; now the gaps are the only reason you are still here.
@@ -3635,6 +3667,9 @@
 
     // ---- the gauntlet's clock ------------------------------------------------
     function updateGauntlet(dt) {
+        // the handover ramp, before anything reads it. it runs through the
+        // ceremony as well, which is where most of it is spent.
+        if (gIn < G_IN) gIn = Math.min(G_IN, gIn + dt);
         if (gShake > 0) gShake = Math.max(0, gShake - dt * 2.4);
         if (king.flash > 0) king.flash = Math.max(0, king.flash - dt * 5);
         sparks = sparks.filter(s => {
@@ -4413,7 +4448,12 @@
     // which over the takeover is a photograph. Every line is knocked out of the
     // background instead -- the same outline the game-over choices wear over
     // him -- so the type reads on his shirt without a slab to sit on.
+    //
+    // On the takeover it also has to LEAVE, because nothing there waits for a
+    // tap. It goes the way it came, over EOR_OUT, and the handover waits for
+    // it -- see bonusGone. On a stage clear it stands until you move on.
     function drawBonus(u) {
+        const out = eorOut();
         const n = eor.rows.length;
         // a round that earned nothing extra has a total identical to its only
         // line, and printing the same number twice reads as a fault
@@ -4427,6 +4467,7 @@
         // lineJoin is set below and nothing else in the file sets it -- without
         // the save every stroked box drawn after this one would inherit it
         ctx.save();
+        ctx.globalAlpha = out;              // the whole screen leaves together
         const cut = (str, x, y, size, color, align) => {
             ctx.font = size + 'px "Trebuchet MS", sans-serif';
             ctx.textAlign = align || 'left';
@@ -4453,23 +4494,23 @@
         for (let i = 0; i < n; i++) {
             const a = Math.max(0, Math.min(1, (eor.t - EOR_IN - EOR_ROW * i) / EOR_FADE));
             if (a <= 0) continue;
-            ctx.globalAlpha = a;
+            ctx.globalAlpha = a * out;
             // the base is the one you were always getting; the rest you earned,
             // and they are gold to say so
             row(eor.rows[i].label, eor.rows[i].pts,
                 top + pitch * (EOR_TITLE_U + i + 1), pitch * 0.72,
                 i === 0 ? '#9a958c' : '#c9a94e');
-            ctx.globalAlpha = 1;
+            ctx.globalAlpha = out;
         }
 
         const done = Math.max(0, Math.min(1, (eor.t - eorTotalAt(eor)) / EOR_FADE));
         if (sum && done > 0) {
-            ctx.globalAlpha = done;
+            ctx.globalAlpha = done * out;
             ctx.fillStyle = 'rgba(242,239,233,0.35)';
             ctx.fillRect(lx, top + pitch * (EOR_TITLE_U + n + EOR_RULE_U * 0.6), EOR_W, 1);
             row('TOTAL', eor.total, top + pitch * (EOR_TITLE_U + n + EOR_RULE_U + 1),
                 pitch * 0.86, '#f2efe9');
-            ctx.globalAlpha = 1;
+            ctx.globalAlpha = out;
         }
 
         if (bonusRead() && phase === 'cleared') {
@@ -4611,7 +4652,10 @@
     // his health bar, the same one he had, in the same place. the overheal sits
     // past the end of the normal span in its own colour, so "more than full" is
     // legible at a glance.
+    // ...and it arrives with the rest of the handover rather than being there
+    // the instant the throne is yours
     function drawKingBar() {
+        ctx.globalAlpha = gInK();
         const w = kingShown;
         const barW = Math.min(Math.max(w * 0.72, 260), LW - 120);
         const barX = Math.max(12, Math.min(LW - 12 - barW, king.x - barW / 2));
@@ -4633,6 +4677,7 @@
             ctx.fillStyle = '#000';
             ctx.fillRect(barX + barW * norm - 1, barY, 2, 6);
         }
+        ctx.globalAlpha = 1;
     }
 
     // The pieces of him. EVERY cell is drawn every frame -- the ones that have
@@ -4761,7 +4806,8 @@
             // bar over him does not
             const o = king.jt > 0 ? wobble(king.jt) * JIG_BRICK : 0;
             const kx = king.x + king.jnx * o, ky = kingY() + king.jny * o;
-            drawFigure(kx, ky, kingShown, a, 0, 0);
+            // the takeover left you grey; the colour comes back over G_IN
+            drawFigure(kx, ky, kingShown, a, 1 - gInK(), 0);
             if (king.flash > 0) {
                 const w = kingShown, h = kingH();
                 const s = shapeSprite('gkflash', '#f2efe9', 900,
@@ -4956,8 +5002,12 @@
             ctx.globalAlpha = 1;
         }
 
+        // SCORE is the one number that survives the handover -- the gauntlet
+        // prints it in this same spot, so it is the thread through the cut and
+        // it stays. BEST does not carry over, and a reading that only ever
+        // disappears is better not put up over the ending in the first place.
         text('SCORE ' + score, 15 * u, 27 * u, 15 * u, '#f2efe9');
-        text('BEST ' + best, 15 * u, 46 * u, 13 * u, '#6d685f');
+        if (phase !== 'ascend') text('BEST ' + best, 15 * u, 46 * u, 13 * u, '#6d685f');
 
         // no lives counter over the ending -- it is meaningless by then, and it
         // was landing squarely on the new king's face
@@ -4975,6 +5025,12 @@
         // you are meant to watch cannot be a number that slides two inches
         // sideways every time a capsule lands or lapses. The transient ones can
         // do the moving; they are transient.
+        //
+        // The whole row goes out with the colour over the takeover -- see
+        // drain(). These are readings off a fight that is over, and a gold
+        // x17.5 BONUS blinking off at the handover is a cut in the middle of
+        // what is otherwise one long fade.
+        ctx.globalAlpha = 1 - drain();
         const by = LH - 12;
         // ONE number for everything the next hit is multiplied by: the run of
         // hits, the spin, and the chaos capsules. The run used to be its own
@@ -5047,6 +5103,7 @@
             text(label, x, by, 12 * u, '#c9a94e');
             x += ctx.measureText(label).width + 14 * u;
         }
+        ctx.globalAlpha = 1;               // end of the row's share of the drain
 
         // ---- the storm over the takeover -----------------------------------
         if (phase === 'ascend') {
