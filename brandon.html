@@ -2655,7 +2655,7 @@
         banner = '';
     }
 
-    // ---- collision against his outline --------------------------------------
+    // ---- collision against his shape ----------------------------------------
     // Everything happens in the brick's OWN frame: spin the ball's centre back
     // by the brick's wiggle, test the mask, then spin the resulting normal
     // forward again. The ball is tested as its real ellipse, not a circle, so
@@ -2711,18 +2711,18 @@
     }
 
     // ---- his outline --------------------------------------------------------
-    // He used to collide as a plain box, PADDLE_W x PADDLE_H, the same bar all
-    // the way along him. He is not a bar. He is a man lying at PADDLE_LEVEL:
-    // his head stands proud at one end, his boot tapers away at the other, and
-    // his middle is thicker than either. The box missed both ways at once -- a
-    // head could meet his drawn head and carry straight on through it, and be
-    // sent back off empty air a third of a head above his legs.
+    // He is a man lying at PADDLE_LEVEL: his head stands proud at one end, his
+    // boot tapers away at the other, and his middle is thicker than either. A
+    // plain bar the length of him missed both ways at once -- a head could meet
+    // his drawn head and carry straight on through it, and be sent back off
+    // empty air a third of a head above his legs.
     //
     // These are his real edges, read off paddle.webp's alpha at BODY_COLS
     // points across him, each sampled AT that point rather than averaged over a
-    // slice -- which is where the straight lines between them meet, so the edge
-    // he collides on lands within a fifth of a pixel of the one you see. In
-    // thousandths of his width, so they scale with him.
+    // slice -- which is where the straight lines between them meet, so they
+    // land within a fifth of a pixel of the edge you see. In thousandths of his
+    // width, so they scale with him. What a head MEETS is bodyAt, not these:
+    // his ends are his own shape, his middle is the deck below.
     const BODY_TOP = [
         -110,-106,-103, -93, -82, -73, -69, -68, -64, -64, -61, -60, -58, -57, -59, -58,
          -57, -58, -58, -58, -58, -60, -59, -57, -65, -73, -72, -72, -75, -78, -82, -85,
@@ -2741,9 +2741,9 @@
     // how far he reaches above and below his middle, at his real proportions
     const bodyHalfH = w => w / SHAPE_ASPECT / 2;
 
-    // His top and his underside at one point along him, in his own frame, or
+    // His drawn top and underside at one point along him, in his own frame, or
     // null where there is no more of him.
-    function bodyAt(x, hw) {
+    function outlineAt(x, hw) {
         const w = hw * 2, cw = w / BODY_COLS;
         const top = c => BODY_TOP[c] / 1000 * w;
         const bot = c => BODY_BOT[c] / 1000 * w;
@@ -2760,6 +2760,60 @@
         const c0 = Math.max(0, Math.min(BODY_COLS - 2, Math.floor(f))), k = f - c0;
         return { top: top(c0) + (top(c0 + 1) - top(c0)) * k,
                  bot: bot(c0) + (bot(c0 + 1) - bot(c0)) * k };
+    }
+
+    // ---- the deck ------------------------------------------------------------
+    // Colliding on his drawn top made every landing spot meet a slightly
+    // different slope at a slightly different depth, so the same shot never
+    // came back twice and the sweet spot stopped being a spot. His middle is
+    // flat again: one level line across DECK_SPAN of him, his own outline at
+    // both ends, where his head is still allowed to stand proud of it.
+    //
+    // The line sits level with the highest his art reaches inside the span,
+    // plus DECK_LIFT. At zero the deck clears every part of him but floats
+    // over his thinner stretches; below zero his high points break through it
+    // instead, which is the trade that was picked. These four are the edge
+    // lab's four sliders and carry its signs, so a value tuned there can be
+    // copied here as it reads.
+    const DECK_SPAN = 64;      // % of his width the flat part covers
+    const DECK_AT   = -14;     // % of his width, the deck's centre off his own
+    const DECK_LIFT = -4.5;    // px at PADDLE_W: + floats it clear, - lets him through
+    const DECK_RAMP = 1;       // 45 degrees, where the deck runs back down to him
+
+    const deckEnds = hw => {
+        const w = hw * 2, half = DECK_SPAN / 100 * w / 2, c = DECK_AT / 100 * w;
+        return [c - half, c + half];
+    };
+
+    // Scanned rather than read off a column, because the span's edges fall
+    // between columns. Held from call to call: it moves only when he does.
+    let deckAtW = -1, deckLine = 0;
+    function deckTop(hw) {
+        if (hw === deckAtW) return deckLine;
+        const [l, r] = deckEnds(hw);
+        let high = null;
+        for (let x = l; x <= r; x += 0.5) {
+            const e = outlineAt(x, hw);
+            if (e && (high === null || e.top < high)) high = e.top;
+        }
+        if (high === null) high = -bodyHalfH(hw * 2);        // the span missed him
+        deckAtW = hw;
+        deckLine = high - DECK_LIFT * (hw * 2 / PADDLE_W);
+        return deckLine;
+    }
+
+    // The surface a head actually meets: flat across the span, and outside it
+    // whichever is higher of his own top and the deck ramping back down to
+    // meet it -- so his head keeps its shape and there is no vertical face
+    // anywhere for a head to catch on.
+    function bodyAt(x, hw) {
+        const e = outlineAt(x, hw);
+        if (!e) return null;                        // past his ends, the deck stops too
+        const [l, r] = deckEnds(hw), y = deckTop(hw);
+        if (x >= l && x <= r) return { top: y, bot: e.bot };
+        const ramp = y + (x < l ? l - x : x - r) * DECK_RAMP;
+        const top = Math.min(e.top, ramp);
+        return top >= e.bot ? null : { top, bot: e.bot };
     }
 
     // Where a head's middle comes to rest on him. A head is an ellipse, so when
@@ -2790,7 +2844,7 @@
     // ---- physics -----------------------------------------------------------
     // Where a head is in one brandon's own frame, turned `a`, and whether it is
     // touching him there: null if not. `rest` comes back with it -- where that
-    // head would sit on his outline -- because finding it is the expensive part
+    // head would sit on the surface -- because finding it is the expensive part
     // and stepBall needs the same number to set it down.
     function touching(b, sg, a) {
         const hw = sg.w / 2;
@@ -2800,7 +2854,7 @@
         const tc = Math.cos(b.angle - a), ts = Math.sin(b.angle - a);
         const lrx = Math.hypot(bRX() * tc, bRY() * ts);
         const lry = Math.hypot(bRX() * ts, bRY() * tc);
-        // cheap reject against the box his outline lives in
+        // cheap reject against the box he and his deck live in
         if (Math.abs(lx) >= hw + lrx || Math.abs(ly) >= bodyHalfH(sg.w) + lry) return null;
         const rest = restOn(lx, hw, lrx, lry);
         if (rest === null || ly < rest) return null;           // still clear above him
@@ -2949,7 +3003,7 @@
 
         // the paddle, which may be one brandon or a pair with a hole between,
         // and either of which may have an end dipped (see DIP_MAX). each is
-        // met in his own frame, where he lies level -- see BODY_TOP.
+        // met in his own frame, where he lies level -- see bodyAt.
         const py = padY();
         if (b.vy > 0) {
             for (const sg of segs()) {
@@ -2978,7 +3032,7 @@
                     break;
                 }
 
-                const ny = rest;                       // set down on his outline
+                const ny = rest;                       // set down on the surface
                 b.x = sg.cx + lx * ca - ny * sa;
                 b.y = py + lx * sa + ny * ca;
 

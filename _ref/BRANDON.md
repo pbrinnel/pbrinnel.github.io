@@ -29,7 +29,7 @@ split across several files can reach a returning player half-updated. See CLAUDE
 
 ## Where things are
 
-The map is in the file, not in this document. 42 sections, in reading order:
+The map is in the file, not in this document. 43 sections, in reading order:
 
 ```bash
 grep -n "// ---- " brandon.html
