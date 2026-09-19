@@ -372,14 +372,14 @@
     function bRY()  { return BALL_RY  * (fx.R > 0 ? BRAIN_MUL : 1); }
     function bMAX() { return BALL_MAX * (fx.R > 0 ? BRAIN_MUL : 1); }
 
-    const BASE_SPEED = 368;
+    const BASE_SPEED = 346;
     const MAX_SPEED  = 620;
     // Every bounce off a brick winds the rally up by this much -- gold and the
     // boss included, since they turn you just the same. It compounds, so the
     // middle of a stage no longer sags the way a flat rally did. It is not the
-    // only thing pushing: the milestone bumps in hitBrick still stack on top,
-    // and between them MAX_SPEED now arrives well before a stage is out.
-    const BRICK_BUMP = 1.03;
+    // only thing pushing: the milestone bumps in hitBrick stack on top, so how
+    // soon MAX_SPEED arrives is the two of them together, never this alone.
+    const BRICK_BUMP = 1.02;
     const MAX_ANGLE  = Math.PI / 3;
     const STEER_CAP  = 1.3;    // never launch flatter than this, wiggle included
 
