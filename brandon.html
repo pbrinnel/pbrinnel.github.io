@@ -606,6 +606,9 @@
     // a head every 0.45s and the total would run away to something that is
     // just permanent. This is the knob to turn if it plays too heavy.
     const DRAG_CAP   = 9.0;
+    // ...and how long the lag takes to unwind when the clock runs out. It goes
+    // on instantly and comes off over this -- see dragLag for why.
+    const DRAG_EASE  = 0.5;
     const DRAG_SHORT = 'SLUGGISH';
     // he gets PALER, never darker. cold and drained, washed toward ice --
     // the one thing this game never does to his face is put a shadow on it.
@@ -1078,6 +1081,7 @@
     let phantoms = [], phGap = 0, shout = null, enterT = 0, rings = [], overT = 0;
     let talk = [], fleeRoll = -1; // the hat stage's voices, and seconds to its next coin toss
     let dragT = 0;                // seconds of sluggish left on him
+    let padLag = 0;               // the lag actually on him -- see dragLag
     let padTrail = [];            // recent positions, for the ghosted tail
 
     // ---- the gauntlet's state ------------------------------------------------
@@ -1203,10 +1207,29 @@
     function effSpeed() { return speed * (fx.S > 0 ? SLOW_MUL : 1); }
 
     // ---- the drag ------------------------------------------------------------
-    // The time constant he chases the pointer on. Nothing on the clock returns
-    // zero, and zero is the old game exactly: x is assigned the pointer's
-    // number and there is no filter in the path at all.
-    function dragLag() { return dragT > 0 ? DRAG_LAG : 0; }
+    // The time constant he chases the pointer on, stepped and returned. Zero is
+    // the old game exactly: x is assigned the pointer's number and there is no
+    // filter in the path at all.
+    //
+    // It goes on in one frame and comes off over DRAG_EASE, and the asymmetry
+    // is the whole point. Raising it can never jerk him -- a longer constant
+    // only means he chases more slowly, from wherever he already is. LOWERING
+    // it has to put the distance he has fallen behind by somewhere, and taking
+    // it to zero in one frame put all of it in one frame: he teleported the
+    // width of the gap the instant the clock ran out, and paddle.vx -- which is
+    // just his own travel over dt -- came out several times faster than any
+    // real swipe, so a head met on that frame took a maxed-out swipe spin
+    // nobody asked for. Unwinding the lag closes the gap at a readable speed
+    // instead, which looks like him catching up, because it is.
+    //
+    // Every road to zero goes through here, so the clock being cleared outright
+    // -- the boss dying, the run ending -- eases out the same way.
+    function dragLag(dt) {
+        const want = dragT > 0 ? DRAG_LAG : 0;
+        padLag = want > padLag ? want
+                               : Math.max(want, padLag - dt * DRAG_LAG / DRAG_EASE);
+        return padLag;
+    }
 
     function addDrag(sg, fromX) {
         dragT = Math.min(DRAG_CAP, dragT + DRAG_SECS);
@@ -1287,6 +1310,7 @@
     function clearEffects() {
         fx = { B: 0, D: 0, S: 0, R: 0, P: 0, W: 0, E: 0 };
         dragT = 0;
+        padLag = 0;                       // a reset, so there is nothing to unwind
         padTrail = [];
         paddle.tx = paddle.x;             // no lag left to catch up on
         paddle.w = PADDLE_W;
@@ -2932,7 +2956,7 @@
         const padFrom = paddle.x;                      // where the physics below starts him
         const hs = halfSpan();
         paddle.tx = Math.max(hs, Math.min(LW - hs, paddle.tx));
-        const lag = dragLag();
+        const lag = dragLag(dt);
         paddle.x = lag > 0
             ? paddle.x + (paddle.tx - paddle.x) * (1 - Math.exp(-dt / lag))
             : paddle.tx;
@@ -3889,8 +3913,12 @@
             return;
         }
 
-        // the tail first, so the echoes sit UNDER him rather than over his face
-        if (dragT > 0) {
+        // the tail first, so the echoes sit UNDER him rather than over his face.
+        // it hangs off the LAG, not off the clock, so it thins out as the lag
+        // unwinds instead of vanishing on the frame the clock hits zero -- the
+        // tail going out at the same instant he lunged for the pointer was half
+        // of what made the old expiry read as a glitch.
+        if (padLag > 0) {
             const tw = padW(), th = tw / SHAPE_ASPECT;
             const ghost = shapeSprite('dragflat', DRAG_TINT, DRAG_BAKE,
                                       DRAG_BAKE / SHAPE_ASPECT, true);
