@@ -1160,6 +1160,10 @@
     let gAbsorbT = 0, gAbsorbLeft = 0;
     let gReady = false, kingShown = 0, gLead = 0, gTimeBonus = 0;
     let gIn = 0;                  // seconds since the throne became yours -- see G_IN
+    // the health TOTAL the bar is currently drawn for, chased the way kingShown
+    // chases his width, so a life going in extends the meter over the same beat
+    // it swells him rather than snapping it longer in one frame
+    let gBarMax = 0;
     let fallT = 0, kingFall = null, victor = null, impact = null;
     let bossFall = null;          // the old one coming apart, during the takeover
     let board = [], boardLive = false;
@@ -3337,6 +3341,7 @@
         king = { x: LW / 2, tx: LW / 2, hp: G_HP, hpMax: G_HP, hpBase: G_HP,
                  hits: 0, hurt: 0, flash: 0, grow: 0, jt: 0, jnx: 0, jny: 0 };
         kingShown = G_W0;
+        gBarMax = G_HP;
         ships = []; gBul = []; gThrow = []; sparks = []; gDrop = []; gVolley = []; gDropAt = [];
         gRunT = 0; gSpawnT = 0; gCool = 0; gShake = 0;
         gSpread = 0; gBurst = 0; gRapid = 0;
@@ -3766,6 +3771,8 @@
         // the handover ramp, before anything reads it. it runs through the
         // ceremony as well, which is where most of it is spent.
         if (gIn < G_IN) gIn = Math.min(G_IN, gIn + dt);
+        // the bar's length follows the total on the same clock his body does
+        gBarMax += (king.hpMax - gBarMax) * (1 - Math.exp(-dt / G_SHRINK_EASE));
         if (gShake > 0) gShake = Math.max(0, gShake - dt * 2.4);
         if (king.flash > 0) king.flash = Math.max(0, king.flash - dt * 5);
         sparks = sparks.filter(s => {
@@ -4745,19 +4752,28 @@
         }
     }
 
-    // his health bar, the same one he had, in the same place. the overheal sits
-    // past the end of the normal span in its own colour, so "more than full" is
-    // legible at a glance.
+    // His health bar, the same one he had, in the same place, and the overheal
+    // makes it LONGER. The span his own G_HP occupies is fixed off his size and
+    // never moves; every life absorbed hangs its G_OVERHEAL off the end of that
+    // span in its own colour, so the meter grows out past where full used to be
+    // instead of the orange giving up room to the yellow. The whole point of
+    // having saved a spare is that you end up with more bar than he ever had,
+    // and at a full pair it very nearly spans the field.
     // ...and it arrives with the rest of the handover rather than being there
     // the instant the throne is yours
     function drawKingBar() {
         ctx.globalAlpha = gInK();
+        const edge = 12;                // the margin even the longest bar keeps
         const w = kingShown;
-        const barW = Math.min(Math.max(w * 0.72, 260), LW - 120);
-        const barX = Math.max(12, Math.min(LW - 12 - barW, king.x - barW / 2));
+        // his own health, at his own size -- the bar he would have had
+        const base = Math.min(Math.max(w * 0.72, 260), LW - 120);
+        // ...extended by what the lives added. norm puts the seam back exactly
+        // at the end of `base`, so the orange span is the one constant here.
+        const barW = Math.min(base * (gBarMax / king.hpBase), LW - 2 * edge);
+        const norm = king.hpBase / gBarMax;
+        const barX = Math.max(edge, Math.min(LW - edge - barW, king.x - barW / 2));
         const barY = Math.max(10, kingY() - kingH() / 2 - 16);
-        const over = king.hpMax - king.hpBase;
-        const norm = king.hpBase / king.hpMax;
+        const over = gBarMax - king.hpBase;
         const hp = Math.max(0, king.hp);
 
         ctx.fillStyle = 'rgba(242,239,233,0.14)';
@@ -4765,9 +4781,12 @@
         ctx.fillStyle = '#c4703c';
         ctx.fillRect(barX, barY, barW * norm * (Math.min(hp, king.hpBase) / king.hpBase), 6);
         if (over > 0 && hp > king.hpBase) {
+            // clamped because the health lands whole and the length catches up
+            // to it: mid-grow there is more overheal than there is yet bar, and
+            // the extension reads best full while it sweeps out
+            const f = Math.min(1, (hp - king.hpBase) / over);
             ctx.fillStyle = '#c9a94e';
-            ctx.fillRect(barX + barW * norm, barY,
-                         barW * (1 - norm) * ((hp - king.hpBase) / over), 6);
+            ctx.fillRect(barX + barW * norm, barY, barW * (1 - norm) * f, 6);
         }
         if (over > 0) {   // the seam: visibly BEYOND full, not just a longer bar
             ctx.fillStyle = '#000';
