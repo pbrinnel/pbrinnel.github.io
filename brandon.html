@@ -813,6 +813,14 @@
     const G_MAX      = 28;        // most of them on the floor at once
     const G_ROW      = 7;         // how many stand in one rank
     const G_STEP     = 34;        // and how far behind it the next rank sits
+    // How far along each rank back is shifted, as a fraction of a place, so
+    // that ranks do not stand in columns directly behind one another. A quarter
+    // gives every rank its own columns across the G_MAX / G_ROW of them; a
+    // third would put the last rank back on the first one's. Where it is used
+    // the shift is folded into plus or minus half a place, which keeps the
+    // first rank unshifted and the whole formation inside G_LO..G_HI whatever
+    // this is set to.
+    const G_STAGGER  = 1 / 4;
     const G_LO       = 70, G_HI = LW - 70;
     const G_SHIP_W   = 116;
     const G_SHIP_H   = G_SHIP_W / SHAPE_ASPECT;
@@ -3401,16 +3409,22 @@
     // ---- the army ------------------------------------------------------------
     // Ranks of G_ROW, filling from the front and stacking BACKWARDS up the
     // screen, so a growing army does not smear sideways -- it deepens, and the
-    // front of it creeps toward you. Odd ranks sit half a place over so it
-    // reads as a crowd rather than a grid. Every one owns a slot; a dead one
-    // frees its slot and the next arrival takes the lowest free one, so holes
-    // at the front fill before anybody stands at the back. Nobody already
-    // standing ever moves, which is what stops arrivals reading as waves.
+    // front of it creeps toward you. Each rank back sits G_STAGGER of a place
+    // along from the last so it reads as a crowd rather than a grid. Every one
+    // owns a slot; a dead one frees its slot and the next arrival takes a free
+    // one in the frontmost rank that has any, so holes at the front fill before
+    // anybody stands at the back. Nobody already standing ever moves, which is
+    // what stops arrivals reading as waves.
     function slotX(slot) {
         const row = (slot / G_ROW) | 0, col = slot % G_ROW;
-        const span = G_HI - G_LO;
+        const span = G_HI - G_LO, place = span / G_ROW;
+        // folded into plus or minus half a place rather than left to run to a
+        // whole one: the first rank comes out unshifted, which is what keeps
+        // the introduction's slot on the middle of the field, and no rank can
+        // push its outermost man past the span the places were cut from.
+        const f = (row * G_STAGGER) % 1;
         return G_LO + span * ((col + 0.5) / G_ROW)
-             + (row % 2) * (span / G_ROW / 2);
+             + (f - Math.round(f)) * place;
     }
     function slotY(slot) { return G_SHIP_Y - ((slot / G_ROW) | 0) * G_STEP; }
 
@@ -3428,14 +3442,27 @@
         return Math.max(1, Math.round(G_BATCH * Math.pow(2, gRunT / G_DOUBLE)));
     }
 
+    // Front before back is the whole of it: the army has to deepen toward you,
+    // so nobody stands in a rank while the one in front of it has a gap. WHICH
+    // gap gets taken is not part of that, and drawing it at random is what
+    // stops a half-empty floor from leaning to the same side every run.
+    function freeSlot(used) {
+        for (let base = 0; base < G_MAX; base += G_ROW) {
+            const free = [];
+            for (let i = base; i < base + G_ROW && i < G_MAX; i++)
+                if (!used.has(i)) free.push(i);
+            if (free.length) return free[(Math.random() * free.length) | 0];
+        }
+        return G_MAX;                              // the floor is full
+    }
+
     function addShip(intro) {
         const used = new Set(ships.filter(s => s.alive).map(s => s.slot));
-        let slot = 0;
-        // slot 3 of a rank of seven is dead centre of the field -- 70 + 660/2
-        // -- so the introduction gets it by name and needs no special case in
-        // the geometry. everybody after him fills in around where he stood.
-        if (intro) slot = (G_ROW / 2) | 0;
-        else while (used.has(slot)) slot++;
+        // the middle slot of the first rank is the middle of the field, so the
+        // introduction gets it by name and needs no special case in the
+        // geometry -- see the fold in slotX, which is what holds that true.
+        // everybody after him fills in around where he stood.
+        const slot = intro ? ((G_ROW / 2) | 0) : freeSlot(used);
         if (slot >= G_MAX) return;                 // the floor is full
         const hp = intro ? 1 : pickHp();
         const w = intro ? G_INTRO_W : G_SHIP_W;
