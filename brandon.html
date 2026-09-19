@@ -4583,7 +4583,7 @@
         }
 
         if (bonusRead() && phase === 'cleared') {
-            cut('tap to continue', LW / 2, top + h, Math.min(15 * u, pitch * 0.55),
+            cut('click/tap to continue', LW / 2, top + h, Math.min(15 * u, pitch * 0.55),
                 '#9a958c', 'center');
         }
         ctx.restore();
@@ -4623,7 +4623,7 @@
             const ready = entry.length === 3;
             text('type three letters, then press RETURN', LW / 2, 552, 14 * u,
                  ready ? '#c9a94e' : '#6d685f', 'center');
-            text('or tap the keys above', LW / 2, 574, 13 * u, '#4a453e', 'center');
+            text('or click/tap the keys above', LW / 2, 574, 13 * u, '#4a453e', 'center');
         }
     }
 
@@ -4989,7 +4989,7 @@
             }
             if (fallT > F_AGAIN) {
                 ctx.globalAlpha = fade(F_AGAIN);
-                text('tap to end the run', LW / 2, 472, 14 * u, '#6d685f', 'center');
+                text('click/tap to end the run', LW / 2, 472, 14 * u, '#6d685f', 'center');
                 ctx.globalAlpha = 1;
             }
         }
@@ -5204,7 +5204,7 @@
             ctx.fillRect(0, 0, LW, LH);
             // down to just above the line under it
             drawBoard(120, 520 - 15 * u - 16, u);
-            text('tap to play again', LW / 2, 520, 15 * u, '#9a958c', 'center');
+            text('click/tap to play again', LW / 2, 520, 15 * u, '#9a958c', 'center');
             return;
         }
 
@@ -5223,7 +5223,7 @@
             // the clock, steady rather than pulsing -- the digit changing once
             // a second is motion enough, and nothing here should flash
             text(String(Math.ceil(overT)), LW / 2, clockY, clockSize, '#c9a94e', 'center');
-            text('click or tap a choice', LW / 2, 480, 14 * u, '#6d685f', 'center');
+            text('click/tap a choice', LW / 2, 480, 14 * u, '#6d685f', 'center');
             drawOverChoices(false);
             drawPaddle();
             drawOverChoices(true);
@@ -5255,11 +5255,11 @@
             // nothing to tap during the takeover any more -- it no longer ends
             // the run, it hands over, and an instruction here would be a lie
             const sub = phase === 'over' ? 'final score ' + score
-                            + '   ·   click or tap a choice   ·   '
+                            + '   ·   click/tap a choice   ·   '
                             + Math.ceil(overT)
-                      : phase === 'ready' ? 'tap or space to serve'
+                      : phase === 'ready' ? 'click/tap or space to serve'
                       : phase === 'ascend' ? ''
-                      : 'tap to continue';
+                      : 'click/tap to continue';
             if (sub) text(sub, LW / 2, my + 26 * u, 15 * u, '#9a958c', 'center');
         }
     }
