@@ -16,7 +16,7 @@ Paul's site, paulbrinnel.com. GitHub Pages serves `master` directly, so whatever
 A game with a shared online leaderboard.
 
 - **Read `_ref/BRANDON.md` before you open the game.** It is the map: the phase machine, the shape of a frame, and how to find a section. It is short on purpose. Keep it true — it tells you when it needs updating.
-- Navigate by section, not by reading the file. `grep -n "// ---- " brandon.html` lists all 41 in order. Line numbers shift under edits from other sessions; section names don't.
+- Navigate by section, not by reading the file. `grep -n "// ---- " brandon.html` lists all 42 in order. Line numbers shift under edits from other sessions; section names don't.
 - **The leaderboard is live and public.** `BOARD_URL` points at a Cloudflare Worker (source in `_worker/`). Any test that reaches the initials screen and presses OK posts a real row.
   - Before testing anything near the end of a run, override `window.fetch` for `workers.dev` URLs. The game looks `fetch` up at call time, so overriding it after the page loads works.
 - Throwaway copies of the game go in `.claude/`. In each copy, empty `BOARD_URL`, rename `BEST_KEY` and remove the analytics tag, then delete the copy when done.

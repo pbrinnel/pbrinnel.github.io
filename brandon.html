@@ -454,6 +454,50 @@
     const ENG_ACCEL  = 60;                 // ...reached, or turned round, at this many rad/s^2
     const BONUS      = 0.25;               // score kicker per chaos capsule
 
+    // ---- the end of round bonus ----------------------------------------------
+    // What clearing a round pays on top of what you knocked down getting there.
+    // The base is always there; the rest are conditions you either met or did
+    // not, and the two that can happen more than once print their count.
+    //
+    // The screen is built from this table, in this order, so a new bonus is a
+    // row here plus whatever sets its flag on `round`. `many` is what separates
+    // a condition from a tally: a tallied row always prints xN, even at x1,
+    // because the count is the point of it.
+    const EOR_BASE = 500;       // ...times the round number, so later rounds pay more
+    // every head the field will hold at once, so the row names its own number
+    // and raising MAX_BALLS renames the bonus with it
+    const HEADS_AT = MAX_BALLS;
+    const EOR_ROWS = [
+        { key: 'flawless', label: 'FLAWLESS',        pts: 1000 },
+        { key: 'multi',    label: 'MULTI-FINISH',    pts: 300 },
+        { key: 'spare',    label: 'SPARE BALL',      pts: 800, many: true },
+        { key: 'fast',     label: 'GOTTA GO FAST',   pts: 300 },
+        { key: 'heads',    label: HEADS_AT + ' HEADS', pts: 600 },
+        { key: 'grit',     label: 'NEVER GIVE UP',   pts: 400 },
+        { key: 'hunter',   label: 'HUNTER',          pts: 300, many: true }
+    ];
+
+    // The reveal. The score does not move until the last line has landed --
+    // the reading IS the screen, and a total that arrives first gives the
+    // ending away before you have been told why.
+    const EOR_IN     = 0.45;    // before the first line
+    const EOR_ROW    = 0.30;    // ...and between each after it
+    const EOR_FADE   = 0.22;    // how long one takes to come up
+    const EOR_GAP    = 0.45;    // the beat before the total lands, and is paid
+    const EOR_LINGER = 0.8;     // ...and how long it stands before a tap moves on
+
+    // The room it is laid out in. The pitch is whatever fits the whole list
+    // between these, so a round that earned everything shrinks rather than
+    // running off the bottom -- the leaderboard sizes itself the same way.
+    // The floor clears the paddle's line; the ceiling clears the wall.
+    const EOR_TOP   = 210;
+    const EOR_BOT   = 506;
+    const EOR_PITCH = 30;       // row to row at full size
+    const EOR_W     = 420;      // label at one edge of this, points at the other
+    const EOR_TITLE_U = 1.5;    // the title's share of the height, in pitches
+    const EOR_RULE_U  = 0.5;    // ...the gap and the line above the total
+    const EOR_HINT_U  = 1.1;    // ...and the line underneath
+
     // ---- the boss -----------------------------------------------------------
     // the real brandon, at last. he shrinks as he takes damage, and once
     // BOSS_STILL of his health is gone he starts moving -- faster and smaller
@@ -1080,6 +1124,8 @@
     let ascendFrom = { y: PADDLE_Y, w: PADDLE_W };
     let phantoms = [], phGap = 0, shout = null, enterT = 0, rings = [], overT = 0;
     let talk = [], fleeRoll = -1; // the hat stage's voices, and seconds to its next coin toss
+    let round = null;             // what this round has done so far -- see EOR_ROWS
+    let eor = null;               // ...and the screen it becomes once the round is over
     let dragT = 0;                // seconds of sluggish left on him
     let padLag = 0;               // the lag actually on him -- see dragLag
     let padTrail = [];            // recent positions, for the ghosted tail
@@ -1345,6 +1391,10 @@
         tierSeen = {};
         talk = []; fleeRoll = -1;          // -1: nobody has started deciding yet
         climb = 0;              // a fresh stage puts him back on his own line
+        // a round's tally starts here and nowhere else -- a lost life and a
+        // continue both happen inside one, and neither may wipe it
+        round = { lost: false, fast: false, heads: false, grit: false, hunter: 0 };
+        eor = null;
 
         if (lvl.boss) {
             bw = BOSS_W0;
@@ -1416,8 +1466,14 @@
         b.x = LW / 2 + Math.sin(bossPhase) * amp - bw / 2;
         b.y = cy + Math.sin(bossPhase * 1.7) * BOSS_BOB * k - bh / 2 + (lunge ? lunge.off : 0);
 
-        // the barrage, thickening as he weakens -- though not over the drain
-        if (dmg < PH_START || phase === 'siphon') return;
+        // The barrage, thickening as he weakens -- but only during a rally.
+        // A head can only land on you while the ball is live (see
+        // stepPhantoms), so anywhere else it is a hail of things that cannot
+        // touch you: over the drain, over a serve you have not taken yet, over
+        // the CONTINUE choices. The clock freezes with it, so he picks his
+        // rhythm back up where he left it rather than emptying his hands the
+        // moment you serve.
+        if (dmg < PH_START || phase !== 'play') return;
         phGap -= dt;
         if (phGap > 0 || phantoms.length >= PH_CAP) return;
         const t = (dmg - PH_START) / (1 - PH_START);
@@ -2172,6 +2228,15 @@
             releaseStuck();
             phase = 'play';
         } else if (phase === 'cleared') {
+            // a tap on a screen still counting itself up finishes the count --
+            // it never skips past it. nothing here may cost you points, and a
+            // tap already on its way when the last brick fell would otherwise
+            // take the whole screen with it.
+            if (!bonusRead()) {
+                eor.t = eorTotalAt(eor) + EOR_FADE + EOR_LINGER;
+                payBonus();
+                return;
+            }
             stage++;
             buildStage(stage);
             banner = '';
@@ -2226,6 +2291,7 @@
             }
         }
         balls.push(...extra);
+        if (balls.length >= HEADS_AT) round.heads = true;
     }
 
     function applyCapsule(kind) {
@@ -2312,6 +2378,11 @@
                 bumpSpeed(1.1);
             }
         }
+        // one HUNTER for each one caught in the act of leaving. counted here,
+        // where he is actually dead, so a silver taking two hits on his way out
+        // is still one of them. the ones that make the edge are never hit, so
+        // they never pay.
+        if (b.flee) round.hunter++;
         maybeDropCapsule(b.x + bw / 2, b.y + bh / 2);
 
         if (++hits === 4 || hits === 12) bumpSpeed(1.12);
@@ -2323,10 +2394,44 @@
         }
     }
 
-    function clearStage() {
-        const bonus = 500 * (stage + 1);
-        score += bonus;
+    // Everything the round earned, as the rows the screen prints. Nothing is
+    // paid here -- see payBonus.
+    function endOfRound() {
+        const boss = stage === LEVELS.length - 1;
+        const rows = [{ label: 'END OF ROUND BONUS', pts: EOR_BASE * (stage + 1) }];
+        const met = {
+            flawless: !round.lost ? 1 : 0,
+            multi:    balls.length > 1 ? 1 : 0,
+            // only the throne converts lives, so only the throne pays for them,
+            // and it pays for exactly what the corner has been showing you --
+            // which is also exactly what startGauntlet is about to eat
+            spare:    boss ? spares() : 0,
+            fast:     round.fast ? 1 : 0,
+            heads:    round.heads ? 1 : 0,
+            grit:     round.grit ? 1 : 0,
+            hunter:   round.hunter
+        };
+        for (const r of EOR_ROWS) {
+            const n = met[r.key];
+            if (n > 0) rows.push({ label: r.label + (r.many ? ' x' + n : ''), pts: r.pts * n });
+        }
+        return { rows, total: rows.reduce((s, r) => s + r.pts, 0), t: 0, paid: false };
+    }
+
+    // when the total lands, which is also when it is paid
+    function eorTotalAt(e) { return EOR_IN + EOR_ROW * e.rows.length + EOR_GAP; }
+    // ...and when the screen has been up long enough to have been read
+    function bonusRead() { return !eor || eor.t >= eorTotalAt(eor) + EOR_FADE + EOR_LINGER; }
+
+    function payBonus() {
+        if (!eor || eor.paid) return;
+        eor.paid = true;
+        score += eor.total;
         if (score > best) { best = score; saveBest(); }
+    }
+
+    function clearStage() {
+        eor = endOfRound();
         capsule = null;
         dragT = 0;                  // nothing of his hangs on you past the kill
         if (stage === LEVELS.length - 1) {
@@ -2342,10 +2447,10 @@
             // he sets off from wherever the fight left him -- by now that is
             // most of the way up the screen already, and half again as big
             ascendFrom = { y: padY(), w: padW() };
-            banner = 'BRANDON WINS   +' + bonus;
+            banner = 'BRANDON WINS';
         } else {
             phase = 'cleared';
-            banner = 'STAGE CLEAR   +' + bonus;
+            banner = 'STAGE CLEAR';
         }
     }
 
@@ -2403,9 +2508,16 @@
         if (gone && !bricks.some(x => x.alive && x.kind !== 'X')) clearStage();
     }
 
+    // What you have IN RESERVE: `lives` counts the head in your hands as well,
+    // and that one is not a spare. This is the number the corner prints, the
+    // number SPARE BALL pays for and the number the throne absorbs -- one
+    // function so the three can never disagree.
+    function spares() { return Math.max(0, lives - 1); }
+
     function loseLife() {
         lives--;
         combo = 0;
+        round.lost = true;              // there goes FLAWLESS for this round
         if (lives <= 0) {
             // out of lives is not the end of the run -- the choice is. nothing
             // is recorded until you decline another go.
@@ -2510,6 +2622,7 @@
     function continueGame() {
         score = Math.floor(score * CONTINUE_KEEP);   // the cost of the quarter
         lives = 3;
+        round.grit = true;              // the round remembers you bought it back
         // Back in exactly where you went out: the same wall with the same
         // holes in it, the boss on whatever health you left him. It used to
         // rebuild the stage, which on the last one handed him back all 27.
@@ -2934,6 +3047,13 @@
         talk = talk.filter(t => (t.life -= dt) > 0);
         rings = rings.filter(r => (r.t -= dt * 2.6) > 0);
 
+        // the end-of-round screen, counting itself up a line at a time. the
+        // score does not move until the last line has landed -- see EOR_IN.
+        if (eor && (phase === 'cleared' || (phase === 'ascend' && ascendT >= A_TITLE))) {
+            eor.t += dt;
+            if (eor.t >= eorTotalAt(eor)) payBonus();
+        }
+
         // the takeover. when it finishes, the banner finally lands.
         // the takeover used to end the game. now it hands over.
         if (phase === 'ascend') {
@@ -2942,7 +3062,10 @@
                 ascendT += dt;
                 stepCrumble(bossFall, dt, A_DIE);
             }
-            if (ascendT >= A_END) startGauntlet();
+            // ...and the handover waits on the screen as well as the clock,
+            // because the boss round's is the longest one and SPARE BALL has
+            // to be paid before startGauntlet spends the lives it counts
+            if (ascendT >= A_END && bonusRead()) startGauntlet();
         }
 
         // where he is headed, then how much of that he has managed. the lag is
@@ -3072,6 +3195,10 @@
             b.angle += turnOf(b) * dt;
         }
 
+        // GOTTA GO FAST reads the same rounded number the rule under BONUS
+        // fills off, so what earns it is exactly the bar you watched top out
+        if (phase === 'play' && liveSpinMul() >= SPIN_MUL) round.fast = true;
+
         // the falling capsule
         if (capsule) {
             capsule.y += CAP_FALL * dt;
@@ -3121,7 +3248,7 @@
         // caption. gLead is that pause before the prompt.
         gReady = true;
         gLead = G_INTRO_RISE + 1;
-        gAbsorbLeft = Math.max(0, lives);
+        gAbsorbLeft = spares();
         gAbsorbT = F_ABSORB;
         ascendT = 0;                    // the takeover is over; it drew its last
         phase = gAbsorbLeft > 0 ? 'absorb' : 'gauntlet';
@@ -4271,6 +4398,87 @@
         }
     }
 
+    // The end-of-round screen: the title, one row per bonus, a rule, the total,
+    // and the line underneath. Everything is sized off ONE pitch, and the pitch
+    // is whatever fits the whole list between EOR_TOP and EOR_BOT -- so a round
+    // that earned every bonus shrinks to fit instead of running off the bottom,
+    // the same trick the leaderboard uses on its ten rows.
+    //
+    // The list is laid out at its FINAL height from the first frame and the
+    // rows only fade up, so nothing moves under you while you are reading it.
+    // A long label is shrunk on its own against the points beside it, so the
+    // two columns can never collide however wide a name gets.
+    //
+    // No band behind it: it is a list floating on whatever is already there,
+    // which over the takeover is a photograph. Every line is knocked out of the
+    // background instead -- the same outline the game-over choices wear over
+    // him -- so the type reads on his shirt without a slab to sit on.
+    function drawBonus(u) {
+        const n = eor.rows.length;
+        // a round that earned nothing extra has a total identical to its only
+        // line, and printing the same number twice reads as a fault
+        const sum = n > 1;
+        const units = EOR_TITLE_U + n + (sum ? EOR_RULE_U + 1 : 0) + EOR_HINT_U;
+        const pitch = Math.min(EOR_PITCH * Math.min(u, 1.25), (EOR_BOT - EOR_TOP) / units);
+        const h = pitch * units;
+        const top = (EOR_TOP + EOR_BOT) / 2 - h / 2;
+        const lx = LW / 2 - EOR_W / 2, rx = LW / 2 + EOR_W / 2;
+
+        // lineJoin is set below and nothing else in the file sets it -- without
+        // the save every stroked box drawn after this one would inherit it
+        ctx.save();
+        const cut = (str, x, y, size, color, align) => {
+            ctx.font = size + 'px "Trebuchet MS", sans-serif';
+            ctx.textAlign = align || 'left';
+            ctx.lineWidth = Math.max(3, size * 0.22);
+            ctx.lineJoin = 'round';                    // no spikes off the corners
+            ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+            ctx.strokeText(str, x, y);
+            ctx.fillStyle = color;
+            ctx.fillText(str, x, y);
+        };
+
+        cut(banner, LW / 2, top + pitch * EOR_TITLE_U,
+            Math.min(32 * u, pitch * 1.15), '#f2efe9', 'center');
+
+        // one row, with its points right-aligned and its label fitted to what
+        // is left of the width
+        const row = (label, pts, y, size, color) => {
+            const money = '+' + pts;
+            cut(money, rx, y, size, color, 'right');
+            const room = EOR_W - ctx.measureText(money).width - pitch * 0.8;
+            cut(label, lx, y, fitSize(label, size, room), color);
+        };
+
+        for (let i = 0; i < n; i++) {
+            const a = Math.max(0, Math.min(1, (eor.t - EOR_IN - EOR_ROW * i) / EOR_FADE));
+            if (a <= 0) continue;
+            ctx.globalAlpha = a;
+            // the base is the one you were always getting; the rest you earned,
+            // and they are gold to say so
+            row(eor.rows[i].label, eor.rows[i].pts,
+                top + pitch * (EOR_TITLE_U + i + 1), pitch * 0.72,
+                i === 0 ? '#9a958c' : '#c9a94e');
+            ctx.globalAlpha = 1;
+        }
+
+        const done = Math.max(0, Math.min(1, (eor.t - eorTotalAt(eor)) / EOR_FADE));
+        if (sum && done > 0) {
+            ctx.globalAlpha = done;
+            ctx.fillStyle = 'rgba(242,239,233,0.35)';
+            ctx.fillRect(lx, top + pitch * (EOR_TITLE_U + n + EOR_RULE_U * 0.6), EOR_W, 1);
+            row('TOTAL', eor.total, top + pitch * (EOR_TITLE_U + n + EOR_RULE_U + 1),
+                pitch * 0.86, '#f2efe9');
+            ctx.globalAlpha = 1;
+        }
+
+        if (bonusRead() && phase === 'cleared') {
+            cut('tap to continue', LW / 2, top + h, Math.min(15 * u, pitch * 0.55),
+                '#9a958c', 'center');
+        }
+        ctx.restore();
+    }
+
     function drawInitials(u) {
         ctx.fillStyle = 'rgba(0,0,0,0.86)';
         ctx.fillRect(0, 0, LW, LH);
@@ -4574,11 +4782,12 @@
         }
         ctx.globalAlpha = 1;
 
-        // The lives you never spent, coming out of the corner they have sat in
-        // all game. The one in flight swells and brightens on the way across
-        // and goes into his chest; the ones still waiting sit exactly where the
-        // counter has always drawn them, so it reads as the counter emptying
-        // rather than as heads appearing from nowhere.
+        // The spares you never spent, coming out of the corner they have sat in
+        // all game -- as many as the counter was showing, no more. The one in
+        // flight swells and brightens on the way across and goes into his
+        // chest; the ones still waiting sit exactly where the counter has
+        // always drawn them, so it reads as the counter emptying rather than as
+        // heads appearing from nowhere.
         if (phase === 'absorb') {
             const u2 = uiScale;
             const home = i => ({ x: LW - (25 + i * 29) * u2, y: 25 * u2 });
@@ -4752,8 +4961,11 @@
 
         // no lives counter over the ending -- it is meaningless by then, and it
         // was landing squarely on the new king's face
+        //
+        // It counts spares, so a fresh run reads 2, 1, 0 and an empty corner
+        // means the next one you lose ends it -- see spares()
         if (phase !== 'ascend') {
-            for (let i = 0; i < lives; i++) drawBall(LW - (25 + i * 29) * u, 25 * u, 9 * u, 0);
+            for (let i = 0; i < spares(); i++) drawBall(LW - (25 + i * 29) * u, 25 * u, 9 * u, 0);
         }
 
         // active effects along the bottom, out of the playfield.
@@ -4889,6 +5101,13 @@
             drawOverChoices(false);
             drawPaddle();
             drawOverChoices(true);
+            return;
+        }
+
+        // the end-of-round screen stands in for the band, and takes the same
+        // beat on the takeover that the band used to -- see drawBonus
+        if (eor && (phase === 'cleared' || (phase === 'ascend' && ascendT >= A_TITLE))) {
+            drawBonus(u);
             return;
         }
 
