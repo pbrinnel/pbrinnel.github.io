@@ -1,11 +1,11 @@
 # brandon.html: the map
 
-How to get oriented in a 4,874-line single file without reading it end to end.
+How to get oriented in a 5,247-line single file without reading it end to end.
 
-**Current as of `b29fa12`, 18 Sep 2026.** Before trusting anything below, run:
+**Current as of `2857fea`, 19 Sep 2026.** Before trusting anything below, run:
 
 ```bash
-git log --oneline b29fa12..HEAD -- brandon.html
+git log --oneline 2857fea..HEAD -- brandon.html
 ```
 
 Nothing listed means this file is still true. A short list means read those commit
@@ -15,7 +15,7 @@ should treat it as a starting point, not an authority — then fix it before you
 ## What the file is
 
 One `<head>` with the analytics tag and the CSS, a few `<div>`s, one `<canvas>`, and
-one `<script>` holding a single IIFE closure of about 4,600 lines. No modules, no
+one `<script>` holding a single IIFE closure of about 5,000 lines. No modules, no
 build step, no imports. Every function and every piece of state is in that one scope,
 so anything can reach anything.
 
@@ -29,7 +29,7 @@ split across several files can reach a returning player half-updated. See CLAUDE
 
 ## Where things are
 
-The map is in the file, not in this document. 41 sections, in reading order:
+The map is in the file, not in this document. 42 sections, in reading order:
 
 ```bash
 grep -n "// ---- " brandon.html
@@ -37,7 +37,7 @@ grep -n "// ---- " brandon.html
 
 That gives you the whole table of contents in one call — `the shape`, `the boss`,
 `the endless gauntlet`, `physics`, `drawing`, `loop`, and so on. Find your section,
-read that span, stop. **Do not read the file top to bottom**; it is 234 KB and you
+read that span, stop. **Do not read the file top to bottom**; it is 248 KB and you
 will spend most of a context window learning things you did not need.
 
 Line numbers are not stable — Paul edits from other sessions and everything below a
