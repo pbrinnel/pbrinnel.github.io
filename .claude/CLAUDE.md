@@ -26,7 +26,7 @@ A game with a shared online leaderboard.
 - What players load stays one self-contained file. Pages are cached for ten minutes, so a page split across several files can reach a returning player half-updated.
 - Keep the game a surprise. Nothing shareable (link previews, the homepage, screenshots, posts) shows gameplay. The share image is the splash, and the missing `og:description` is deliberate.
 - Feel numbers (spin, speeds, angles, timings) stay flat named `const`s. When a change is about how something feels, offer Paul a slider page to tune it himself instead of guessing values.
-- If `.claude/spinlab/` exists, rebuild the spin lab after spin or paddle changes: `node .claude/spinlab/spinlab-build.js`.
+- Don't rebuild the spin lab. If `.claude/spinlab/` exists, write what the next build will need into `.claude/spinlab/TODO.md` instead — new sliders, hooks, panel rows — and say so when you finish. Paul rebuilds it when he next wants it: `node .claude/spinlab/spinlab-build.js`.
 
 ## Comments
 
