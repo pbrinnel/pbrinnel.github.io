@@ -1,11 +1,11 @@
 # brandon.html: the map
 
-How to get oriented in a 5,247-line single file without reading it end to end.
+How to get oriented in a 5,594-line single file without reading it end to end.
 
-**Current as of `2857fea`, 19 Sep 2026.** Before trusting anything below, run:
+**Current as of `ef3b094`, 19 Sep 2026.** Before trusting anything below, run:
 
 ```bash
-git log --oneline 2857fea..HEAD -- brandon.html
+git log --oneline ef3b094..HEAD -- brandon.html
 ```
 
 Nothing listed means this file is still true. A short list means read those commit
@@ -134,6 +134,21 @@ on this Mac and in the commit history:
 - **A GBA port.** The photo art and the swipe-driven spin are what do not survive
   240x160 and a D-pad.
 - **A letter wheel for initials.** Was in for a while and was worse.
+- **Mask collision for the gauntlet's army.** Not a taste call, a fact: the 24 x 9
+  mask is 52% solid but 100% solid in *vertical* projection — rows 3–4 span columns
+  0–22 and his head covers 22–23, so a straight-down throw hits in every one of the
+  24 columns. It only ever gated the ball because the ball arrives at an angle.
+  Nothing about a downward shot can be gated by his outline.
+- **Deflected heads that kill.** Turning a head off your body into a weapon makes
+  being struck both good and bad, and a player cannot hold two readings of the same
+  event. Damage stays unambiguously bad.
+- **Hold-to-charge a heavier throw.** A drag is how you steer on a phone.
+- **Survivors advancing up the ranks.** Breaks "nobody already standing ever moves",
+  which is what stops arrivals reading as waves, and buys less than it costs.
+
+The last four come from the 19 Sep pass on the gauntlet's decision space. What it
+did ship — nearest-first throws, the bounty in the rank that fills first, the
+streak — is in `ef3b094`, and every number in it is a guess waiting on sliders.
 
 ## Keeping this true
 
