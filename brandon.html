@@ -2444,7 +2444,10 @@
         }
     }
 
-    function hitBrick(b) {
+    // cx, cy are where the ball actually touched, which only the boss needs --
+    // see the award below. An ordinary brick is small enough that its own
+    // middle IS the contact point, near enough, so it goes on using that.
+    function hitBrick(b, cx, cy) {
         // the white flash is the "I hurt it" signal. a solid brick must not
         // give it, or the game is telling you to keep swinging at something
         // that will never break.
@@ -2461,7 +2464,16 @@
             // hp is fractional now, so "finished" needs a tolerance rather
             // than an exact zero -- five subtractions of 0.2 do not land on it
             const done = b.hp <= 1e-6;
-            award(BOSS_PTS * (done ? 5 : 1), b.x + bw / 2, b.y);
+            // Where the BALL struck, not the corner of his box. Every other
+            // brick hands award() its own top edge, which is fine when the
+            // brick is 90px across -- but he arrives 1060 wide with his centre
+            // at BOSS_Y0, so his box top is about 160px ABOVE the ceiling and
+            // the number was being drawn off the screen for most of the fight.
+            // The contact point is the one place on him you are certainly
+            // looking, and it is where the glance ring already goes.
+            award(BOSS_PTS * (done ? 5 : 1),
+                  cx === undefined ? b.x + bw / 2 : cx,
+                  cy === undefined ? b.y : cy);
             // now and then he has something to say about it
             if (!done && Math.random() < SHOUT_ODDS) {
                 shout = { x: b.x + bw * 0.88, y: b.y + bh + 8, life: SHOUT_SECS };
@@ -3094,7 +3106,7 @@
             const glances = br.kind === 'X' || (br.kind === 'Z' && bossIF > 0);
             if (glances) rings.push({ x: hit.cx, y: hit.cy, t: 1 });
             else kick(br, -nx, -ny, 1);   // shoved away from where the ball struck
-            hitBrick(br);
+            hitBrick(br, hit.cx, hit.cy);
             // it is the bounce that pays, not the wound: a glance off gold
             // winds you up as much as breaking a red does. PIERCE is the one
             // contact that does not, because it does not turn you -- and a
