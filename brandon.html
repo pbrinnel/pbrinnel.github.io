@@ -1024,17 +1024,19 @@
     // Times how many hits it took, so a three-rung one pays three times -- it
     // cost you three throws.
     //
-    // It looks far too small to be a score, and it is: nothing here is ever
-    // shown per kill. There are no popups in this mode -- hitShip adds to the
-    // total in silence and the HUD carries the running score and the streak,
-    // so this number is a scale factor nobody reads and can be whatever the
-    // arithmetic wants. What a player actually sees is the streak and the
-    // bounty, and those both keep their full range because of it.
+    // It looks far too small to be a score because it is never paid on its
+    // own. Everything a kill pays goes through two multipliers that compound
+    // -- G_MULT_MAX of streak on top of G_MARK_MUL for the bounty -- so the
+    // same kill is worth anywhere from this to thirty times it. Pricing the
+    // base off what the best kill should be worth is the only way the coda
+    // stays a coda: at fifty it was taking more of a run than the five stages
+    // it is supposed to be an encore to.
     //
-    // Everything a kill pays goes through two multipliers that compound --
-    // G_MULT_MAX of streak on top of G_MARK_MUL for the bounty -- so a kill at
-    // the top of both is thirty times a plain one. That is the spread the mode
-    // is built to reward, and the only honest place to pay for it is here.
+    // It is what the popups read, so the bottom of that range is a "+5" on a
+    // one-rung kill with no streak going. That is the correct thing for it to
+    // say -- one man out of an endless queue, killed by somebody who is not
+    // on a run, IS worth almost nothing, and the number climbing as the streak
+    // does is the whole feedback the mode gives you.
     const G_PTS_KILL = 5;
     // Paid once, at the end, on the title. Four times what it was: the lump
     // has to feel like a result when it lands next to the words, and at ten
@@ -3437,6 +3439,7 @@
         fallT = 0; kingFall = null; victor = null; bossFall = null; impact = null;
         phantoms = [];                  // nothing of the old fight comes through
         balls = [];
+        popups = [];                    // ...including what the last brick paid
         // Nothing moves until you throw something -- you have never had a fire
         // button in this game and nobody has told you that you have one now.
         // But the ASKING waits: he walks on first and gets a second to stand
@@ -3659,7 +3662,14 @@
         if (marked) gMark = null;
         // it cost you a throw a rung, so it pays by the rung -- through the
         // streak, and again through the bounty if he was the one at the back
-        score += Math.round(G_PTS_KILL * s.maxHp * gMult * (marked ? G_MARK_MUL : 1));
+        const pts = Math.round(G_PTS_KILL * s.maxHp * gMult * (marked ? G_MARK_MUL : 1));
+        score += pts;
+        // ...and it says so, the way a brick does. The whole point of the
+        // streak and the bounty is that some kills are worth many times
+        // others, and a spread nobody is shown is a spread nobody plays for.
+        // The bounty's number comes up in the gold he was wearing.
+        popups.push({ x: s.x, y: s.y - G_SHIP_H * 0.4, text: '+' + pts,
+                      color: marked ? '#c9a94e' : '#f2efe9', life: 1 });
         gMult = Math.min(G_MULT_MAX, gMult + G_MULT_STEP);
         gMultT = 0;
         if (score > best) { best = score; saveBest(); }
@@ -3925,6 +3935,9 @@
         // ring in the air, and the fall would hold it there for fourteen
         // seconds because everything below returns.
         gBlast = gBlast.filter(b => (b.t -= dt) > 0);
+        // up here with the sparks for the same reason they are: a number still
+        // rising off the kill that finished you should finish rising.
+        popups = popups.filter(p => (p.life -= dt * 1.4) > 0);
 
         if (phase === 'fall') {
             if (!stepImpact(dt)) {
@@ -5145,6 +5158,15 @@
             ctx.fillRect(s.x - 2, s.y - 2, 4, 4);
         }
         ctx.globalAlpha = 1;
+
+        // The same rising number a brick gives, drawn the same way -- this is
+        // the second copy of it, because the gauntlet forks out of both update
+        // and draw and neither half of the main game's reaches here.
+        for (const p of popups) {
+            ctx.globalAlpha = Math.min(1, p.life);
+            text(p.text, p.x, p.y - 26 * (1 - p.life), 15, p.color, 'center');
+            ctx.globalAlpha = 1;
+        }
 
         // The spares you never spent, coming out of the corner they have sat in
         // all game -- as many as the counter was showing, no more. The one in
