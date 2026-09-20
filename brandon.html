@@ -951,6 +951,32 @@
     const G_SPREAD_N = 3, G_SPREAD_ARC = 0.22;
     const G_BURST_N  = 3, G_BURST_GAP = 0.09;
 
+    // one of them is worth going after, and the rule is WHERE he is standing.
+    // Always the rank that fills first -- which is the bottom of the screen,
+    // and the LAST thing a thrown head reaches, because ranks stack upward
+    // toward the throne and a head meets the nearest body first. So every rank
+    // above him is a man your throw hits before he does, and taking him means
+    // digging a column while the army fills the holes back in behind you.
+    //
+    // A mark that went to the longest-lived would be a glow whose reason the
+    // player has no way to see. "Always at the back" is a rule you learn by
+    // looking once, and it scales itself: early the floor is one rank deep and
+    // he is simply somewhere to go, and by the time it is four deep the same
+    // rule has become a dig. Nothing about it changes; the army does.
+    //
+    // It rides outside his outline -- a halo, never a wash over him -- because
+    // the colour he is wearing is how many rungs he has left, and that has to
+    // stay the only thing his own pixels are saying.
+    const G_MARK_IN   = 1.0;      // the halo winds up rather than switching on
+    const G_MARK_HZ   = 0.38;     // ...and then breathes. well under three a second
+    const G_MARK_MUL  = 5;        // what he pays, against an ordinary kill
+    // ...and what taking him does to the men around him. The blast is the
+    // whole reason the dig pays: it opens the one rank you cannot otherwise
+    // open, which is the rank he was standing in. Outright kills, not a rung
+    // off each -- four throws that end in three men flinching is not a reward.
+    const G_BLAST_R   = 105;
+    const G_BLAST_T   = 0.5;      // how long the ring takes to go out
+
     // Straight down, from wherever you are. It swept on a timer once and hung
     // off you like a pendulum once, and both were the same mistake: an aim you
     // do not control is not a skill, it is a slot machine you have to wait for.
@@ -973,6 +999,24 @@
     // has to feel like a result when it lands next to the words, and at ten
     // a point a whole reign was worth less than a handful of kills.
     const G_PTS_SEC  = 40;
+
+    // The streak, which every kill pays through. It does NOT reset on a hit.
+    // You arrive on the throne 760 across a 800 field, where there is nowhere
+    // to dodge to and nothing you can do about being struck -- a number that
+    // zeroed on contact would be unreachable for the first third of a reign
+    // and then easy once you had shrunk into something nimble, which is
+    // backwards. Halving leaves it worth reading at every size: early it
+    // hovers low because you are being hit and killing in equal measure, and
+    // by the time you are small it is yours to lose.
+    const G_MULT_MAX  = 6;
+    const G_MULT_STEP = 0.25;     // per kill, whatever it was worth
+    const G_MULT_HIT  = 0.5;      // ...and what one hit leaves of it
+    // It also goes off if you stop. Lasting already pays, by the second, at
+    // the end -- this is the other axis, and sitting on it has to cost
+    // something or the safe game is the high-scoring one as well.
+    const G_MULT_HOLD = 3;        // seconds without a kill before it starts to go
+    const G_MULT_DECAY = 0.8;     // ...and how much a second after that
+
     // what the board can actually hold -- see killShip
     const SCORE_CAP  = 9999999;
 
@@ -1157,6 +1201,8 @@
     let gVolley = [], gRunT = 0, gSpawnT = 0, gCool = 0, gShake = 0;
     let gSpread = 0, gBurst = 0, gRapid = 0;
     let gDropAt = [];             // when each recent powerup turned up, oldest first
+    let gMark = null, gMarkT = 0, gBlast = [];
+    let gMult = 1, gMultT = 0;    // the streak, and how long since it last grew
     let gAbsorbT = 0, gAbsorbLeft = 0;
     let gReady = false, kingShown = 0, gLead = 0, gTimeBonus = 0;
     let gIn = 0;                  // seconds since the throne became yours -- see G_IN
@@ -1749,6 +1795,7 @@
         gVolley = []; gDropAt = []; kingFall = null; bossFall = null; victor = null; ascendT = 0;
         impact = null;
         gReady = false; gSpread = 0; gBurst = 0; gRapid = 0;
+        gMark = null; gMarkT = 0; gBlast = []; gMult = 1; gMultT = 0;
         showCursor(false);
         setHint(HINT_PLAY);
         buildStage(0);
@@ -3345,6 +3392,7 @@
         ships = []; gBul = []; gThrow = []; sparks = []; gDrop = []; gVolley = []; gDropAt = [];
         gRunT = 0; gSpawnT = 0; gCool = 0; gShake = 0;
         gSpread = 0; gBurst = 0; gRapid = 0;
+        gMark = null; gMarkT = 0; gBlast = []; gMult = 1; gMultT = 0;
         fallT = 0; kingFall = null; victor = null; bossFall = null; impact = null;
         phantoms = [];                  // nothing of the old fight comes through
         balls = [];
@@ -3407,6 +3455,9 @@
         king.hits++;
         king.hurt = G_MERCY;
         king.flash = 1;
+        // halved, not lost -- see G_MULT_HIT. it is the only thing being struck
+        // costs you that you can win straight back.
+        gMult = Math.max(1, gMult * G_MULT_HIT);
         gShake = Math.min(1, gShake + 0.7);
         if (king.hp <= 0) startFall();
     }
@@ -3563,8 +3614,15 @@
         if (--s.hp > 0) return;
         s.alive = false;
         s.dead = G_DEATH;
-        // it cost you a throw a rung, so it pays by the rung
-        score += G_PTS_KILL * s.maxHp;
+        // cleared BEFORE the blast, so a man caught in it cannot be wearing the
+        // halo and set another one off
+        const marked = s === gMark;
+        if (marked) gMark = null;
+        // it cost you a throw a rung, so it pays by the rung -- through the
+        // streak, and again through the bounty if he was the one at the back
+        score += Math.round(G_PTS_KILL * s.maxHp * gMult * (marked ? G_MARK_MUL : 1));
+        gMult = Math.min(G_MULT_MAX, gMult + G_MULT_STEP);
+        gMultT = 0;
         if (score > best) { best = score; saveBest(); }
         // The worker refuses anything over ten million and the table clamps at
         // 9,999,999, so a reign that somehow got there would be posting a score
@@ -3590,6 +3648,26 @@
             const a = Math.random() * 6.28, v = 60 + Math.random() * 150;
             sparks.push({ x: s.x, y: s.y, vx: Math.cos(a) * v,
                           vy: Math.sin(a) * v, life: 1 });
+        }
+        if (marked) blast(s.x, s.y);
+    }
+
+    // What the bounty leaves. Everything inside G_BLAST_R goes outright,
+    // whatever rung it was on -- a dig that costs four throws and ends with
+    // three men flinching is not a reward, and the HOLE is the reward: he was
+    // standing in the rank you cannot otherwise reach, and now it is open.
+    //
+    // Routed through hitShip so a blast kill pays and counts toward the streak
+    // exactly like one you threw for. It cannot cascade: the halo was cleared
+    // before this ran, so nobody it catches is wearing one.
+    function blast(x, y) {
+        if (phase !== 'gauntlet') return;      // the run ended on that same kill
+        gBlast.push({ x, y, t: G_BLAST_T });
+        gShake = Math.min(1, gShake + 0.5);
+        for (const s of ships) {
+            if (!s.alive || Math.hypot(s.x - x, s.y - y) > G_BLAST_R) continue;
+            s.hp = 1;                          // whatever it was wearing, it goes
+            hitShip(s);
         }
     }
 
@@ -3779,6 +3857,11 @@
             s.x += s.vx * dt; s.y += s.vy * dt; s.vy += 320 * dt;
             return (s.life -= dt * 1.6) > 0;
         });
+        // up here with the sparks rather than down in the live-play block, for
+        // the same reason: a bounty taken on the frame before you go leaves a
+        // ring in the air, and the fall would hold it there for fourteen
+        // seconds because everything below returns.
+        gBlast = gBlast.filter(b => (b.t -= dt) > 0);
 
         if (phase === 'fall') {
             if (!stepImpact(dt)) {
@@ -3858,6 +3941,27 @@
 
 
         stepShipMotion(dt);        // <- everything below needs this to have run
+
+        // The streak bleeds if you stop taking anybody down -- see G_MULT_HOLD.
+        // Kills reset the clock where they happen, in hitShip.
+        gMultT += dt;
+        if (gMultT > G_MULT_HOLD && gMult > 1)
+            gMult = Math.max(1, gMult - G_MULT_DECAY * dt);
+
+        // The bounty, drawn fresh whenever nobody is wearing it -- normally the
+        // frame after the last one went. Only from the rank that fills first,
+        // which is the one your throws reach last, and never the introduction:
+        // he is already the untinted photograph and two men who look special
+        // for two different reasons is neither of them reading.
+        if (gMark && !gMark.alive) gMark = null;
+        if (!gMark) {
+            const back = ships.filter(s => s.alive && !s.intro && s.slot < G_ROW);
+            if (back.length) {
+                gMark = back[(Math.random() * back.length) | 0];
+                gMarkT = 0;
+            }
+        }
+        if (gMark) gMarkT = Math.min(G_MARK_IN, gMarkT + dt);
 
         for (const s of ships) {
             if (!s.alive || s.rise < 1) continue;  // no serving while climbing in
@@ -3954,15 +4058,24 @@
             if (t.y > LH + 40 || t.x < -40 || t.x > LW + 40) {
                 gThrow.splice(i, 1); continue;
             }
+            // The NEAREST body it overlaps, not the first one the array
+            // happens to hold. Ranks sit G_STEP apart and their bands are
+            // deeper than that, so two of them overlap by about 19px, and
+            // taking whichever was spawned first resolved that stretch at
+            // random. Smallest y is the one closest to the throne, which is
+            // the one a falling head reaches first.
+            //
+            // That makes the army shield itself, which is the only aiming
+            // problem the mode has: a man in the back rank is under three
+            // other men, and the bounty is always in the back rank.
+            let near = null;
             for (const s of ships) {
                 if (!s.alive) continue;
                 if (Math.abs(t.x - s.x) < G_SHIP_W / 2 &&
-                    Math.abs(t.y - s.y) < G_SHIP_H / 2 + 6) {
-                    hitShip(s);
-                    gThrow.splice(i, 1);
-                    break;
-                }
+                    Math.abs(t.y - s.y) < G_SHIP_H / 2 + 6 &&
+                    (!near || s.y < near.y)) near = s;
             }
+            if (near) { hitShip(near); gThrow.splice(i, 1); }
         }
     }
 
@@ -4736,6 +4849,39 @@
             const t = s.alive ? 1 : s.dead / G_DEATH;
             const w = s.w * (s.alive ? 1 : 1 + (1 - t) * 0.4);
             const h = w / SHAPE_ASPECT;
+            // The bounty. It sits BEHIND and AROUND him and never ON him: his
+            // own colour is how many rungs he has left, and a wash over that
+            // would cost the floor its damage reading to say one thing about
+            // one man. It winds up over G_MARK_IN rather than switching on,
+            // and then breathes at G_MARK_HZ.
+            //
+            // A RING, not just a glow. The gold this game means "worth having"
+            // in is also what a Y-tier one is already wearing, so a glow alone
+            // vanishes against the men it is trying to pick out of. An outline
+            // is a shape rather than a tint, and it reads whatever colour the
+            // man inside it happens to be. Cut to his own proportion, so it
+            // looks drawn around him rather than dropped on him.
+            // ...and only while there is still a game to spend it on. Once you
+            // are falling, the man who was worth going after is not.
+            if (s === gMark && s.alive && phase === 'gauntlet') {
+                const k = ease01(gMarkT / G_MARK_IN)
+                        * (0.62 + 0.38 * Math.sin(clock * G_MARK_HZ * 6.283));
+                const r = w * (0.78 + 0.1 * k);
+                const gr = ctx.createRadialGradient(s.x, s.y, w * 0.16,
+                                                    s.x, s.y, r);
+                gr.addColorStop(0, 'rgba(201,169,78,' + (0.42 * k).toFixed(3) + ')');
+                gr.addColorStop(1, 'rgba(201,169,78,0)');
+                ctx.fillStyle = gr;
+                ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, 6.284); ctx.fill();
+                ctx.globalAlpha = 0.35 + 0.55 * k;
+                ctx.strokeStyle = '#c9a94e';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.ellipse(s.x, s.y, w * 0.58, h * 1.2, 0, 0, 6.284);
+                ctx.stroke();
+                ctx.lineWidth = 1;
+                ctx.globalAlpha = 1;
+            }
             ctx.globalAlpha = s.alive ? 1 : t;
             ctx.drawImage(sprite, s.x - w / 2, s.y - h / 2, w, h);
             // the same white knock the bricks give: "I hurt it", distinct from
@@ -4936,6 +5082,21 @@
             drawKingBar();
         }
 
+        // What the bounty left. The same expanding ring a solid brick gives
+        // when the ball glances off it, in the bounty's own gold and at the
+        // radius it actually cleared -- so the hole in the rank and the ring
+        // that made it are the same size, and you can see what you just won.
+        for (const b of gBlast) {
+            const k = 1 - b.t / G_BLAST_T;
+            ctx.globalAlpha = (b.t / G_BLAST_T) * 0.8;
+            ctx.strokeStyle = '#c9a94e';
+            ctx.lineWidth = 2 + 3 * (1 - k);
+            ctx.beginPath();
+            ctx.arc(b.x, b.y, G_BLAST_R * ease01(k), 0, 6.284);
+            ctx.stroke();
+        }
+        ctx.lineWidth = 1;
+
         for (const s of sparks) {
             ctx.globalAlpha = Math.max(0, s.life) * 0.8;
             ctx.fillStyle = '#c9a94e';
@@ -4969,11 +5130,25 @@
         }
         ctx.restore();
 
-        // Score, and nothing else. A clock or a headcount tells you where you
-        // are in a thing that is not supposed to have a where -- they turn an
-        // unwinnable slide into a progress bar, and you start playing the
-        // numbers instead of the screen. The screen already says how bad it is.
+        // Score, and the streak, and nothing else. No clock and no headcount:
+        // those tell you where you are in a thing that is not supposed to have
+        // a where -- they turn an unwinnable slide into a progress bar, and you
+        // start playing the numbers instead of the screen. The streak is not
+        // one of those. It says how well you are playing, not how far in you
+        // are, and a number you can send back up is the opposite of a gauge
+        // counting down to the end. The screen already says how bad it is.
         text('SCORE ' + Math.floor(score), 15 * u, 27 * u, 15 * u, '#f2efe9');
+        // Printed only once it is worth something, so it is the reward turning
+        // up rather than a field sitting at x1 for the whole opening. It is in
+        // the bounty's gold: both of them are the mode saying "this is what
+        // there is to want".
+        if (phase === 'gauntlet' && gMult > 1.001) {
+            // measured in the font the line above just set, the same way the
+            // capsule row spaces itself
+            const sw = ctx.measureText('SCORE ' + Math.floor(score)).width;
+            text('x' + gMult.toFixed(1).replace(/\.0$/, ''),
+                 15 * u + sw + 10 * u, 27 * u, 15 * u, '#c9a94e');
+        }
 
         // What you are carrying, in the same words and colours the stages
         // print their capsules in. The stages keep that row along the bottom,
