@@ -1023,7 +1023,19 @@
     // a second game, and the table should still be won in the five stages.
     // Times how many hits it took, so a three-rung one pays three times -- it
     // cost you three throws.
-    const G_PTS_KILL = 50;
+    //
+    // It looks far too small to be a score, and it is: nothing here is ever
+    // shown per kill. There are no popups in this mode -- hitShip adds to the
+    // total in silence and the HUD carries the running score and the streak,
+    // so this number is a scale factor nobody reads and can be whatever the
+    // arithmetic wants. What a player actually sees is the streak and the
+    // bounty, and those both keep their full range because of it.
+    //
+    // Everything a kill pays goes through two multipliers that compound --
+    // G_MULT_MAX of streak on top of G_MARK_MUL for the bounty -- so a kill at
+    // the top of both is thirty times a plain one. That is the spread the mode
+    // is built to reward, and the only honest place to pay for it is here.
+    const G_PTS_KILL = 5;
     // Paid once, at the end, on the title. Four times what it was: the lump
     // has to feel like a result when it lands next to the words, and at ten
     // a point a whole reign was worth less than a handful of kills.
