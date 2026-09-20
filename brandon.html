@@ -876,12 +876,29 @@
     // pulses together, and with more than a couple of them standing there it
     // adds up to something always being in the air. The escalation is the
     // NUMBER of them, not any of them getting twitchier.
-    const G_SERVE_LO = 1, G_SERVE_HI = 9;
-    // ...with one guard on top. Twenty-eight men each rolling a 1 is a wall of
-    // heads nobody can read and the renderer would not thank us for, so the
-    // army also has a combined ceiling and an individual gap is never allowed
-    // below what that implies. It only ever binds when the floor is crowded.
-    const G_RATE0    = 2.4,  G_RATE1 = 11;     // the army's serves/sec, early/late
+    //
+    // All three clocks below -- this one, the army's budget, and the one a
+    // fresh arrival serves on -- were scaled together, because the gap a man
+    // actually waits is max(his own, the army's floor) and moving one of them
+    // alone only quietens whichever regime it happens to bind in. One line
+    // each, so the lab can reach them.
+    const G_SERVE_LO = 1.54;
+    const G_SERVE_HI = 13.85;
+    // ...with one guard on top. Twenty-eight men each rolling a low one is a
+    // wall of heads nobody can read and the renderer would not thank us for, so
+    // the army also has a combined ceiling and an individual gap is never
+    // allowed below what that implies. It only ever binds when the floor is
+    // crowded.
+    const G_RATE0    = 1.56;      // the army's serves/sec, early
+    const G_RATE1    = 7.15;      // ...and late
+    // What a fresh arrival waits before his first one. He does not wait out a
+    // full roll -- walking on and then standing about is dead air. It is a
+    // third clock rather than a special case of the one above, and with the
+    // floor churning as hard as it does late on it is a real share of
+    // everything thrown at you: leaving it out of the scaling landed a cut to
+    // the other two at two thirds of its intended size.
+    const G_FIRST_LO = 0.62;
+    const G_FIRST_HI = 3.08;
     const G_BULL0    = 250,  G_BULL1 = 430;
     const G_BUL_R    = 11;
     // They do not shoot at you. They SERVE. Each one starts a head bouncing up
@@ -914,7 +931,20 @@
                          B: { short: 'BURST',  color: '#d2683f' },
                          R: { short: 'RAPID',  color: '#c96aa8' } };
     const G_DROP_K   = Object.keys(G_DROPS);
-    const G_DROP_ODDS= 0.28;
+    // What one rung is worth as a chance at a powerup, BEFORE the damping
+    // below -- which is most of what actually decides it, and the reason this
+    // number cannot be read on its own. G_DROP_DAMP compounds against every
+    // drop already in the window, so the pipeline pushes back on any attempt
+    // to open it and the two do not compose the way they look. Raising this by
+    // half again buys under a third more powerups actually reaching the floor;
+    // the rest is eaten. Measured, not reasoned -- the arithmetic is not close.
+    //
+    // What it moves is the quiet floor rather than the busy one, which is the
+    // right place for it: a stretch where nothing has dropped is a stretch
+    // where you are pinned, and coming out of one a three-rung kill is now
+    // better than an even chance. A hand fast enough to farm still runs into
+    // the damping exactly as it did, which is what that number is for.
+    const G_DROP_ODDS = 0.44;
     // ...and one serve in fifty is a powerup instead of a head. It arrives on
     // the same arc from the same place, so the army is occasionally arming the
     // thing it is trying to kill, and neither of you meant it.
@@ -958,17 +988,16 @@
     // above him is a man your throw hits before he does, and taking him means
     // digging a column while the army fills the holes back in behind you.
     //
-    // A mark that went to the longest-lived would be a glow whose reason the
-    // player has no way to see. "Always at the back" is a rule you learn by
-    // looking once, and it scales itself: early the floor is one rank deep and
-    // he is simply somewhere to go, and by the time it is four deep the same
-    // rule has become a dig. Nothing about it changes; the army does.
+    // A mark that went to the longest-lived would single somebody out for a
+    // reason the player has no way to see. "Always at the back" is a rule you
+    // learn by looking once, and it scales itself: early the floor is one rank
+    // deep and he is simply somewhere to go, and by the time it is four deep
+    // the same rule has become a dig. Nothing about it changes; the army does.
     //
-    // It rides outside his outline -- a halo, never a wash over him -- because
-    // the colour he is wearing is how many rungs he has left, and that has to
-    // stay the only thing his own pixels are saying.
-    const G_MARK_IN   = 1.0;      // the halo winds up rather than switching on
-    const G_MARK_HZ   = 0.38;     // ...and then breathes. well under three a second
+    // He is marked by NOT being marked -- the one man nobody dyed, wearing the
+    // photograph while the rest of the floor wears the wall. See drawShips for
+    // why that beats hanging anything on him.
+    const G_MARK_IN   = 1.0;      // seconds for the colour to drain out of him
     const G_MARK_MUL  = 5;        // what he pays, against an ordinary kill
     // ...and what taking him does to the men around him. The blast is the
     // whole reason the dig pays: it opens the one rank you cannot otherwise
@@ -3541,9 +3570,7 @@
             bobPh: Math.random() * 6.28,
             bobRate: 0.7 + Math.random() * 0.8,
             rise: 0,
-            // a fresh arrival serves soon after it lands rather than waiting
-            // out a full roll -- walking on and then standing about is dead air
-            fire: 0.4 + Math.random() * 1.6,
+            fire: G_FIRST_LO + Math.random() * (G_FIRST_HI - G_FIRST_LO),
             hp, maxHp: hp, flash: 0, held: 0, hitAt: -9, knockAt: -9, dead: 0, alive: true
         });
     }
@@ -3650,6 +3677,30 @@
                           vy: Math.sin(a) * v, life: 1 });
         }
         if (marked) blast(s.x, s.y);
+    }
+
+    // One at a time, and never on the frame the last one died. Taking him used
+    // to designate the next one instantly, which made the bounty a fixture --
+    // something always on the floor rather than something that turns up. It
+    // arrives with a batch now, so killing him buys a stretch with nothing to
+    // go after, and the next one walking on is an event you can want.
+    //
+    // Always from the rank that fills first, whether or not this batch is what
+    // put anybody there: the bounty being the deepest thing on the floor is
+    // the whole of the dig, and an arrival that happened to land in the third
+    // rank would be a bounty you can reach without paying for it.
+    function markBounty() {
+        if (gMark) return;
+        const back = ships.filter(s => s.alive && s.slot < G_ROW);
+        if (!back.length) return;
+        // The introduction is undyed as well -- he is the photograph because he
+        // is the same as you, which is a different reason for the same look.
+        // Undyed is now the ONLY thing that says bounty, so while he is still
+        // standing he has to be the one wearing it, or the floor shows two and
+        // the rule stops being a rule. He is nearly always dead long before the
+        // first batch lands; this is for when he is not.
+        gMark = back.find(s => s.intro) || back[(Math.random() * back.length) | 0];
+        gMarkT = 0;
     }
 
     // What the bounty leaves. Everything inside G_BLAST_R goes outright,
@@ -3937,6 +3988,7 @@
             gSpawnT = G_GAP0 + Math.random() * (G_GAP1 - G_GAP0);
             const n = 1 + ((Math.random() * batchMax()) | 0);
             for (let i = 0; i < n; i++) addShip(false);
+            markBounty();               // at most one, and only ever with a batch
         }
 
 
@@ -3948,19 +4000,7 @@
         if (gMultT > G_MULT_HOLD && gMult > 1)
             gMult = Math.max(1, gMult - G_MULT_DECAY * dt);
 
-        // The bounty, drawn fresh whenever nobody is wearing it -- normally the
-        // frame after the last one went. Only from the rank that fills first,
-        // which is the one your throws reach last, and never the introduction:
-        // he is already the untinted photograph and two men who look special
-        // for two different reasons is neither of them reading.
         if (gMark && !gMark.alive) gMark = null;
-        if (!gMark) {
-            const back = ships.filter(s => s.alive && !s.intro && s.slot < G_ROW);
-            if (back.length) {
-                gMark = back[(Math.random() * back.length) | 0];
-                gMarkT = 0;
-            }
-        }
         if (gMark) gMarkT = Math.min(G_MARK_IN, gMarkT + dt);
 
         for (const s of ships) {
@@ -4849,41 +4889,31 @@
             const t = s.alive ? 1 : s.dead / G_DEATH;
             const w = s.w * (s.alive ? 1 : 1 + (1 - t) * 0.4);
             const h = w / SHAPE_ASPECT;
-            // The bounty. It sits BEHIND and AROUND him and never ON him: his
-            // own colour is how many rungs he has left, and a wash over that
-            // would cost the floor its damage reading to say one thing about
-            // one man. It winds up over G_MARK_IN rather than switching on,
-            // and then breathes at G_MARK_HZ.
-            //
-            // A RING, not just a glow. The gold this game means "worth having"
-            // in is also what a Y-tier one is already wearing, so a glow alone
-            // vanishes against the men it is trying to pick out of. An outline
-            // is a shape rather than a tint, and it reads whatever colour the
-            // man inside it happens to be. Cut to his own proportion, so it
-            // looks drawn around him rather than dropped on him.
-            // ...and only while there is still a game to spend it on. Once you
-            // are falling, the man who was worth going after is not.
-            if (s === gMark && s.alive && phase === 'gauntlet') {
-                const k = ease01(gMarkT / G_MARK_IN)
-                        * (0.62 + 0.38 * Math.sin(clock * G_MARK_HZ * 6.283));
-                const r = w * (0.78 + 0.1 * k);
-                const gr = ctx.createRadialGradient(s.x, s.y, w * 0.16,
-                                                    s.x, s.y, r);
-                gr.addColorStop(0, 'rgba(201,169,78,' + (0.42 * k).toFixed(3) + ')');
-                gr.addColorStop(1, 'rgba(201,169,78,0)');
-                ctx.fillStyle = gr;
-                ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, 6.284); ctx.fill();
-                ctx.globalAlpha = 0.35 + 0.55 * k;
-                ctx.strokeStyle = '#c9a94e';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.ellipse(s.x, s.y, w * 0.58, h * 1.2, 0, 0, 6.284);
-                ctx.stroke();
-                ctx.lineWidth = 1;
-                ctx.globalAlpha = 1;
-            }
             ctx.globalAlpha = s.alive ? 1 : t;
             ctx.drawImage(sprite, s.x - w / 2, s.y - h / 2, w, h);
+            // The bounty is the one nobody dyed. Every other man on the floor
+            // is wearing a colour off the wall you spent four stages knocking
+            // down; he is the photograph, which is the same thing the very
+            // first arrival is and the same thing you are.
+            //
+            // It arrives as the colour DRAINING OUT of him over G_MARK_IN,
+            // which is the move this game already makes when somebody stops
+            // being part of the crowd -- it is what happened to you on the way
+            // up to the throne. Nothing is added: no glow, no ring, no marker
+            // hung off him. The floor is busy enough without one more thing
+            // drawn on top of it, and a man who is simply not the colour of
+            // his neighbours is found faster than a man with a badge.
+            //
+            // Only while there is a game to spend it on -- once you are
+            // falling, the man who was worth going after is not.
+            if (s === gMark && s.alive && phase === 'gauntlet') {
+                const raw = shapeSprite('gsRaw', null, 300,
+                                        300 / SHAPE_ASPECT, false);
+                if (raw) {
+                    ctx.globalAlpha = ease01(gMarkT / G_MARK_IN);
+                    ctx.drawImage(raw, s.x - w / 2, s.y - h / 2, w, h);
+                }
+            }
             // the same white knock the bricks give: "I hurt it", distinct from
             // the colour change that says "and there is still some left"
             if (s.flash > 0) {
