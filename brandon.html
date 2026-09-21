@@ -2615,6 +2615,17 @@
         }
     }
 
+    // The order the ball meets bricks in: whoever is running for the edge
+    // first, then everybody else. It only matters where two overlap, and that
+    // is a runaway walking out across another brick -- on the hat, usually a
+    // statue. The field is drawn in exactly the reverse, so whichever is on
+    // top is the one the ball hits, and a runaway crossing in front of a
+    // statue can still be caught there.
+    function* hitOrder() {
+        for (const b of bricks) if (b.flee) yield b;
+        for (const b of bricks) if (!b.flee) yield b;
+    }
+
     // his BRANDON!, left hanging just under him where he said it. The same
     // for the one your first ball gets and the ones a hit rolls for.
     function bossShout(b) {
@@ -3311,7 +3322,7 @@
         if (b.y - ry < 0)  { b.y = ry;      b.vy =  Math.abs(b.vy); b.spin *= SPIN_WALL; }
         if (b.y - ry > LH) return false;
 
-        for (const br of bricks) {
+        for (const br of hitOrder()) {
             if (!br.alive) continue;
             // cheap reject, padded out to the wiggled bounding box
             // enough for the corners of a boss turned 45 degrees, too
@@ -5582,7 +5593,10 @@
                           (Math.random() - 0.5) * HIT_SHAKE * jolt);
         }
 
-        for (const b of bricks) if (b.alive) drawBrick(b);
+        // the reverse of the order the ball meets them in, so where two
+        // overlap, the one on top is the one it hits -- see hitOrder
+        const drawn = [...hitOrder()];
+        for (let i = drawn.length - 1; i >= 0; i--) if (drawn[i].alive) drawBrick(drawn[i]);
         if (phase === 'ascend') { drawBossFall(); drawImpact(); }
         drawRings();
         drawCapsule();
