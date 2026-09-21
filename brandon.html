@@ -201,6 +201,11 @@
 
         #debug button:hover { border-color: #6d685f; }
 
+        /* not a stage, so it stands apart from them, and quieter */
+        #debug button.reset { margin-top: 10px; color: #9a958c; }
+
+        #debug button:disabled { color: #4a453e; border-color: #2e2a24; cursor: default; }
+
         #debug p {
             margin-top: 6px;
             font-size: 0.72rem;
@@ -1280,6 +1285,10 @@
     function saveBest() {
         try { localStorage.setItem(BEST_KEY, String(best)); } catch (e) { /* private mode */ }
     }
+    function clearBest() {
+        best = 0;
+        try { localStorage.removeItem(BEST_KEY); } catch (e) { /* private mode */ }
+    }
 
     // ---- the leaderboard -----------------------------------------------------
     // One shared table for everyone, held by a small Cloudflare Worker (its
@@ -2230,6 +2239,32 @@
         btn.addEventListener('click', startGauntletAt);
         debugEl.appendChild(btn);
     })();
+    // Your best is kept in this browser and nothing in the game ever lowers
+    // it, so one set while testing, or under scoring that has since changed,
+    // would otherwise stand until someone cleared the site's data by hand.
+    // It takes two presses in a row, because any player can find this menu
+    // and a cleared best does not come back.
+    const resetBtn = document.createElement('button');
+    resetBtn.className = 'reset';
+    let resetArmed = false;
+    function labelReset(armed) {
+        resetArmed = armed;
+        resetBtn.textContent = armed ? 'PRESS AGAIN TO RESET' : 'RESET BEST  ·  ' + best;
+        resetBtn.disabled = best === 0;
+    }
+    resetBtn.addEventListener('click', () => {
+        if (!resetArmed) { labelReset(true); return; }
+        clearBest();
+        labelReset(false);
+    });
+    // Pressing anything else in the menu is changing your mind. A press is
+    // the one thing a finger and a mouse both send: a tapped button never
+    // takes focus on iOS, so blur only covers tabbing off it with keys.
+    debugEl.addEventListener('pointerdown', e => {
+        if (e.target !== resetBtn) labelReset(false);
+    });
+    resetBtn.addEventListener('blur', () => labelReset(false));
+    debugEl.appendChild(resetBtn);
     debugEl.appendChild(Object.assign(document.createElement('p'),
         { textContent: 'esc to go back' }));
 
@@ -2269,6 +2304,7 @@
         if (konami.length === KONAMI.length && KONAMI.every((k, i) => konami[i] === k)) {
             konami = [];
             freeMouse();                          // the menu is all buttons
+            labelReset(false);                    // the best as it stands now
             debugEl.hidden = false;
         }
     }, true);
