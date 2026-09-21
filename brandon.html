@@ -810,9 +810,7 @@
 
     // his entrance: an empty screen for a beat, then he lowers in from above
     // while the health bar grows out from nothing, so the size of the problem
-    // arrives gradually rather than all at once. The moment he is down and
-    // the bar is full, he yells for you. That one is not left to SHOUT_ODDS
-    // the way the yells in the fight are: every fight with him opens on it.
+    // arrives gradually rather than all at once
     const ENTER_WAIT = 0.7;
     const ENTER_SECS = 2.6;
     const CONTINUE_KEEP = 0.5;  // what survives of your score when you re-up
@@ -1309,6 +1307,7 @@
     let paddle, balls, popups, hits, tierSeen, bw, bh;
     let speed, capsule, fx, callout, clock = 0, spreadT = 0, bossPhase = 0;
     let bossHits = 0;             // landed on him, however much each was worth
+    let bossServed = false;       // your first ball has gone up at him, and he has yelled
     let bossTwo = false;          // he has had his second wind
     let siphon = null;            // the scene itself, while it plays
     let shrinkT = 0;              // seconds of play before you are yourself again
@@ -1626,6 +1625,7 @@
             bossPhase = 0;
             bossHits = 0;
             bossIF = 0;
+            bossServed = false;
             bossTwo = false; siphon = null; shrinkT = 0;
             motes = []; yell = null; tilt = null; lunge = null;
             resetBall();
@@ -2513,6 +2513,12 @@
         if (phase === 'ready') {
             releaseStuck();
             phase = 'play';
+            // he yells at the first ball you put up at him, every fight. Not
+            // left to SHOUT_ODDS the way the yells after it are.
+            if (LEVELS[stage].boss && !bossServed) {
+                bossServed = true;
+                bossShout(bricks[0]);
+            }
         } else if (phase === 'cleared') {
             if (!bonusRead()) { finishBonus(); return; }
             stage++;
@@ -2606,7 +2612,7 @@
     }
 
     // his BRANDON!, left hanging just under him where he said it. The same
-    // for the one every fight opens on and the ones a hit rolls for.
+    // for the one your first ball gets and the ones a hit rolls for.
     function bossShout(b) {
         shout = { x: b.x + bw * 0.88, y: b.y + bh + 8, life: SHOUT_SECS };
     }
@@ -3483,10 +3489,7 @@
 
         if (phase === 'entrance') {
             enterT += dt;
-            if (enterT >= ENTER_WAIT + ENTER_SECS) {
-                phase = 'ready';
-                bossShout(bricks[0]);   // down, with all of his health showing
-            }
+            if (enterT >= ENTER_WAIT + ENTER_SECS) phase = 'ready';
         }
 
         // the continue clock. dt is clamped and rAF sleeps in a hidden tab, so
