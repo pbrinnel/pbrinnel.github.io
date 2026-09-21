@@ -427,7 +427,7 @@
 
     const BASE_SPEED = 346;
     const MAX_SPEED  = 620;
-    // Every bounce off a brick winds the rally up by this much -- gold and the
+    // Every bounce off a brick winds the rally up by this much -- stone and the
     // boss included, since they turn you just the same. It compounds, so the
     // middle of a stage no longer sags the way a flat rally did. It is not the
     // only thing pushing: the milestone bumps in hitBrick stack on top, so how
@@ -938,7 +938,7 @@
     //
     // The last rung is its OWN colour, drawn from the wall you spent four
     // stages knocking down. An army of identical slate was a crowd; an army in
-    // red, orange, green and gold is the whole game coming back for you.
+    // red, orange, green and yellow is the whole game coming back for you.
     const G_HURT3    = '#9a6ec4';    // three left: violet
     const G_HURT2    = '#b9bcc4';    // two left: silver, exactly like the bricks
     const G_TOUGH    = 85;        // seconds until the mix is at its meanest
@@ -1233,14 +1233,14 @@
     // hue rather than getting a black wash over it
     const SILVER     = '#b9bcc4';
     const SILVER_HIT = '#7a8cb4';   // slate blue: still metal, and nothing like the stone
-    const GOLD       = '#7d776b';   // stone. the unbreakable ones are statues.
+    const STONE      = '#7d776b';   // the unbreakable ones are statues
 
     // ---- stages ------------------------------------------------------------
     // 7 across puts each brandon at ~90px, about two thirds of the paddle.
-    // . empty   Y/G/O/R tiers   S silver, multi-hit   X gold, indestructible
+    // . empty   Y/G/O/R tiers   S silver, multi-hit   X stone, indestructible
     // Each stage adds a RULE rather than just a new picture, and the workload
     // climbs -- 22, 26, 33 hits -- and eases only to 31 for the hat, which
-    // keeps SPLIT's gold and MESH's silver alongside its own rule so the
+    // keeps SPLIT's stone and MESH's silver alongside its own rule so the
     // run-in to the boss does not sag. `dbg` names them for the stage-select
     // only; nothing shows a stage name during play.
     const LEVELS = [
@@ -1251,7 +1251,7 @@
                    'GGGGGGG',
                    '.YYYYY.']
         },
-        {   dbg: 'SPLIT',  // gold: immovable geometry, worked around not through
+        {   dbg: 'SPLIT',  // stone: immovable geometry, worked around not through
             silverHp: 2,
             rows: ['RRRRRRR',
                    'OO.X.OO',
@@ -1272,8 +1272,8 @@
             talks: true,   // see FLEE_AT and STATUE_WAIT
             // silver only in the brim, and one buckle on the band: the bottom
             // row breaks in one hit as on every stage, and the crown, which is
-            // usually what is left when they run, stays one hit to catch. gold
-            // stands in both top corners until the round is over
+            // usually what is left when they run, stays one hit to catch. the
+            // statues stand in both top corners until the round is over
             rows: ['X.RRR.X',
                    '..RRR..',
                    '.OOSOO.',
@@ -3371,7 +3371,7 @@
             if (glances) rings.push({ x: hit.cx, y: hit.cy, t: 1 });
             else kick(br, -nx, -ny, 1);   // shoved away from where the ball struck
             hitBrick(br, hit.cx, hit.cy);
-            // it is the bounce that pays, not the wound: a glance off gold
+            // it is the bounce that pays, not the wound: a glance off stone
             // winds you up as much as breaking a red does. PIERCE is the one
             // contact that does not, because it does not turn you -- and a
             // whole row taken in one step would otherwise compound at once.
@@ -4506,7 +4506,7 @@
     }
 
     function brickColor(kind) {
-        return kind === 'X'  ? GOLD
+        return kind === 'X'  ? STONE
              : kind === 'S'  ? SILVER
              : kind === 'S2' ? SILVER_HIT
              : TIERS[kind].fill;
