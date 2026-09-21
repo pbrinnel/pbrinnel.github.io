@@ -778,6 +778,7 @@
 
     const SHOUT_ODDS = 0.1;     // how often a hit makes him say something
     const SHOUT_SECS = 1.3;
+    const SHOUT_WAIT = 1;       // your first serve at him always gets one, this long after it
 
     // The hat stage runs away. Once it is down to its last few, each of them
     // tosses a coin about saying his piece -- in a little bubble over his head
@@ -1307,7 +1308,8 @@
     let paddle, balls, popups, hits, tierSeen, bw, bh;
     let speed, capsule, fx, callout, clock = 0, spreadT = 0, bossPhase = 0;
     let bossHits = 0;             // landed on him, however much each was worth
-    let bossServed = false;       // your first ball has gone up at him, and he has yelled
+    let bossServed = false;       // your first ball has gone up at him
+    let shoutT = -1;              // ...and the seconds until he yells at it, negative once nothing waits
     let bossTwo = false;          // he has had his second wind
     let siphon = null;            // the scene itself, while it plays
     let shrinkT = 0;              // seconds of play before you are yourself again
@@ -1613,6 +1615,7 @@
         tierSeen = {};
         talk = []; fleeRoll = -1;          // -1: nobody has started deciding yet
         climb = 0;              // a fresh stage puts him back on his own line
+        shoutT = -1;            // ...and leaves no yell of the boss's still waiting
         // a round's tally starts here and nowhere else -- a lost life and a
         // continue both happen inside one, and neither may wipe it
         round = { lost: false, fast: false, heads: false, grit: false, hunter: 0, peak: 1 };
@@ -2513,11 +2516,12 @@
         if (phase === 'ready') {
             releaseStuck();
             phase = 'play';
-            // he yells at the first ball you put up at him, every fight. Not
-            // left to SHOUT_ODDS the way the yells after it are.
+            // he yells at the first ball you put up at him, every fight, once
+            // SHOUT_WAIT has gone by. Not left to SHOUT_ODDS the way the yells
+            // after it are.
             if (LEVELS[stage].boss && !bossServed) {
                 bossServed = true;
-                bossShout(bricks[0]);
+                shoutT = SHOUT_WAIT;
             }
         } else if (phase === 'cleared') {
             if (!bonusRead()) { finishBonus(); return; }
@@ -3499,6 +3503,8 @@
             overChoose('end');  // silence is a no. the run stands as it is.
         }
         stepPhantoms(dt);
+        // his yell at your first ball, where he is by the time it comes
+        if (shoutT >= 0 && (shoutT -= dt) < 0) bossShout(bricks[0]);
         if (shout && (shout.life -= dt) <= 0) shout = null;
         talk = talk.filter(t => (t.life -= dt) > 0);
         rings = rings.filter(r => (r.t -= dt * 2.6) > 0);
