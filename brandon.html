@@ -3889,9 +3889,11 @@
     }
 
     // ---- the fall ------------------------------------------------------------
-    // whoever is still standing nearest gets the throne. not the one that
-    // landed the shot -- the one that is THERE, which is the honest version of
-    // how you got it.
+    // The throne goes to the next one to arrive. Not the one that landed the
+    // shot, and nobody already standing -- nobody on the floor ever moves, and
+    // the army holding its ground is the whole ending, see drawGauntlet. He
+    // comes up from below the screen once you are on your way out, the way you
+    // came up once the boss was, which is the honest version of how you got it.
     function startFall() {
         phase = 'fall';
         fallT = 0;
@@ -3902,11 +3904,8 @@
         // won anything; it is just the caption this game puts under whoever
         // is on top.
         banner = 'BRANDON WINS';
-        const near = ships.filter(s => s.alive)
-            .sort((a, b) => Math.abs(a.x - king.x) - Math.abs(b.x - king.x))[0];
-        victor = near
-            ? { x: near.x, y: near.y, w: near.w, tint: near.tint, hp: near.hp, from: near }
-            : { x: LW / 2, y: G_SHIP_Y, w: G_SHIP_W, tint: null, hp: 1, from: null };
+        // under the spot you fell from, in any arrival's colour -- see drawVictor
+        victor = { x: king.x, tint: TIER_KEYS[(Math.random() * TIER_KEYS.length) | 0] };
         gShake = 1;
         kingFall = shatter(king.x, G_Y, kingShown, F_SPAN);
         hitStop(king.x, kingY(), kingShown);       // the same blow, your turn
@@ -5024,7 +5023,6 @@
     function drawShips() {
         // back rank first, so the ones nearer you end up on top
         for (const s of ships.slice().sort((a, b) => a.y - b.y)) {
-            if (victor && s === victor.from) continue;   // he is on his way up
             const sprite = shipSprite(s.hp, s.tint);
             if (!sprite) continue;
             const t = s.alive ? 1 : s.dead / G_DEATH;
@@ -5162,9 +5160,13 @@
         drawCrumble(kingFall, sag, lean, true);
     }
 
-    // The successor, climbing into the space you are leaving. He arrives at the
-    // width YOU started at, because that is what he inherits, and the tint comes
-    // off him on the way up -- he stops being one of a crowd and becomes the
+    // The successor, climbing into the space you are leaving. He walks on from
+    // below the screen at an arrival's size, the way every one of them does,
+    // and sets off with his head just under the bottom edge, so he comes into
+    // view a sliver at a time and there is no frame on which he appears. Then,
+    // instead of stopping in a rank, he keeps coming. He arrives at the width
+    // YOU started at, because that is what he inherits, and the tint comes off
+    // him on the way up -- he stops being one of a crowd and becomes the
     // photograph. The ease is quintic rather than smoothstep so the first
     // seconds are almost imperceptible: he is not charging the throne, he is
     // arriving at something already decided.
@@ -5172,10 +5174,11 @@
         if (!victor || fallT < F_RISE_AT) return;
         const raw = Math.min(1, (fallT - F_RISE_AT) / F_RISE);
         const t = raw * raw * raw * (raw * (raw * 6 - 15) + 10);
-        const w = victor.w + (G_W0 - victor.w) * t;
-        const y = victor.y + (G_Y - victor.y) * t;
+        const y0 = LH + G_SHIP_H / 2;
+        const w = G_SHIP_W + (G_W0 - G_SHIP_W) * t;
+        const y = y0 + (G_Y - y0) * t;
         const x = victor.x + (LW / 2 - victor.x) * t;
-        const sprite = shipSprite(victor.hp, victor.tint);
+        const sprite = shipSprite(1, victor.tint);
         if (sprite && t < 1) {
             ctx.globalAlpha = 1 - t;
             ctx.drawImage(sprite, x - w / 2, y - w / SHAPE_ASPECT / 2,
