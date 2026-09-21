@@ -164,7 +164,7 @@
             color: #f2efe9;
         }
 
-        /* stage select, unlocked with the konami code */
+        /* stage select, unlocked with the konami code or ?debug */
         #debug {
             position: fixed;
             inset: 0;
@@ -230,6 +230,23 @@
             .hint { display: none; }
             /* at this size the screen's own edge is the border */
             #stage { border-color: transparent; }
+        }
+
+        /* in one column the stage menu stands taller than a landscape phone,
+           so there the stages pair up. portrait keeps the column: a phone that
+           short is too narrow for two. */
+        @media (max-height: 560px) and (orientation: landscape) {
+            #debug {
+                display: grid;
+                grid-template-columns: repeat(2, auto);
+                align-content: center;
+                justify-content: center;
+                gap: 10px;
+            }
+            #debug h2, #debug p, #debug button.reset {
+                grid-column: 1 / -1;
+                justify-self: center;
+            }
         }
 
         /* the field is 4:3, which leaves a portrait phone showing a postage
@@ -2301,13 +2318,26 @@
         }
         konami.push(e.code);
         if (konami.length > KONAMI.length) konami.shift();
-        if (konami.length === KONAMI.length && KONAMI.every((k, i) => konami[i] === k)) {
-            konami = [];
-            freeMouse();                          // the menu is all buttons
-            labelReset(false);                    // the best as it stands now
-            debugEl.hidden = false;
-        }
+        if (konami.length === KONAMI.length && KONAMI.every((k, i) => konami[i] === k)) openMenu();
     }, true);
+
+    function openMenu() {
+        konami = [];
+        freeMouse();                              // the menu is all buttons
+        labelReset(false);                        // the best as it stands now
+        debugEl.hidden = false;
+    }
+
+    // A phone has no keys to enter the code with, so the address can ask for
+    // the menu instead: brandon.html?debug opens it as the page loads. The
+    // splash is cleared first and the wake lock taken, as a tap on it would:
+    // a tap that clears the splash can lose its click (see splash), and the
+    // first tap here chooses a stage.
+    if (new URLSearchParams(location.search).has('debug')) {
+        splash.hidden = true;
+        keepAwake();
+        openMenu();
+    }
 
     // ---- initials ------------------------------------------------------------
     // 26 letters plus DEL and OK across seven columns. Tappable for phones and
