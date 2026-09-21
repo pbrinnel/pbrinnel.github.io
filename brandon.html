@@ -463,6 +463,10 @@
     // row here plus whatever sets its flag on `round`. `many` is what separates
     // a condition from a tally: a tallied row always prints xN, even at x1,
     // because the count is the point of it.
+    //
+    // The end of a reign in the gauntlet goes out on the same screen, with
+    // the same reveal and the same rule about when the score moves. It has
+    // its own rows, not these -- see endOfReign.
     const EOR_BASE = 500;       // ...times the round number, so later rounds pay more
     // every head the field will hold at once, so the row names its own number
     // and raising MAX_BALLS renames the bonus with it
@@ -496,6 +500,11 @@
     // The floor clears the paddle's line; the ceiling clears the wall.
     const EOR_TOP   = 210;
     const EOR_BOT   = 506;
+    // The end of a reign has an army standing under it for the whole fall, and
+    // with no band to hide behind, a list laid down to EOR_BOT prints its last
+    // line through their heads. It stops this far above the back rank of a
+    // full floor instead -- see endOfReign.
+    const EOR_ARMY_GAP = 10;
     const EOR_PITCH = 30;       // row to row at full size
     const EOR_W     = 420;      // label at one edge of this, points at the other
     const EOR_TITLE_U = 1.5;    // the title's share of the height, in pitches
@@ -1038,9 +1047,10 @@
     // on a run, IS worth almost nothing, and the number climbing as the streak
     // does is the whole feedback the mode gives you.
     const G_PTS_KILL = 5;
-    // Paid once, at the end, on the title. Four times what it was: the lump
-    // has to feel like a result when it lands next to the words, and at ten
-    // a point a whole reign was worth less than a handful of kills.
+    // Paid once, at the end, as the TIME BONUS line on the same screen a round
+    // ends on -- see endOfReign. Four times what it was: the lump has to feel
+    // like a result when it lands, and at ten a point a whole reign was worth
+    // less than a handful of kills.
     const G_PTS_SEC  = 40;
 
     // The streak, which every kill pays through. It does NOT reset on a hit.
@@ -1247,7 +1257,7 @@
     let gMark = null, gMarkT = 0, gBlast = [];
     let gMult = 1, gMultT = 0;    // the streak, and how long since it last grew
     let gAbsorbT = 0, gAbsorbLeft = 0;
-    let gReady = false, kingShown = 0, gLead = 0, gTimeBonus = 0;
+    let gReady = false, kingShown = 0, gLead = 0;
     let gIn = 0;                  // seconds since the throne became yours -- see G_IN
     // the health TOTAL the bar is currently drawn for, chased the way kingShown
     // chases his width, so a life going in extends the meter over the same beat
@@ -2336,7 +2346,13 @@
         if (phase === 'gauntlet') { throwHead(); return; }
         if (phase === 'absorb') return;
         if (phase === 'fall') {
-            if (fallT > F_AGAIN) endRun();        // no continue from the throne
+            // no continue from the throne, and nothing at all before F_AGAIN.
+            // after it, the same rule as a stage clear: a count still running
+            // is finished, and only a screen that has been read ends the run.
+            if (fallT > F_AGAIN) {
+                if (!bonusRead()) { finishBonus(); return; }
+                endRun();
+            }
             return;
         }
         if (phase === 'ascend' || phase === 'entrance' || phase === 'initials') return;
@@ -2345,15 +2361,7 @@
             releaseStuck();
             phase = 'play';
         } else if (phase === 'cleared') {
-            // a tap on a screen still counting itself up finishes the count --
-            // it never skips past it. nothing here may cost you points, and a
-            // tap already on its way when the last brick fell would otherwise
-            // take the whole screen with it.
-            if (!bonusRead()) {
-                eor.t = eorTotalAt(eor) + EOR_FADE + EOR_LINGER;
-                payBonus();
-                return;
-            }
+            if (!bonusRead()) { finishBonus(); return; }
             stage++;
             buildStage(stage);
             banner = '';
@@ -2544,7 +2552,36 @@
             const n = met[r.key];
             if (n > 0) rows.push({ label: r.label + (r.many ? ' x' + n : ''), pts: r.pts * n });
         }
-        return { rows, total: rows.reduce((s, r) => s + r.pts, 0), t: 0, paid: false };
+        return bonusScreen(rows);
+    }
+
+    // The same screen at the end of a reign. There is one thing to pay here,
+    // the time bonus: never paid by the second (see gRunT), and no longer paid
+    // the moment you die either -- it waits for its line, like everything else
+    // this screen pays.
+    //
+    // It is laid out in the gap between the throne and the army. The floor is
+    // taken off a FULL floor's back rank rather than the one standing there,
+    // so the list sits in the same place however many were left to watch.
+    function endOfReign() {
+        const army = slotY(G_MAX - 1) - G_SHIP_H / 2 - G_SHIP_BOB;
+        return bonusScreen([{ label: 'TIME BONUS', pts: Math.round(gRunT * G_PTS_SEC) }],
+                           army - EOR_ARMY_GAP);
+    }
+
+    // `bot` is the lowest the list may reach -- see EOR_BOT
+    function bonusScreen(rows, bot = EOR_BOT) {
+        return { rows, total: rows.reduce((s, r) => s + r.pts, 0), t: 0, paid: false, bot };
+    }
+
+    // Whether the screen is up. Three things put one up, each on its own beat:
+    // a stage clear at once, the takeover at its title, the fall at its.
+    // Everything that ticks it or draws it asks here, so the three cannot
+    // disagree about when it is showing.
+    function eorShowing() {
+        return !!eor && (phase === 'cleared'
+            || (phase === 'ascend' && ascendT >= A_TITLE)
+            || (phase === 'fall' && fallT >= F_TITLE));
     }
 
     // when the total lands, which is also when it is paid
@@ -2552,8 +2589,25 @@
     // ...and when the screen has been up long enough to have been read
     function bonusRead() { return !eor || eor.t >= eorTotalAt(eor) + EOR_FADE + EOR_LINGER; }
 
+    // counting itself up a line at a time. the score does not move until the
+    // last line has landed -- see EOR_IN.
+    function stepBonus(dt) {
+        if (!eorShowing()) return;
+        eor.t += dt;
+        if (eor.t >= eorTotalAt(eor)) payBonus();
+    }
+
+    // A tap on a screen still counting itself up finishes the count -- it never
+    // skips past it. Nothing on it may cost you points, and a tap already on its
+    // way when the screen went up would otherwise take the whole thing with it.
+    function finishBonus() {
+        eor.t = Math.max(eor.t, eorTotalAt(eor) + EOR_FADE + EOR_LINGER);
+        payBonus();
+    }
+
     // How much of it is still on screen. It only leaves on the takeover, which
-    // is the one place nothing is waiting for a tap; a stage clear holds at 1.
+    // is the one place nothing is waiting for a tap; a stage clear and the end
+    // of a reign both hold at 1 until you move on.
     function eorOut() {
         if (!eor || phase !== 'ascend') return 1;
         const gone = (eor.t - eorTotalAt(eor) - EOR_FADE - EOR_LINGER) / EOR_OUT;
@@ -2564,7 +2618,10 @@
     function payBonus() {
         if (!eor || eor.paid) return;
         eor.paid = true;
-        score += eor.total;
+        // the cap holds here too: a reign that ran the number out ends on the
+        // spot (see hitShip), and its time bonus must not carry it past what
+        // the board will take
+        score = Math.min(SCORE_CAP, score + eor.total);
         if (score > best) { best = score; saveBest(); }
     }
 
@@ -3254,12 +3311,7 @@
         talk = talk.filter(t => (t.life -= dt) > 0);
         rings = rings.filter(r => (r.t -= dt * 2.6) > 0);
 
-        // the end-of-round screen, counting itself up a line at a time. the
-        // score does not move until the last line has landed -- see EOR_IN.
-        if (eor && (phase === 'cleared' || (phase === 'ascend' && ascendT >= A_TITLE))) {
-            eor.t += dt;
-            if (eor.t >= eorTotalAt(eor)) payBonus();
-        }
+        stepBonus(dt);           // the end-of-round screen, if one is up
 
         // the takeover. when it finishes, the banner finally lands.
         // the takeover used to end the game. now it hands over.
@@ -3803,10 +3855,13 @@
     function startFall() {
         phase = 'fall';
         fallT = 0;
-        // everything you were owed for staying up here, paid at once
-        gTimeBonus = Math.round(gRunT * G_PTS_SEC);
-        score += gTimeBonus;
-        if (score > best) { best = score; saveBest(); }
+        // what you were owed for staying up here, as the screen that goes up at
+        // F_TITLE and pays once it has been read -- see eorShowing
+        eor = endOfReign();
+        // the same two words that were on the screen when YOU took it. nobody
+        // won anything; it is just the caption this game puts under whoever
+        // is on top.
+        banner = 'BRANDON WINS';
         const near = ships.filter(s => s.alive)
             .sort((a, b) => Math.abs(a.x - king.x) - Math.abs(b.x - king.x))[0];
         victor = near
@@ -3956,6 +4011,9 @@
                 fallT += dt;
                 stepCrumble(kingFall, dt, F_BREAK);
             }
+            // the main update never runs out here, so the screen's clock has to
+            // be stepped twice, once on each side of the fork
+            stepBonus(dt);
             return;
         }
 
@@ -4728,9 +4786,10 @@
 
     // The end-of-round screen: the title, one row per bonus, a rule, the total,
     // and the line underneath. Everything is sized off ONE pitch, and the pitch
-    // is whatever fits the whole list between EOR_TOP and EOR_BOT -- so a round
-    // that earned every bonus shrinks to fit instead of running off the bottom,
-    // the same trick the leaderboard uses on its ten rows.
+    // is whatever fits the whole list between EOR_TOP and the screen's own
+    // floor -- so a round that earned every bonus shrinks to fit instead of
+    // running off the bottom, the same trick the leaderboard uses on its ten
+    // rows.
     //
     // The list is laid out at its FINAL height from the first frame and the
     // rows only fade up, so nothing moves under you while you are reading it.
@@ -4744,7 +4803,8 @@
     //
     // On the takeover it also has to LEAVE, because nothing there waits for a
     // tap. It goes the way it came, over EOR_OUT, and the handover waits for
-    // it -- see bonusGone. On a stage clear it stands until you move on.
+    // it -- see bonusGone. On a stage clear, and at the end of a reign, it
+    // stands until you move on.
     function drawBonus(u) {
         const out = eorOut();
         const n = eor.rows.length;
@@ -4752,9 +4812,9 @@
         // line, and printing the same number twice reads as a fault
         const sum = n > 1;
         const units = EOR_TITLE_U + n + (sum ? EOR_RULE_U + 1 : 0) + EOR_HINT_U;
-        const pitch = Math.min(EOR_PITCH * Math.min(u, 1.25), (EOR_BOT - EOR_TOP) / units);
+        const pitch = Math.min(EOR_PITCH * Math.min(u, 1.25), (eor.bot - EOR_TOP) / units);
         const h = pitch * units;
-        const top = (EOR_TOP + EOR_BOT) / 2 - h / 2;
+        const top = (EOR_TOP + eor.bot) / 2 - h / 2;
         const lx = LW / 2 - EOR_W / 2, rx = LW / 2 + EOR_W / 2;
 
         // lineJoin is set below and nothing else in the file sets it -- without
@@ -4806,9 +4866,13 @@
             ctx.globalAlpha = out;
         }
 
-        if (bonusRead() && phase === 'cleared') {
-            cut('click/tap to continue', LW / 2, top + h, Math.min(15 * u, pitch * 0.55),
-                '#9a958c', 'center');
+        // what a tap does now, once a tap does anything. the takeover gets no
+        // line: nothing there is waiting on you. the fall keeps its own rule
+        // about when you may leave -- see F_AGAIN.
+        const hint = phase === 'cleared' ? 'click/tap to continue'
+                   : phase === 'fall' && fallT > F_AGAIN ? 'click/tap to end the run' : '';
+        if (hint && bonusRead()) {
+            cut(hint, LW / 2, top + h, Math.min(15 * u, pitch * 0.55), '#9a958c', 'center');
         }
         ctx.restore();
     }
@@ -5266,30 +5330,8 @@
         }
 
 
-        if (phase === 'fall') {
-            const band = Math.min(1, Math.max(0, (fallT - F_TITLE + 0.6) / 0.9));
-            if (band > 0.01) {
-                ctx.globalAlpha = band * 0.72;
-                ctx.fillStyle = '#000';
-                ctx.fillRect(0, 360, LW, 132);
-                ctx.globalAlpha = 1;
-            }
-            const fade = t0 => Math.min(1, Math.max(0, (fallT - t0) / 1.1));
-            if (fallT > F_TITLE) {
-                // the same two words that were on the screen when YOU took it.
-                // nobody won anything; it is just the caption this game puts
-                // under whoever is on top.
-                ctx.globalAlpha = fade(F_TITLE);
-                text('BRANDON WINS   +' + gTimeBonus, LW / 2, 412, 34 * u,
-                     '#f2efe9', 'center');
-                ctx.globalAlpha = 1;
-            }
-            if (fallT > F_AGAIN) {
-                ctx.globalAlpha = fade(F_AGAIN);
-                text('click/tap to end the run', LW / 2, 472, 14 * u, '#6d685f', 'center');
-                ctx.globalAlpha = 1;
-            }
-        }
+        // the end of a reign gets the screen every round gets -- see drawBonus
+        if (eorShowing()) drawBonus(u);
     }
 
     // how much of the angle the boss died at is still on him: all of it through
@@ -5529,7 +5571,7 @@
 
         // the end-of-round screen stands in for the band, and takes the same
         // beat on the takeover that the band used to -- see drawBonus
-        if (eor && (phase === 'cleared' || (phase === 'ascend' && ascendT >= A_TITLE))) {
+        if (eorShowing()) {
             drawBonus(u);
             return;
         }
