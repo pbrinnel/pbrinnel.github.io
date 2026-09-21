@@ -1167,9 +1167,10 @@
     // 7 across puts each brandon at ~90px, about two thirds of the paddle.
     // . empty   Y/G/O/R tiers   S silver, multi-hit   X gold, indestructible
     // Each stage adds a RULE rather than just a new picture, and the workload
-    // climbs -- 22, 26, 33 hits -- then deliberately dips for the hat before
-    // the boss. `dbg` names them for the stage-select only; nothing shows a
-    // stage name during play.
+    // climbs -- 22, 26, 33 hits -- and eases only to 31 for the hat, which
+    // keeps MESH's silver alongside its own rule so the run-in to the boss
+    // does not sag. `dbg` names them for the stage-select only; nothing shows
+    // a stage name during play.
     const LEVELS = [
         {   dbg: 'WALL',   // plain. a short opener, to teach the paddle angle
             silverHp: 2,
@@ -1194,13 +1195,16 @@
                    'OOOOOOO',
                    '.GGGGG.']
         },
-        {   dbg: 'HAT',    // the joke, and a deliberate breather before the boss
+        {   dbg: 'HAT',    // the joke: the last few talk back and run for it
             silverHp: 2,
             talks: true,   // see FLEE_AT
+            // silver only in the brim, and one buckle on the band: the bottom
+            // row breaks in one hit as on every stage, and the crown, which is
+            // usually what is left when they run, stays one hit to catch
             rows: ['..RRR..',
                    '..RRR..',
-                   '.OOOOO.',
-                   'YYYYYYY',
+                   '.OOSOO.',
+                   'SSSSSSS',
                    '.YYYYY.']
         },
         {   dbg: 'BOSS',   // one enormous brandon, no bricks at all
