@@ -1234,6 +1234,11 @@
     const SILVER     = '#b9bcc4';
     const SILVER_HIT = '#7a8cb4';   // slate blue: still metal, and nothing like the stone
     const STONE      = '#7d776b';   // the unbreakable ones are statues
+    // ...and they wear a rim of paler stone round the outside, which nothing
+    // breakable does -- see statueSprite
+    const STONE_RIM     = '#b8ae9b';
+    const STONE_RIM_W   = 2.5;      // px out from his edge
+    const STONE_RIM_PAD = Math.ceil(STONE_RIM_W) + 1;   // room in the sprite for it
 
     // ---- stages ------------------------------------------------------------
     // 7 across puts each brandon at ~90px, about two thirds of the paddle.
@@ -4507,6 +4512,36 @@
         return c;
     }
 
+    // A statue, rim and all: the one thing on the wall that says it will not
+    // come apart. The rim is only paint -- the ball meets the outline it always
+    // did -- so the sprite is STONE_RIM_PAD bigger than his box all round, and
+    // drawBrick draws it that much further out. The rim is his silhouette
+    // grown by STONE_RIM_W: copies of it shifted round rings out that far.
+    function statueSprite() {
+        const k = 'statue@' + Math.round(bw);
+        if (spriteCache.has(k)) return spriteCache.get(k);
+        const base = shapeSprite('X', STONE, bw, bh, 'statue');
+        const sil = shapeSprite('rim', STONE_RIM, bw, bh, true);
+        if (!base || !sil) return null;
+
+        const m = STONE_RIM_PAD;
+        const c = document.createElement('canvas');
+        c.width = Math.round((bw + 2 * m) * SS);
+        c.height = Math.round((bh + 2 * m) * SS);
+        const g = c.getContext('2d');
+        g.scale(SS, SS);
+        for (let r = 0.5; r <= STONE_RIM_W + 1e-6; r += 0.5) {
+            const n = Math.max(12, Math.ceil(r * 12));
+            for (let i = 0; i < n; i++) {
+                const a = i / n * Math.PI * 2;
+                g.drawImage(sil, m + Math.cos(a) * r, m + Math.sin(a) * r, bw, bh);
+            }
+        }
+        g.drawImage(base, m, m, bw, bh);
+        spriteCache.set(k, c);
+        return c;
+    }
+
     function brickColor(kind) {
         return kind === 'X'  ? STONE
              : kind === 'A'  ? GOLD
@@ -4570,15 +4605,16 @@
         // never a dark wash over the top of him
         const multi = b.kind === 'S' || b.kind === 'A';
         const kind = !multi ? b.kind : b.hp >= 3 ? 'A' : b.hp === 2 ? 'S' : 'S2';
-        const sprite = shapeSprite(kind, brickColor(kind), bw, bh,
-                                   kind === 'X' ? 'statue' : false);
+        const statue = kind === 'X';
+        const sprite = statue ? statueSprite() : shapeSprite(kind, brickColor(kind), bw, bh, false);
         if (!sprite) return;
+        const m = statue ? STONE_RIM_PAD : 0;
 
         const o = b.jt > 0 ? wobble(b.jt) * JIG_BRICK : 0;
         ctx.save();
         ctx.translate(b.x + b.jnx * o + bw / 2, b.y + b.jny * o + bh / 2);
         if (b.wigA) ctx.rotate(b.wigA);
-        ctx.drawImage(sprite, -bw / 2, -bh / 2, bw, bh);
+        ctx.drawImage(sprite, -bw / 2 - m, -bh / 2 - m, bw + 2 * m, bh + 2 * m);
         if (b.flash > 0) {
             ctx.globalAlpha = Math.min(1, b.flash) * 0.75;
             ctx.drawImage(shapeSprite('flash', '#f2efe9', bw, bh, true), -bw / 2, -bh / 2, bw, bh);
