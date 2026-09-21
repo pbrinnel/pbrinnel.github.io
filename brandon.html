@@ -509,13 +509,16 @@
 
     // ---- the end of round bonus ----------------------------------------------
     // What clearing a round pays on top of what you knocked down getting there.
-    // The base is always there; the rest are conditions you either met or did
+    // The base is always there, and so is MAX BONUS, which pays on the best
+    // BONUS the round reached. The rest are conditions you either met or did
     // not, and the two that can happen more than once print their count.
     //
     // The screen is built from this table, in this order, so a new bonus is a
     // row here plus whatever sets its flag on `round`. `many` is what separates
     // a condition from a tally: a tallied row always prints xN, even at x1,
-    // because the count is the point of it.
+    // because the count is the point of it. `mul` is a tally of a multiplier
+    // rather than a count: it prints to a tenth, the way BONUS does, and pays
+    // `pts` per x, tenths and all.
     //
     // The end of a reign in the gauntlet goes out on the same screen, with
     // the same reveal and the same rule about when the score moves. It has
@@ -525,6 +528,9 @@
     // and raising MAX_BALLS renames the bonus with it
     const HEADS_AT = MAX_BALLS;
     const EOR_ROWS = [
+        // first, straight under the base: it is the other row that is always
+        // there, so the two never move and what you earned lines up after them
+        { key: 'peak',     label: 'MAX BONUS',       pts: 100, mul: true },
         { key: 'flawless', label: 'FLAWLESS',        pts: 1000 },
         { key: 'multi',    label: 'MULTI-FINISH',    pts: 300 },
         { key: 'spare',    label: 'SPARE BALL',      pts: 800, many: true },
@@ -1105,6 +1111,9 @@
     // like a result when it lands, and at ten a point a whole reign was worth
     // less than a handful of kills.
     const G_PTS_SEC  = 40;
+    // ...and MAX MULT, on the same screen, pays this for every x of the best
+    // the streak reached -- the gauntlet's MAX BONUS
+    const G_PTS_MULT = 100;
 
     // The streak, which every kill pays through. It does NOT reset on a hit.
     // You arrive on the throne 760 across a 800 field, where there is nowhere
@@ -1313,6 +1322,7 @@
     let gDropAt = [];             // when each recent powerup turned up, oldest first
     let gMark = null, gMarkT = 0, gBlast = [];
     let gMult = 1, gMultT = 0;    // the streak, and how long since it last grew
+    let gMultTop = 1;             // ...and the most it has been this reign -- see MAX MULT
     let gAbsorbT = 0, gAbsorbLeft = 0;
     let gReady = false, kingShown = 0, gLead = 0;
     let gIn = 0;                  // seconds since the throne became yours -- see G_IN
@@ -1524,6 +1534,20 @@
 
     function liveSpinMul() { return spinMul(liveTurn()); }
 
+    // A multiplier to the tenth the screen prints it at. Everything that
+    // prints one or pays on one rounds it here, so a row can never name one
+    // number and pay for another. toFixed alone will not do: it rounds 2.15
+    // down and this rounds it up.
+    function tenth(m) { return Math.round(m * 10) / 10; }
+
+    // BONUS, the number along the bottom: everything the next hit is
+    // multiplied by. The HUD prints it and MAX BONUS keeps the best of it.
+    function bonusNow() { return tenth(comboMul() * liveSpinMul() * scoreMul()); }
+
+    // The gauntlet's streak as its corner prints it, without the ".0" on a
+    // whole one. MAX MULT names its best the same way.
+    function multText(m) { return 'x' + tenth(m).toFixed(1).replace(/\.0$/, ''); }
+
     function aim(b, angle) {
         const a = Math.max(-STEER_CAP, Math.min(STEER_CAP, angle));
         const s = effSpeed();
@@ -1580,7 +1604,7 @@
         climb = 0;              // a fresh stage puts him back on his own line
         // a round's tally starts here and nowhere else -- a lost life and a
         // continue both happen inside one, and neither may wipe it
-        round = { lost: false, fast: false, heads: false, grit: false, hunter: 0 };
+        round = { lost: false, fast: false, heads: false, grit: false, hunter: 0, peak: 1 };
         eor = null;
 
         if (lvl.boss) {
@@ -1909,7 +1933,7 @@
         gVolley = []; gDropAt = []; kingFall = null; bossFall = null; victor = null; ascendT = 0;
         impact = null;
         gReady = false; gSpread = 0; gBurst = 0; gRapid = 0;
-        gMark = null; gMarkT = 0; gBlast = []; gMult = 1; gMultT = 0;
+        gMark = null; gMarkT = 0; gBlast = []; gMult = 1; gMultT = 0; gMultTop = 1;
         showCursor(false);
         setHint(HINT_PLAY);
         buildStage(0);
@@ -2654,6 +2678,10 @@
         const boss = stage === LEVELS.length - 1;
         const rows = [{ label: 'END OF ROUND BONUS', pts: EOR_BASE * (stage + 1) }];
         const met = {
+            // the hit that ends a round moves BONUS in the same step that ends
+            // play, so update never reads it. One more look here, or the screen
+            // names less than the BONUS still showing under it.
+            peak:     Math.max(round.peak, bonusNow()),
             flawless: !round.lost ? 1 : 0,
             multi:    balls.length > 1 ? 1 : 0,
             // only the throne converts lives, so only the throne pays for them,
@@ -2667,23 +2695,31 @@
         };
         for (const r of EOR_ROWS) {
             const n = met[r.key];
-            if (n > 0) rows.push({ label: r.label + (r.many ? ' x' + n : ''), pts: r.pts * n });
+            if (n <= 0) continue;
+            const x = r.mul ? ' x' + n.toFixed(1) : r.many ? ' x' + n : '';
+            // rounded, because a tenth multiplies out a hair off whole in floats
+            rows.push({ label: r.label + x, pts: Math.round(r.pts * n) });
         }
         return bonusScreen(rows);
     }
 
-    // The same screen at the end of a reign. There is one thing to pay here,
-    // the time bonus: never paid by the second (see gRunT), and no longer paid
-    // the moment you die either -- it waits for its line, like everything else
-    // this screen pays.
+    // The same screen at the end of a reign, with two rows of its own. The time
+    // bonus is never paid by the second (see gRunT), nor the moment you die --
+    // it waits for its line, like everything else this screen pays. MAX MULT
+    // is what MAX BONUS is on a round, the best the streak reached. It is not
+    // called BONUS because nothing in the gauntlet is: its multiplier is the
+    // bare x beside the score, so the row names it the way that prints it.
     //
     // It is laid out in the gap between the throne and the army. The floor is
     // taken off a FULL floor's back rank rather than the one standing there,
     // so the list sits in the same place however many were left to watch.
     function endOfReign() {
         const army = slotY(G_MAX - 1) - G_SHIP_H / 2 - G_SHIP_BOB;
-        return bonusScreen([{ label: 'TIME BONUS', pts: Math.round(gRunT * G_PTS_SEC) }],
-                           army - EOR_ARMY_GAP);
+        const top = tenth(gMultTop);
+        return bonusScreen([
+            { label: 'TIME BONUS', pts: Math.round(gRunT * G_PTS_SEC) },
+            { label: 'MAX MULT ' + multText(top), pts: Math.round(G_PTS_MULT * top) }
+        ], army - EOR_ARMY_GAP);
     }
 
     // `bot` is the lowest the list may reach -- see EOR_BOT
@@ -3575,6 +3611,9 @@
         // GOTTA GO FAST reads the same rounded number the rule under BONUS
         // fills off, so what earns it is exactly the bar you watched top out
         if (phase === 'play' && liveSpinMul() >= SPIN_MUL) round.fast = true;
+        // ...and MAX BONUS keeps the best BONUS read, off the same number the
+        // HUD draws after this frame
+        if (phase === 'play') round.peak = Math.max(round.peak, bonusNow());
 
         // the falling capsule
         if (capsule) {
@@ -3616,7 +3655,7 @@
         ships = []; gBul = []; gThrow = []; sparks = []; gDrop = []; gVolley = []; gDropAt = [];
         gRunT = 0; gSpawnT = 0; gCool = 0; gShake = 0;
         gSpread = 0; gBurst = 0; gRapid = 0;
-        gMark = null; gMarkT = 0; gBlast = []; gMult = 1; gMultT = 0;
+        gMark = null; gMarkT = 0; gBlast = []; gMult = 1; gMultT = 0; gMultTop = 1;
         fallT = 0; kingFall = null; victor = null; bossFall = null; impact = null;
         phantoms = [];                  // nothing of the old fight comes through
         balls = [];
@@ -3853,6 +3892,9 @@
                       color: marked ? '#c9a94e' : '#f2efe9', life: 1 });
         gMult = Math.min(G_MULT_MAX, gMult + G_MULT_STEP);
         gMultT = 0;
+        // a kill is the only thing that raises it, so this is the only place
+        // its best can be set -- and before the cap below can end the reign
+        gMultTop = Math.max(gMultTop, gMult);
         if (score > best) { best = score; saveBest(); }
         // The worker refuses anything over ten million and the table clamps at
         // 9,999,999, so a reign that somehow got there would be posting a score
@@ -4924,8 +4966,8 @@
     function drawBonus(u) {
         const out = eorOut();
         const n = eor.rows.length;
-        // a round that earned nothing extra has a total identical to its only
-        // line, and printing the same number twice reads as a fault
+        // a list of one line has a total identical to it, and printing the
+        // same number twice reads as a fault
         const sum = n > 1;
         const units = EOR_TITLE_U + n + (sum ? EOR_RULE_U + 1 : 0) + EOR_HINT_U;
         const pitch = Math.min(EOR_PITCH * Math.min(u, 1.25), (eor.bot - EOR_TOP) / units);
@@ -5406,8 +5448,7 @@
             // measured in the font the line above just set, the same way the
             // capsule row spaces itself
             const sw = ctx.measureText('SCORE ' + Math.floor(score)).width;
-            text('x' + gMult.toFixed(1).replace(/\.0$/, ''),
-                 15 * u + sw + 10 * u, 27 * u, 15 * u, '#c9a94e');
+            text(multText(gMult), 15 * u + sw + 10 * u, 27 * u, 15 * u, '#c9a94e');
         }
 
         // What you are carrying, in the same words and colours the stages
@@ -5567,7 +5608,7 @@
         // in the row behind it.
         // to a tenth, and everything below reads the rounded number, so the
         // size can never disagree with the digits about which whole x it is on
-        const mul = Math.round(comboMul() * liveSpinMul() * scoreMul() * 10) / 10;
+        const mul = bonusNow();
         const mulLabel = 'x' + mul.toFixed(1) + ' BONUS';
         // a size up from the rest of the row, since it is the one to watch,
         // and a point bigger again for every whole x past the first, so x2.0
