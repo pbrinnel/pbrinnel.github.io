@@ -810,14 +810,11 @@
 
     // his entrance: an empty screen for a beat, then he lowers in from above
     // while the health bar grows out from nothing, so the size of the problem
-    // arrives gradually rather than all at once.
-    //
-    // He is heard before he is seen. Partway through the empty beat he yells
-    // for you from above the screen, and he is not left to SHOUT_ODDS for it
-    // the way he is in the fight: every fight with him opens on that yell.
-    const ENTER_SHOUT = 0.35;   // the empty screen before he yells
-    const ENTER_WAIT  = 0.7;    // ...and before he starts down
-    const ENTER_SECS  = 2.6;
+    // arrives gradually rather than all at once. The moment he is down and
+    // the bar is full, he yells for you. That one is not left to SHOUT_ODDS
+    // the way the yells in the fight are: every fight with him opens on it.
+    const ENTER_WAIT = 0.7;
+    const ENTER_SECS = 2.6;
     const CONTINUE_KEEP = 0.5;  // what survives of your score when you re-up
     // The clock is on the OFFER, not on the ceremony. Ten seconds to decide
     // whether to spend another quarter, and if you let it run out the run is
@@ -2608,6 +2605,12 @@
         }
     }
 
+    // his BRANDON!, left hanging just under him where he said it. The same
+    // for the one every fight opens on and the ones a hit rolls for.
+    function bossShout(b) {
+        shout = { x: b.x + bw * 0.88, y: b.y + bh + 8, life: SHOUT_SECS };
+    }
+
     // cx, cy are where the ball actually touched, which only the boss needs --
     // see the award below. An ordinary brick is small enough that its own
     // middle IS the contact point, near enough, so it goes on using that.
@@ -2639,9 +2642,7 @@
                   cx === undefined ? b.x + bw / 2 : cx,
                   cy === undefined ? b.y : cy);
             // now and then he has something to say about it
-            if (!done && Math.random() < SHOUT_ODDS) {
-                shout = { x: b.x + bw * 0.88, y: b.y + bh + 8, life: SHOUT_SECS };
-            }
+            if (!done && Math.random() < SHOUT_ODDS) bossShout(b);
             if (done) { b.alive = false; clearStage(); return; }
             // three from the end, the first time round: his second wind
             if (!bossTwo && bossHitsLeft(b.hp) <= SIPHON_AT) { startSiphon(b); return; }
@@ -3481,12 +3482,11 @@
         stepClimb(dt);           // and before the clamp, so his span is too
 
         if (phase === 'entrance') {
-            // on the one frame whose step takes in ENTER_SHOUT, zero included
-            if (enterT <= ENTER_SHOUT && ENTER_SHOUT < enterT + dt) {
-                shout = { above: true, life: SHOUT_SECS };
-            }
             enterT += dt;
-            if (enterT >= ENTER_WAIT + ENTER_SECS) phase = 'ready';
+            if (enterT >= ENTER_WAIT + ENTER_SECS) {
+                phase = 'ready';
+                bossShout(bricks[0]);   // down, with all of his health showing
+            }
         }
 
         // the continue clock. dt is clamped and rAF sleeps in a hidden tab, so
@@ -4813,12 +4813,10 @@
         const size = 22;
         ctx.font = 'bold ' + size + 'px "Trebuchet MS", sans-serif';
         const w = ctx.measureText(txt).width + 30, h = size + 18;
-        // one shouted during the drain rides on him, since he grows under it.
-        // the one he opens the fight with hangs from the top, over the middle
-        // he is about to come down, because he is not on the screen yet
+        // one shouted during the drain rides on him, since he grows under it
         const boss = bricks && bricks[0];
-        const sx = shout.above ? LW / 2 : shout.follow && boss ? boss.x + bw * 0.88 : shout.x;
-        const sy = shout.above ? 0 : shout.follow && boss ? boss.y + bh + 8 : shout.y;
+        const sx = shout.follow && boss ? boss.x + bw * 0.88 : shout.x;
+        const sy = shout.follow && boss ? boss.y + bh + 8 : shout.y;
         const x = Math.max(12 + w / 2, Math.min(LW - 12 - w / 2, sx));
         const y = Math.max(20, Math.min(LH - h - 90, sy));
 
@@ -4827,10 +4825,10 @@
         ctx.beginPath();
         ctx.roundRect(x - w / 2, y, w, h, 9);
         ctx.fill();
-        ctx.beginPath();                       // the tail, pointing back at him --
-        ctx.moveTo(x - 10, y + 3);             // off the top of the screen, when
-        ctx.lineTo(x + 10, y + 3);             // that is where he is
-        ctx.lineTo(x + 1, shout.above ? -8 : y - 14);
+        ctx.beginPath();                       // the tail, pointing back at him
+        ctx.moveTo(x - 10, y + 3);
+        ctx.lineTo(x + 10, y + 3);
+        ctx.lineTo(x + 1, y - 14);
         ctx.closePath();
         ctx.fill();
         text(txt, x, y + h / 2 + 8, size, '#12100e', 'center');
