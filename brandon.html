@@ -201,10 +201,41 @@
 
         #debug button:hover { border-color: #6d685f; }
 
-        /* not a stage, so it stands apart from them, and quieter */
-        #debug button.reset { margin-top: 10px; color: #9a958c; }
+        /* resetting your best: small, in a corner well away from the stages,
+           and only a long hold sets it off -- see RESET_HOLD. out of the
+           column, it takes no room from them on a short screen. */
+        #debug button.wipe {
+            position: absolute;
+            top: calc(10px + env(safe-area-inset-top, 0px));
+            right: calc(14px + env(safe-area-inset-right, 0px));
+            width: auto;
+            padding: 6px 0;
+            border: 0;
+            border-radius: 0;
+            /* the hold's progress, an underline drawn across as it goes */
+            background: linear-gradient(#9a958c, #9a958c) left bottom / 0 1px no-repeat;
+            font-size: 0.72rem;
+            font-style: italic;
+            letter-spacing: normal;
+            color: #4a453e;
+            /* a long press on a phone would otherwise select the words, raise
+               the browser's own menu or be taken for a gesture, and any of
+               those ends the hold */
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+            touch-action: none;
+        }
 
-        #debug button:disabled { color: #4a453e; border-color: #2e2a24; cursor: default; }
+        /* the duration is RESET_HOLD, set on the element as a hold starts */
+        #debug button.wipe.holding {
+            background-size: 100% 1px;
+            transition-property: background-size;
+            transition-timing-function: linear;
+            color: #9a958c;
+        }
+
+        #debug button.wipe:disabled { cursor: default; }
 
         #debug p {
             margin-top: 6px;
@@ -243,7 +274,7 @@
                 justify-content: center;
                 gap: 10px;
             }
-            #debug h2, #debug p, #debug button.reset {
+            #debug h2, #debug p {
                 grid-column: 1 / -1;
                 justify-self: center;
             }
@@ -2259,28 +2290,44 @@
     // Your best is kept in this browser and nothing in the game ever lowers
     // it, so one set while testing, or under scoring that has since changed,
     // would otherwise stand until someone cleared the site's data by hand.
-    // It takes two presses in a row, because any player can find this menu
-    // and a cleared best does not come back.
+    //
+    // Any player can find this menu, and a cleared best does not come back,
+    // so it sits in a corner away from the stages and only a press held for
+    // RESET_HOLD sets it off. A stray click, a double-click and a quick tap
+    // all let go too soon. It is out of the tab order because no key can
+    // hold it down.
+    const RESET_HOLD = 2;                     // seconds
     const resetBtn = document.createElement('button');
-    resetBtn.className = 'reset';
-    let resetArmed = false;
-    function labelReset(armed) {
-        resetArmed = armed;
-        resetBtn.textContent = armed ? 'PRESS AGAIN TO RESET' : 'RESET BEST  ·  ' + best;
-        resetBtn.disabled = best === 0;
+    resetBtn.className = 'wipe';
+    resetBtn.tabIndex = -1;
+    let resetT = 0;                           // the hold under way, or 0
+    function holdReset(on) {
+        clearTimeout(resetT);
+        resetT = on ? setTimeout(wipeBest, RESET_HOLD * 1000) : 0;
+        resetBtn.classList.toggle('holding', on);
+        resetBtn.style.transitionDuration = on ? RESET_HOLD + 's' : '';
     }
-    resetBtn.addEventListener('click', () => {
-        if (!resetArmed) { labelReset(true); return; }
+    // what it says each time the menu opens, and gone when there is no best
+    function labelReset() {
+        holdReset(false);
+        resetBtn.disabled = false;
+        resetBtn.textContent = 'hold to reset your best';
+        resetBtn.hidden = best === 0;
+    }
+    function wipeBest() {
+        holdReset(false);
+        if (debugEl.hidden) return;           // the menu shut under the hold
         clearBest();
-        labelReset(false);
+        resetBtn.textContent = 'best reset';
+        resetBtn.disabled = true;             // until the menu next opens
+    }
+    resetBtn.addEventListener('pointerdown', e => {
+        if (e.button === 0 && !resetBtn.disabled) holdReset(true);
     });
-    // Pressing anything else in the menu is changing your mind. A press is
-    // the one thing a finger and a mouse both send: a tapped button never
-    // takes focus on iOS, so blur only covers tabbing off it with keys.
-    debugEl.addEventListener('pointerdown', e => {
-        if (e.target !== resetBtn) labelReset(false);
-    });
-    resetBtn.addEventListener('blur', () => labelReset(false));
+    for (const t of ['pointerup', 'pointerleave', 'pointercancel'])
+        resetBtn.addEventListener(t, () => holdReset(false));
+    // Android raises this on a long press, whatever is under the finger
+    resetBtn.addEventListener('contextmenu', e => e.preventDefault());
     debugEl.appendChild(resetBtn);
     debugEl.appendChild(Object.assign(document.createElement('p'),
         { textContent: 'esc to go back' }));
@@ -2324,7 +2371,7 @@
     function openMenu() {
         konami = [];
         freeMouse();                              // the menu is all buttons
-        labelReset(false);                        // the best as it stands now
+        labelReset();                             // the best as it stands now
         debugEl.hidden = false;
     }
 
