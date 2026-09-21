@@ -932,15 +932,13 @@
     const G_DOUBLE   = 26;
     const G_GAP0     = 3, G_GAP1 = 10;
     // How much killing one takes. A hit knocks it one rung DOWN the ladder, so
-    // the colour it is wearing is always how many more you still owe it -- the
-    // same trick the silver bricks play, where a struck one swaps to its own
-    // worn tint rather than taking a dark wash over him.
+    // the colour it is wearing is always how many more you still owe it: gold
+    // for three and silver for two, the colours the bricks wear for the hits
+    // they have left -- see shipSprite, which takes theirs.
     //
     // The last rung is its OWN colour, drawn from the wall you spent four
     // stages knocking down. An army of identical slate was a crowd; an army in
     // red, orange, green and yellow is the whole game coming back for you.
-    const G_HURT3    = '#9a6ec4';    // three left: violet
-    const G_HURT2    = '#b9bcc4';    // two left: silver, exactly like the bricks
     const G_TOUGH    = 85;        // seconds until the mix is at its meanest
     const G_T3       = 0.5;       // ...and its share of three-hit ones then
     const G_T2       = 0.62;
@@ -1231,18 +1229,21 @@
     };
     // all mid-tone. nothing here darkens his face -- a damaged brick changes
     // hue rather than getting a black wash over it
+    const GOLD       = '#efb920';   // three hits, then it steps down -- see drawBrick
+    const GOLD_HP    = 3;
     const SILVER     = '#b9bcc4';
     const SILVER_HIT = '#7a8cb4';   // slate blue: still metal, and nothing like the stone
     const STONE      = '#7d776b';   // the unbreakable ones are statues
 
     // ---- stages ------------------------------------------------------------
     // 7 across puts each brandon at ~90px, about two thirds of the paddle.
-    // . empty   Y/G/O/R tiers   S silver, multi-hit   X stone, indestructible
+    // . empty   Y/G/O/R tiers   X stone, indestructible
+    // S silver, silverHp hits   A gold (Au, since G is green), GOLD_HP hits
     // Each stage adds a RULE rather than just a new picture, and the workload
-    // climbs -- 22, 26, 33 hits -- and eases only to 31 for the hat, which
-    // keeps SPLIT's stone and MESH's silver alongside its own rule so the
-    // run-in to the boss does not sag. `dbg` names them for the stage-select
-    // only; nothing shows a stage name during play.
+    // climbs -- 22, 26, 33 hits -- and eases only to 32 for the hat, which
+    // keeps SPLIT's stone and MESH's silver, and adds a gold, alongside its
+    // own rule so the run-in to the boss does not sag. `dbg` names them for
+    // the stage-select only; nothing shows a stage name during play.
     const LEVELS = [
         {   dbg: 'WALL',   // plain. a short opener, to teach the paddle angle
             silverHp: 2,
@@ -1270,13 +1271,14 @@
         {   dbg: 'HAT',    // the joke: the last few talk back and run for it
             silverHp: 2,
             talks: true,   // see FLEE_AT and STATUE_WAIT
-            // silver only in the brim, and one buckle on the band: the bottom
-            // row breaks in one hit as on every stage, and the crown, which is
-            // usually what is left when they run, stays one hit to catch. the
-            // statues stand in both top corners until the round is over
+            // silver in the brim and a gold buckle on the band, and nothing
+            // else that takes more than one hit: the bottom row breaks in one
+            // as on every stage, and the crown, which is usually what is left
+            // when they run, stays one hit to catch. the statues stand in both
+            // top corners until the round is over
             rows: ['X.RRR.X',
                    '..RRR..',
-                   '.OOSOO.',
+                   '.OOAOO.',
                    'SSSSSSS',
                    '.YYYYY.']
         },
@@ -1646,8 +1648,8 @@
             for (let c = 0; c < cols; c++) {
                 const ch = row[c];
                 if (!ch || ch === '.') continue;
-                bricks.push(newBrick(MARGIN + c * (bw + GAP), TOP + r * (bh + GAP),
-                                     ch, ch === 'S' ? lvl.silverHp : 1));
+                const hp = ch === 'S' ? lvl.silverHp : ch === 'A' ? GOLD_HP : 1;
+                bricks.push(newBrick(MARGIN + c * (bw + GAP), TOP + r * (bh + GAP), ch, hp));
             }
         });
         resetBall();
@@ -2679,7 +2681,7 @@
             return;
         }
 
-        if (b.kind === 'S') {
+        if (b.kind === 'S' || b.kind === 'A') {
             if (--b.hp > 0) return;
             b.alive = false;
             shockwave(b);
@@ -4507,6 +4509,7 @@
 
     function brickColor(kind) {
         return kind === 'X'  ? STONE
+             : kind === 'A'  ? GOLD
              : kind === 'S'  ? SILVER
              : kind === 'S2' ? SILVER_HIT
              : TIERS[kind].fill;
@@ -4561,9 +4564,12 @@
 
     function drawBrick(b) {
         if (b.kind === 'Z') { drawBoss(b); return; }
-        // a struck silver brick swaps to its own worn tint, rather than taking
-        // a dark wash over the top of him
-        const kind = (b.kind === 'S' && b.hp < b.maxHp) ? 'S2' : b.kind;
+        // silver and gold wear how many hits they have left, stepping down the
+        // same ladder the gauntlet's army does: gold for three, silver for two,
+        // a struck silver's slate blue for the last. each rung is its own tint,
+        // never a dark wash over the top of him
+        const multi = b.kind === 'S' || b.kind === 'A';
+        const kind = !multi ? b.kind : b.hp >= 3 ? 'A' : b.hp === 2 ? 'S' : 'S2';
         const sprite = shapeSprite(kind, brickColor(kind), bw, bh,
                                    kind === 'X' ? 'statue' : false);
         if (!sprite) return;
@@ -5187,10 +5193,11 @@
 
     // One sprite per look, cached. The top two rungs are the same for
     // everybody, so damage is legible at a glance across a whole rank; only
-    // the last rung is personal.
+    // the last rung is personal. They are the bricks' own gold and silver, so
+    // three hits and two look the same on the wall and in the army.
     function shipSprite(hp, tint) {
-        if (hp >= 3) return shapeSprite('gs3', G_HURT3, 300, 300 / SHAPE_ASPECT, false);
-        if (hp === 2) return shapeSprite('gs2', G_HURT2, 300, 300 / SHAPE_ASPECT, false);
+        if (hp >= 3) return shapeSprite('gs3', GOLD, 300, 300 / SHAPE_ASPECT, false);
+        if (hp === 2) return shapeSprite('gs2', SILVER, 300, 300 / SHAPE_ASPECT, false);
         if (!tint) return shapeSprite('gsRaw', null, 300, 300 / SHAPE_ASPECT, false);
         return shapeSprite('gs1' + tint, TIERS[tint].fill, 300,
                            300 / SHAPE_ASPECT, false);
