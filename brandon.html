@@ -799,6 +799,15 @@
     const TODDLE_LEAN = 7 * Math.PI / 180;
     const TODDLE_HOP  = 3;       // px he lifts at the end of each step
 
+    // The hat's statues cannot be broken, so they are not left standing over a
+    // stage you have cleared: the moment the round is over, every one of them
+    // walks off to the nearer edge. They say nothing. STATUE_WAIT lets the
+    // clear land first, and the walk is quick enough to be over before a
+    // single tap can move on from the shortest bonus screen (EOR_IN through
+    // EOR_LINGER). STATUE_SECS has to stay above FLEE_RAMP, which it shares.
+    const STATUE_WAIT = 0.4;
+    const STATUE_SECS = 2;
+
     // his entrance: an empty screen for a beat, then he lowers in from above
     // while the health bar grows out from nothing, so the size of the problem
     // arrives gradually rather than all at once.
@@ -1235,9 +1244,9 @@
     // . empty   Y/G/O/R tiers   S silver, multi-hit   X gold, indestructible
     // Each stage adds a RULE rather than just a new picture, and the workload
     // climbs -- 22, 26, 33 hits -- and eases only to 31 for the hat, which
-    // keeps MESH's silver alongside its own rule so the run-in to the boss
-    // does not sag. `dbg` names them for the stage-select only; nothing shows
-    // a stage name during play.
+    // keeps SPLIT's gold and MESH's silver alongside its own rule so the
+    // run-in to the boss does not sag. `dbg` names them for the stage-select
+    // only; nothing shows a stage name during play.
     const LEVELS = [
         {   dbg: 'WALL',   // plain. a short opener, to teach the paddle angle
             silverHp: 2,
@@ -1264,11 +1273,12 @@
         },
         {   dbg: 'HAT',    // the joke: the last few talk back and run for it
             silverHp: 2,
-            talks: true,   // see FLEE_AT
+            talks: true,   // see FLEE_AT and STATUE_WAIT
             // silver only in the brim, and one buckle on the band: the bottom
             // row breaks in one hit as on every stage, and the crown, which is
-            // usually what is left when they run, stays one hit to catch
-            rows: ['..RRR..',
+            // usually what is left when they run, stays one hit to catch. gold
+            // stands in both top corners until the round is over
+            rows: ['X.RRR.X',
                    '..RRR..',
                    '.OOSOO.',
                    'SSSSSSS',
@@ -2804,6 +2814,13 @@
         } else {
             phase = 'cleared';
             banner = 'STAGE CLEAR';
+            // the hat's statues go too, now there is nothing left to stand
+            // over -- see STATUE_WAIT
+            if (LEVELS[stage].talks) {
+                for (const b of bricks) {
+                    if (b.alive && b.kind === 'X') walkOff(b, STATUE_WAIT, STATUE_SECS);
+                }
+            }
         }
     }
 
@@ -2826,16 +2843,24 @@
     // way off it
     function startFlee(b) {
         say(b);
+        walkOff(b, FLEE_WAIT, FLEE_SECS);
+    }
+
+    // `wait` seconds where he stands, then `secs` to get all the way off the
+    // nearer edge, however far that is -- see stepFlee
+    function walkOff(b, wait, secs) {
         const dir = b.x + bw / 2 < LW / 2 ? -1 : 1;
-        b.flee = { t: 0, x0: b.x, y0: b.y, dir, dist: dir < 0 ? b.x + bw : LW - b.x };
+        b.flee = { t: 0, x0: b.x, y0: b.y, dir, dist: dir < 0 ? b.x + bw : LW - b.x, wait, secs };
     }
 
     // only while a ball is in play: a lost life or a pause holds everybody
     // where they are, so nobody gets away -- or decides to -- while you are
-    // waiting to serve
+    // waiting to serve. The statues' walk after the round is the exception,
+    // and a round that is over has nobody left to toss for.
     function stepFlee(dt) {
-        if (phase !== 'play') return;
-        if ((fleeRoll -= dt) <= 0) {
+        const playing = phase === 'play';
+        if (!playing && phase !== 'cleared') return;
+        if (playing && fleeRoll >= 0 && (fleeRoll -= dt) <= 0) {
             fleeRoll += FLEE_REROLL;
             tossForFlight();
         }
@@ -2844,11 +2869,11 @@
             const f = b.flee;
             if (!f || !b.alive) continue;
             f.t += dt;
-            const t = f.t - FLEE_WAIT;
+            const t = f.t - f.wait;
             if (t <= 0) continue;
             // up to walking pace over FLEE_RAMP, then steady, so the trip takes
-            // FLEE_SECS all told however far he has to go
-            const v = f.dist / (FLEE_SECS - FLEE_RAMP / 2);
+            // its `secs` all told however far he has to go
+            const v = f.dist / (f.secs - FLEE_RAMP / 2);
             const d = Math.min(f.dist, t < FLEE_RAMP ? v * t * t / (2 * FLEE_RAMP)
                                                      : v * (t - FLEE_RAMP / 2));
             const step = t * TODDLE_HZ * Math.PI * 2;
@@ -2857,8 +2882,10 @@
             b.wigA += Math.sin(step) * TODDLE_LEAN;    // on top of any WIGGLY sway
             if (d >= f.dist) { b.alive = false; b.flee = null; gone = true; }
         }
-        // the stage ends when nobody is left, whether they were hit or ran
-        if (gone && !bricks.some(x => x.alive && x.kind !== 'X')) clearStage();
+        // the stage ends when nobody is left, whether they were hit or ran --
+        // once. the statues leave after it has ended, and a second clearStage
+        // would put up, and pay, a second bonus
+        if (playing && gone && !bricks.some(x => x.alive && x.kind !== 'X')) clearStage();
     }
 
     // What you have IN RESERVE: `lives` counts the head in your hands as well,
@@ -3545,10 +3572,11 @@
             b.wigA = (amp && b.kind !== 'X')
                 ? Math.sin(clock * WIG_FREQ * b.wigF + b.wigP) * amp : 0;
         }
-        // the hat stage's last few, deciding to run for it and running. after
-        // the lean above so a waddle rides on top of any wiggle, and before
-        // the physics so the ball meets them where they have got to
-        if (fleeRoll >= 0) stepFlee(dt);
+        // the hat stage's last few, deciding to run for it and running, and
+        // its statues leaving once the round is over. after the lean above so
+        // a waddle rides on top of any wiggle, and before the physics so the
+        // ball meets them where they have got to
+        stepFlee(dt);
         // and the boss, turned to meet a ball -- see TILT_ODDS
         if (tilt && bricks[0]) bricks[0].wigA += tilt.a * tilt.k * tilt.k * (3 - 2 * tilt.k);
 
