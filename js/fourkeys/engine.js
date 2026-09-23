@@ -1,0 +1,5681 @@
+// ---- FOUR KEYS: the engine ----------------------------------------------------
+// brandon.html's game, forked on 22 September 2026 as the sequel's own engine
+// and edited here from now on. brandon.html is the released game and is not
+// touched by anything in this folder.
+//
+// It is a plain script, not a module and not wrapped in a closure, because
+// every other file in this folder reaches into it by name: a classic script's
+// top-level const/let go into a scope all the classic scripts on the page
+// share, and its functions onto the window. The indentation is brandon.html's,
+// left as it is so the two can still be read side by side.
+//
+// Load order matters and fourkeys.html sets it: runtime, then the bosses,
+// mini-bosses, paddles and the town, and this last -- setup at the bottom of
+// this file calls into all of them.
+'use strict';
+
+
+    const LW = 800, LH = 600;
+
+    // ---- the shape ---------------------------------------------------------
+    // brandon lies along the diagonal of the source art at -34 degrees. rotate
+    // him level and his silhouette occupies the box below -- that box IS the
+    // brick, and the mask under it is his actual outline, sampled off the alpha
+    // channel. every number here was measured from paddle.webp, not guessed.
+    const PADDLE_LEVEL = 34 * Math.PI / 180;
+    const SHAPE = {
+        SW: 800, SH: 602,                 // source art
+        RW: 1000, RH: 948,                // its bounding box once rotated level
+        bx: 36, by: 382, bw: 896, bh: 316 // where he actually sits inside that
+    };
+    const SHAPE_ASPECT = SHAPE.bw / SHAPE.bh;     // 2.835 : 1
+
+    // 24 x 9 occupancy grid over that box. only 52% of it is solid, which is
+    // the whole point -- the ball clips his boot and threads the gaps.
+    const MASK = [
+        '......................##',
+        '.................#######',
+        '##........##############',
+        '#######################.',
+        '.######################.',
+        '........###############.',
+        '.........##############.',
+        '..........############..',
+        '...........###...####...'
+    ];
+    const MCOLS = 24, MROWS = 9;
+
+    const PADDLE_ASPECT  = SHAPE.SW / SHAPE.SH;
+    const BODY_LEN_PER_W = 1.1189;
+    const ART_OFF_X      = 0.0291;
+    const ART_OFF_Y      = 0.1052;
+
+    // ---- rules -------------------------------------------------------------
+    const MARGIN     = 44;
+    const GAP        = 14;
+    const TOP        = 70;
+
+    const PADDLE_W   = 160;
+    const PADDLE_H   = 36;
+    // he is drawn proportionally, so growing him makes him taller as well as
+    // longer -- the hitbox has to grow with him or a BIG brandon would have
+    // the ball passing through his chest
+    // BIG and the boss climb are both 1.5x, and they take the larger rather
+    // than multiplying: 2.25x brandon plus DOUBLE asks for more span than the
+    // field has, and the clamp would answer by pinning him at dead centre,
+    // unable to move, during the tightest part of the fight. so BIG keeps
+    // winning for most of the climb and simply stops compounding at the end.
+    const padW = () => Math.max(paddle.w, PADDLE_W * (1 + CLIMB_GROW * climb)) * lifeScale() * labPadW();
+    const padH = () => PADDLE_H * (padW() / PADDLE_W);
+    const PADDLE_Y   = LH - 58;
+
+    // ...except during the boss, who pulls you off that line. as his health
+    // goes you drift north and swell, so the last hits are traded at close
+    // range -- and with more brandon to trade them with. 150px up still leaves
+    // ~160px of daylight under his lowest bob, which is four ball-heights: the
+    // fight gets intimate without getting unwinnable. `climb` chases his damage
+    // rather than matching it, so a hit slides you up over a second or so
+    // instead of stepping you.
+    const CLIMB_RISE = 150;
+    const CLIMB_GROW = 0.5;
+    const CLIMB_EASE = 0.8;     // seconds to catch up, near enough
+    const padY = () => PADDLE_Y - CLIMB_RISE * climb - menuLift();
+
+    // A head that has got below his top near one end, still coming down, makes
+    // that end dip toward it -- DIP_MAX straight away, most of the way there in
+    // about DIP_EASE -- so there is a slope to meet it with, and as the head
+    // sinks the end follows it down, as far as it takes to keep that slope under
+    // it, up to DIP_LIMIT: on end, if it comes to that. Run into it and it goes
+    // off the slope, square to the angle you can see him at. It used to warp up
+    // on top of him and get served from there, which was a free save that
+    // looked like a glitch; knocking it straight down was fair and no fun.
+    const DIP_MAX   = 30 * Math.PI / 180;
+    const DIP_LIMIT = 90 * Math.PI / 180;
+    const DIP_REACH = 70;       // px past his end a head's EDGE gets a dip from
+    const DIP_LEAD  = 30;       // ...from this far above his top
+    const DIP_EASE  = 0.06;
+    // an end swings further in one frame than a head is wide, so a turn is
+    // checked at DIP_ARC points along it and not only at its two ends
+    const DIP_ARC   = 8;
+
+    // the ball is a HEAD, 141 x 209, so it is an ellipse and not a circle.
+    // colliding against its real shape means rotation changes how far it
+    // reaches -- 15px across the narrow axis, 22px across the long one. that
+    // 7px swing is what makes a fast-spinning ball genuinely unpredictable,
+    // with no made-up forces involved.
+    const BALL_RX = 15, BALL_RY = 22;
+    const BALL_MAX = Math.max(BALL_RX, BALL_RY);   // conservative, for cheap rejects
+    const BRAIN_MUL = 1.7;                         // how much BIG BRAIN swells it
+
+    // the player's ball can grow; the boss's phantoms never do, so they keep
+    // using the bare constants above
+    function bRX()  { return BALL_RX  * (fx.R > 0 ? BRAIN_MUL : 1); }
+    function bRY()  { return BALL_RY  * (fx.R > 0 ? BRAIN_MUL : 1); }
+    function bMAX() { return BALL_MAX * (fx.R > 0 ? BRAIN_MUL : 1); }
+
+    const BASE_SPEED = 346;
+    const MAX_SPEED  = 620;
+    // Every bounce off a brick winds the rally up by this much -- stone and the
+    // boss included, since they turn you just the same. It compounds, so the
+    // middle of a stage no longer sags the way a flat rally did. It is not the
+    // only thing pushing: the milestone bumps in hitBrick stack on top, so how
+    // soon MAX_SPEED arrives is the two of them together, never this alone.
+    const BRICK_BUMP = 1.02;
+    const MAX_ANGLE  = Math.PI / 3;
+    const STEER_CAP  = 1.3;    // never launch flatter than this, wiggle included
+
+    // How far anything is allowed to travel between two collision checks, and
+    // the most checks one frame will buy. The cap only bites on a pointer jump
+    // across most of the field, which is not a shot anyone was aiming.
+    const SUBSTEP_PX  = 7;
+    const SUBSTEP_CAP = 48;
+
+    // Spin, in rad/s. A hit off the end of him, or with him on the move, is a
+    // shove on the edge of the head, and what a shove does depends on how
+    // heavy the head is to turn: SPIN_INERTIA divides every shove AND the
+    // drag, so a heavier head is slower to wind up and slower to run down. A
+    // shove the way it is already turning adds to it, one the other way takes
+    // off, and a wall leaves it turning the way it was -- so it is BUILT, hit
+    // on hit, by taking it on the same end and moving the same way.
+    const SPIN_EDGE    = 11;      // off the very end of him
+    const SPIN_SWIPE   = 0.045;   // ...and this much per px/s he is moving
+    const SPIN_KICK    = 65;      // the most one hit can shove, both together
+    const SPIN_INERTIA = 2;
+    const SPIN_DRAG    = 0.3;     // what the air takes off it
+    const SPIN_WALL    = 0.85;    // what a wall leaves of it
+    const SPIN_MAX     = 60;      // it will not turn faster than this on its own
+    const SPIN_FULL    = 60;      // how fast it has to turn to pay the most...
+    const SPIN_MUL     = 2;       // ...which is double
+    const ENGLISH_AT   = 8;
+
+    // the rule under BONUS that reads the spin out. it hangs below the label's
+    // baseline, which is safe because the label is digits and capitals and so
+    // has nothing descending into it. fixed rather than scaled by uiScale: the
+    // label's baseline is pinned to the bottom of the field, and a rule that
+    // grew with the type would hang off the edge at the top of uiScale's range.
+    const SPIN_RULE_DROP = 3;
+    const SPIN_RULE_H    = 7;
+    const SPIN_RULE_BED  = '#2e2a24';
+
+    // the word spelled the whole way along the rule, in two inks: SPIN_WORD_INK
+    // where the gold has reached and SPIN_WORD_DIM on the bed it has not. The
+    // rule's height is what caps the lettering, so the two are tuned together.
+    const SPIN_WORD       = 'SPIN';
+    const SPIN_WORD_SIZE  = 6.6;
+    const SPIN_WORD_BOLD  = true;
+    const SPIN_WORD_INK   = '#f2efe9';
+    const SPIN_WORD_DIM   = '#12100e';   // barely off the bed, so it only murmurs
+    const SPIN_WORD_INSET = 6;    // clear of each end of the rule
+    const SPIN_WORD_DROP  = 1;    // its baseline, up from the rule's bottom
+
+    const JIG_BRICK  = 5;
+    const JIG_NEIGH  = 0.75;
+    const JIG_PADDLE = 7;
+    const JIG_DECAY  = 3.4;
+    const JIG_FREQ   = 15;
+
+    // ---- capsules ----------------------------------------------------------
+    // arkanoid, 1986. bricks drop a capsule you catch with the paddle, and only
+    // one may be falling at a time -- that one-at-a-time rule was a deliberate
+    // constraint in the original, and it keeps this readable too.
+    const CAP_CHANCE = 0.16;   // per brick destroyed, if none is already falling
+    const CAP_FALL   = 130;    // px per second
+    const CAP_W      = 58;
+    const CAP_H      = CAP_W / SHAPE_ASPECT;
+    const CAP_SCORE  = 250;
+    const MAX_BALLS  = 6;
+    const SLOW_MUL   = 0.68;
+
+    const WIG_AMP    = 8 * Math.PI / 180;  // how far things lean
+    const WIG_FREQ   = 3.2;                // rad/s -- a slow sway, not a buzz
+    const WIG_EASE   = 0.6;                // seconds of fade-out at the end
+    const DBL_GAP    = 0.45;               // hole between the pair, as a fraction of width
+    const DBL_SPLIT  = 0.38;               // seconds to come apart, and to rejoin
+    const ENG_BOOST  = 0.3;                // ENGLISH: this share of SPIN_FULL on top, always
+    const ENG_ACCEL  = 60;                 // ...reached, or turned round, at this many rad/s^2
+    const BONUS      = 0.25;               // score kicker per chaos capsule
+
+    // ---- the end of round bonus ----------------------------------------------
+    // What clearing a round pays on top of what you knocked down getting there.
+    // The base is always there, and so is MAX BONUS, which pays on the best
+    // BONUS the round reached. The rest are conditions you either met or did
+    // not, and the two that can happen more than once print their count.
+    //
+    // The screen is built from this table, in this order, so a new bonus is a
+    // row here plus whatever sets its flag on `round`. `many` is what separates
+    // a condition from a tally: a tallied row always prints xN, even at x1,
+    // because the count is the point of it. `mul` is a tally of a multiplier
+    // rather than a count: it prints to a tenth, the way BONUS does, and pays
+    // `pts` per x, tenths and all.
+    //
+    // The end of a reign in the gauntlet goes out on the same screen, with
+    // the same reveal and the same rule about when the score moves. It has
+    // its own rows, not these -- see endOfReign.
+    const EOR_BASE = 500;       // ...times the round number, so later rounds pay more
+    // every head the field will hold at once, so the row names its own number
+    // and raising MAX_BALLS renames the bonus with it
+    const HEADS_AT = MAX_BALLS;
+    const EOR_ROWS = [
+        // first, straight under the base: it is the other row that is always
+        // there, so the two never move and what you earned lines up after them
+        { key: 'peak',     label: 'MAX BONUS',       pts: 100, mul: true },
+        { key: 'flawless', label: 'FLAWLESS',        pts: 1000 },
+        { key: 'multi',    label: 'MULTI-FINISH',    pts: 300 },
+        { key: 'spare',    label: 'SPARE BALL',      pts: 800, many: true },
+        { key: 'fast',     label: 'GOTTA GO FAST',   pts: 300 },
+        { key: 'heads',    label: HEADS_AT + ' HEADS', pts: 600 },
+        { key: 'grit',     label: 'NEVER GIVE UP',   pts: 400 },
+        { key: 'hunter',   label: 'HUNTER',          pts: 300, many: true }
+    ];
+
+    // The reveal. The score does not move until the last line has landed --
+    // the reading IS the screen, and a total that arrives first gives the
+    // ending away before you have been told why.
+    const EOR_IN     = 0.45;    // before the first line
+    const EOR_ROW    = 0.30;    // ...and between each after it
+    const EOR_FADE   = 0.22;    // how long one takes to come up
+    const EOR_GAP    = 0.45;    // the beat before the total lands, and is paid
+    const EOR_LINGER = 0.8;     // ...and how long it stands before a tap moves on
+    // ...and how long it takes to go again on the takeover, where there is no
+    // tap. Long enough that the last of it is gone before the throne changes
+    // hands, so the two do not happen on the same frame.
+    const EOR_OUT    = 1.1;
+
+    // The room it is laid out in. The pitch is whatever fits the whole list
+    // between these, so a round that earned everything shrinks rather than
+    // running off the bottom -- the leaderboard sizes itself the same way.
+    // The floor clears the paddle's line; the ceiling clears the wall.
+    const EOR_TOP   = 210;
+    const EOR_BOT   = 506;
+    // The end of a reign has an army standing under it for the whole fall, and
+    // with no band to hide behind, a list laid down to EOR_BOT prints its last
+    // line through their heads. It stops this far above the back rank of a
+    // full floor instead -- see endOfReign.
+    const EOR_ARMY_GAP = 10;
+    const EOR_PITCH = 30;       // row to row at full size
+    const EOR_W     = 420;      // label at one edge of this, points at the other
+    const EOR_TITLE_U = 1.5;    // the title's share of the height, in pitches
+    const EOR_RULE_U  = 0.5;    // ...the gap and the line above the total
+    const EOR_HINT_U  = 1.1;    // ...and the line underneath
+
+    // ---- the boss -----------------------------------------------------------
+    // the real brandon, at last. he shrinks as he takes damage, and once
+    // BOSS_STILL of his health is gone he starts moving -- faster and smaller
+    // the closer he gets to finished.
+    const BOSS_HP     = 27;
+    // he arrives too big for the screen -- 1060 wide against an 800 field, so
+    // he hangs 130px off each side and cannot be seen whole. a few hits bring
+    // him inside the frame. the 0.6 exponent front-loads the shrink so those
+    // early hits visibly contract him rather than nibbling.
+    const BOSS_W0     = 1060;   // as he arrives
+    const BOSS_W1     = 180;    // what is left of him at the end
+    const BOSS_CURVE  = 0.6;
+    // he arrives high as well as wide, so his top is cut off too and you only
+    // ever see a slice of him. he settles down to BOSS_Y on the same curve he
+    // shrinks on, which turns the early hits into a slow reveal.
+    const BOSS_Y0     = 30;     // centre on arrival
+    const BOSS_Y      = 150;    // centre once he is down to size
+    const BOSS_STILL  = 0.18;   // fraction of damage before he bothers to move
+    const ASCEND_W    = 760;    // the size you inherit -- imposing, but on screen
+    const BOSS_SWEEP0 = 0.35;   // rad/s once he gets going
+    const BOSS_SWEEP1 = 0.65;   // extra rad/s by the end. the pair is capped so
+                                // his top speed lands near 310px/s -- fast, but
+                                // under the ball's, and slow enough to hit
+    const BOSS_BOB    = 20;
+    const BOSS_PTS    = 60;
+    const BOSS_CAP    = 4;      // force a capsule out of him every N hits
+
+    // The last of him does not come off in the same bites as the first. He has
+    // the final four points of it take half damage a hit, and the last point
+    // takes a quarter. So the fight stops ending on the same swing that the
+    // twentieth hit was: 23 hits to get him down to the last four, then ten
+    // more to finish him, with the bar visibly refusing to move while he will
+    // not go down.
+    //
+    // 33 hits, down from a first pass at 40. That version was right about the
+    // shape and wrong about the length -- the tail went on past the point where
+    // it was dramatic and into where it was just slow. The health came off the
+    // end rather than the beginning, so what is gone is the part that had
+    // stopped earning its time.
+    //
+    // That count is his health bar alone. His second wind cuts in three hits
+    // from the end and puts him back to half health (see SIPHON_AT), so the
+    // whole fight runs longer.
+    const BOSS_HALF   = 4;      // hp at or below which a hit is worth half
+    const BOSS_LAST   = 1;      // ...and at or below which it is worth a quarter
+    const BOSS_D_HALF = 0.5;
+    const BOSS_D_LAST = 0.25;
+    // He shrinks on every hit, which can leave the ball already inside his new,
+    // smaller outline on the very next physics substep -- and a fast one near
+    // the end was cashing three or four wounds out of a single contact, which
+    // is exactly where the fight is supposed to be at its slowest. A plain
+    // minimum gap between wounds fixes that whatever the cause.
+    //
+    // A hit that lands inside it shows the way a hit on a solid brick does: a
+    // ring where the ball struck and no flinch, because a hit that does nothing
+    // should look like one. Half a second is under the time it takes the ball
+    // to come back off him anyway, so a legitimate second hit never waits.
+    const BOSS_IF = 0.5;
+
+    // From a third of his health down he flushes red, in a slow swell that
+    // deepens the closer he gets to finished -- and it ebbs again if his second
+    // wind takes him back above a third. Well under three swells a second, and
+    // colour laid over him, never a darkening of his face.
+    const RAGE_AT    = 1 / 3;
+    const RAGE_A     = 0.45;      // how red he gets at the very end
+    const RAGE_HZ    = 0.9;       // swells a second
+    const RAGE_COLOR = '#cc3322';
+    // if a turn to meet the ball has him at an angle when he dies, he eases back
+    // level over this as he goes, rather than snapping straight
+    const LEVEL_SECS = 0.6;
+
+    function bossBite(hp) {
+        return hp <= BOSS_LAST ? BOSS_D_LAST
+             : hp <= BOSS_HALF ? BOSS_D_HALF : 1;
+    }
+
+    // how many more hits he takes from here, the smaller bites included
+    function bossHitsLeft(hp) {
+        let n = 0;
+        while (hp > 1e-6) { hp -= bossBite(hp); n++; }
+        return n;
+    }
+
+    // ---- his second wind ------------------------------------------------------
+    // Three hits from the end, he stops taking it. Everything holds -- you cannot
+    // steer, the ball is gone -- and he drinks the life out of you, both of you
+    // shouting, until he is back to half his health and you are half of
+    // yourself, growing back over REBOUND_SECS of play. Then the ball goes
+    // straight back at him. After that he fights differently: he moves more,
+    // and as the ball comes up at him he may turn to meet it at an angle, or
+    // draw back, turn to an angle of his choosing, and put it back at you off
+    // that -- or draw back, catch it, and hand it back so gently that you are
+    // early for it.
+    const SIPHON_AT    = 3;       // hits left in him when it happens
+    const SIPHON_HP    = 0.5;     // of his health he takes back
+    const SIPHON_IN    = 0.5;     // the stand-off before he drinks
+    const SIPHON_DRINK = 4.5;     // the drinking itself
+    const SIPHON_OUT   = 0.8;     // the last of it reaching him, before the ball goes
+    const SHRINK       = 0.5;     // how much of you he takes
+    const SIPHON_PULSE = 1.1;     // red swells a second on you while he drinks
+    const REBOUND_SECS = 15;      // seconds of play to grow back into yourself
+    const MOTE_RATE    = 26;      // life leaving you, specks a second
+    const MOTE_SECS    = 0.7;     // ...each one's trip up to him
+    const TWO_MOVE     = 0.85;    // the least of his full patrol he keeps to after
+    const NOTICE_PX    = 170;     // how far below him an incoming ball gets a reaction
+    const TILT_ODDS    = 1 / 4;
+    const TILT_MIN     = 15 * Math.PI / 180;
+    const TILT_MAX     = 25 * Math.PI / 180;
+    const TILT_IN      = 0.18;    // seconds to turn to it
+    const TILT_OUT     = 0.4;     // ...and back once it has gone
+    const LUNGE_ODDS   = 2 / 3;
+    const REAR_PX      = 40;      // how far he draws back
+    const LUNGE_PX     = 30;      // ...and how far past his line he comes at it
+    const REAR_SPEED   = 260;     // px/s drawing back, and settling again after
+    const LUNGE_SPEED  = 900;     // px/s coming forward. he starts when the gap left
+                                  // is what the swing needs, so he is past his line
+                                  // as the ball arrives, however fast it is coming
+    // the angles a draw-back sends it back at, off straight down. he turns to
+    // his pick as he draws back, and it leaves square off his face, no faster
+    const SLAM_ANGLES  = [-45, 45, -30, 30, -15, 15].map(d => d * Math.PI / 180);
+    // one draw-back in FAKE_ODDS is a fake: he catches it instead, holds on to it,
+    // and hands it back at a crawl -- and it stays that slow until you touch it
+    const FAKE_ODDS    = 1 / 4;
+    const FAKE_MIN     = 1;       // seconds he holds on to it, at least...
+    const FAKE_MAX     = 2;       // ...and at most
+    const TOUCH_SPEED  = 70;      // px/s coming forward with it
+    const TOUCH_PX     = 20;      // ...and how far past his line
+    const TOUCH_MUL    = 0.4;     // the speed it leaves him at, of the rally's
+
+    // his attack: phantom heads flung out at random. The transparency is the
+    // tell -- you can always see which head is the real one, and that is what
+    // keeps it fair.
+    //
+    // They used to be pure theatre: no hitbox, no consequence, just doubt.
+    // Now one that lands on him STICKS, and the barrage is asking you to be in
+    // two places -- under the ball, and out from under everything else. The
+    // head is spent doing it, so one phantom is one helping.
+    //
+    // There is ONE strength of it, and the duration is what accumulates --
+    // exactly the way a second copy of a capsule behaves. Being hit while
+    // already sluggish does not make him worse, it makes it last longer.
+    //
+    // It is a LAG, not a speed limit: he still goes wherever you point him,
+    // he just takes his time about it. Nothing is ever put out of reach, which
+    // matters on a phone, where the finger IS the paddle and a clamp on how
+    // fast he may travel would read as the game ignoring you.
+    const DRAG_LAG   = 0.20;     // seconds of lag while it is up -- the whole strength of it
+    const DRAG_SECS  = 3.0;      // what one head adds to the clock
+    // ...and a ceiling on the clock. Without one, the end of the fight throws
+    // a head every 0.45s and the total would run away to something that is
+    // just permanent. This is the knob to turn if it plays too heavy.
+    const DRAG_CAP   = 9.0;
+    // ...and how long the lag takes to unwind when the clock runs out. It goes
+    // on instantly and comes off over this -- see dragLag for why.
+    const DRAG_EASE  = 0.5;
+    const DRAG_SHORT = 'SLUGGISH';
+    // he gets PALER, never darker. cold and drained, washed toward ice --
+    // the one thing this game never does to his face is put a shadow on it.
+    const DRAG_TINT  = '#7fb4cf';
+    const DRAG_BAKE  = 320;      // one cached sprite, scaled -- see drawPaddle
+    // The pulse is a SWELL and deliberately slow: 1.1 cycles a second, over a
+    // 30% band, on a small object. WCAG 2.3.1's limit is three flashes in any
+    // one second and the pair of luminances here is nowhere near a flash --
+    // it reads as breathing, which is what it is meant to read as.
+    const DRAG_A0    = 0.55;     // middle of the tint's alpha
+    const DRAG_A1    = 0.13;     // how far it breathes either side
+    const DRAG_HZ    = 1.1;
+    // the tail of where he has been. the lag is the whole mechanic, so it is
+    // worth being able to SEE it and not only feel it.
+    const TRAIL_SECS = 0.30;
+    const TRAIL      = [{ back: 0.10, a: 0.20 }, { back: 0.22, a: 0.10 }];
+
+    const PH_ALPHA  = 0.45;
+    // ...and what is washed over them so they read as HIS, not as a stray ball.
+    // They stay see-through -- that is still the tell for which head matters --
+    // but a colour makes it unmistakable that the thing coming at you was
+    // thrown rather than hit.
+    //
+    // There is no black option here, for two reasons. On a black field it is
+    // invisible, and it would mean putting a shadow over his face, which is the
+    // one thing nothing in this game does. The glow does the "unclean" work
+    // that black was being asked to do, and it reads on a dark background.
+    // Sickly green, chosen off a sheet of five. Not red: a red head reads as
+    // the real ball's own skin tone at a glance, which is the one confusion
+    // this colour exists to prevent.
+    const PH_LOOK = { color: '#6faf3a', wash: 0.55, glow: 0.34 };
+
+    const PH_START  = 0.2;      // damage before he starts throwing them: 80% of him left
+    const PH_GAP0   = 2.2;      // seconds between them at first
+    // ...and when he is nearly finished. Renormalised when the tail was cut
+    // from thirteen hits to ten: the barrage is paced off his DAMAGE, so a
+    // shorter endgame at the same rate would simply have thrown three fewer
+    // fistfuls of heads at the part of the fight they exist for. 0.45 x 10/13
+    // is 0.35, which puts the same number of them in the air over the shorter
+    // window. It does mean the very end is DENSER than it was -- same heads,
+    // less time -- which is the honest consequence of asking for both.
+    const PH_GAP1   = 0.35;
+    // ...and all of that thrown 35% less often, because the fight had that many
+    // too many of them in the air
+    const PH_RATE   = 0.65;
+    const PH_LIFE   = 4.5;
+    const PH_CAP    = 13;       // never more than this many on screen. raised
+                                // with the rate, or the cap would eat exactly
+                                // the increase it was renormalised to deliver.
+    const PH_SPEED  = 300;
+
+    const SHOUT_ODDS = 0.1;     // how often a hit makes him say something
+    const SHOUT_SECS = 1.3;
+    const SHOUT_WAIT = 1;       // your first serve at him always gets one, this long after it
+
+    // The hat stage runs away. Once it is down to its last few, each of them
+    // tosses a coin about saying his piece -- in a little bubble over his head
+    // -- and walking off the edge of the screen rather than wait for you, and
+    // the ones still standing toss again every few seconds. One who gets away
+    // is gone for good; the stage ends when nobody is left, however they went.
+    // A hit used to make one of them say something now and then, too. That
+    // went, and the running stayed.
+    const TALK_SECS   = 1.8;
+    const TALK_MAX    = 3;
+    const TALK_LINES  = ['The Chosen One...', 'Ouch', '...', 'Brandon?'];
+    const FLEE_AT     = 3;       // how few are left before they start running
+    const FLEE_ODDS   = 0.5;     // each one's chance, every time they decide
+    const FLEE_REROLL = 5;       // seconds before the ones still there decide again
+    const FLEE_WAIT   = 1.0;     // seconds one spends saying it before he goes
+    const FLEE_SECS   = 8;       // ...then getting all the way off the screen, at a dawdle
+    const FLEE_RAMP   = 0.8;     // seconds of that spent getting up to pace
+    const TODDLE_HZ   = 2.2;     // rocks a second, left and back
+    const TODDLE_LEAN = 7 * Math.PI / 180;
+    const TODDLE_HOP  = 3;       // px he lifts at the end of each step
+
+    // The hat's statues cannot be broken, so they are not left standing over a
+    // stage you have cleared: the moment the round is over, every one of them
+    // walks off to the nearer edge. They say nothing. STATUE_WAIT lets the
+    // clear land first, and the walk is quick enough to be over before a
+    // single tap can move on from the shortest bonus screen (EOR_IN through
+    // EOR_LINGER). STATUE_SECS has to stay above FLEE_RAMP, which it shares.
+    const STATUE_WAIT = 0.4;
+    const STATUE_SECS = 2;
+
+    // his entrance: an empty screen for a beat, then he lowers in from above
+    // while the health bar grows out from nothing, so the size of the problem
+    // arrives gradually rather than all at once
+    const ENTER_WAIT = 0.7;
+    const ENTER_SECS = 2.6;
+    const CONTINUE_KEEP = 0.5;  // what survives of your score when you re-up
+    // The clock is on the OFFER, not on the ceremony. Ten seconds to decide
+    // whether to spend another quarter, and if you let it run out the run is
+    // over and the initials screen that follows takes as long as it takes.
+    // Nobody should be hurried through typing their own name.
+    const CONTINUE_SECS = 10;
+
+    // ---- the ending ---------------------------------------------------------
+    // A clock in seconds rather than a 0..1 ramp, because the beats are keyed
+    // to absolute times.
+    //
+    // He comes apart FIRST, and he comes apart exactly the way you eventually
+    // will -- same grid, same drift, same order, boot to face. That is the
+    // whole cycle in one gesture: by the time it is happening to you, you have
+    // already watched it once and done it on purpose.
+    const A_DIE    = 1.1;   // a beat and the colour going, then he lets go
+    const A_DIE_T  = 3.4;   // how long the peeling takes end to end
+    const A_RISE   = 4.2;   // you start climbing while the last of him falls
+    const A_RISE_T = 4.4;   // ...and how long the climb takes
+    const A_CREED  = 6.0;   // the line lands once you are most of the way up
+    const A_TITLE  = 9.6;   // BRANDON WINS
+    const A_END    = 12.4;  // and the next one is already on his way
+    // The storm is SWELLS, not strobes. WCAG 2.3.1 allows at most three
+    // flashes in any one second; a hard strobe here was hitting four, whiting
+    // out the whole canvas each time -- a photosensitive seizure risk. These
+    // are three slow blooms across the whole rise, each taking 350ms to come
+    // up and 500ms to fall, peaking well short of white. No rapid luminance
+    // pair exists anywhere in it, so there is nothing to trip on.
+    const SWELLS     = [4.9, 6.4, 7.9];
+    const SWELL_UP   = 0.35;
+    const SWELL_DOWN = 0.5;
+    const SWELL_PEAK = 0.4;
+    const DRAIN_SECS = 1.6;   // how long the scene takes to bleed to black and white
+    const CREED    = 'YOU HAVE BECOME WHAT YOU SWORE TO PROTECT US FROM';
+
+    // ---- the endless gauntlet -----------------------------------------------
+    // You do not get to just win, and now you do not get to just STOP either.
+    // The takeover ends with you sitting in the space he occupied, at his size,
+    // and the next one is already on his way up -- so the game hands you his
+    // seat and then hands his problem to you with it. You cannot win from here.
+    // You can only last.
+    //
+    // Everything below is one block on purpose: it is the whole mode, and every
+    // number in it is meant to be found by playing rather than by reasoning.
+    const G_Y        = BOSS_Y;    // the throne, where he sat
+    const G_BOB      = 14;
+    const G_W0       = ASCEND_W;  // you inherit what he had
+    const G_W1       = 170;       // ...and what is left of you at the end
+    // Size decays off HITS TAKEN, not off health remaining. A curve on the
+    // health fraction is hostage to the health total -- the opening hit is 4%
+    // of the bar and barely moves you whatever exponent it is raised to. Per
+    // hit, the first one is always the big one: 760, 593, 473, 387, 326, 281,
+    // and then it flattens and the rest barely touch you. Being enormous is
+    // the first thing you lose, and it is the only thing that helps.
+    const G_SHRINK   = 3;         // hits to fall 1/e of the way down
+    const G_HP       = 24;
+    const G_DMG      = 2;         // what one head costs you
+    const G_MERCY    = 0.7;       // seconds of it after a hit
+    const G_OVERHEAL = 4;         // health per unspent life
+    const G_GROW     = 26;        // ...and how much bigger each one makes you
+
+    // The handover. The takeover ends with you grey and dead still -- the
+    // colour has been draining out of you since you started climbing, and the
+    // throne does not bob. This mode had you in full colour and already
+    // breathing on its very first frame, which swapped one picture for a
+    // different one between two frames of the same man. Everything that
+    // differs between the two now arrives over this: the colour comes back
+    // into you, the bob winds up from nothing, and the bar fades in. It is
+    // short -- you have just sat down, you have not changed seats.
+    const G_IN       = 1.4;
+
+    // the army. no waves: one number climbs the whole time you are alive and
+    // everything reads off it, so nothing steps and nothing announces itself.
+    const G_RAMP     = 95;        // seconds to full ferocity
+    const G_MAX      = 28;        // most of them on the floor at once
+    const G_ROW      = 7;         // how many stand in one rank
+    const G_STEP     = 34;        // and how far behind it the next rank sits
+    // How far along each rank back is shifted, as a fraction of a place, so
+    // that ranks do not stand in columns directly behind one another. A quarter
+    // gives every rank its own columns across the G_MAX / G_ROW of them; a
+    // third would put the last rank back on the first one's. Where it is used
+    // the shift is folded into plus or minus half a place, which keeps the
+    // first rank unshifted and the whole formation inside G_LO..G_HI whatever
+    // this is set to.
+    const G_STAGGER  = 1 / 4;
+    const G_LO       = 70, G_HI = LW - 70;
+    const G_SHIP_W   = 116;
+    const G_SHIP_H   = G_SHIP_W / SHAPE_ASPECT;
+    const G_SHIP_Y   = LH - 78;
+    const G_RISE     = 0.9;       // seconds to climb into formation
+    const G_SWEEP    = 0.55;      // rad/s of patrol, before its own variation
+    const G_DEATH    = 0.45;      // how long one takes to come apart
+    const G_SHIP_BOB = 7;         // and a little vertical drift each, so the
+    const G_SHIP_HZ  = 0.45;      // rank breathes instead of sitting on a rail
+    // an empty floor is dead air. whatever the batch clock says, clearing them
+    // buys you a second and a half, not ten.
+    const G_REFILL   = 1.6;
+
+    // The first one is the whole introduction. He is exactly the size your
+    // paddle was when you walked into the boss fight, and he is the untinted
+    // photograph -- the same as you. For a few seconds there are two brandons
+    // on the screen and no way to tell which one answers to you except by
+    // moving. Then you find out, and the colours start arriving.
+    const G_INTRO_W  = PADDLE_W;
+    const G_INTRO_RISE = 2.4;     // he walks on slowly, and from further down
+    // ...and then he has you to himself for a while. Whatever the batch clock
+    // says, nobody else joins for this long after you take your first throw --
+    // unless you kill him, in which case the empty-floor rule refills as usual
+    // and you have earned the company.
+    const G_SOLO     = 5;
+    // they arrive in batches, and the batch size doubles every G_DOUBLE
+    // seconds: ~1-3 at the start, ~1-6 by thirty seconds, ~1-15 by a minute,
+    // and onward. the gap before the next batch is plain random within its
+    // range, because a regular drumbeat is exactly what reads as waves.
+    const G_BATCH    = 3;
+    const G_DOUBLE   = 26;
+    const G_GAP0     = 3, G_GAP1 = 10;
+    // How much killing one takes. A hit knocks it one rung DOWN the ladder, so
+    // the colour it is wearing is always how many more you still owe it: gold
+    // for three and silver for two, the colours the bricks wear for the hits
+    // they have left -- see shipSprite, which takes theirs.
+    //
+    // The last rung is its OWN colour, drawn from the wall you spent four
+    // stages knocking down. An army of identical slate was a crowd; an army in
+    // red, orange, green and yellow is the whole game coming back for you.
+    const G_TOUGH    = 85;        // seconds until the mix is at its meanest
+    const G_T3       = 0.5;       // ...and its share of three-hit ones then
+    const G_T2       = 0.62;
+    // their fire is budgeted for the ARMY, not per man. Twenty-eight of them
+    // each on their own clock is hundreds of heads a second once the spreads
+    // open up: unreadable, unplayable, unrenderable. Under a shared budget
+    // another body makes the wall WIDER instead, which is the better threat --
+    // not more to dodge, but nowhere left that is not covered.
+    // Every one of them is on his own clock, somewhere in this range, rerolled
+    // after each serve. No ramp on it and no shared beat: the floor never
+    // pulses together, and with more than a couple of them standing there it
+    // adds up to something always being in the air. The escalation is the
+    // NUMBER of them, not any of them getting twitchier.
+    //
+    // All three clocks below -- this one, the army's budget, and the one a
+    // fresh arrival serves on -- were scaled together, because the gap a man
+    // actually waits is max(his own, the army's floor) and moving one of them
+    // alone only quietens whichever regime it happens to bind in. One line
+    // each, so the lab can reach them.
+    const G_SERVE_LO = 1.54;
+    const G_SERVE_HI = 13.85;
+    // ...with one guard on top. Twenty-eight men each rolling a low one is a
+    // wall of heads nobody can read and the renderer would not thank us for, so
+    // the army also has a combined ceiling and an individual gap is never
+    // allowed below what that implies. It only ever binds when the floor is
+    // crowded.
+    const G_RATE0    = 1.56;      // the army's serves/sec, early
+    const G_RATE1    = 7.15;      // ...and late
+    // What a fresh arrival waits before his first one. He does not wait out a
+    // full roll -- walking on and then standing about is dead air. It is a
+    // third clock rather than a special case of the one above, and with the
+    // floor churning as hard as it does late on it is a real share of
+    // everything thrown at you: leaving it out of the scaling landed a cut to
+    // the other two at two thirds of its intended size.
+    const G_FIRST_LO = 0.62;
+    const G_FIRST_HI = 3.08;
+    const G_BULL0    = 250,  G_BULL1 = 430;
+    const G_BUL_R    = 11;
+    // They do not shoot at you. They SERVE. Each one starts a head bouncing up
+    // the screen, and it goes on bouncing -- off the walls, off the ceiling,
+    // off you -- until it falls back out of the bottom of the world. So every
+    // ship down there is running its own game of breakout, and you are the
+    // brick. When one comes off you it leaves at the angle your body gave it,
+    // exactly the way the paddle used to send one back into the wall.
+    const G_BALL_CAP = 26;        // the air can only hold so much
+    const G_BALL_LIFE= 22;        // ...and nothing rattles around forever
+
+    // your reply: his moveset, now yours. straight down from wherever you are,
+    // so lining a throw up and staying out of the way are the same decision.
+    const G_COOL     = 0.85;
+    const G_TSPEED   = 520;
+    const G_THROW_R  = 13;
+    const G_PH_A     = 0.62;      // your heads are more solid than his were.
+                                  // his had to be deniable; yours do not.
+    // what a dead one leaves. Arkanoid's capsules fell into the paddle at the
+    // bottom; you are at the top now, so they rise into you -- the same idea
+    // seen from the throne. caught on your own outline, which means a huge
+    // early king hoovers them up and a nearly-finished one has to go and get
+    // them: the only pressure in the mode that eases as you get worse off.
+    //
+    // no shout on pickup. the capsules announce themselves because catching one
+    // is the good thing that happens in an otherwise quiet rally; here the
+    // screen is already full and a line of type across it is one more thing to
+    // see through.
+    const G_DROPS    = { S: { short: 'SPREAD', color: '#4fa9c4' },
+                         B: { short: 'BURST',  color: '#d2683f' },
+                         R: { short: 'RAPID',  color: '#c96aa8' } };
+    const G_DROP_K   = Object.keys(G_DROPS);
+    // What one rung is worth as a chance at a powerup, BEFORE the damping
+    // below -- which is most of what actually decides it, and the reason this
+    // number cannot be read on its own. G_DROP_DAMP compounds against every
+    // drop already in the window, so the pipeline pushes back on any attempt
+    // to open it and the two do not compose the way they look. Raising this by
+    // half again buys under a third more powerups actually reaching the floor;
+    // the rest is eaten. Measured, not reasoned -- the arithmetic is not close.
+    //
+    // What it moves is the quiet floor rather than the busy one, which is the
+    // right place for it: a stretch where nothing has dropped is a stretch
+    // where you are pinned, and coming out of one a three-rung kill is now
+    // better than an even chance. A hand fast enough to farm still runs into
+    // the damping exactly as it did, which is what that number is for.
+    const G_DROP_ODDS = 0.44;
+    // ...and one serve in fifty is a powerup instead of a head. It arrives on
+    // the same arc from the same place, so the army is occasionally arming the
+    // thing it is trying to kill, and neither of you meant it.
+    const G_SERVE_DROP  = 0.02;
+    const G_SERVE_DROP_V= 0.55;   // of a head's speed -- catchable, not a taunt
+    // A run of them makes the next one less likely. Every powerup that has
+    // turned up in the last G_DROP_WINDOW seconds -- off a corpse or out of a
+    // serve, caught or not -- takes three eighths off the odds that the next
+    // corpse leaves one, and the odds come back as those age out. Drops used to
+    // scale with kills and kills with drops, so a quick enough hand never saw a
+    // timer run out: all three up for good, and every arrival dead before its
+    // first serve. A quiet stretch still pays out exactly as it always did.
+    const G_DROP_WINDOW = 5;      // seconds a drop keeps counting against the next
+    const G_DROP_DAMP   = 0.625;  // what each of those multiplies the odds by. 0.5 bit
+                                  // too hard once RAPID and BURST came down, 0.75 let
+                                  // too many through, so: halfway
+    const G_DROP_RISE= 118;
+    const G_DROP_R   = 12;
+    const G_DROP_LIFE= 9;
+    const G_SPREAD_S = 12, G_BURST_S = 10, G_RAPID_S = 11;   // how long each lasts
+    const G_RAPID_MUL= 0.35;      // RAPID: about a third of the wait between throws
+    // A hit ship's white knock fades in a quarter of a second, and under RAPID
+    // a stream lands every 0.3s. Restarted on every hit, that is the ship
+    // pulsing white more than three times a second, and nothing in this game
+    // flashes more than three. So a hit closer than G_KNOCK_HOLD behind the
+    // last one holds the knock where it is instead of knocking again, and a
+    // knock never starts over until G_KNOCK_GAP after it last started. A
+    // stream reads as one glow; a lone hit looks exactly as it always did.
+    const G_KNOCK_HOLD = 0.34;
+    const G_KNOCK_GAP  = 1 / 3;
+    // SPREAD is spatial and BURST is temporal, so they compose rather than
+    // collide: BURST decides how many volleys leave you, SPREAD how wide each
+    // one is. Nine heads with both up.
+    const G_SPREAD_N = 3, G_SPREAD_ARC = 0.22;
+    const G_BURST_N  = 3, G_BURST_GAP = 0.09;
+
+    // one of them is worth going after, and the rule is WHERE he is standing.
+    // Always the rank that fills first -- which is the bottom of the screen,
+    // and the LAST thing a thrown head reaches, because ranks stack upward
+    // toward the throne and a head meets the nearest body first. So every rank
+    // above him is a man your throw hits before he does, and taking him means
+    // digging a column while the army fills the holes back in behind you.
+    //
+    // A mark that went to the longest-lived would single somebody out for a
+    // reason the player has no way to see. "Always at the back" is a rule you
+    // learn by looking once, and it scales itself: early the floor is one rank
+    // deep and he is simply somewhere to go, and by the time it is four deep
+    // the same rule has become a dig. Nothing about it changes; the army does.
+    //
+    // He is marked by NOT being marked -- the one man nobody dyed, wearing the
+    // photograph while the rest of the floor wears the wall. See drawShips for
+    // why that beats hanging anything on him.
+    const G_MARK_IN   = 1.0;      // seconds for the colour to drain out of him
+    const G_MARK_MUL  = 5;        // what he pays, against an ordinary kill
+    // ...and what taking him does to the men around him. The blast is the
+    // whole reason the dig pays: it opens the one rank you cannot otherwise
+    // open, which is the rank he was standing in. Outright kills, not a rung
+    // off each -- four throws that end in three men flinching is not a reward.
+    const G_BLAST_R   = 105;
+    const G_BLAST_T   = 0.5;      // how long the ring takes to go out
+
+    // Straight down, from wherever you are. It swept on a timer once and hung
+    // off you like a pendulum once, and both were the same mistake: an aim you
+    // do not control is not a skill, it is a slot machine you have to wait for.
+    // Lining a throw up and staying out of the way are the same decision again,
+    // which is the tension the mode was built on.
+    //
+    // The shot leaves from his CENTRE, so the only thing that matters is that
+    // his centre can reach every place a ship can stand. See G_REACH.
+
+    // his size is eased rather than stepped -- a hit taking 160px off him in
+    // one frame reads as a glitch, not as damage
+    const G_SHRINK_EASE = 0.55;   // seconds to catch up, near enough
+
+    // the score. deliberately modest against a full run -- this is a coda, not
+    // a second game, and the table should still be won in the five stages.
+    // Times how many hits it took, so a three-rung one pays three times -- it
+    // cost you three throws.
+    //
+    // It looks far too small to be a score because it is never paid on its
+    // own. Everything a kill pays goes through two multipliers that compound
+    // -- G_MULT_MAX of streak on top of G_MARK_MUL for the bounty -- so the
+    // same kill is worth anywhere from this to thirty times it. Pricing the
+    // base off what the best kill should be worth is the only way the coda
+    // stays a coda: at fifty it was taking more of a run than the five stages
+    // it is supposed to be an encore to.
+    //
+    // It is what the popups read, so the bottom of that range is a "+5" on a
+    // one-rung kill with no streak going. That is the correct thing for it to
+    // say -- one man out of an endless queue, killed by somebody who is not
+    // on a run, IS worth almost nothing, and the number climbing as the streak
+    // does is the whole feedback the mode gives you.
+    const G_PTS_KILL = 5;
+    // Paid once, at the end, as the TIME BONUS line on the same screen a round
+    // ends on -- see endOfReign. Four times what it was: the lump has to feel
+    // like a result when it lands, and at ten a point a whole reign was worth
+    // less than a handful of kills.
+    const G_PTS_SEC  = 40;
+    // ...and MAX MULT, on the same screen, pays this for every x of the best
+    // the streak reached -- the gauntlet's MAX BONUS
+    const G_PTS_MULT = 100;
+
+    // The streak, which every kill pays through. It does NOT reset on a hit.
+    // You arrive on the throne 760 across a 800 field, where there is nowhere
+    // to dodge to and nothing you can do about being struck -- a number that
+    // zeroed on contact would be unreachable for the first third of a reign
+    // and then easy once you had shrunk into something nimble, which is
+    // backwards. Halving leaves it worth reading at every size: early it
+    // hovers low because you are being hit and killing in equal measure, and
+    // by the time you are small it is yours to lose.
+    const G_MULT_MAX  = 6;
+    const G_MULT_STEP = 0.25;     // per kill, whatever it was worth
+    const G_MULT_HIT  = 0.5;      // ...and what one hit leaves of it
+    // It also goes off if you stop. Lasting already pays, by the second, at
+    // the end -- this is the other axis, and sitting on it has to cost
+    // something or the safe game is the high-scoring one as well.
+    const G_MULT_HOLD = 3;        // seconds without a kill before it starts to go
+    const G_MULT_DECAY = 0.8;     // ...and how much a second after that
+
+    // what the board can actually hold -- see killShip
+    const SCORE_CAP  = 9999999;
+
+    // the fall. fourteen seconds, and not skippable until the end: the whole
+    // run was about how fast you could take something apart, so the one thing
+    // that should not be quick is watching it happen to you.
+    const F_HOLD     = 1.2;       // nothing moves. it has just happened.
+    const F_WILT     = 2.9;       // sagging and draining, still in one piece
+    const F_BREAK    = 3.4;       // the first piece leaves
+    const F_SPAN     = 5.6;       // and the spread between first and last
+    const F_GONE     = 2.4;       // how long a piece takes to fade
+    const F_RISE_AT  = 2.6, F_RISE = 8.6;
+    const F_TITLE    = 11.6, F_STATS = 12.6, F_AGAIN = 14.0;
+    const F_LEAN     = 0.16;      // radians he sags through
+    const F_SAG      = 18;        // ...and pixels he settles by
+
+    // The blow that finishes somebody. For a fifth of a second nothing in the
+    // world advances -- not the ceremony, not the crumble, not one head in the
+    // air -- and the body that just took it is a flat white cut-out of itself.
+    // Then time restarts and the shape burns off while he starts to come apart.
+    //
+    // Hitstop, and it is doing what hitstop does: a kill that lands on a frame
+    // you never see is a kill that did not feel like anything. Both deaths in
+    // the game use it, because both deaths in the game are the same death.
+    //
+    // It is a silhouette, not a screen flash. One figure going bright against
+    // black is a shape appearing; the whole canvas going bright is a strobe,
+    // and this game has already decided it does not do those.
+    const HIT_HOLD   = 0.20;      // the freeze
+    const HIT_FADE   = 0.26;      // ...and the white burning off after it
+    const HIT_SHAKE  = 9;         // px, worst case, decaying across both
+    // Each unspent life comes up out of the corner it has been sitting in all
+    // game, crosses the screen, and goes into him. Slowly, and one at a time,
+    // because the whole point is that you SEE a life turn into health -- the
+    // bar jumping on its own with a caption under it would be telling you.
+    const F_ABSORB   = 1.35;      // one life, corner to chest
+    const F_ABSORB_G = 0.45;      // ...and the pause before the next sets off
+    // Where his chest actually is, as a fraction of the silhouette box from
+    // its centre. He lies on the diagonal with his head up and to the right,
+    // so the CENTRE of his box -- which is where these were flying -- is his
+    // hips. Read off the mask: the head is rows 0-1 at columns 17-23, so his
+    // chest is around column 18, row 2.5, which is up and to the right of
+    // centre by these much.
+    const G_CHEST_X  = 0.25;
+    const G_CHEST_Y  = -0.22;
+
+    // `name` is shouted across the screen on pickup, `short` is the hud tag,
+    // and the KEY is the letter printed on the falling capsule -- so they
+    // always agree
+    const CAPS = {
+        B: { name: 'BIG BRANDON',       short: 'BIG',     color: '#5b8cab', secs: 10 },
+        D: { name: 'DOUBLE BRANDON',    short: 'DOUBLE',  color: '#8f7fc4', secs: 12, noBoss: true },
+        S: { name: 'SLOW BRANDON',      short: 'SLOW',    color: '#4f9d8c', secs: 8  },
+        M: { name: 'MULTI-BRANDON',     short: 'MULTI',   color: '#e0c060', secs: 0  },
+        // R for bRain, because B was already spoken for
+        R: { name: 'BIG BRAIN BRANDON', short: 'BRAIN',   color: '#d98cc0', secs: 9  },
+        P: { name: 'PIERCING BRANDON',  short: 'PIERCE',  color: '#7fc4b0', secs: 6, noBoss: true },
+        W: { name: 'WIGGLY BRANDON',    short: 'WIGGLY',  color: '#c06a8f', secs: 9, bonus: true },
+        // ENGLISH has no flat bonus. It does not need one: spin is paid for
+        // directly by the multiplier below, and ENGLISH is a steady spin of its
+        // own on top of whatever the head already has. It turns whichever way
+        // your last hit pushed the head, so it is yours to steer: send the head
+        // back the other way and ENGLISH comes round after it, at ENG_ACCEL.
+        E: { name: 'ENGLISH BRANDON',   short: 'ENGLISH', color: '#cf6b4e', secs: 9 }
+    };
+    const TIMED = ['B', 'D', 'S', 'R', 'P', 'W', 'E'];     // M is instant
+    const CAP_KEYS = Object.keys(CAPS);
+    // the four brick colours, for the gauntlet's army to wear
+    const TIER_KEYS = ['R', 'O', 'G', 'Y'];
+
+    // Two of them simply do not work against one enormous target. PIERCE would
+    // let you sit inside him racking up hits; DOUBLE gives you a second body to
+    // catch his phantoms on and a hole down the middle to lose the ball
+    // through, which is a straight downgrade during the only fight where being
+    // hit costs you something. Neither needs a special case in the collision
+    // code -- they just never drop on his stage.
+    function capsulePool() {
+        return LEVELS[stage].boss ? CAP_KEYS.filter(k => !CAPS[k].noBoss) : CAP_KEYS;
+    }
+    const CALLOUT_SECS = 1.15;
+
+    const TIERS = {
+        R: { pts: 70, fill: '#9e4b3c' },
+        O: { pts: 50, fill: '#bd7f3f' },
+        G: { pts: 30, fill: '#6f7f4e' },
+        Y: { pts: 10, fill: '#c9a94e' }
+    };
+    // all mid-tone. nothing here darkens his face -- a damaged brick changes
+    // hue rather than getting a black wash over it
+    const GOLD       = '#efb920';   // three hits, then it steps down -- see drawBrick
+    const GOLD_HP    = 3;
+    const SILVER     = '#b9bcc4';
+    const SILVER_HIT = '#7a8cb4';   // slate blue: still metal, and nothing like the stone
+    const STONE      = '#7d776b';   // the unbreakable ones are statues
+    // ...and they wear a rim of paler stone round the outside, which nothing
+    // breakable does -- see statueSprite
+    const STONE_RIM     = '#b8ae9b';
+    const STONE_RIM_W   = 2.5;      // px out from his edge
+    const STONE_RIM_PAD = Math.ceil(STONE_RIM_W) + 1;   // room in the sprite for it
+
+    // ---- stages ------------------------------------------------------------
+    // 7 across puts each brandon at ~90px, about two thirds of the paddle.
+    // . empty   Y/G/O/R tiers   X stone, indestructible
+    // S silver, silverHp hits   A gold (Au, since G is green), GOLD_HP hits
+    // Each stage adds a RULE rather than just a new picture, and the workload
+    // climbs -- 22, 26, 33 hits -- and eases only to 32 for the hat, which
+    // keeps SPLIT's stone and MESH's silver, and adds a gold, alongside its
+    // own rule so the run-in to the boss does not sag. `dbg` names them for
+    // the stage-select only; nothing shows a stage name during play.
+    const LEVELS = [
+        {   dbg: 'WALL',   // plain. a short opener, to teach the paddle angle
+            silverHp: 2,
+            rows: ['.RRRRR.',
+                   '.OOOOO.',
+                   'GGGGGGG',
+                   '.YYYYY.']
+        },
+        {   dbg: 'SPLIT',  // stone: immovable geometry, worked around not through
+            silverHp: 2,
+            rows: ['RRRRRRR',
+                   'OO.X.OO',
+                   'OO.X.OO',
+                   'GGGGGGG',
+                   '.YY.YY.']
+        },
+        {   dbg: 'MESH',   // silver: things that refuse to die in one hit
+            silverHp: 2,
+            rows: ['S.S.S.S',
+                   'RRRRRRR',
+                   '.S.S.S.',
+                   'OOOOOOO',
+                   '.GGGGG.']
+        },
+        {   dbg: 'HAT',    // the joke: the last few talk back and run for it
+            silverHp: 2,
+            talks: true,   // see FLEE_AT and STATUE_WAIT
+            // silver in the brim and a gold buckle on the band, and nothing
+            // else that takes more than one hit: the bottom row breaks in one
+            // as on every stage, and the crown, which is usually what is left
+            // when they run, stays one hit to catch. the statues stand in both
+            // top corners until the round is over
+            rows: ['X.RRR.X',
+                   '..RRR..',
+                   '.OOAOO.',
+                   'SSSSSSS',
+                   '.YYYYY.']
+        },
+        {   dbg: 'BOSS',   // one enormous brandon, no bricks at all
+            boss: true
+        }
+    ];
+
+    // ---- canvas ------------------------------------------------------------
+    const canvas = document.getElementById('stage');
+    const ctx = canvas.getContext('2d');
+
+    // The line under the field. It changes when the game does -- what he is
+    // steering stops being a paddle. Declared up here because newGame() runs
+    // during setup and would hit the dead zone of anything defined lower down.
+    const HINT_PLAY = 'move to slide brandon · click or space to serve';
+    const HINT_GAUNTLET = 'move to dodge · click or space to throw a head';
+    function setHint(txt) {
+        const el = document.querySelector('.hint');
+        if (el) el.textContent = txt;
+    }
+
+    const paddleImg = Object.assign(new Image(), { src: 'images/brandon/paddle.webp' });
+    const ballImg   = Object.assign(new Image(), { src: 'images/brandon/ball.webp' });
+    const ready = img => img.complete && img.naturalWidth > 0;
+
+    // ---- state -------------------------------------------------------------
+    let bricks, stage, score, best, lives, combo, phase, banner;
+    let paddle, balls, popups, hits, tierSeen, bw, bh;
+    let speed, capsule, fx, callout, clock = 0, spreadT = 0, bossPhase = 0;
+    let bossHits = 0;             // landed on him, however much each was worth
+    let bossServed = false;       // your first ball has gone up at him
+    let shoutT = -1;              // ...and the seconds until he yells at it, negative once nothing waits
+    let bossTwo = false;          // he has had his second wind
+    let siphon = null;            // the scene itself, while it plays
+    let shrinkT = 0;              // seconds of play before you are yourself again
+    let motes = [], yell = null;  // the life leaving you, and your own shout
+    let tilt = null, lunge = null;  // his answers to an incoming ball
+    let bossIF = 0;               // ...and the gap before another one can
+    let ascendT = 0, uiScale = 1, climb = 0;
+    // where the fight left him when he started for the throne -- the takeover
+    // rises from there, not from the line he opened the fight on
+    let ascendFrom = { y: PADDLE_Y, w: PADDLE_W };
+    let phantoms = [], phGap = 0, shout = null, enterT = 0, rings = [], overT = 0;
+    let talk = [], fleeRoll = -1; // the hat stage's voices, and seconds to its next coin toss
+    let round = null;             // what this round has done so far -- see EOR_ROWS
+    let eor = null;               // ...and the screen it becomes once the round is over
+    let dragT = 0;                // seconds of sluggish left on him
+    let padLag = 0;               // the lag actually on him -- see dragLag
+    let padTrail = [];            // recent positions, for the ghosted tail
+
+    // ---- the gauntlet's state ------------------------------------------------
+    let king = null, ships = [], gBul = [], gThrow = [], sparks = [], gDrop = [];
+    let gVolley = [], gRunT = 0, gSpawnT = 0, gCool = 0, gShake = 0;
+    let gSpread = 0, gBurst = 0, gRapid = 0;
+    let gDropAt = [];             // when each recent powerup turned up, oldest first
+    let gMark = null, gMarkT = 0, gBlast = [];
+    let gMult = 1, gMultT = 0;    // the streak, and how long since it last grew
+    let gMultTop = 1;             // ...and the most it has been this reign -- see MAX MULT
+    let gAbsorbT = 0, gAbsorbLeft = 0;
+    let gReady = false, kingShown = 0, gLead = 0;
+    let gIn = 0;                  // seconds since the throne became yours -- see G_IN
+    // the health TOTAL the bar is currently drawn for, chased the way kingShown
+    // chases his width, so a life going in extends the meter over the same beat
+    // it swells him rather than snapping it longer in one frame
+    let gBarMax = 0;
+    let fallT = 0, kingFall = null, victor = null, impact = null;
+    let bossFall = null;          // the old one coming apart, during the takeover
+    let board = [], boardLive = false;
+    let entry = '', entryRank = -1, sending = false;
+
+    const BEST_KEY = 'fourkeys.best';
+    function loadBest() {
+        try { return parseInt(localStorage.getItem(BEST_KEY), 10) || 0; }
+        catch (e) { return 0; }
+    }
+    function saveBest() {
+        try { localStorage.setItem(BEST_KEY, String(best)); } catch (e) { /* private mode */ }
+    }
+    function clearBest() {
+        best = 0;
+        try { localStorage.removeItem(BEST_KEY); } catch (e) { /* private mode */ }
+    }
+
+    // ---- the leaderboard -----------------------------------------------------
+    // One shared table for everyone, held by a small Cloudflare Worker (its
+    // source is _worker/brandon-leaderboard-worker.js). Everything
+    // here fails soft: if the board is unreachable the game plays exactly as it
+    // did before, just without a table. It is never awaited on a hot path.
+    // Paste the deployed worker's URL here to switch the board on. While it is
+    // empty the game behaves exactly as it did before one existed: no table, no
+    // initials prompt, no network calls at all.
+    //
+    const BOARD_URL = '';
+    const BOARD_ON = !!BOARD_URL;
+    const TOP_N = 10;
+
+    // rows come back from a public endpoint, so treat them as untrusted text
+    function cleanRows(raw) {
+        if (!Array.isArray(raw)) return [];
+        return raw.map(r => ({
+            ini: String((r && r.ini) || '???').toUpperCase()
+                     .replace(/[^A-Z]/g, '').slice(0, 3).padEnd(3, '?'),
+            score: Math.max(0, Math.min(9999999, parseInt(r && r.score, 10) || 0))
+        })).sort((a, b) => b.score - a.score).slice(0, TOP_N);
+    }
+
+    async function fetchBoard() {
+        if (!BOARD_URL) return;
+        try {
+            const res = await fetch(BOARD_URL, { cache: 'no-store' });
+            if (!res.ok) throw new Error(res.status);
+            board = cleanRows(await res.json());
+            boardLive = true;
+        } catch (e) { boardLive = false; }
+    }
+
+    async function submitScore(ini, n) {
+        if (!BOARD_URL) return;
+        try {
+            const res = await fetch(BOARD_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ini, score: n })
+            });
+            if (!res.ok) throw new Error(res.status);
+            board = cleanRows(await res.json());
+            boardLive = true;
+        } catch (e) { boardLive = false; }
+        entryRank = board.findIndex(r => r.ini === ini && r.score === n);
+    }
+
+    // decided against the table we last saw. it can be a little stale, which at
+    // worst means someone types three letters and does not appear -- the server
+    // is the one that actually sorts.
+    function qualifies(n) {
+        if (!boardLive || n <= 0) return false;
+        return board.length < TOP_N || n > board[board.length - 1].score;
+    }
+
+    // ---- the ball's real, non-round shape -----------------------------------
+    // half-extents of the rotated ellipse along each world axis
+    function extX(b) {
+        const c = Math.cos(b.angle), s = Math.sin(b.angle);
+        return Math.hypot(bRX() * c, bRY() * s);
+    }
+    function extY(b) {
+        const c = Math.cos(b.angle), s = Math.sin(b.angle);
+        return Math.hypot(bRX() * s, bRY() * c);
+    }
+
+    // ---- the paddle, which may be one brandon or two ------------------------
+    // `spreadT` runs 0 -> 1 when DOUBLE comes up and back down when it lapses,
+    // so the pair slides apart and rejoins instead of snapping. at rest the
+    // two are exactly on top of each other, which is indistinguishable from
+    // the single brandon -- so there is no pop at either end.
+    function spread() {
+        const t = spreadT;
+        return t * t * (3 - 2 * t);        // smoothstep, no overshoot either way
+    }
+    function segs() {
+        const w = padW();
+        const k = spread();
+        if (k < 0.001) return [{ cx: paddle.x, w, i: 0 }];
+        const off = (w + w * DBL_GAP) / 2 * k;
+        return [{ cx: paddle.x - off, w, i: 0 },
+                { cx: paddle.x + off, w, i: 1 }];
+    }
+    function halfSpan() {
+        const w = padW();
+        return w / 2 + (w + w * DBL_GAP) / 2 * spread();
+    }
+
+    // ---- the wiggle ---------------------------------------------------------
+    // eased at the tail so nothing snaps back upright when it expires
+    function wigAmp() {
+        return fx.W > 0 ? WIG_AMP * Math.min(1, fx.W / WIG_EASE) : 0;
+    }
+    function segWig(i) {
+        const a = wigAmp();
+        return (a ? Math.sin(clock * WIG_FREQ * (1 + i * 0.13) + i * 2.3) * a : 0) + menuRock(i);
+    }
+
+    function effSpeed() { return speed * (fx.S > 0 ? SLOW_MUL : 1); }
+
+    // ---- the drag ------------------------------------------------------------
+    // The time constant he chases the pointer on, stepped and returned. Zero is
+    // the old game exactly: x is assigned the pointer's number and there is no
+    // filter in the path at all.
+    //
+    // It goes on in one frame and comes off over DRAG_EASE, and the asymmetry
+    // is the whole point. Raising it can never jerk him -- a longer constant
+    // only means he chases more slowly, from wherever he already is. LOWERING
+    // it has to put the distance he has fallen behind by somewhere, and taking
+    // it to zero in one frame put all of it in one frame: he teleported the
+    // width of the gap the instant the clock ran out, and paddle.vx -- which is
+    // just his own travel over dt -- came out several times faster than any
+    // real swipe, so a head met on that frame took a maxed-out swipe spin
+    // nobody asked for. Unwinding the lag closes the gap at a readable speed
+    // instead, which looks like him catching up, because it is.
+    //
+    // Every road to zero goes through here, so the clock being cleared outright
+    // -- the boss dying, the run ending -- eases out the same way.
+    function dragLag(dt) {
+        const want = dragT > 0 ? DRAG_LAG : 0;
+        padLag = want > padLag ? want
+                               : Math.max(want, padLag - dt * DRAG_LAG / DRAG_EASE);
+        return padLag;
+    }
+
+    function addDrag(sg, fromX) {
+        dragT = Math.min(DRAG_CAP, dragT + DRAG_SECS);
+        paddle.jt[sg.i] = 1;                  // he wears it like any other knock
+        paddle.tilt[sg.i] = Math.max(-1, Math.min(1, (fromX - sg.cx) / Math.max(1, sg.w / 2)));
+    }
+
+    // how strongly the tint sits on him this frame -- a slow breath rather
+    // than anything that could be called a flash
+    function dragAlpha() {
+        return DRAG_A0 + DRAG_A1 * Math.sin(clock * DRAG_HZ * Math.PI * 2);
+    }
+
+    // where he was `back` seconds ago, or null if the tail does not reach
+    function trailAt(back) {
+        const want = clock - back;
+        for (let i = padTrail.length - 1; i >= 0; i--) {
+            if (padTrail[i].t <= want) return padTrail[i].x;
+        }
+        return null;
+    }
+
+    function scoreMul() {
+        let m = 1;
+        for (const k of TIMED) if (fx[k] > 0 && CAPS[k].bonus) m += BONUS;
+        return m;
+    }
+
+    // the run: every brick since the head last came home adds another half
+    // to what the next one pays
+    function comboMul() { return 1 + 0.5 * combo; }
+
+    // How fast the head is turning, as money. It used to be a cliff -- nothing
+    // at all until the spin passed a threshold, then a jump -- which meant the
+    // thing you could feel happening to the ball had no reading on the screen
+    // most of the time. Now it is continuous from a dead-flat 1.00 up to
+    // SPIN_MUL at SPIN_FULL. So there is always a little english on, and
+    // chasing the rest is a thing you can do on purpose with no capsule at
+    // all: keep taking it on the same end, moving the same way, and it builds.
+    function spinMul(spin) {
+        const m = 1 + (SPIN_MUL - 1) * Math.min(1, Math.abs(spin) / SPIN_FULL);
+        return Math.round(m * 100) / 100;      // to the hundredth, as shown
+    }
+
+    // what a head is actually turning at: the spin it has been given, plus
+    // whatever ENGLISH has put on it
+    function turnOf(b) { return b.spin + b.eng; }
+
+    // The fastest-turning ball in play, whichever one that is. Both the gauge
+    // and the money read this, so what the bar promises is what a hit pays even
+    // when six heads are up and only one of them is really turning. Direction
+    // does not come into it: a head winding up anticlockwise is worth what one
+    // winding up clockwise is.
+    function liveTurn() {
+        let s = 0;
+        for (const b of balls) s = Math.max(s, Math.abs(turnOf(b)));
+        return s;
+    }
+
+    function liveSpinMul() { return spinMul(liveTurn()); }
+
+    // A multiplier to the tenth the screen prints it at. Everything that
+    // prints one or pays on one rounds it here, so a row can never name one
+    // number and pay for another. toFixed alone will not do: it rounds 2.15
+    // down and this rounds it up.
+    function tenth(m) { return Math.round(m * 10) / 10; }
+
+    // BONUS, the number along the bottom: everything the next hit is
+    // multiplied by. The HUD prints it and MAX BONUS keeps the best of it.
+    function bonusNow() { return tenth(comboMul() * liveSpinMul() * scoreMul()); }
+
+    // The gauntlet's streak as its corner prints it, without the ".0" on a
+    // whole one. MAX MULT names its best the same way.
+    function multText(m) { return 'x' + tenth(m).toFixed(1).replace(/\.0$/, ''); }
+
+    function aim(b, angle) {
+        const a = Math.max(-STEER_CAP, Math.min(STEER_CAP, angle));
+        const s = effSpeed();
+        b.vx = Math.sin(a) * s;
+        b.vy = -Math.cos(a) * s;
+    }
+
+    function newBall(x, y) {
+        // `pierced` remembers what this ball has already gone through on the
+        // current trip. a piercing ball overlaps a brick across several physics
+        // substeps, so without it one pass would drain a silver brick's whole
+        // health bar instead of a single point.
+        return { x, y, vx: 0, vy: 0, spin: 0, eng: 0, kickDir: 0, angle: 0, stuck: false, off: 0,
+                 pierced: new Set() };
+    }
+
+    function clearEffects() {
+        fx = { B: 0, D: 0, S: 0, R: 0, P: 0, W: 0, E: 0 };
+        dragT = 0;
+        padLag = 0;                       // a reset, so there is nothing to unwind
+        padTrail = [];
+        paddle.tx = paddle.x;             // no lag left to catch up on
+        paddle.w = PADDLE_W;
+        capsule = null;
+        callout = null;
+        spreadT = 0;                      // a fresh ball starts as one brandon
+        paddle.dip = [0, 0];              // ...lying level
+        phantoms = [];
+        shout = null;
+        talk = [];                        // ...though one that is running keeps running
+        shrinkT = 0; yell = null; motes = [];   // a fresh ball, and all of you back
+        rings = [];
+        for (const b of bricks || []) b.wigA = 0;
+    }
+
+    function newBrick(x, y, kind, hp) {
+        return {
+            x, y, kind, alive: true, hp, maxHp: hp, flash: 0,
+            jt: 0, jnx: 0, jny: 0,        // jiggle: energy, and which way
+            // each one sways on its own phase and slightly its own tempo, so
+            // the wall never moves as one mechanical block
+            wigP: Math.random() * Math.PI * 2,
+            wigF: 0.82 + Math.random() * 0.36,
+            wigA: 0,
+            flee: null                    // his run for the edge, on the hat stage
+        };
+    }
+
+    function buildStage(n) {
+        const lvl = LEVELS[n];
+        labStageReset();
+        hits = 0;
+        tierSeen = {};
+        talk = []; fleeRoll = -1;          // -1: nobody has started deciding yet
+        climb = 0;              // a fresh stage puts him back on his own line
+        shoutT = -1;            // ...and leaves no yell of the boss's still waiting
+        // a round's tally starts here and nowhere else -- a lost life and a
+        // continue both happen inside one, and neither may wipe it
+        round = { lost: false, fast: false, heads: false, grit: false, hunter: 0, peak: 1 };
+        eor = null;
+
+        if (lvl.boss) {
+            bw = BOSS_W0;
+            bh = bw / SHAPE_ASPECT;
+            bricks = [newBrick((LW - bw) / 2, BOSS_Y0 - bh / 2, 'Z', BOSS_HP)];
+            bossPhase = 0;
+            bossHits = 0;
+            bossIF = 0;
+            bossServed = false;
+            bossTwo = false; siphon = null; shrinkT = 0;
+            motes = []; yell = null; tilt = null; lunge = null;
+            resetBall();
+            enterT = 0;
+            phase = 'entrance';      // he is not here yet
+            labBossStart();
+            return;
+        }
+
+        const cols = lvl.rows[0].length;
+        bw = (LW - MARGIN * 2 - GAP * (cols - 1)) / cols;
+        bh = bw / SHAPE_ASPECT;
+
+        bricks = [];
+        lvl.rows.forEach((row, r) => {
+            for (let c = 0; c < cols; c++) {
+                const ch = row[c];
+                if (!ch || ch === '.') continue;
+                const hp = ch === 'S' ? lvl.silverHp : ch === 'A' ? GOLD_HP : 1;
+                bricks.push(newBrick(MARGIN + c * (bw + GAP), TOP + r * (bh + GAP), ch, hp));
+            }
+        });
+        labMiniStart();
+        resetBall();
+    }
+
+    // 0 while the screen is still empty, then 0 -> 1 as he lowers into frame
+    function enterK() {
+        return Math.min(1, Math.max(0, (enterT - ENTER_WAIT) / ENTER_SECS));
+    }
+
+    // once BOSS_STILL of his health is gone he starts patrolling, and he
+    // shrinks and speeds up the whole way down
+    function bossUpdate(dt) {
+        const b = bricks[0];
+        if (!b || b.kind !== 'Z' || !b.alive) return;
+        if (labB) { labB.update(b, dt); return; }
+
+        if (phase === 'entrance') {
+            const raw = enterK();
+            const k = raw * raw * (3 - 2 * raw);               // settles, not thuds
+            const from = -(bh + 40);                           // wholly out of sight
+            b.x = LW / 2 - bw / 2;
+            b.y = from + (BOSS_Y0 - bh / 2 - from) * k;
+            return;
+        }
+
+        const dmg = 1 - b.hp / b.maxHp;                       // 0 -> 1
+        const p = Math.pow(dmg, BOSS_CURVE);                  // shared by size and height
+        bw = BOSS_W0 + (BOSS_W1 - BOSS_W0) * p;
+        bh = bw / SHAPE_ASPECT;
+        const cy = BOSS_Y0 + (BOSS_Y - BOSS_Y0) * p;          // descends as he shrinks
+
+        // after his second wind he never settles back into the lazy patrol his
+        // health alone would give him; over the drain itself he holds still
+        const k = Math.max(bossTwo ? TWO_MOVE : 0, (dmg - BOSS_STILL) / (1 - BOSS_STILL));
+        const pdt = phase === 'siphon' ? 0 : dt;
+        bossPhase += (BOSS_SWEEP0 + k * BOSS_SWEEP1) * pdt;   // integrated, so
+                                                              // speeding up never
+                                                              // jumps his phase
+        // amplitude grows FROM zero, so he is genuinely motionless until
+        // BOSS_STILL of his health is gone and then eases into the patrol
+        const amp = Math.max(0, (LW - bw) / 2) * k;
+        b.x = LW / 2 + Math.sin(bossPhase) * amp - bw / 2;
+        b.y = cy + Math.sin(bossPhase * 1.7) * BOSS_BOB * k - bh / 2 + (lunge ? lunge.off : 0);
+
+        // The barrage, thickening as he weakens -- but only during a rally.
+        // A head can only land on you while the ball is live (see
+        // stepPhantoms), so anywhere else it is a hail of things that cannot
+        // touch you: over the drain, over a serve you have not taken yet, over
+        // the CONTINUE choices. The clock freezes with it, so he picks his
+        // rhythm back up where he left it rather than emptying his hands the
+        // moment you serve.
+        if (dmg < PH_START || phase !== 'play') return;
+        phGap -= dt;
+        if (phGap > 0 || phantoms.length >= PH_CAP) return;
+        const t = (dmg - PH_START) / (1 - PH_START);
+        phGap = (PH_GAP0 + (PH_GAP1 - PH_GAP0) * t) / PH_RATE;
+        const a = Math.PI * (0.15 + Math.random() * 0.7);     // always downward-ish
+        phantoms.push({
+            x: b.x + bw / 2, y: b.y + bh / 2,
+            vx: Math.cos(a) * PH_SPEED * (Math.random() < 0.5 ? -1 : 1),
+            vy: Math.sin(a) * PH_SPEED,
+            angle: Math.random() * 6.28,
+            spin: (Math.random() - 0.5) * 18,
+            life: PH_LIFE
+        });
+    }
+
+    // ---- the second wind -------------------------------------------------------
+    // The balls are left where they are, only hidden -- emptying the list here
+    // would read to the physics loop as the last ball lost, and cost a life.
+    function startSiphon(b) {
+        bossTwo = true;
+        siphon = { t: 0, hp0: b.hp, acc: 0, said: {} };
+        phase = 'siphon';
+        capsule = null; phantoms = []; dragT = 0;
+        shout = null; yell = null; motes = [];
+        tilt = null; lunge = null;
+    }
+
+    const ease01 = k => { k = Math.max(0, Math.min(1, k)); return k * k * (3 - 2 * k); };
+
+    // how far through his drinking he is
+    function siphonHad() {
+        return siphon ? ease01((siphon.t - SIPHON_IN) / SIPHON_DRINK) : 0;
+    }
+
+    // you, pulsing red while he drinks: whole swells across the drink, so the
+    // first rises from nothing and the last is gone as he stops. about one a
+    // second -- a pulse, never a flash
+    function siphonRed() {
+        if (!siphon) return 0;
+        const p = (siphon.t - SIPHON_IN) / SIPHON_DRINK;
+        if (p <= 0 || p >= 1) return 0;
+        const n = Math.max(1, Math.round(SIPHON_DRINK * SIPHON_PULSE));
+        return 0.5 - 0.5 * Math.cos(p * n * Math.PI * 2);
+    }
+
+    // how much of yourself you have: taken down across the siphon, then grown
+    // back over REBOUND_SECS of play
+    function lifeScale() {
+        if (siphon) return 1 - SHRINK * siphonHad();
+        return 1 - SHRINK * Math.min(1, shrinkT / REBOUND_SECS);
+    }
+
+    // the scene. nothing you do moves anything -- see update()
+    function stepSiphon(dt) {
+        const b = bricks[0];
+        siphon.t += dt;
+        const t = siphon.t;
+        const once = (key, at, fn) => { if (!siphon.said[key] && t >= at) { siphon.said[key] = true; fn(); } };
+        once('his',   0.15,             () => { shout = { follow: true, text: 'BRANDON!', life: 1.2 }; });
+        once('yours', SIPHON_IN + 0.05, () => { yell = { text: 'BRANDON!', life: 1.2 }; });
+        if (yell && (yell.life -= dt) <= 0) yell = null;
+
+        // he fills back up as you go down
+        b.hp = siphon.hp0 + (b.maxHp * SIPHON_HP - siphon.hp0) * siphonHad();
+        if (t >= SIPHON_IN && t < SIPHON_IN + SIPHON_DRINK) {
+            const spread = padW() * 0.4;
+            for (siphon.acc += dt * MOTE_RATE; siphon.acc >= 1; siphon.acc--) {
+                motes.push({ t: 0, sx: paddle.x + (Math.random() * 2 - 1) * spread, sy: padY(),
+                             sway: (Math.random() - 0.5) * 80 });
+            }
+        }
+        motes = motes.filter(m => (m.t += dt) < MOTE_SECS);
+
+        if (t >= SIPHON_IN + SIPHON_DRINK + SIPHON_OUT) {
+            siphon = null;
+            b.hp = b.maxHp * SIPHON_HP;
+            resetBall();                  // everything the scene left lying about goes...
+            shrinkT = REBOUND_SECS;       // ...but you stay half of yourself
+            // and it is back on without waiting for you: the ball leaves you
+            // aimed straight at him
+            const ball = balls[0];
+            ball.y = padY() - padH() / 2 - bRY() - 2;
+            ball.stuck = false;
+            aim(ball, Math.atan2((b.x + bw / 2) - ball.x, ball.y - (b.y + bh / 2)));
+            phase = 'play';
+        }
+    }
+
+    // After his second wind, an incoming ball gets an answer, rolled once for
+    // each trip up at him: a turn to meet it at an angle, a draw back to hit it
+    // harder, both, or neither. Each lets go once its ball has turned back.
+    function reactToBall(dt) {
+        const b = bricks && bricks[0];
+        const live = bossTwo && phase === 'play' && b && b.kind === 'Z' && b.alive;
+        if (live) {
+            for (const ball of balls) {
+                if (ball.stuck) continue;
+                if (ball.vy >= 0) { ball.noticed = false; continue; }
+                const gap = ball.y - (b.y + bh);
+                if (ball.noticed || gap < 0 || gap > NOTICE_PX) continue;
+                ball.noticed = true;
+                if (!tilt && Math.random() < TILT_ODDS) {
+                    const a = TILT_MIN + Math.random() * (TILT_MAX - TILT_MIN);
+                    tilt = { ball, a: Math.random() < 0.5 ? -a : a, k: 0, out: false };
+                }
+                if (!lunge && Math.random() < LUNGE_ODDS) {
+                    const aim = SLAM_ANGLES[(Math.random() * SLAM_ANGLES.length) | 0];
+                    lunge = { ball, off: 0, stage: 'rear', fake: Math.random() < FAKE_ODDS, aim };
+                    // turned to it as he draws back -- unless he is already turned for another ball
+                    if (!tilt || tilt.ball === ball) tilt = { ball, a: aim, k: tilt ? tilt.k : 0, out: false };
+                }
+            }
+        }
+        if (tilt) {
+            if (!live || !balls.includes(tilt.ball) || (tilt.ball.vy >= 0 && !caught(tilt.ball))) tilt.out = true;
+            tilt.k = tilt.out ? tilt.k - dt / TILT_OUT : Math.min(1, tilt.k + dt / TILT_IN);
+            if (tilt.out && tilt.k <= 0) tilt = null;
+        }
+        if (lunge) {
+            const ball = lunge.ball;
+            const gone = !live || !balls.includes(ball);
+            if (caught(ball)) {
+                // the one he caught stays his -- see holdCaught -- until he lets go of it
+                if (gone) lunge.stage = 'back';
+                if (lunge.stage === 'hold' && (lunge.wait -= dt) <= 0) lunge.stage = 'touch';
+            } else if (lunge.stage !== 'back' && (gone || ball.vy >= 0)) {
+                lunge.stage = 'back';
+            }
+            if (lunge.stage === 'rear' && !lunge.fake) {
+                // forward once the gap left is what the rest of the swing takes
+                const swing = (LUNGE_PX - lunge.off) / LUNGE_SPEED;             // seconds
+                const gap = ball.y - extY(ball) - (b.y + bh);
+                if (gap <= (Math.abs(ball.vy) + LUNGE_SPEED) * swing) lunge.stage = 'lunge';
+            }
+            // a fake stays drawn back through the catch and the hold, then comes
+            // forward at a crawl
+            const st = lunge.stage;
+            const want = st === 'rear' || st === 'hold' ? -REAR_PX
+                       : st === 'lunge' ? LUNGE_PX : st === 'touch' ? TOUCH_PX : 0;
+            const rate = (st === 'lunge' ? LUNGE_SPEED : st === 'touch' ? TOUCH_SPEED : REAR_SPEED) * dt;
+            lunge.off += Math.max(-rate, Math.min(rate, want - lunge.off));
+            if (st === 'touch' && lunge.off >= TOUCH_PX - 0.5) {
+                // let go at the end of the reach, barely moving, off the angle he
+                // turned to -- whatever part of him it was caught on
+                const m = Math.hypot(ball.vx, ball.vy) || 1;
+                ball.vx = -Math.sin(lunge.aim) * m;
+                ball.vy = Math.cos(lunge.aim) * m;
+                ball.boost = TOUCH_MUL;
+                lunge.stage = 'back';
+            }
+            if (lunge.stage === 'back' && Math.abs(lunge.off) < 0.5) lunge = null;
+        }
+    }
+
+    // a ball he caught on a fake draw-back: held, then walked forward, and not
+    // the physics' to move until he lets go of it
+    function caught(ball) {
+        if (labHolds(ball)) return true;
+        return !!lunge && lunge.ball === ball && (lunge.stage === 'hold' || lunge.stage === 'touch');
+    }
+
+    // ...and sits where he has just got to, so it is placed after he moves
+    function holdCaught() {
+        const b = bricks && bricks[0];
+        if (!b || !lunge || !caught(lunge.ball)) return;
+        lunge.ball.x = b.x + bw / 2 + lunge.dx;
+        lunge.ball.y = b.y + bh / 2 + lunge.dy;
+    }
+
+    // the same forgiving box the ball is caught on, tested against the
+    // phantom's real ellipse -- phantoms never grow, so they use the bare
+    // constants rather than the player ball's BIG BRAIN ones
+    // which of him it came down on, so only that one wears it
+    function phantomOnPaddle(p) {
+        const c = Math.cos(p.angle), s = Math.sin(p.angle);
+        const rx = Math.hypot(BALL_RX * c, BALL_RY * s);
+        const ry = Math.hypot(BALL_RX * s, BALL_RY * c);
+        const halfH = padH() / 2, py = padY();
+        if (p.y + ry < py - halfH || p.y - ry > py + halfH) return null;
+        for (const sg of segs()) {
+            if (p.x + rx > sg.cx - sg.w / 2 && p.x - rx < sg.cx + sg.w / 2) return sg;
+        }
+        return null;
+    }
+
+    function stepPhantoms(dt) {
+        for (let i = phantoms.length - 1; i >= 0; i--) {
+            const p = phantoms[i];
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.angle += p.spin * dt;
+            // they bounce off the sides like the real thing, which is the
+            // whole point
+            if (p.x < BALL_RX && p.vx < 0) p.vx = -p.vx;
+            if (p.x > LW - BALL_RX && p.vx > 0) p.vx = -p.vx;
+            if (p.y < BALL_RY && p.vy < 0) p.vy = -p.vy;
+            // one that lands on him is SPENT landing on him. only during the
+            // rally: nothing should be able to stick to him while he is
+            // holding a serve, or standing on a CONTINUE.
+            const landed = phase === 'play' ? phantomOnPaddle(p) : null;
+            if (landed) {
+                addDrag(landed, p.x);
+                phantoms.splice(i, 1);
+                continue;
+            }
+            if ((p.life -= dt) <= 0 || p.y - BALL_RY > LH) phantoms.splice(i, 1);
+        }
+    }
+
+    // how far up the boss has drawn you: his damage, exactly, but arrived at
+    // slowly. everything that is not the fight itself -- the takeover, the
+    // game-over choices -- wants him back on the original line, so they all
+    // aim at nothing and he glides home.
+    function climbTarget() {
+        const b = bricks && bricks[0];
+        if (!LEVELS[stage].boss || !b || b.kind !== 'Z') return 0;
+        if (phase === 'ascend' || phase === 'over' ||
+            phase === 'initials' || phase === 'scores' ||
+            phase === 'gauntlet' || phase === 'absorb' || phase === 'fall') return 0;
+        return (1 - b.hp / b.maxHp) * labClimb();
+    }
+
+    function stepClimb(dt) {
+        // exponential, so the rate is the same whatever the frame rate. one
+        // hit moves the target by a thirty-second; this spends about a second
+        // covering it, which is slow enough that you never catch him moving.
+        climb += (climbTarget() - climb) * (1 - Math.exp(-dt / CLIMB_EASE));
+    }
+
+    function resetBall() {
+        // the one thing that made every stage feel identical: this used to be
+        // a flat BASE_SPEED, so stage five opened exactly as slow as stage one
+        speed = BASE_SPEED * (1 + 0.08 * stage);
+        clearEffects();
+        combo = 0;
+        const b = newBall(paddle.x, padY() - padH() / 2 - bRY() - 2);
+        b.stuck = true;
+        balls = [b];
+        ascendT = 0;
+        phase = 'ready';
+    }
+
+    function newGame() {
+        score = 0; lives = 3; stage = 0;
+        popups = [];
+        king = null; ships = []; gBul = []; gThrow = []; gDrop = []; sparks = [];
+        gVolley = []; gDropAt = []; kingFall = null; bossFall = null; victor = null; ascendT = 0;
+        impact = null;
+        gReady = false; gSpread = 0; gBurst = 0; gRapid = 0;
+        gMark = null; gMarkT = 0; gBlast = []; gMult = 1; gMultT = 0; gMultTop = 1;
+        showCursor(false);
+        setHint(HINT_PLAY);
+        buildStage(0);
+        banner = '';
+    }
+
+    // tx is where the pointer wants him, x is where he has got to. they are the
+    // same number unless something is dragging on him. jt, tilt and dip are one
+    // entry per segment, because under DOUBLE a knock lands on one of the two.
+    paddle = { x: LW / 2, tx: LW / 2, prevX: LW / 2, vx: 0, w: PADDLE_W,
+               jt: [0, 0], tilt: [0, 0], dip: [0, 0] };
+    fx = { B: 0, D: 0, S: 0, R: 0, P: 0, W: 0, E: 0 };
+    best = loadBest();
+    fetchBoard();                 // async; the game never waits on it
+    newGame();
+
+    // ---- getting rid of the address bar --------------------------------------
+    // The bar is the single biggest thing between a phone and a playable field.
+    // The field scales off the HEIGHT -- it is 4:3 on a screen nearer 21:9 -- so
+    // a 90px bar on a 390px-tall landscape phone is not 23% of the screen, it is
+    // 23% off every dimension and closer to 40% of the area.
+    //
+    // Requesting fullscreen is the ONLY lever for this. There is no separate
+    // "hide the bar" control, and the old scrollTo(0,1) trick that used to
+    // collapse Safari's has not worked since iOS 8 -- since then the bar only
+    // minimises for a real scroll gesture, which here is the swipe that steers
+    // brandon. So: no button, no prompt, nothing to read. The tap that dismisses
+    // the splash is the tap that starts the game, and it asks for fullscreen on
+    // the way through.
+    //
+    // Android and iPad hand the panel over. iPhone Safari implements none of
+    // this, so the request is a silent no-op there and the bar stays -- Add to
+    // Home Screen is the only route on that phone, which is what the
+    // apple-mobile-web-app tags up top are for. Every call here fails soft.
+    const root = document.documentElement;
+    const rawFS = root.requestFullscreen || root.webkitRequestFullscreen;
+
+    function fsOn() {
+        return !!(document.fullscreenElement || document.webkitFullscreenElement);
+    }
+
+    // the field wants landscape, and a phone will give it -- but ONLY from
+    // inside fullscreen. Asking before the request settles is asking too early
+    // and just gets refused, which is what used to happen here.
+    function lockLandscape() {
+        const so = screen.orientation;
+        if (!so || !so.lock) return;
+        try { const p = so.lock('landscape'); if (p && p.catch) p.catch(() => {}); }
+        catch (e) { /* desktop, or a phone that will not. no matter. */ }
+    }
+
+    function enterFS() {
+        if (!rawFS || fsOn()) return;
+        try {
+            const p = rawFS.call(root, { navigationUI: 'hide' });
+            if (p && p.then) p.then(lockLandscape, () => {});
+            else setTimeout(lockLandscape, 60);        // old webkit, no promise
+        } catch (e) { /* refused. the game plays in a tab, just smaller. */ }
+    }
+
+    // Once we have been fullscreen even briefly, stop asking. If you then leave
+    // deliberately, the next tap should not haul you straight back in.
+    let fsSettled = false;
+    function onFsChange() {
+        if (fsOn()) fsSettled = true;
+        resize();               // the room available just changed
+    }
+    document.addEventListener('fullscreenchange', onFsChange);
+    document.addEventListener('webkitfullscreenchange', onFsChange);
+
+    // ---- keeping the screen on -----------------------------------------------
+    // A phone dims and then sleeps when it decides nothing is happening, and a
+    // thumb resting on the glass waiting for the ball to come down does not
+    // count as something happening.
+    let wake = null;
+    function keepAwake() {
+        if (!navigator.wakeLock || wake || document.visibilityState !== 'visible') return;
+        navigator.wakeLock.request('screen').then(w => {
+            wake = w;
+            w.addEventListener('release', () => { wake = null; });
+        }).catch(() => { /* denied, or the battery is low. not ours to argue. */ });
+    }
+    // the lock is dropped whenever the tab goes away, so take it again on return
+    document.addEventListener('visibilitychange', keepAwake);
+
+    // ---- splash ------------------------------------------------------------
+    // caught on the capture phase so the dismissing click or key does not also
+    // fall through and serve the ball
+    const splash = document.getElementById('splash');
+    function dismissSplash(e) {
+        if (splash.hidden) return;
+        splash.hidden = true;          // hard cut, no fade
+        keepAwake();
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    addEventListener('pointerdown', dismissSplash, true);
+    addEventListener('keydown', dismissSplash, true);
+
+    // THE ORDER HERE MATTERS AND IT IS NOT OBVIOUS.
+    //
+    // Fullscreen needs transient user activation, and the HTML spec is exact
+    // about which events confer it:
+    //     pointerdown -- only when pointerType IS "mouse"
+    //     pointerup   -- only when pointerType is NOT "mouse"
+    // A finger on glass gets you nothing on the way down, because until it
+    // lifts the browser cannot tell a tap from the start of a scroll. The
+    // request used to sit in dismissSplash, on pointerdown, so it worked with a
+    // mouse and was refused by every phone on earth -- "API can only be
+    // initiated by a user gesture" -- which is precisely backwards from what it
+    // is for. The splash still hides on the way down, where it feels instant;
+    // the request rides the way back up.
+    //
+    // pointerup rather than click, because the preventDefault above suppresses
+    // the click that would otherwise follow.
+    //
+    // Asking the event for its pointerType also beats asking a media query.
+    // This used to gate on (hover: none), and some android browsers answer that
+    // with a flat no -- skipping fullscreen entirely on the devices it exists
+    // for. The event knows what actually touched the screen; a media query is
+    // guessing about the device.
+    //
+    // HONEST STATUS: all of the above is a real fix to a real spec violation --
+    // asking on pointerdown could never have worked with a finger. It still did
+    // not visibly hide the address bar on chrome for android when tested on a
+    // handset, and we stopped digging there rather than keep spending on it.
+    // So treat this as plausible but UNPROVEN on a real phone. The game does not
+    // depend on it: every call fails soft, and the field is sized off what is
+    // actually visible either way. If you pick this up again, instrument the
+    // phone itself -- log the rejection reason and navigator.userActivation at
+    // the moment of the call -- rather than reasoning about it from a desktop.
+    addEventListener('pointerup', e => {
+        if (fsSettled || !splash.hidden || e.pointerType === 'mouse') return;
+        enterFS();      // keeps offering on later taps until one lands
+    }, true);
+
+    // ---- input -------------------------------------------------------------
+    // These sit on the window rather than the canvas. The field is 4:3 on a
+    // screen that is much wider, so a landscape phone letterboxes it with a
+    // fat black margin down each side -- which is exactly where a thumb rests
+    // when you hold the thing. Touching there used to do nothing at all. The
+    // whole screen steers him now; update() clamps him to the field either way.
+    const onUI = e => e.target && e.target.closest && e.target.closest('#debug');
+
+    // ---- the mouse, captured -------------------------------------------------
+    // A mouse used to steer by where the pointer WAS, with the pointer hidden.
+    // Nothing kept it on the page, so a rally that drifted upward walked it
+    // off the top of the window without anyone seeing it go, and the moment it
+    // crossed the edge he stopped answering. Desktop games fix that by
+    // capturing the mouse, and browsers offer the same thing as pointer lock:
+    // the pointer is held, there is no position and so no edge, and movement
+    // arrives as a stream of deltas. The arcade Arkanoid's free-spinning knob
+    // worked the same way.
+    //
+    // It is taken by a mouse click that goes into play -- the serve, most of
+    // the time -- and held through lost lives and cleared stages, because a
+    // READY screen needs no pointer. It is let go on purpose on the screens
+    // that DO need one: game over, the initials, the table, the stage menu.
+    // That costs nothing on the way back -- Chrome re-locks quietly, without
+    // its "press Esc" notice, when it was the page that let go.
+    //
+    // If it is lost any other way -- Esc, Cmd-Tab, another window jumping in
+    // front -- while something can still hurt you, the game stops and waits
+    // for a click. Losing the mouse is never allowed to cost a life.
+    //
+    // Touch never asks for any of this. A finger has no edge to fall off.
+    const LOCK_OK   = 'requestPointerLock' in canvas;
+    const LOCK_GAIN = 1;          // travel per px of mouse, as a multiple of the old feel
+    const PLAYING = new Set(['ready', 'play', 'cleared', 'entrance', 'siphon', 'ascend',
+                             'absorb', 'gauntlet', 'fall']);
+    let paused = false;           // the mouse got away mid-rally
+    let lockLetGo = false;        // ...unless WE let it go, which is not an accident
+    let lockMissed = false;       // the browser said no to the click on PAUSED
+
+    function locked() { return document.pointerLockElement === canvas; }
+
+    function grabMouse(e) {
+        if (!LOCK_OK || locked() || !e || e.pointerType !== 'mouse') return;
+        if (!PLAYING.has(phase) || !debugEl.hidden) return;
+        try {
+            const p = canvas.requestPointerLock();
+            if (p && p.catch) p.catch(() => {});     // refusals land in pointerlockerror
+        } catch (err) { /* older engines throw instead of rejecting */ }
+    }
+
+    function freeMouse() {
+        if (!locked() || lockLetGo) return;   // not held, or already on its way back
+        lockLetGo = true;
+        document.exitPointerLock();
+    }
+
+    // what can still hurt you while you are not holding the mouse
+    function pausable() { return phase === 'play' || (phase === 'gauntlet' && !gReady); }
+
+    // stopped, the pointer comes back, so you can see what you are clicking on
+    function hold(on) {
+        paused = on;
+        lockMissed = false;
+        showCursor(on);
+    }
+
+    document.addEventListener('pointerlockchange', () => {
+        if (locked()) { lockLetGo = false; if (paused) hold(false); return; }
+        if (lockLetGo) { lockLetGo = false; return; }
+        if (pausable()) hold(true);
+    });
+    // Refused. Chrome turns down a request made too soon after Esc, click or
+    // no click, so one refusal just leaves PAUSED up. The click after that
+    // resumes whether the lock comes back or not: a game without the lock is
+    // only the game as it always was, and one stuck waiting on it is broken.
+    document.addEventListener('pointerlockerror', () => { if (paused) lockMissed = true; });
+
+    // the click on PAUSED. a mouse asks for the lock back, and play restarts
+    // when pointerlockchange says it landed. a finger has no lock to ask for,
+    // and a mouse that has already been refused once has waited long enough.
+    function resume(e) {
+        if (e.pointerType === 'mouse' && !lockMissed) { grabMouse(e); return; }
+        hold(false);
+        grabMouse(e);
+    }
+
+    // captured steering: the same travel per inch of desk it always had
+    function steerBy(dx) {
+        if (king && (phase === 'gauntlet' || phase === 'absorb' || phase === 'fall')) {
+            if (gReady) return;               // not a step until the first throw
+            const edge = kingEdge();
+            king.tx = Math.max(edge, Math.min(LW - edge, king.tx + dx));
+            return;
+        }
+        const hs = halfSpan();
+        paddle.tx = Math.max(hs, Math.min(LW - hs, paddle.tx + dx));
+    }
+    addEventListener('mousemove', e => {
+        if (!locked() || paused) return;
+        const r = canvas.getBoundingClientRect();
+        steerBy(e.movementX * LW / r.width * LOCK_GAIN);
+    });
+
+    // the pointer sets where he is HEADED. with nothing dragging on him
+    // update() copies that straight into where he is, which is what this line
+    // used to do on its own.
+    const track = e => {
+        const r = canvas.getBoundingClientRect();
+        const x = (e.clientX - r.left) / r.width * LW;
+        // once the throne is yours the pointer steers YOU, and there is no lag
+        // on it -- you are the thing that used to be unkillable and it should
+        // feel like it
+        if (king && (phase === 'gauntlet' || phase === 'absorb' || phase === 'fall')) {
+            if (!gReady) king.tx = x;         // ...once you have thrown the first one
+            return;
+        }
+        paddle.tx = x;
+    };
+    // a pointer event in field coordinates
+    const fieldAt = e => {
+        const r = canvas.getBoundingClientRect();
+        return { x: (e.clientX - r.left) / r.width * LW,
+                 y: (e.clientY - r.top) / r.height * LH };
+    };
+
+    addEventListener('pointermove', e => {
+        if (phase === 'initials' || onUI(e)) return;
+        // captured, the pointer's position is frozen where the lock began and
+        // movement comes through mousemove instead. reading clientX here would
+        // snap him straight back to that spot. PAUSED does not steer either:
+        // walking the pointer over to click would slide him there the instant
+        // play restarts.
+        if (locked() || paused) return;
+        track(e);
+        if (phase === 'over') {
+            const p = fieldAt(e);
+            overHover = overAt(p.x, p.y);
+            overKeys = false;
+        }
+    });
+    addEventListener('pointerdown', e => {
+        if (onUI(e)) return;
+        // paused because the mouse got away: this click only takes it back. it
+        // must not also serve, throw, or move him.
+        if (paused) { resume(e); return; }
+        if (phase === 'initials') {
+            const r = canvas.getBoundingClientRect();
+            const px = (e.clientX - r.left) / r.width * LW;
+            const py = (e.clientY - r.top) / r.height * LH;
+            for (const c of GRID) {
+                if (px >= c.hx && px <= c.hx + c.hw && py >= c.hy && py <= c.hy + c.hh) {
+                    entryKey(c.k); return;
+                }
+            }
+            return;
+        }
+        // Drag to move, tap to throw. Everywhere else a tap puts him where you
+        // touched, which is right when he is a paddle -- but on the throne a
+        // tap is the fire button, and a fire button that also teleports you is
+        // no fire button at all. Dragging still steers, because a drag is a
+        // pointermove and that handler is untouched.
+        if (!locked() && !(king && (phase === 'gauntlet' || phase === 'absorb' || phase === 'fall'))) {
+            track(e);                           // wherever you tap, he goes
+        }
+        // on the game-over screen a press only ARMS a box; see pointerup
+        if (phase === 'over') {
+            const p = fieldAt(e);
+            overPress = overHover = overAt(p.x, p.y);
+            overKeys = false;
+            return;
+        }
+        action();
+        grabMouse(e);                           // a mouse click into play takes the mouse
+    });
+    addEventListener('pointerup', e => {
+        if (phase !== 'over' || overPress === null || onUI(e)) { overPress = null; return; }
+        const p = fieldAt(e);
+        if (overAt(p.x, p.y) === overPress) {
+            overChoose(overPress);
+            grabMouse(e);                    // CONTINUE goes straight back into play
+        } else overPress = null;             // slid off before letting go
+    });
+    addEventListener('pointercancel', () => { overPress = null; });
+    addEventListener('keydown', e => {
+        // PAUSED asks for a click. a key would throw into a frozen field, or
+        // steer him somewhere to lurch off to when it thaws.
+        if (paused) { if (e.code === 'Space') e.preventDefault(); return; }
+        if (phase === 'initials') {
+            if (/^[a-zA-Z]$/.test(e.key)) entryKey(e.key.toUpperCase());
+            else if (e.code === 'Backspace') { e.preventDefault(); entryKey('DEL'); }
+            else if (e.code === 'Enter' || e.code === 'Space') {
+                e.preventDefault(); entryKey('OK');
+            }
+            return;
+        }
+        if (e.code === 'ArrowLeft')  paddle.tx -= 34;   // steer him either way
+        if (e.code === 'ArrowRight') paddle.tx += 34;
+        if (phase === 'over') {
+            if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') overKeys = true;
+            if (e.code === 'Space') {
+                e.preventDefault();
+                overChoose(overKeys || !overHover ? overKeyPick() : overHover);
+            }
+            if (e.code === 'KeyC') overChoose('continue');   // still direct, if you know
+            if (e.code === 'KeyN') overChoose('end');        // n for no, another go
+            return;
+        }
+        if (e.code === 'Space') { e.preventDefault(); action(); }
+    });
+
+    // the ball rides the paddle until you serve it
+    function releaseStuck() {
+        for (const b of balls) {
+            if (!b.stuck) continue;
+            b.stuck = false;
+            const off = Math.max(-1, Math.min(1, b.off / (padW() / 2)));
+            aim(b, off * MAX_ANGLE * 0.8 + (Math.random() * 0.2 - 0.1));
+        }
+    }
+
+    // ---- stage select, on the konami code -----------------------------------
+    const KONAMI = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft',
+                    'ArrowRight', 'ArrowLeft', 'ArrowRight', 'KeyB', 'KeyA'];
+    const debugEl = document.getElementById('debug');
+    let konami = [];
+
+    LEVELS.forEach((lvl, i) => {
+        const btn = document.createElement('button');
+        btn.textContent = (i + 1) + '  ·  ' + lvl.dbg;
+        btn.addEventListener('click', () => startAt(i));
+        debugEl.appendChild(btn);
+    });
+    // The throne is not a LEVEL -- it has no bricks and no entry in the table
+    // above -- so it needs its own way in. Without one the only route to half
+    // the game is landing thirty-three hits on him first, which is a poor way
+    // to look at something twice.
+    (() => {
+        const btn = document.createElement('button');
+        btn.textContent = (LEVELS.length + 1) + '  ·  GAUNTLET';
+        btn.addEventListener('click', startGauntletAt);
+        debugEl.appendChild(btn);
+    })();
+    // Your best is kept in this browser and nothing in the game ever lowers
+    // it, so one set while testing, or under scoring that has since changed,
+    // would otherwise stand until someone cleared the site's data by hand.
+    //
+    // Any player can find this menu, and a cleared best does not come back,
+    // so it sits in a corner away from the stages and only a press held for
+    // RESET_HOLD sets it off. A stray click, a double-click and a quick tap
+    // all let go too soon. It is out of the tab order because no key can
+    // hold it down.
+    const RESET_HOLD = 2;                     // seconds
+    const resetBtn = document.createElement('button');
+    resetBtn.className = 'wipe';
+    resetBtn.tabIndex = -1;
+    let resetT = 0;                           // the hold under way, or 0
+    function holdReset(on) {
+        clearTimeout(resetT);
+        resetT = on ? setTimeout(wipeBest, RESET_HOLD * 1000) : 0;
+        resetBtn.classList.toggle('holding', on);
+        resetBtn.style.transitionDuration = on ? RESET_HOLD + 's' : '';
+    }
+    // what it says each time the menu opens, and gone when there is no best
+    function labelReset() {
+        holdReset(false);
+        resetBtn.disabled = false;
+        resetBtn.textContent = 'hold to reset your best';
+        resetBtn.hidden = best === 0;
+    }
+    function wipeBest() {
+        holdReset(false);
+        if (debugEl.hidden) return;           // the menu shut under the hold
+        clearBest();
+        resetBtn.textContent = 'best reset';
+        resetBtn.disabled = true;             // until the menu next opens
+    }
+    resetBtn.addEventListener('pointerdown', e => {
+        if (e.button === 0 && !resetBtn.disabled) holdReset(true);
+    });
+    for (const t of ['pointerup', 'pointerleave', 'pointercancel'])
+        resetBtn.addEventListener(t, () => holdReset(false));
+    // Android raises this on a long press, whatever is under the finger
+    resetBtn.addEventListener('contextmenu', e => e.preventDefault());
+    debugEl.appendChild(resetBtn);
+    debugEl.appendChild(Object.assign(document.createElement('p'),
+        { textContent: 'esc to go back' }));
+
+    // stand his stage up, take him off the board, and hand over -- the same
+    // handover the takeover performs, minus the fight and the ceremony
+    function startGauntletAt() {
+        score = 0; lives = 3;
+        popups = [];
+        stage = LEVELS.length - 1;
+        buildStage(stage);
+        bricks[0].alive = false;
+        startGauntlet();
+        banner = '';
+        debugEl.hidden = true;
+    }
+
+    function startAt(n) {
+        score = 0; lives = 3; stage = n;
+        popups = [];
+        buildStage(n);
+        banner = '';
+        debugEl.hidden = true;
+    }
+
+    addEventListener('keydown', e => {
+        if (!debugEl.hidden) {                    // menu is open
+            if (e.code === 'Escape') debugEl.hidden = true;
+            const n = '12345'.indexOf(e.key);
+            if (n >= 0 && n < LEVELS.length) startAt(n);
+            // ...and one past the last stage for the throne
+            if (e.key === String(LEVELS.length + 1)) startGauntletAt();
+            e.stopPropagation();
+            return;
+        }
+        konami.push(e.code);
+        if (konami.length > KONAMI.length) konami.shift();
+        if (konami.length === KONAMI.length && KONAMI.every((k, i) => konami[i] === k)) openMenu();
+    }, true);
+
+    function openMenu() {
+        konami = [];
+        freeMouse();                              // the menu is all buttons
+        labelReset();                             // the best as it stands now
+        debugEl.hidden = false;
+    }
+
+    // A phone has no keys to enter the code with, so the address can ask for
+    // the menu instead: brandon.html?debug opens it as the page loads. The
+    // splash is cleared first and the wake lock taken, as a tap on it would:
+    // a tap that clears the splash can lose its click (see splash), and the
+    // first tap here chooses a stage.
+    if (new URLSearchParams(location.search).has('debug')) {
+        splash.hidden = true;
+        keepAwake();
+        openMenu();
+    }
+
+    // ---- initials ------------------------------------------------------------
+    // 26 letters plus DEL and OK across seven columns. Tappable for phones and
+    // typeable everywhere else, so neither input is second class.
+    // Two rects per key: the box that gets DRAWN, and the pitch it sits in,
+    // which is what a tap is tested against. The field renders at about
+    // two-thirds size on a landscape phone, so the old 59x39 box came out
+    // 38x25 css px -- under every touch-target guideline going -- and the
+    // gutters between them were dead strips you could put a thumb in and have
+    // nothing happen. On the pitch below a key is ~48x42 css px on that same
+    // phone, and the keys tile, so there is nowhere left to miss.
+    //
+    // A letter wheel replaced this for a while and was worse. The reason is
+    // one line of CSS: the canvas is `cursor: none`, so on a desktop every
+    // click on this screen was aimed with an invisible pointer -- which is why
+    // the keypad felt mouse-hostile and why the wheel felt unusable. The
+    // pointer comes back for exactly this screen now (see showCursor), and the
+    // keyboard route is spelled out at the bottom instead of being folklore.
+    const GRID = (() => {
+        const cells = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').concat(['DEL', 'OK']);
+        const cw = 74, chh = 64, cols = 7;
+        const x0 = LW / 2 - (cols * cw) / 2, y0 = 268;
+        return cells.map((k, i) => {
+            const hx = x0 + (i % cols) * cw, hy = y0 + ((i / cols) | 0) * chh;
+            return { k, hx, hy, hw: cw, hh: chh,
+                     x: hx + 4, y: hy + 7, w: cw - 8, h: chh - 14 };
+        });
+    })();
+
+    // The cursor is hidden for the whole game, because during a rally a mouse
+    // pointer sitting on top of him is just litter. This is the one screen with
+    // things to click, so it comes back here and goes away again after.
+    function showCursor(on) {
+        canvas.style.cursor = on ? 'default' : 'none';
+    }
+
+    function entryKey(k) {
+        if (sending) return;
+        if (k === 'DEL') entry = entry.slice(0, -1);
+        else if (k === 'OK') {
+            if (entry.length !== 3) return;
+            sending = true;
+            submitScore(entry, score).then(() => {
+                sending = false;
+                showCursor(false);
+                phase = 'scores';
+            });
+        } else if (entry.length < 3) entry += k;
+    }
+
+    // the run is over for good -- either you won, or you turned down another go.
+    // this is the only place a score is ever recorded, so one run leaves one row
+    // however many times you continued along the way.
+    function endRun() {
+        freeMouse();                  // the initials and the table both want a pointer
+        climb = 0;
+        if (qualifies(score)) {
+            entry = ''; entryRank = -1;
+            showCursor(true);          // the one screen with things to click
+            phase = 'initials';
+        } else if (BOARD_ON) {
+            fetchBoard();                 // refresh it for the screen that follows
+            phase = 'scores';
+        } else {
+            // no board to end on -- straight back to the start, exactly as it
+            // behaved before one existed
+            newGame();
+        }
+    }
+
+    function action() {
+        if (menuUp()) return;
+        if (!debugEl.hidden) return;              // ignore taps behind the menu
+        // the gauntlet: a tap is a thrown head, and nothing else. the ceremony
+        // at the end of it is not skippable by the click that was already on
+        // its way when you died.
+        if (phase === 'gauntlet') { throwHead(); return; }
+        if (phase === 'absorb') return;
+        if (phase === 'fall') {
+            // no continue from the throne, and nothing at all before F_AGAIN.
+            // after it, the same rule as a stage clear: a count still running
+            // is finished, and only a screen that has been read ends the run.
+            if (fallT > F_AGAIN) {
+                if (!bonusRead()) { finishBonus(); return; }
+                endRun();
+            }
+            return;
+        }
+        if (phase === 'ascend' || phase === 'entrance' || phase === 'initials') return;
+        if (phase === 'scores') { newGame(); return; }
+        if (phase === 'ready') {
+            releaseStuck();
+            phase = 'play';
+            // he yells at the first ball you put up at him, every fight, once
+            // SHOUT_WAIT has gone by. Not left to SHOUT_ODDS the way the yells
+            // after it are.
+            if (LEVELS[stage].boss && !bossServed) {
+                bossServed = true;
+                shoutT = SHOUT_WAIT;
+            }
+        } else if (phase === 'cleared') {
+            if (!bonusRead()) { finishBonus(); return; }
+            stage++;
+            buildStage(stage);
+            banner = '';
+        }
+        // 'over' is handled by the CONTINUE / END RUN boxes, not by a stray tap
+    }
+
+    // ---- scoring -----------------------------------------------------------
+    // No spin is passed in. It is read here, off the fastest head on the field
+    // rather than off whichever one happened to land the hit -- the bar under
+    // BONUS shows that same number, and a bar that can promise double while the
+    // hit in front of you pays flat is worse than no bar at all.
+    function award(base, x, y) {
+        const turn = liveTurn();           // how fast the quickest head is turning
+        let pts = base * comboMul();       // the run it is part of
+        pts *= spinMul(turn);
+        pts *= scoreMul();                 // chaos capsules pay for themselves
+
+        pts = Math.round(pts);
+        score += pts;
+        if (score > best) { best = score; saveBest(); }
+        popups.push({ x, y, text: '+' + pts,
+                      color: turn > ENGLISH_AT ? '#c9a94e' : '#f2efe9',
+                      life: 1 });
+        combo++;
+    }
+
+    function bumpSpeed(f) { speed = Math.min(speed * f, MAX_SPEED); }
+
+    // ---- capsules ----------------------------------------------------------
+    function maybeDropCapsule(x, y) {
+        if (capsule) return;                       // only one falling at a time
+        if (Math.random() > CAP_CHANCE) return;
+        const pool = capsulePool();
+        capsule = { x, y, kind: pool[(Math.random() * pool.length) | 0] };
+    }
+
+    function splitBalls() {
+        const extra = [];
+        for (const b of balls) {
+            for (let k = 0; k < 2; k++) {
+                if (balls.length + extra.length >= MAX_BALLS) break;
+                const a = Math.atan2(b.vy, b.vx) + (k ? 0.42 : -0.42);
+                const nb = newBall(b.x, b.y);
+                const s = effSpeed();
+                nb.vx = Math.cos(a) * s;
+                nb.vy = Math.sin(a) * s;
+                nb.spin = b.spin;
+                nb.eng = b.eng;
+                nb.kickDir = b.kickDir;
+                extra.push(nb);
+            }
+        }
+        balls.push(...extra);
+        if (balls.length >= HEADS_AT) round.heads = true;
+    }
+
+    function applyCapsule(kind) {
+        const cap = CAPS[kind];
+        score += CAP_SCORE;
+        if (score > best) { best = score; saveBest(); }
+        popups.push({ x: paddle.x, y: padY() - 40, text: '+' + CAP_SCORE, color: cap.color, life: 1 });
+        callout = { text: cap.name, color: cap.color, life: CALLOUT_SECS };
+
+        if (kind === 'M') { splitBalls(); return; }
+        fx[kind] = cap.secs * labPadCaps();
+        if (kind === 'B') paddle.w = PADDLE_W * 1.5;
+    }
+
+    // ---- bricks ------------------------------------------------------------
+    function wobble(jt) { return Math.sin((1 - jt) * JIG_FREQ) * jt; }
+
+    function kick(b, nx, ny, power) {
+        if (power <= b.jt) return;          // a harder knock wins
+        b.jt = power; b.jnx = nx; b.jny = ny;
+    }
+
+    // knocking one loose shoves the ones around it -- makes the wall feel
+    // like a physical thing rather than a grid of independent tiles
+    function shockwave(src) {
+        const range = (bw + GAP) * 1.25;
+        for (const o of bricks) {
+            if (!o.alive || o === src || o.kind === 'X') continue;
+            const dx = o.x - src.x, dy = o.y - src.y;
+            const d = Math.hypot(dx, dy);
+            if (d > range || d < 1e-4) continue;
+            kick(o, dx / d, dy / d, (1 - d / range) * JIG_NEIGH);
+        }
+    }
+
+    // The order the ball meets bricks in: whoever is running for the edge
+    // first, then everybody else. It only matters where two overlap, and that
+    // is a runaway walking out across another brick -- on the hat, usually a
+    // statue. The field is drawn in exactly the reverse, so whichever is on
+    // top is the one the ball hits, and a runaway crossing in front of a
+    // statue can still be caught there.
+    function* hitOrder() {
+        for (const b of bricks) if (b.flee) yield b;
+        for (const b of bricks) if (!b.flee) yield b;
+    }
+
+    // his BRANDON!, left hanging just under him where he said it. The same
+    // for the one your first ball gets and the ones a hit rolls for.
+    function bossShout(b) {
+        shout = { x: b.x + bw * 0.88, y: b.y + bh + 8, life: SHOUT_SECS };
+    }
+
+    // cx, cy are where the ball actually touched, which only the boss needs --
+    // see the award below. An ordinary brick is small enough that its own
+    // middle IS the contact point, near enough, so it goes on using that.
+    function hitBrick(b, cx, cy) {
+        // the white flash is the "I hurt it" signal. a solid brick must not
+        // give it, or the game is telling you to keep swinging at something
+        // that will never break.
+        if (labHit(b, cx, cy)) return;
+        if (b.kind === 'X') return;
+        // he still BOUNCES it -- that happens in the physics, before this --
+        // he just cannot be wounded twice inside half a second
+        if (b.kind === 'Z' && bossIF > 0) return;
+        b.flash = 1;
+
+        if (b.kind === 'Z') {                        // the boss
+            bossIF = BOSS_IF;
+            b.hp = Math.max(0, b.hp - bossBite(b.hp));
+            bossHits++;
+            // hp is fractional now, so "finished" needs a tolerance rather
+            // than an exact zero -- five subtractions of 0.2 do not land on it
+            const done = b.hp <= 1e-6;
+            // Where the BALL struck, not the corner of his box. Every other
+            // brick hands award() its own top edge, which is fine when the
+            // brick is 90px across -- but he arrives 1060 wide with his centre
+            // at BOSS_Y0, so his box top is about 160px ABOVE the ceiling and
+            // the number was being drawn off the screen for most of the fight.
+            // The contact point is the one place on him you are certainly
+            // looking, and it is where the glance ring already goes.
+            award(BOSS_PTS * (done ? 5 : 1),
+                  cx === undefined ? b.x + bw / 2 : cx,
+                  cy === undefined ? b.y : cy);
+            // now and then he has something to say about it
+            if (!done && Math.random() < SHOUT_ODDS) bossShout(b);
+            if (done) { b.alive = false; clearStage(); return; }
+            // three from the end, the first time round: his second wind
+            if (!bossTwo && bossHitsLeft(b.hp) <= SIPHON_AT) { startSiphon(b); return; }
+            // he coughs up a capsule every few hits, so the fight has tools.
+            // counted in HITS rather than off his health, which no longer
+            // steps by one.
+            if (bossHits % BOSS_CAP === 0 && !capsule) {
+                const pool = capsulePool();
+                capsule = { x: b.x + bw / 2, y: b.y + bh / 2,
+                            kind: pool[(Math.random() * pool.length) | 0] };
+            }
+            if (++hits === 4 || hits === 12) bumpSpeed(1.12);
+            return;
+        }
+
+        if (b.kind === 'S' || b.kind === 'A') {
+            if (--b.hp > 0) return;
+            b.alive = false;
+            shockwave(b);
+            award(25 * b.maxHp, b.x + bw / 2, b.y);
+        } else {
+            b.alive = false;
+            shockwave(b);
+            award(TIERS[b.kind].pts, b.x + bw / 2, b.y);
+            if (!tierSeen[b.kind] && (b.kind === 'O' || b.kind === 'R')) {
+                tierSeen[b.kind] = true;
+                bumpSpeed(1.1);
+            }
+        }
+        // one HUNTER for each one caught in the act of leaving. counted here,
+        // where he is actually dead, so a silver taking two hits on his way out
+        // is still one of them. the ones that make the edge are never hit, so
+        // they never pay.
+        if (b.flee) round.hunter++;
+        maybeDropCapsule(b.x + bw / 2, b.y + bh / 2);
+
+        if (++hits === 4 || hits === 12) bumpSpeed(1.12);
+        const left = bricks.filter(x => x.alive && x.kind !== 'X');
+        if (!left.length) { if (!labBusy()) clearStage(); }
+        else if (labLeft(left)) { /* the mini-boss has taken it from here */ }
+        else if (LEVELS[stage].talks && left.length <= FLEE_AT && fleeRoll < 0) {
+            fleeRoll = FLEE_REROLL;             // the first toss is right now
+            tossForFlight();
+        }
+    }
+
+    // Everything the round earned, as the rows the screen prints. Nothing is
+    // paid here -- see payBonus.
+    function endOfRound() {
+        const boss = stage === LEVELS.length - 1;
+        const rows = [{ label: 'END OF ROUND BONUS', pts: EOR_BASE * (stage + 1) }];
+        const met = {
+            // the hit that ends a round moves BONUS in the same step that ends
+            // play, so update never reads it. One more look here, or the screen
+            // names less than the BONUS still showing under it.
+            peak:     Math.max(round.peak, bonusNow()),
+            flawless: !round.lost ? 1 : 0,
+            multi:    balls.length > 1 ? 1 : 0,
+            // only the throne converts lives, so only the throne pays for them,
+            // and it pays for exactly what the corner has been showing you --
+            // which is also exactly what startGauntlet is about to eat
+            spare:    boss ? spares() : 0,
+            fast:     round.fast ? 1 : 0,
+            heads:    round.heads ? 1 : 0,
+            grit:     round.grit ? 1 : 0,
+            hunter:   round.hunter
+        };
+        for (const r of EOR_ROWS) {
+            const n = met[r.key];
+            if (n <= 0) continue;
+            const x = r.mul ? ' x' + n.toFixed(1) : r.many ? ' x' + n : '';
+            // rounded, because a tenth multiplies out a hair off whole in floats
+            rows.push({ label: r.label + x, pts: Math.round(r.pts * n) });
+        }
+        return bonusScreen(rows);
+    }
+
+    // The same screen at the end of a reign, with two rows of its own. The time
+    // bonus is never paid by the second (see gRunT), nor the moment you die --
+    // it waits for its line, like everything else this screen pays. MAX MULT
+    // is what MAX BONUS is on a round, the best the streak reached. It is not
+    // called BONUS because nothing in the gauntlet is: its multiplier is the
+    // bare x beside the score, so the row names it the way that prints it.
+    //
+    // It is laid out in the gap between the throne and the army. The floor is
+    // taken off a FULL floor's back rank rather than the one standing there,
+    // so the list sits in the same place however many were left to watch.
+    function endOfReign() {
+        const army = slotY(G_MAX - 1) - G_SHIP_H / 2 - G_SHIP_BOB;
+        const top = tenth(gMultTop);
+        return bonusScreen([
+            { label: 'TIME BONUS', pts: Math.round(gRunT * G_PTS_SEC) },
+            { label: 'MAX MULT ' + multText(top), pts: Math.round(G_PTS_MULT * top) }
+        ], army - EOR_ARMY_GAP);
+    }
+
+    // `bot` is the lowest the list may reach -- see EOR_BOT
+    function bonusScreen(rows, bot = EOR_BOT) {
+        return { rows, total: rows.reduce((s, r) => s + r.pts, 0), t: 0, paid: false, bot };
+    }
+
+    // Whether the screen is up. Three things put one up, each on its own beat:
+    // a stage clear at once, the takeover at its title, the fall at its.
+    // Everything that ticks it or draws it asks here, so the three cannot
+    // disagree about when it is showing.
+    function eorShowing() {
+        return !!eor && (phase === 'cleared'
+            || (phase === 'ascend' && ascendT >= A_TITLE)
+            || (phase === 'fall' && fallT >= F_TITLE));
+    }
+
+    // when the total lands, which is also when it is paid
+    function eorTotalAt(e) { return EOR_IN + EOR_ROW * e.rows.length + EOR_GAP; }
+    // ...and when the screen has been up long enough to have been read
+    function bonusRead() { return !eor || eor.t >= eorTotalAt(eor) + EOR_FADE + EOR_LINGER; }
+
+    // counting itself up a line at a time. the score does not move until the
+    // last line has landed -- see EOR_IN.
+    function stepBonus(dt) {
+        if (!eorShowing()) return;
+        eor.t += dt;
+        if (eor.t >= eorTotalAt(eor)) payBonus();
+    }
+
+    // A tap on a screen still counting itself up finishes the count -- it never
+    // skips past it. Nothing on it may cost you points, and a tap already on its
+    // way when the screen went up would otherwise take the whole thing with it.
+    function finishBonus() {
+        eor.t = Math.max(eor.t, eorTotalAt(eor) + EOR_FADE + EOR_LINGER);
+        payBonus();
+    }
+
+    // How much of it is still on screen. It only leaves on the takeover, which
+    // is the one place nothing is waiting for a tap; a stage clear and the end
+    // of a reign both hold at 1 until you move on.
+    function eorOut() {
+        if (!eor || phase !== 'ascend') return 1;
+        const gone = (eor.t - eorTotalAt(eor) - EOR_FADE - EOR_LINGER) / EOR_OUT;
+        return Math.max(0, Math.min(1, 1 - gone));
+    }
+    function bonusGone() { return eorOut() <= 0; }
+
+    function payBonus() {
+        if (!eor || eor.paid) return;
+        eor.paid = true;
+        // the cap holds here too: a reign that ran the number out ends on the
+        // spot (see hitShip), and its time bonus must not carry it past what
+        // the board will take
+        score = Math.min(SCORE_CAP, score + eor.total);
+        if (score > best) { best = score; saveBest(); }
+    }
+
+    function clearStage() {
+        eor = endOfRound();
+        capsule = null;
+        dragT = 0;                  // nothing of his hangs on you past the kill
+        if (stage === LEVELS.length - 1) {
+            // you do not get to just win. he comes apart where he stands --
+            // the same way you will when your turn comes -- and your brandon
+            // rises into the space he leaves and swells to fill it.
+            phase = 'ascend';
+            ascendT = 0;
+            const b = bricks[0];
+            bossFall = shatter(b.x + bw / 2, b.y + bh / 2, bw, A_DIE_T);
+            bossFall.tilt = b.wigA || 0;   // the angle he died at, eased out -- see LEVEL_SECS
+            hitStop(b.x + bw / 2, b.y + bh / 2, bw, b.wigA || 0);   // the blow lands first
+            // he sets off from wherever the fight left him -- by now that is
+            // most of the way up the screen already, and half again as big
+            ascendFrom = { y: padY(), w: padW() };
+            banner = 'BRANDON WINS';
+        } else {
+            phase = 'cleared';
+            banner = 'STAGE CLEAR';
+            // the hat's statues go too, now there is nothing left to stand
+            // over -- see STATUE_WAIT
+            if (LEVELS[stage].talks) {
+                for (const b of bricks) {
+                    if (b.alive && b.kind === 'X') walkOff(b, STATUE_WAIT, STATUE_SECS);
+                }
+            }
+        }
+    }
+
+    // ---- the hat stage talks back ----------------------------------------------
+    function say(b) {
+        talk = talk.filter(t => t.brick !== b);        // one thing at a time each
+        talk.push({ brick: b, text: TALK_LINES[(Math.random() * TALK_LINES.length) | 0],
+                    life: TALK_SECS });
+        if (talk.length > TALK_MAX) talk.shift();
+    }
+
+    // every brandon still standing, and not already on his way, tosses a coin
+    function tossForFlight() {
+        for (const b of bricks) {
+            if (b.alive && b.kind !== 'X' && !b.flee && Math.random() < FLEE_ODDS) startFlee(b);
+        }
+    }
+
+    // he says his piece, then heads for whichever edge is nearer, and all the
+    // way off it
+    function startFlee(b) {
+        say(b);
+        walkOff(b, FLEE_WAIT, FLEE_SECS);
+    }
+
+    // `wait` seconds where he stands, then `secs` to get all the way off the
+    // nearer edge, however far that is -- see stepFlee
+    function walkOff(b, wait, secs) {
+        const dir = b.x + bw / 2 < LW / 2 ? -1 : 1;
+        b.flee = { t: 0, x0: b.x, y0: b.y, dir, dist: dir < 0 ? b.x + bw : LW - b.x, wait, secs };
+    }
+
+    // only while a ball is in play: a lost life or a pause holds everybody
+    // where they are, so nobody gets away -- or decides to -- while you are
+    // waiting to serve. The statues' walk after the round is the exception,
+    // and a round that is over has nobody left to toss for.
+    function stepFlee(dt) {
+        const playing = phase === 'play';
+        if (!playing && phase !== 'cleared') return;
+        if (playing && fleeRoll >= 0 && (fleeRoll -= dt) <= 0) {
+            fleeRoll += FLEE_REROLL;
+            tossForFlight();
+        }
+        let gone = false;
+        for (const b of bricks) {
+            const f = b.flee;
+            if (!f || !b.alive) continue;
+            f.t += dt;
+            const t = f.t - f.wait;
+            if (t <= 0) continue;
+            // up to walking pace over FLEE_RAMP, then steady, so the trip takes
+            // its `secs` all told however far he has to go
+            const v = f.dist / (f.secs - FLEE_RAMP / 2);
+            const d = Math.min(f.dist, t < FLEE_RAMP ? v * t * t / (2 * FLEE_RAMP)
+                                                     : v * (t - FLEE_RAMP / 2));
+            const step = t * TODDLE_HZ * Math.PI * 2;
+            b.x = f.x0 + f.dir * d;
+            b.y = f.y0 - Math.abs(Math.sin(step)) * TODDLE_HOP;
+            b.wigA += Math.sin(step) * TODDLE_LEAN;    // on top of any WIGGLY sway
+            if (d >= f.dist) { b.alive = false; b.flee = null; gone = true; }
+        }
+        // the stage ends when nobody is left, whether they were hit or ran --
+        // once. the statues leave after it has ended, and a second clearStage
+        // would put up, and pay, a second bonus
+        if (playing && gone && !bricks.some(x => x.alive && x.kind !== 'X') && !labBusy()) clearStage();
+    }
+
+    // What you have IN RESERVE: `lives` counts the head in your hands as well,
+    // and that one is not a spare. This is the number the corner prints, the
+    // number SPARE BALL pays for and the number the throne absorbs -- one
+    // function so the three can never disagree.
+    function spares() { return Math.max(0, lives - 1); }
+
+    function loseLife() {
+        if (!menuLost()) lives--;
+        combo = 0;
+        round.lost = true;              // there goes FLAWLESS for this round
+        if (lives <= 0) {
+            // out of lives is not the end of the run -- the choice is. nothing
+            // is recorded until you decline another go.
+            banner = 'GAME OVER';
+            climb = 0;          // the choices sit on the original line; so does he
+            // he follows the pointer on that screen, and a lag on him there
+            // would only read as the screen being slow
+            dragT = 0; phantoms = [];
+            overPress = null; overHover = null; overKeys = false;
+            // the one screen besides the initials with something to click
+            freeMouse();
+            showCursor(true);
+            fetchBoard();       // so the table you are deciding against is current
+            overT = CONTINUE_SECS;
+            phase = 'over';
+            return;
+        }
+        resetBall();
+    }
+
+    // ---- game over: another quarter, or let it stand -------------------------
+    // Two real buttons. They used to be one gesture: BRANDON was the cursor,
+    // and whichever side he stood on was what a tap committed. On a phone that
+    // made the tap you used to START dragging him a commit in its own right --
+    // to whatever he happened to be standing on -- so the screen could choose
+    // for you before you had moved him an inch. Now a tap on a box is the only
+    // thing that chooses, and he just follows your finger around underneath.
+    //
+    // A choice is made on the way UP, and only if the pointer went down on the
+    // same box, which is what any button does: press, think better of it, slide
+    // off, and nothing happens. It also means a finger that was already down
+    // when the ball got away cannot pick anything by lifting, because it never
+    // pressed anything on this screen.
+    //
+    // The continue's price is not printed on it. You find out what it costs by
+    // paying it -- the score halves in the HUD on the way back in, which is the
+    // honest moment to learn it, and it keeps the choice a gamble rather than a
+    // sum you can do in advance.
+    function overButtons() {
+        const w = 300, h = 58, y = PADDLE_Y - h / 2;
+        return [
+            { key: 'continue', label: 'CONTINUE', x: 56, y, w, h },
+            { key: 'end',      label: 'END RUN',  x: LW - 56 - w, y, w, h }
+        ];
+    }
+
+    // The drawn box is 58 tall, which a landscape phone renders under 40 css
+    // px -- short of every touch guideline. The pitch a tap is tested against
+    // runs well above and below it. The gap between the two stays dead.
+    const OVER_PAD = 26;
+    function overAt(px, py) {
+        for (const b of overButtons()) {
+            if (px >= b.x && px <= b.x + b.w &&
+                py >= b.y - OVER_PAD && py <= b.y + b.h + OVER_PAD) return b.key;
+        }
+        return null;
+    }
+
+    let overPress = null;          // the box a pointer went down on, if any
+    let overHover = null;          // the box under the pointer right now
+    let overKeys = false;          // steering with the arrows instead
+
+    // With the keyboard there is nothing to aim, so the old rule still stands
+    // there: the arrows walk him across, and space takes the side he is on.
+    function overKeyPick() { return paddle.x < LW / 2 ? 'continue' : 'end'; }
+
+    function overChoose(key) {
+        overPress = null;
+        showCursor(false);             // endRun brings it back for the initials
+        key === 'continue' ? continueGame() : endRun();
+    }
+
+    // Two passes: the boxes go UNDER the paddle, the labels go OVER him so his
+    // body can never hide a choice. What lights up is what a commit would
+    // take: the box under the pointer, or his side if you are on the arrows.
+    // With neither, nothing is lit -- nothing is chosen yet, and it says so.
+    function drawOverChoices(labels) {
+        if (phase !== 'over') return;
+        const sel = overKeys ? overKeyPick() : (overPress || overHover);
+        for (const b of overButtons()) {
+            const on = b.key === sel;
+            if (!labels) {
+                ctx.fillStyle = on ? 'rgba(201,169,78,0.14)' : 'rgba(0,0,0,0.6)';
+                ctx.fillRect(b.x, b.y, b.w, b.h);
+                ctx.strokeStyle = on ? '#c9a94e' : '#2e2a24';
+                ctx.lineWidth = on ? 2 : 1;
+                ctx.strokeRect(b.x, b.y, b.w, b.h);
+                continue;
+            }
+            const size = fitSize(b.label, 17 * uiScale, b.w - 24);
+            const x = b.x + b.w / 2, y = b.y + b.h / 2 + size * 0.35;
+            ctx.font = size + 'px "Trebuchet MS", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.lineWidth = 5;                       // knocked out of him
+            ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+            ctx.strokeText(b.label, x, y);
+            ctx.fillStyle = on ? '#f2efe9' : '#8d877d';
+            ctx.fillText(b.label, x, y);
+        }
+    }
+
+    function continueGame() {
+        score = Math.floor(score * CONTINUE_KEEP);   // the cost of the quarter
+        lives = 3;
+        round.grit = true;              // the round remembers you bought it back
+        // Back in exactly where you went out: the same wall with the same
+        // holes in it, the boss on whatever health you left him. It used to
+        // rebuild the stage, which on the last one handed him back all 27.
+        // Only the ball is new, served the way any lost life serves it.
+        resetBall();
+        banner = '';
+    }
+
+    // ---- collision against his shape ----------------------------------------
+    // Everything happens in the brick's OWN frame: spin the ball's centre back
+    // by the brick's wiggle, test the mask, then spin the resulting normal
+    // forward again. The ball is tested as its real ellipse, not a circle, so
+    // how far it reaches depends on which way the head is facing.
+    function contact(br, ball) {
+        const cw = bw / MCOLS, chh = bh / MROWS;
+        const ccx = br.x + bw / 2, ccy = br.y + bh / 2;
+        const a = br.wigA || 0;
+
+        let bx = ball.x, by = ball.y;
+        if (a) {
+            const c = Math.cos(-a), s = Math.sin(-a);
+            const dx = bx - ccx, dy = by - ccy;
+            bx = ccx + dx * c - dy * s;
+            by = ccy + dx * s + dy * c;
+        }
+
+        // a cell counts as touched if its centre falls inside the ball's
+        // ellipse grown by half a cell
+        const pad = Math.max(cw, chh) * 0.5;
+        const rx = bRX() + pad, ry = bRY() + pad;
+        const ang = -(ball.angle - a);          // head's facing, in this frame
+        const ca = Math.cos(ang), sa = Math.sin(ang);
+        const span = bMAX() + pad;
+
+        const c0 = Math.max(0, Math.floor((bx - span - br.x) / cw));
+        const c1 = Math.min(MCOLS - 1, Math.floor((bx + span - br.x) / cw));
+        const r0 = Math.max(0, Math.floor((by - span - br.y) / chh));
+        const r1 = Math.min(MROWS - 1, Math.floor((by + span - br.y) / chh));
+
+        let sx = 0, sy = 0, n = 0;
+        for (let r = r0; r <= r1; r++) {
+            const line = MASK[r];
+            for (let c = c0; c <= c1; c++) {
+                if (line[c] !== '#') continue;
+                const px = br.x + (c + 0.5) * cw, py = br.y + (r + 0.5) * chh;
+                const dx = px - bx, dy = py - by;
+                const lx = dx * ca - dy * sa, ly = dx * sa + dy * ca;
+                if ((lx / rx) ** 2 + (ly / ry) ** 2 > 1) continue;
+                sx += px; sy += py; n++;
+            }
+        }
+        if (!n) return null;
+
+        let cx = sx / n, cy = sy / n;
+        if (a) {
+            const c = Math.cos(a), s = Math.sin(a);
+            const dx = cx - ccx, dy = cy - ccy;
+            cx = ccx + dx * c - dy * s;
+            cy = ccy + dx * s + dy * c;
+        }
+        return { cx, cy };
+    }
+
+    // ---- his outline --------------------------------------------------------
+    // He is a man lying at PADDLE_LEVEL: his head stands proud at one end, his
+    // boot tapers away at the other, and his middle is thicker than either. A
+    // plain bar the length of him missed both ways at once -- a head could meet
+    // his drawn head and carry straight on through it, and be sent back off
+    // empty air a third of a head above his legs.
+    //
+    // These are his real edges, read off paddle.webp's alpha at BODY_COLS
+    // points across him, each sampled AT that point rather than averaged over a
+    // slice -- which is where the straight lines between them meet, so they
+    // land within a fifth of a pixel of the edge you see. In thousandths of his
+    // width, so they scale with him. What a head MEETS is bodyAt, not these:
+    // his ends are his own shape, his middle is the deck below.
+    const BODY_TOP = [
+        -110,-106,-103, -93, -82, -73, -69, -68, -64, -64, -61, -60, -58, -57, -59, -58,
+         -57, -58, -58, -58, -58, -60, -59, -57, -65, -73, -72, -72, -75, -78, -82, -85,
+         -89, -94, -95, -94, -89, -81, -78, -76, -74, -78, -91,-103,-115,-125,-133,-139,
+        -142,-146,-148,-149,-146,-133,-122,-118,-136,-154,-167,-174,-175,-172,-166,-147
+    ];
+    const BODY_BOT = [
+         -55, -24, -13,  17,  19,  12,   9,   5,  22,  23,  24,  25,  26,  26,  27,  28,
+          29,  28,  28,  28,  30,  29,  31,  76,  93, 110, 122, 133, 142, 147, 152, 154,
+         156, 155, 154, 153, 151, 150, 147, 145, 144, 145, 146, 144, 140, 143, 154, 164,
+         173, 171, 170, 171, 171, 168, 161, 151, 134, 119, 103,  90,  85, -43, -66, -90
+    ];
+    const BODY_COLS  = BODY_TOP.length;
+    const BODY_TAPER = 1;      // 45 degrees, where his ends run out to nothing
+
+    // how far he reaches above and below his middle, at his real proportions
+    const bodyHalfH = w => w / SHAPE_ASPECT / 2;
+
+    // His drawn top and underside at one point along him, in his own frame, or
+    // null where there is no more of him.
+    function outlineAt(x, hw) {
+        const w = hw * 2, cw = w / BODY_COLS;
+        const top = c => BODY_TOP[c] / 1000 * w;
+        const bot = c => BODY_BOT[c] / 1000 * w;
+        const first = -hw + cw / 2, last = hw - cw / 2;
+        if (x < first || x > last) {
+            // past his outermost reading the two edges close on each other, so
+            // his ends come to a point rather than a cliff a head could catch
+            const c = x < first ? 0 : BODY_COLS - 1;
+            const d = (x < first ? first - x : x - last) * BODY_TAPER;
+            const t = top(c) + d, u = bot(c) - d;
+            return t >= u ? null : { top: t, bot: u };
+        }
+        const f = (x + hw) / cw - 0.5;
+        const c0 = Math.max(0, Math.min(BODY_COLS - 2, Math.floor(f))), k = f - c0;
+        return { top: top(c0) + (top(c0 + 1) - top(c0)) * k,
+                 bot: bot(c0) + (bot(c0 + 1) - bot(c0)) * k };
+    }
+
+    // ---- the deck ------------------------------------------------------------
+    // Colliding on his drawn top made every landing spot meet a slightly
+    // different slope at a slightly different depth, so the same shot never
+    // came back twice and the sweet spot stopped being a spot. His middle is
+    // flat again: one level line across DECK_SPAN of him, his own outline at
+    // both ends, where his head is still allowed to stand proud of it.
+    //
+    // The line sits level with the highest his art reaches inside the span,
+    // plus DECK_LIFT. At zero the deck clears every part of him but floats
+    // over his thinner stretches; below zero his high points break through it
+    // instead, which is the trade that was picked. These four are the edge
+    // lab's four sliders and carry its signs, so a value tuned there can be
+    // copied here as it reads.
+    const DECK_SPAN = 64;      // % of his width the flat part covers
+    const DECK_AT   = -14;     // % of his width, the deck's centre off his own
+    const DECK_LIFT = -4.5;    // px at PADDLE_W: + floats it clear, - lets him through
+    const DECK_RAMP = 1;       // 45 degrees, where the deck runs back down to him
+
+    const deckEnds = hw => {
+        const w = hw * 2, half = DECK_SPAN * labPadDeck() / 100 * w / 2, c = DECK_AT / 100 * w;
+        return [c - half, c + half];
+    };
+
+    // Scanned rather than read off a column, because the span's edges fall
+    // between columns. Held from call to call: it moves only when he does.
+    let deckAtW = -1, deckLine = 0;
+    function deckTop(hw) {
+        if (hw === deckAtW && deckAtPad === labPadDeck()) return deckLine;
+        const [l, r] = deckEnds(hw);
+        let high = null;
+        for (let x = l; x <= r; x += 0.5) {
+            const e = outlineAt(x, hw);
+            if (e && (high === null || e.top < high)) high = e.top;
+        }
+        if (high === null) high = -bodyHalfH(hw * 2);        // the span missed him
+        deckAtW = hw;
+        deckAtPad = labPadDeck();
+        deckLine = high - DECK_LIFT * (hw * 2 / PADDLE_W);
+        return deckLine;
+    }
+
+    // The surface a head actually meets: flat across the span, and outside it
+    // whichever is higher of his own top and the deck ramping back down to
+    // meet it -- so his head keeps its shape and there is no vertical face
+    // anywhere for a head to catch on.
+    function bodyAt(x, hw) {
+        const e = outlineAt(x, hw);
+        if (!e) return null;                        // past his ends, the deck stops too
+        const [l, r] = deckEnds(hw), y = deckTop(hw);
+        if (x >= l && x <= r) return { top: y, bot: e.bot };
+        const ramp = y + (x < l ? l - x : x - r) * DECK_RAMP;
+        const top = Math.min(e.top, ramp);
+        return top >= e.bot ? null : { top, bot: e.bot };
+    }
+
+    // Where a head's middle comes to rest on him. A head is an ellipse, so when
+    // it lands off to one side what meets him is the part of its underside out
+    // there, which sits well above its lowest point. Setting it down a whole
+    // radius under his top would float it as much as half a head clear of him.
+    function restOn(lx, hw, rx, ry) {
+        let low = null;
+        for (let dx = -rx; dx <= rx; dx += 0.5) {
+            const e = bodyAt(lx + dx, hw);
+            if (!e) continue;
+            const y = e.top - ry * Math.sqrt(Math.max(0, 1 - (dx / rx) ** 2));
+            if (low === null || y < low) low = y;
+        }
+        return low;
+    }
+
+    // the lowest of him anywhere under a head that wide
+    function bodyUnder(lx, rx, hw) {
+        let deep = null;
+        for (let dx = -rx; dx <= rx; dx += 0.5) {
+            const e = bodyAt(lx + dx, hw);
+            if (e && (deep === null || e.bot > deep)) deep = e.bot;
+        }
+        return deep;
+    }
+
+    // ---- physics -----------------------------------------------------------
+    // Where a head is in one brandon's own frame, turned `a`, and whether it is
+    // touching him there: null if not. `rest` comes back with it -- where that
+    // head would sit on the surface -- because finding it is the expensive part
+    // and stepBall needs the same number to set it down.
+    function touching(b, sg, a) {
+        const hw = sg.w / 2;
+        const ca = Math.cos(a), sa = Math.sin(a);
+        const dx = b.x - sg.cx, dy = b.y - padY();
+        const lx = dx * ca + dy * sa, ly = dy * ca - dx * sa;
+        const tc = Math.cos(b.angle - a), ts = Math.sin(b.angle - a);
+        const lrx = Math.hypot(bRX() * tc, bRY() * ts);
+        const lry = Math.hypot(bRX() * ts, bRY() * tc);
+        // cheap reject against the box he and his deck live in
+        if (Math.abs(lx) >= hw + lrx || Math.abs(ly) >= bodyHalfH(sg.w) + lry) return null;
+        const rest = restOn(lx, hw, lrx, lry);
+        if (rest === null || ly < rest) return null;           // still clear above him
+        const under = bodyUnder(lx, lrx, hw);
+        if (under === null || ly - lry > under) return null;   // gone by underneath
+        return { hw, ca, sa, lx, ly, lrx, lry, rest };
+    }
+
+    // The turns he must not make: one that ends up touching a head he was
+    // clear of, and one that lifts his top past the middle of a head already
+    // resting on him -- the second is how a head ended up inside his chest
+    // with him having moved and it having not, and got knocked on down from
+    // there as though it had been beside him all along. Both are looked for
+    // along the turn rather than at its ends, because an end can cross a
+    // whole head in one frame and land clear of it on the far side.
+    function turnBites(b, sg, was, next) {
+        const halfH = padH() / 2;
+        const c0 = touching(b, sg, was);
+        for (let k = 1; k <= DIP_ARC; k++) {
+            const c = touching(b, sg, was + (next - was) * (k / DIP_ARC));
+            if (!c) continue;
+            if (!c0) return true;
+            if (-halfH - c0.ly > 0 && -halfH - c.ly <= 0) return true;
+        }
+        return false;
+    }
+
+    // How far past his end a head really is, and where it will be by the time
+    // it has fallen to him. Measured from its NEAR EDGE, not its middle: a head
+    // is bRX() * 2 across, so one whose centre is a few pixels past his end
+    // still overlaps that end and would land on his top untouched. Measuring
+    // from the middle called that out of reach, he leaned, and the lean took
+    // the top out from under a head that was about to land on it. And measured
+    // where it will have fallen to rather than where it is now, because a head
+    // out past him but travelling back inward is over him by the time it
+    // arrives. Both readings are what dipFor then aims at.
+    function dipGap(b, sg, lip) {
+        const t = b.vy > 0 ? Math.max(0, (lip - (b.y + extY(b))) / b.vy) : 0;
+        const px = b.x + b.vx * t, py = b.y + b.vy * t;
+        return { gap: Math.abs(px - sg.cx) - sg.w / 2 - extX(b), px, py };
+    }
+
+    // How far an end turns for a head getting past it (see DIP_LIMIT): DIP_MAX,
+    // or more once the head has sunk below where that leaves his top -- far
+    // enough that the line of his top passes under the head's reach, aimed at
+    // where the head will be by the time he has turned. A head UNDER him rather
+    // than out past his end gets no more than DIP_MAX: turning further would
+    // only bring his underside down on it.
+    function dipFor(b, sg, px, py) {
+        const side = px < sg.cx ? -1 : 1;
+        const now = Math.sign(paddle.dip[sg.i]) === side ? Math.abs(paddle.dip[sg.i]) : 0;
+        const dx = Math.abs(px - sg.cx), dy = py - padY();
+        if (dy * Math.cos(now) - dx * Math.sin(now) >= 0
+            && dx * Math.cos(now) + dy * Math.sin(now) <= sg.w / 2) return DIP_MAX;
+        const hx = Math.max(0, side * (px + b.vx * DIP_EASE - sg.cx));
+        const hy = py + b.vy * DIP_EASE - padY();
+        const r = Math.max(1e-6, Math.hypot(hx, hy));
+        const need = Math.atan2(hy, hx) + Math.asin(Math.min(1, (padH() / 2 + bRY()) / r));
+        return Math.max(DIP_MAX, Math.min(DIP_LIMIT, need));
+    }
+
+    // the deepest any end of him can reach below his middle, turned as far as
+    // he ever turns
+    function reachBelow() {
+        const hw = padW() / 2, halfH = bodyHalfH(padW());
+        const a = Math.min(Math.max(DIP_MAX, DIP_LIMIT), Math.atan2(hw, halfH));
+        return hw * Math.sin(a) + halfH * Math.cos(a);
+    }
+
+    // returns false if this ball drained off the bottom
+    function stepBall(b, dt) {
+        const s = effSpeed() * (b.boost || 1);    // one he handed back on a fake goes slower
+
+        // hold the shared speed, so SLOW and the ramps apply to every ball
+        const m = Math.hypot(b.vx, b.vy);
+        if (m > 1e-4) { b.vx = b.vx / m * s; b.vy = b.vy / m * s; }
+
+        b.x += b.vx * dt;
+        b.y += b.vy * dt;
+
+        // walls, against the ellipse's reach along each axis. they scrub a
+        // little spin off and leave the rest turning the way it was -- one that
+        // reversed it would undo whatever the last hit built, half the time
+        const rx = extX(b), ry = extY(b);
+        if (b.x - rx < 0)  { b.x = rx;      b.vx =  Math.abs(b.vx); b.spin *= SPIN_WALL; }
+        if (b.x + rx > LW) { b.x = LW - rx; b.vx = -Math.abs(b.vx); b.spin *= SPIN_WALL; }
+        if (b.y - ry < 0)  { b.y = ry;      b.vy =  Math.abs(b.vy); b.spin *= SPIN_WALL; labCeiling(b); }
+        if (b.y - ry > LH) return false;
+
+        for (const br of hitOrder()) {
+            if (!br.alive) continue;
+            // cheap reject, padded out to the wiggled bounding box
+            // enough for the corners of a boss turned 45 degrees, too
+            const pad = br.wigA ? Math.max(bh * 0.35, Math.abs(Math.sin(br.wigA)) * (bw + bh) / 2) : 0;
+            const bm = bMAX();
+            if (b.x + bm <= br.x - pad || b.x - bm >= br.x + bw + pad) continue;
+            if (b.y + bm <= br.y - pad || b.y - bm >= br.y + bh + pad) continue;
+
+            const hit = labContact(br, b);
+            if (!hit) continue;
+            if (labTouch(br, b, hit)) break;
+
+            // PIERCE: plough straight on through the breakable ones, taking
+            // as many as lie in the path. `continue` rather than `break`, so a
+            // single step can clear a whole run of them. The solid ones still
+            // turn you -- being able to pass through those would gut THE SPLIT.
+            if (fx.P > 0 && br.kind !== 'X' && br.kind !== 'Z') {
+                if (!b.pierced.has(br)) {     // one point of damage each, per trip
+                    b.pierced.add(br);
+                    hitBrick(br);
+                }
+                continue;
+            }
+
+            let nx = b.x - hit.cx, ny = b.y - hit.cy;
+            let len = Math.hypot(nx, ny);
+            if (len < 1e-4) { nx = 0; ny = -1; len = 1; }
+            nx /= len; ny /= len;
+
+            const dot = b.vx * nx + b.vy * ny;
+            if (dot < 0) { b.vx -= 2 * dot * nx; b.vy -= 2 * dot * ny; }
+            b.x += nx * 4; b.y += ny * 4;          // nudge clear of the outline
+
+            // his contours can flatten a bounce out to nearly horizontal, which
+            // would leave the ball skating sideways forever
+            if (Math.abs(b.vy) < s * 0.16) {
+                b.vy = (b.vy < 0 ? -1 : 1) * s * 0.16;
+                const q = Math.hypot(b.vx, b.vy) || 1;
+                b.vx = b.vx / q * s; b.vy = b.vy / q * s;
+            }
+
+            // a solid one does not budge, and does not pretend to. it gets a
+            // ring of impact at the contact point instead of a damage flash --
+            // and so does the boss inside his half second of invincibility,
+            // because that hit is not going to hurt him either
+            const glances = labGlances(br, hit);
+            if (glances) rings.push({ x: hit.cx, y: hit.cy, t: 1 });
+            else kick(br, -nx, -ny, 1);   // shoved away from where the ball struck
+            hitBrick(br, hit.cx, hit.cy);
+            // it is the bounce that pays, not the wound: a glance off stone
+            // winds you up as much as breaking a red does. PIERCE is the one
+            // contact that does not, because it does not turn you -- and a
+            // whole row taken in one step would otherwise compound at once.
+            bumpSpeed(BRICK_BUMP);
+            // he came forward into this one: it goes back off the angle he turned
+            // to, square off his face, at the rally's speed. on a fake he only
+            // catches it -- see caught()
+            if (br.kind === 'Z' && lunge && lunge.ball === b && lunge.stage !== 'back') {
+                if (!lunge.fake) {
+                    b.vx = -Math.sin(lunge.aim) * s;
+                    b.vy = Math.cos(lunge.aim) * s;
+                    lunge.stage = 'back';
+                } else if (lunge.stage === 'rear') {
+                    lunge.stage = 'hold';
+                    lunge.wait = FAKE_MIN + Math.random() * (FAKE_MAX - FAKE_MIN);
+                    lunge.dx = b.x - (br.x + bw / 2);     // from his middle, which stays put
+                    lunge.dy = b.y - (br.y + bh / 2);     // as he shrinks from the hit
+                }
+            }
+            break;
+        }
+
+        // the paddle, which may be one brandon or a pair with a hole between,
+        // and either of which may have an end dipped (see DIP_MAX). each is
+        // met in his own frame, where he lies level -- see bodyAt.
+        labBallStep(b);
+        const py = padY();
+        if (b.vy > 0) {
+            for (const sg of segs()) {
+                const a = paddle.dip[sg.i];
+                const c = touching(b, sg, a);
+                if (!c) continue;
+                const { hw, ca, sa, lx, ly, lrx, lry, rest } = c;
+
+                // Only a head coming down ONTO him gets sent back up. One whose
+                // middle has sunk past his top, or that is further out past his
+                // end than it is above him, is beside him, and running into it
+                // there is a glancing knock away with it still falling. With an
+                // end dipped, most of what would be beside him is on the slope.
+                // measured off where it would come to rest, so at the moment it
+                // lands this is exactly its own radius, as it was off his top
+                const above = rest + lry - ly;
+                const out = Math.max(0, Math.abs(lx) - hw);
+                if (above <= 0 || above / lry < out / lrx) {
+                    const dir = lx < 0 ? -1 : 1;
+                    const push = Math.max(Math.abs(b.vx), s * 0.25, Math.min(s, dir * paddle.vx));
+                    const nx = dir * (hw + lrx);
+                    b.x = sg.cx + nx * ca - ly * sa;
+                    b.y = py + nx * sa + ly * ca;
+                    b.vx = dir * push;
+                    b.vy = Math.max(b.vy, push * 0.5);
+                    break;
+                }
+
+                const ny = rest;                       // set down on the surface
+                b.x = sg.cx + lx * ca - ny * sa;
+                b.y = py + lx * sa + ny * ca;
+
+                // where it lands on him sets the angle, and if he is wiggling
+                // then the lean he happens to be at goes into the shot too. the
+                // further an end is dipped, the more the shot leaves square off
+                // that slope instead, so it goes where he visibly sends it
+                const off = Math.max(-1, Math.min(1, lx / hw));
+                const dipped = DIP_MAX > 0 ? Math.min(1, Math.abs(a) / DIP_MAX) : 0;
+                aim(b, off * MAX_ANGLE * labPadAngle() * (1 - dipped) + a + segWig(sg.i));
+
+                // the shove, capped, then what it does to a head this heavy.
+                // the way it is already turning, it builds; against it, it
+                // unwinds.
+                const kick = Math.max(-SPIN_KICK, Math.min(SPIN_KICK,
+                                      off * SPIN_EDGE * labPadEdge() + paddle.vx * SPIN_SWIPE * labPadSwipe()));
+                b.spin = Math.max(-SPIN_MAX, Math.min(SPIN_MAX, b.spin + kick / SPIN_INERTIA));
+                if (kick) b.kickDir = Math.sign(kick);   // ENGLISH turns whichever way this was
+
+                paddle.jt[sg.i] = 1;        // recoil, tilting toward the end he took it on
+                paddle.tilt[sg.i] = off;
+
+                combo = 0;                  // the run ends when it comes home
+                b.pierced.clear();          // ...and so does what it has been through
+                b.boost = 1;                // ...and the crawl a fake left it at
+                if (++hits === 4 || hits === 12) bumpSpeed(1.12);
+                break;
+            }
+        }
+
+        // Past him, it falls. His outline can flatten a bounce out to nearly
+        // horizontal, and a flat ball that has slipped under him has nothing
+        // left to hit: it skates wall to wall down there, forever as far as
+        // anyone watching is concerned, because the only thing that ends a
+        // ball is leaving the bottom and a horizontal one never does. The
+        // brick bounce already refuses to go flatter than 0.16 of the speed,
+        // but nothing was watching the space beneath him. So once a head is
+        // lower than any end of him could reach down to, turned as far as he
+        // ever turns, it goes straight down and the life is lost cleanly -- and
+        // never before that: a head he can still touch is still in play.
+        if (b.y - ry > py + reachBelow()) {
+            const sp = Math.hypot(b.vx, b.vy) || s;
+            b.vx = 0;
+            b.vy = sp;
+        }
+        return true;
+    }
+
+    function update(dt) {
+        clock += dt;
+
+
+        // the gauntlet is its own game with its own clock. nothing below this
+        // applies once the throne is yours -- there is no ball, no paddle, no
+        // wall and no capsule left in play.
+        if (king && (phase === 'gauntlet' || phase === 'absorb' || phase === 'fall')) {
+            updateGauntlet(dt);
+            return;
+        }
+
+        // drive the split open when DOUBLE is up and closed when it lapses.
+        // done before the clamp below so the widening span is what keeps him
+        // on screen as he comes apart.
+        const want = (fx.D > 0 || labPadSplit()) ? 1 : 0;
+        if (spreadT !== want) {
+            const step = dt / DBL_SPLIT;
+            spreadT = want > spreadT ? Math.min(want, spreadT + step)
+                                     : Math.max(want, spreadT - step);
+        }
+
+        if (siphon) stepSiphon(dt);
+        reactToBall(dt);         // his second-wind answers, before his box is placed
+        bossUpdate(dt);          // before the physics, so his box is current
+        holdCaught();            // ...and whatever he has caught goes where he went
+        stepClimb(dt);           // and before the clamp, so his span is too
+
+        if (phase === 'entrance') {
+            enterT += dt;
+            if (enterT >= ENTER_WAIT + ENTER_SECS) phase = 'ready';
+        }
+
+        // the continue clock. dt is clamped and rAF sleeps in a hidden tab, so
+        // this only ever runs down while someone is actually looking at it.
+        if (phase === 'over' && (overT -= dt) <= 0) {
+            overT = 0;
+            overChoose('end');  // silence is a no. the run stands as it is.
+        }
+        stepPhantoms(dt);
+        // his yell at your first ball, where he is by the time it comes
+        if (shoutT >= 0 && (shoutT -= dt) < 0) bossShout(bricks[0]);
+        if (shout && (shout.life -= dt) <= 0) shout = null;
+        talk = talk.filter(t => (t.life -= dt) > 0);
+        rings = rings.filter(r => (r.t -= dt * 2.6) > 0);
+
+        stepBonus(dt);           // the end-of-round screen, if one is up
+
+        // the takeover. when it finishes, the banner finally lands.
+        // the takeover used to end the game. now it hands over.
+        if (phase === 'ascend') {
+            // held on the blow: the ceremony does not begin until it is over
+            if (!stepImpact(dt)) {
+                ascendT += dt;
+                stepCrumble(bossFall, dt, A_DIE);
+            }
+            // ...and the handover waits for the screen to have gone as well as
+            // for the clock. SPARE BALL has to be paid before startGauntlet
+            // spends the lives it counts, and a full list blinking out on the
+            // same frame the throne changes hands is two cuts at once.
+            if (ascendT >= A_END && bonusGone()) startGauntlet();
+        }
+
+        // where he is headed, then how much of that he has managed. the lag is
+        // exponential for the same reason the boss climb is: the rate comes out
+        // the same at 30fps as at 120, and it eases rather than steps.
+        //
+        // vx falls out of where he ACTUALLY got to, so a dragged brandon also
+        // puts less swipe on the ball. That is not a second penalty bolted on,
+        // it is the same one seen from the ball's side.
+        if (phase === 'siphon') paddle.tx = paddle.x;   // he is not yours to move while it happens
+        const padFrom = paddle.x;                      // where the physics below starts him
+        const hs = halfSpan();
+        paddle.tx = Math.max(hs, Math.min(LW - hs, paddle.tx));
+        const lag = dragLag(dt);
+        paddle.x = lag > 0
+            ? paddle.x + (paddle.tx - paddle.x) * (1 - Math.exp(-dt / lag))
+            : paddle.tx;
+        paddle.x = Math.max(hs, Math.min(LW - hs, paddle.x));
+        paddle.vx = (paddle.x - paddle.prevX) / Math.max(dt, 1e-4);
+        paddle.prevX = paddle.x;
+
+        if (dragT > 0) dragT = Math.max(0, dragT - dt);
+        if (bossIF > 0) bossIF = Math.max(0, bossIF - dt);
+        // growing back only counts while you are playing, or waiting to serve
+        // would hand you your size back for free
+        if (shrinkT > 0 && phase === 'play') shrinkT = Math.max(0, shrinkT - dt);
+
+        // kept whether or not he is dragged, so the tail never pops into
+        // existence with a hole in the middle of it
+        padTrail.push({ x: paddle.x, t: clock });
+        while (padTrail.length > 1 && clock - padTrail[0].t > TRAIL_SECS) padTrail.shift();
+
+        // timed effects
+        for (const k of TIMED) {
+            if (fx[k] <= 0) continue;
+            fx[k] = Math.max(0, fx[k] - dt);
+            if (fx[k] === 0 && k === 'B') paddle.w = PADDLE_W;
+            // when ENGLISH lets go the head keeps what it was turning at, and
+            // runs down from there like any other spin instead of stopping dead
+            if (fx[k] === 0 && k === 'E') {
+                for (const b of balls) {
+                    b.spin = Math.max(-SPIN_MAX, Math.min(SPIN_MAX, b.spin + b.eng));
+                    b.eng = 0;
+                }
+            }
+        }
+
+        // each brick's lean is sampled ONCE per frame and held across every
+        // physics substep -- resampling mid-step would let a fast ball tunnel
+        // through an edge that rotated out from under it
+        const amp = wigAmp();
+        for (const b of bricks) {
+            // what cannot be broken also cannot be moved -- the solid ones
+            // stay rigid while the whole wall sways around them
+            b.wigA = (amp && b.kind !== 'X')
+                ? Math.sin(clock * WIG_FREQ * b.wigF + b.wigP) * amp : 0;
+        }
+        // the hat stage's last few, deciding to run for it and running, and
+        // its statues leaving once the round is over. after the lean above so
+        // a waddle rides on top of any wiggle, and before the physics so the
+        // ball meets them where they have got to
+        stepFlee(dt);
+        labUpdate(dt);
+        // and the boss, turned to meet a ball -- see TILT_ODDS
+        if (tilt && bricks[0]) bricks[0].wigA += tilt.a * tilt.k * tilt.k * (3 - 2 * tilt.k);
+
+        for (const b of balls) if (b.stuck) {
+            b.x = paddle.x + b.off;
+            b.y = padY() - padH() / 2 - bRY() - 2;
+        }
+
+        // each end of him dips toward a head that is getting past it (see
+        // DIP_MAX), and follows it down. set once a frame and held across the
+        // substeps below, the same as the bricks' lean. a turn that would take
+        // a head, or scoop one already on him into his chest, waits until it
+        // has moved -- see turnBites
+        const lip = padY() - padH() / 2;
+        for (const sg of segs()) {
+            let want = 0, near = Infinity;
+            for (const b of phase === 'play' ? balls : []) {
+                if (b.stuck || b.vy <= 0 || b.y + extY(b) < lip - DIP_LEAD) continue;
+                const { gap, px, py } = dipGap(b, sg, lip);        // out past his end
+                if (gap > DIP_REACH * labPadDip() || gap >= near || (gap <= 0 && b.y < lip)) continue;
+                near = gap;
+                want = (px < sg.cx ? -1 : 1) * dipFor(b, sg, px, py);
+            }
+            const was = paddle.dip[sg.i];
+            const next = was + (want - was) * (1 - Math.exp(-dt / DIP_EASE));
+            if (!balls.some(b => !b.stuck && turnBites(b, sg, was, next))) paddle.dip[sg.i] = next;
+        }
+
+        // Nothing crosses more than SUBSTEP_PX between checks, and his own
+        // travel counts toward that as much as a head's does. He used to be set
+        // down once and held there for the whole frame, which meant a flick
+        // could carry him most of his own length through the gap between two
+        // tests -- so the first time anyone looked, he was already under a head
+        // that had sunk past his top, and that reads as beside him rather than
+        // on him. Carried across the substeps he meets it on the way instead.
+        if (phase === 'play') {
+            const fast = Math.max(...balls.map(b => Math.hypot(b.vx, b.vy)), effSpeed());
+            const slid = Math.abs(paddle.x - padFrom);
+            const steps = Math.max(1, Math.min(SUBSTEP_CAP,
+                          Math.ceil(Math.max(fast * dt, slid) / SUBSTEP_PX)));
+            const padTo = paddle.x;
+            for (let i = 0; i < steps && phase === 'play'; i++) {
+                paddle.x = padFrom + (padTo - padFrom) * ((i + 1) / steps);
+                for (let j = balls.length - 1; j >= 0; j--) {
+                    if (balls[j].stuck || caught(balls[j])) continue;
+                    if (!stepBall(balls[j], dt / steps)) balls.splice(j, 1);
+                }
+                if (balls.length === 0) { loseLife(); break; }
+            }
+            paddle.x = padTo;      // however it went, he ends where the hand put him
+        }
+
+        for (const b of balls) {
+            // the ball is an ellipse, so a fast enough spin means its facing at
+            // any impact is anyone's guess -- that is the whole
+            // unpredictability, no invented force. what hits and walls put on
+            // runs down; ENGLISH's share does not. that share heads for the
+            // way the last hit pushed, and gets there at ENG_ACCEL rather than
+            // all at once, so bringing it round takes a moment.
+            b.spin -= b.spin * SPIN_DRAG / SPIN_INERTIA * dt;
+            if (fx.E > 0) {
+                const want = (b.kickDir || Math.sign(turnOf(b)) || 1) * ENG_BOOST * SPIN_FULL;
+                const step = ENG_ACCEL * dt;
+                b.eng += Math.max(-step, Math.min(step, want - b.eng));
+            }
+            b.angle += turnOf(b) * dt;
+        }
+
+        // GOTTA GO FAST reads the same rounded number the rule under BONUS
+        // fills off, so what earns it is exactly the bar you watched top out
+        if (phase === 'play' && liveSpinMul() >= SPIN_MUL) round.fast = true;
+        // ...and MAX BONUS keeps the best BONUS read, off the same number the
+        // HUD draws after this frame
+        if (phase === 'play') round.peak = Math.max(round.peak, bonusNow());
+
+        // the falling capsule
+        if (capsule) {
+            capsule.y += CAP_FALL * dt;
+            const halfH2 = padH() / 2, py2 = padY();
+            let caught = false;
+            if (capsule.y + CAP_H / 2 > py2 - halfH2 &&
+                capsule.y - CAP_H / 2 < py2 + halfH2) {
+                for (const sg of segs()) {
+                    if (capsule.x + CAP_W / 2 > sg.cx - sg.w / 2 &&
+                        capsule.x - CAP_W / 2 < sg.cx + sg.w / 2) { caught = true; break; }
+                }
+            }
+            if (caught) { applyCapsule(capsule.kind); capsule = null; }
+            else if (capsule.y - CAP_H > LH) capsule = null;
+        }
+
+        for (const b of bricks) {
+            if (b.flash > 0) b.flash -= dt * 6;
+            if (b.jt > 0) b.jt = Math.max(0, b.jt - dt * JIG_DECAY);
+        }
+        for (let i = 0; i < paddle.jt.length; i++) {
+            if (paddle.jt[i] > 0) paddle.jt[i] = Math.max(0, paddle.jt[i] - dt * JIG_DECAY);
+        }
+        if (callout && (callout.life -= dt) <= 0) callout = null;
+        popups = popups.filter(p => (p.life -= dt * 1.4) > 0);
+    }
+
+    // ---- the endless gauntlet ------------------------------------------------
+    // The takeover hands over to this. You are the boss now: one axis, his
+    // size, his health bar, his moveset -- and the queue that formed behind
+    // you when you did this to him.
+
+    function startGauntlet() {
+        king = { x: LW / 2, tx: LW / 2, hp: G_HP, hpMax: G_HP, hpBase: G_HP,
+                 hits: 0, hurt: 0, flash: 0, grow: 0, jt: 0, jnx: 0, jny: 0 };
+        kingShown = G_W0;
+        gBarMax = G_HP;
+        ships = []; gBul = []; gThrow = []; sparks = []; gDrop = []; gVolley = []; gDropAt = [];
+        gRunT = 0; gSpawnT = 0; gCool = 0; gShake = 0;
+        gSpread = 0; gBurst = 0; gRapid = 0;
+        gMark = null; gMarkT = 0; gBlast = []; gMult = 1; gMultT = 0; gMultTop = 1;
+        fallT = 0; kingFall = null; victor = null; bossFall = null; impact = null;
+        phantoms = [];                  // nothing of the old fight comes through
+        balls = [];
+        popups = [];                    // ...including what the last brick paid
+        // Nothing moves until you throw something -- you have never had a fire
+        // button in this game and nobody has told you that you have one now.
+        // But the ASKING waits: he walks on first and gets a second to stand
+        // there, so the first thing that happens is somebody arriving, not a
+        // caption. gLead is that pause before the prompt.
+        gReady = true;
+        gLead = G_INTRO_RISE + 1;
+        gIn = 0;                        // you have only just sat down -- see G_IN
+        gAbsorbLeft = spares();
+        gAbsorbT = F_ABSORB;
+        ascendT = 0;                    // the takeover is over; it drew its last
+        phase = gAbsorbLeft > 0 ? 'absorb' : 'gauntlet';
+        // the challenger arrives after the ceremony, not during it -- the lives
+        // going in are about you, and he is the next thing, not a garnish on it
+        if (phase === 'gauntlet') addShip(true);
+        // there is nothing left to serve, and he is not the paddle any more
+        setHint(HINT_GAUNTLET);
+    }
+
+
+    function gPressure() { return Math.min(1, gRunT / G_RAMP); }
+    const gRamp = (a, b) => a + (b - a) * gPressure();
+
+    // how far the world has come back to you since the handover. eased, so the
+    // colour and the breath arrive rather than switch on.
+    function gInK() { return ease01(gIn / G_IN); }
+
+    function kingW() {
+        const w0 = G_W0 + king.grow;
+        return G_W1 + (w0 - G_W1) * Math.exp(-king.hits / G_SHRINK);
+    }
+    // what is actually DRAWN and collided against: the target width, chased
+    // exponentially, so losing 160px of yourself is a second of visibly
+    // contracting rather than one frame of being a different size
+    function kingH() { return kingShown / SHAPE_ASPECT; }
+    // the bob winds up out of nothing over the handover -- he was sitting
+    // perfectly still a frame ago, and starting mid-breath is a jump
+    function kingY() { return G_Y + Math.sin(clock * 0.9) * G_BOB * gInK(); }
+
+    // the mask test, in his own frame. the ball used to thread the gaps in his
+    // outline; now the gaps are the only reason you are still here.
+    function hitsKing(px, py) {
+        const w = kingShown, h = kingH();
+        const x0 = king.x - w / 2, y0 = kingY() - h / 2;
+        if (px < x0 || px > x0 + w || py < y0 || py > y0 + h) return false;
+        const cx = Math.min(MCOLS - 1, Math.max(0, ((px - x0) / w * MCOLS) | 0));
+        const cy = Math.min(MROWS - 1, Math.max(0, ((py - y0) / h * MROWS) | 0));
+        return MASK[cy][cx] === '#';
+    }
+
+    function hurtKing() {
+        if (king.hurt > 0) return;
+        // the HIT count is what your size decays off and it goes up by one
+        // whatever the damage was, so heavier hits kill you sooner without
+        // changing how fast you shrink. the two were never the same clock.
+        king.hp -= G_DMG;
+        king.hits++;
+        king.hurt = G_MERCY;
+        king.flash = 1;
+        // halved, not lost -- see G_MULT_HIT. it is the only thing being struck
+        // costs you that you can win straight back.
+        gMult = Math.max(1, gMult * G_MULT_HIT);
+        gShake = Math.min(1, gShake + 0.7);
+        if (king.hp <= 0) startFall();
+    }
+
+    // ---- the army ------------------------------------------------------------
+    // Ranks of G_ROW, filling from the front and stacking BACKWARDS up the
+    // screen, so a growing army does not smear sideways -- it deepens, and the
+    // front of it creeps toward you. Each rank back sits G_STAGGER of a place
+    // along from the last so it reads as a crowd rather than a grid. Every one
+    // owns a slot; a dead one frees its slot and the next arrival takes a free
+    // one in the frontmost rank that has any, so holes at the front fill before
+    // anybody stands at the back. Nobody already standing ever moves, which is
+    // what stops arrivals reading as waves.
+    function slotX(slot) {
+        const row = (slot / G_ROW) | 0, col = slot % G_ROW;
+        const span = G_HI - G_LO, place = span / G_ROW;
+        // folded into plus or minus half a place rather than left to run to a
+        // whole one: the first rank comes out unshifted, which is what keeps
+        // the introduction's slot on the middle of the field, and no rank can
+        // push its outermost man past the span the places were cut from.
+        const f = (row * G_STAGGER) % 1;
+        return G_LO + span * ((col + 0.5) / G_ROW)
+             + (f - Math.round(f)) * place;
+    }
+    function slotY(slot) { return G_SHIP_Y - ((slot / G_ROW) | 0) * G_STEP; }
+
+    // three-hit ones arrive on a square, so they stay genuinely rare early and
+    // are then suddenly most of what walks on
+    function pickHp() {
+        const hard = Math.min(1, gRunT / G_TOUGH);
+        const p3 = hard * hard * G_T3;
+        const p2 = hard * G_T2 * (1 - p3);
+        const r = Math.random();
+        return r < p3 ? 3 : r < p3 + p2 ? 2 : 1;
+    }
+
+    function batchMax() {
+        return Math.max(1, Math.round(G_BATCH * Math.pow(2, gRunT / G_DOUBLE)));
+    }
+
+    // Front before back is the whole of it: the army has to deepen toward you,
+    // so nobody stands in a rank while the one in front of it has a gap. WHICH
+    // gap gets taken is not part of that, and drawing it at random is what
+    // stops a half-empty floor from leaning to the same side every run.
+    function freeSlot(used) {
+        for (let base = 0; base < G_MAX; base += G_ROW) {
+            const free = [];
+            for (let i = base; i < base + G_ROW && i < G_MAX; i++)
+                if (!used.has(i)) free.push(i);
+            if (free.length) return free[(Math.random() * free.length) | 0];
+        }
+        return G_MAX;                              // the floor is full
+    }
+
+    function addShip(intro) {
+        const used = new Set(ships.filter(s => s.alive).map(s => s.slot));
+        // the middle slot of the first rank is the middle of the field, so the
+        // introduction gets it by name and needs no special case in the
+        // geometry -- see the fold in slotX, which is what holds that true.
+        // everybody after him fills in around where he stood.
+        const slot = intro ? ((G_ROW / 2) | 0) : freeSlot(used);
+        if (slot >= G_MAX) return;                 // the floor is full
+        const hp = intro ? 1 : pickHp();
+        const w = intro ? G_INTRO_W : G_SHIP_W;
+        ships.push({
+            slot, x: slotX(slot), y: slotY(slot), w,
+            // he takes his time getting here, and comes from further down, so
+            // it reads as somebody arriving rather than a unit spawning
+            riseT: intro ? G_INTRO_RISE : G_RISE,
+            riseFrom: intro ? 300 : 140,
+            // the introduction is the untouched photograph, same as you. every
+            // one after it wears a brick's colour on its last rung.
+            tint: intro ? null : TIER_KEYS[(Math.random() * TIER_KEYS.length) | 0],
+            intro: !!intro,
+            // each on its own phase, its own reach and its own tempo, so the
+            // rank never moves as one block. kept short -- they are shoulder to
+            // shoulder and a wide sway is everyone walking through everyone.
+            amp: 14 + Math.random() * 26,
+            ph: Math.random() * 6.28,
+            rate: 0.7 + Math.random() * 0.7,
+            bobPh: Math.random() * 6.28,
+            bobRate: 0.7 + Math.random() * 0.8,
+            rise: 0,
+            fire: G_FIRST_LO + Math.random() * (G_FIRST_HI - G_FIRST_LO),
+            hp, maxHp: hp, flash: 0, held: 0, hitAt: -9, knockAt: -9, dead: 0, alive: true
+        });
+    }
+
+    // He does not shoot. He SERVES -- puts a head up the screen the way you
+    // used to put one into the wall, and from there it is loose.
+    //
+    // One each, ever. They used to fan out three and then five apiece, which
+    // made the late game a curtain rather than a set of trajectories -- and
+    // with the sight sweeping on its own clock, a curtain is not something you
+    // can answer, only something that happens to you. One head from each of
+    // many is the same amount of trouble arriving somewhere you can read.
+    function nextServe(alive) {
+        const own = G_SERVE_LO + Math.random() * (G_SERVE_HI - G_SERVE_LO);
+        const budget = Math.max(0.1, gRamp(G_RATE0, G_RATE1));
+        return Math.max(own, alive / budget);
+    }
+
+    function shipServe(s) {
+        const a = (Math.random() - 0.5) * 0.34;
+        const y = s.y - s.w / SHAPE_ASPECT * 0.3;
+
+        // Once in fifty he serves you something useful by mistake. Same throw,
+        // same arc, and it is coming at you exactly like everything else -- the
+        // only tell is that it is the wrong colour and has a letter on it, so
+        // for a beat you cannot be sure whether to get under it or out of its
+        // way. Slower than a head, because a free thing you have no chance of
+        // catching is not a gift, it is a taunt.
+        if (Math.random() < G_SERVE_DROP) {
+            const speed = gRamp(G_BULL0, G_BULL1) * G_SERVE_DROP_V;
+            addDrop({
+                x: s.x, y,
+                vx: Math.sin(a) * speed, vy: -Math.cos(a) * speed,
+                kind: G_DROP_K[(Math.random() * G_DROP_K.length) | 0],
+                angle: Math.random() * 6.28,
+                spin: (Math.random() - 0.5) * 3,
+                life: G_DROP_LIFE
+            });
+            return;
+        }
+
+        if (gBul.length >= G_BALL_CAP) return;
+        const speed = gRamp(G_BULL0, G_BULL1);
+        gBul.push({
+            x: s.x, y,
+            vx: Math.sin(a) * speed, vy: -Math.cos(a) * speed,
+            angle: Math.random() * 6.28,
+            spin: (Math.random() - 0.5) * 9,
+            life: G_BALL_LIFE
+        });
+    }
+
+    // a powerup turning up, from either source, and a note of when -- see
+    // G_DROP_DAMP
+    function addDrop(d) {
+        gDrop.push(d);
+        gDropAt.push(clock);
+    }
+
+    // one of yours landing. it takes a rung off; only the last rung kills.
+    function hitShip(s) {
+        // hard behind the last hit, hold the knock rather than restart it --
+        // see G_KNOCK_HOLD
+        const quick = clock - s.hitAt < G_KNOCK_HOLD;
+        s.held = quick ? G_KNOCK_HOLD : 0;
+        if (!quick || clock - s.knockAt >= G_KNOCK_GAP) { s.flash = 1; s.knockAt = clock; }
+        s.hitAt = clock;
+        if (--s.hp > 0) return;
+        s.alive = false;
+        s.dead = G_DEATH;
+        // cleared BEFORE the blast, so a man caught in it cannot be wearing the
+        // halo and set another one off
+        const marked = s === gMark;
+        if (marked) gMark = null;
+        // it cost you a throw a rung, so it pays by the rung -- through the
+        // streak, and again through the bounty if he was the one at the back
+        const pts = Math.round(G_PTS_KILL * s.maxHp * gMult * (marked ? G_MARK_MUL : 1));
+        score += pts;
+        // ...and it says so, the way a brick does. The whole point of the
+        // streak and the bounty is that some kills are worth many times
+        // others, and a spread nobody is shown is a spread nobody plays for.
+        // The bounty's number comes up in the gold he was wearing.
+        popups.push({ x: s.x, y: s.y - G_SHIP_H * 0.4, text: '+' + pts,
+                      color: marked ? '#c9a94e' : '#f2efe9', life: 1 });
+        gMult = Math.min(G_MULT_MAX, gMult + G_MULT_STEP);
+        gMultT = 0;
+        // a kill is the only thing that raises it, so this is the only place
+        // its best can be set -- and before the cap below can end the reign
+        gMultTop = Math.max(gMultTop, gMult);
+        if (score > best) { best = score; saveBest(); }
+        // The worker refuses anything over ten million and the table clamps at
+        // 9,999,999, so a reign that somehow got there would be posting a score
+        // the board cannot hold. Rather than silently clipping it, the run just
+        // ends: you have run the number out, and there is nothing above this.
+        if (score >= SCORE_CAP) { score = SCORE_CAP; startFall(); }
+        // ...and is likelier to leave something, as though each rung had
+        // rolled for it separately -- and less likely again for every powerup
+        // that has turned up in the last few seconds
+        while (gDropAt.length && clock - gDropAt[0] >= G_DROP_WINDOW) gDropAt.shift();
+        const odds = (1 - Math.pow(1 - G_DROP_ODDS, s.maxHp))
+                   * Math.pow(G_DROP_DAMP, gDropAt.length);
+        if (Math.random() < odds) {
+            addDrop({
+                x: s.x, y: s.y - G_SHIP_H * 0.3,
+                kind: G_DROP_K[(Math.random() * G_DROP_K.length) | 0],
+                angle: Math.random() * 6.28,
+                spin: (Math.random() - 0.5) * 3,
+                life: G_DROP_LIFE
+            });
+        }
+        for (let i = 0; i < 9; i++) {
+            const a = Math.random() * 6.28, v = 60 + Math.random() * 150;
+            sparks.push({ x: s.x, y: s.y, vx: Math.cos(a) * v,
+                          vy: Math.sin(a) * v, life: 1 });
+        }
+        if (marked) blast(s.x, s.y);
+    }
+
+    // One at a time, and never on the frame the last one died. Taking him used
+    // to designate the next one instantly, which made the bounty a fixture --
+    // something always on the floor rather than something that turns up. It
+    // arrives with a batch now, so killing him buys a stretch with nothing to
+    // go after, and the next one walking on is an event you can want.
+    //
+    // Always from the rank that fills first, whether or not this batch is what
+    // put anybody there: the bounty being the deepest thing on the floor is
+    // the whole of the dig, and an arrival that happened to land in the third
+    // rank would be a bounty you can reach without paying for it.
+    function markBounty() {
+        if (gMark) return;
+        const back = ships.filter(s => s.alive && s.slot < G_ROW);
+        if (!back.length) return;
+        // The introduction is undyed as well -- he is the photograph because he
+        // is the same as you, which is a different reason for the same look.
+        // Undyed is now the ONLY thing that says bounty, so while he is still
+        // standing he has to be the one wearing it, or the floor shows two and
+        // the rule stops being a rule. He is nearly always dead long before the
+        // first batch lands; this is for when he is not.
+        gMark = back.find(s => s.intro) || back[(Math.random() * back.length) | 0];
+        gMarkT = 0;
+    }
+
+    // What the bounty leaves. Everything inside G_BLAST_R goes outright,
+    // whatever rung it was on -- a dig that costs four throws and ends with
+    // three men flinching is not a reward, and the HOLE is the reward: he was
+    // standing in the rank you cannot otherwise reach, and now it is open.
+    //
+    // Routed through hitShip so a blast kill pays and counts toward the streak
+    // exactly like one you threw for. It cannot cascade: the halo was cleared
+    // before this ran, so nobody it catches is wearing one.
+    function blast(x, y) {
+        if (phase !== 'gauntlet') return;      // the run ended on that same kill
+        gBlast.push({ x, y, t: G_BLAST_T });
+        gShake = Math.min(1, gShake + 0.5);
+        for (const s of ships) {
+            if (!s.alive || Math.hypot(s.x - x, s.y - y) > G_BLAST_R) continue;
+            s.hp = 1;                          // whatever it was wearing, it goes
+            hitShip(s);
+        }
+    }
+
+    // ---- your reply ----------------------------------------------------------
+    // How far in his centre may come. Never tighter than the outermost place a
+    // ship can stand, so that every one of them is under him at some point on
+    // his travel -- at full size that means hanging a long way off the edge of
+    // the world, which is the price of shooting from the middle of a body that
+    // is nearly as wide as the field. When he has shrunk past G_LO the clamp
+    // goes back to his own half-width and he stays on screen like anything
+    // else.
+    function kingEdge() { return Math.min(kingShown / 2, G_LO); }
+
+    function throwHead() {
+        if (phase !== 'gauntlet' || gCool > 0) return;
+        // the first one starts the clock, and buys you a while alone with him
+        if (gReady) { gReady = false; gSpawnT = G_SOLO; }
+        gCool = G_COOL * (gRapid > 0 ? G_RAPID_MUL : 1);
+        // the queue holds TIMES, not positions, so a burst fired while you are
+        // sliding lays itself across the floor behind you rather than stacking
+        // in one column. moving is how you aim the back half of it.
+        const n = gBurst > 0 ? G_BURST_N : 1;
+        for (let i = 0; i < n; i++) gVolley.push(clock + i * G_BURST_GAP);
+    }
+
+    function volley() {
+        const n = gSpread > 0 ? G_SPREAD_N : 1;
+        const y = kingY() + kingH() / 2;
+        // every volley leaves from wherever he is when it fires -- including
+        // the later ones in a burst, which is why a burst thrown on the move
+        // lays itself across the floor (see throwHead)
+        const base = 0;                 // straight down
+        for (let i = 0; i < n; i++) {
+            const a = base + (n === 1 ? 0 : (i - (n - 1) / 2) * G_SPREAD_ARC);
+            gThrow.push({
+                x: king.x, y,
+                vx: Math.sin(a) * G_TSPEED, vy: Math.cos(a) * G_TSPEED,
+                angle: Math.random() * 6.28,
+                spin: 7 * (Math.random() < 0.5 ? -1 : 1)
+            });
+        }
+    }
+
+    // ---- the fall ------------------------------------------------------------
+    // The throne goes to the next one to arrive. Not the one that landed the
+    // shot, and nobody already standing -- nobody on the floor ever moves, and
+    // the army holding its ground is the whole ending, see drawGauntlet. He
+    // comes up from below the screen once you are on your way out, the way you
+    // came up once the boss was, which is the honest version of how you got it.
+    function startFall() {
+        phase = 'fall';
+        fallT = 0;
+        // what you were owed for staying up here, as the screen that goes up at
+        // F_TITLE and pays once it has been read -- see eorShowing
+        eor = endOfReign();
+        // the same two words that were on the screen when YOU took it. nobody
+        // won anything; it is just the caption this game puts under whoever
+        // is on top.
+        banner = 'BRANDON WINS';
+        // under the spot you fell from, in any arrival's colour -- see drawVictor
+        victor = { x: king.x, tint: TIER_KEYS[(Math.random() * TIER_KEYS.length) | 0] };
+        gShake = 1;
+        kingFall = shatter(king.x, G_Y, kingShown, F_SPAN);
+        hitStop(king.x, kingY(), kingShown);       // the same blow, your turn
+    }
+
+    // A brandon coming apart along the MASK -- the same 24 x 9 grid that has
+    // decided what the ball could and could not hit since the first brick. The
+    // grid was always his outline; at the end it is his fracture pattern. Each
+    // piece waits its turn and the wait is its distance from his head, so the
+    // boot goes first and his face is the last thing left on the screen.
+    //
+    // ONE of these serves both deaths, which is the entire point: the boss goes
+    // exactly the way you will, so by the time it happens to you it is already
+    // familiar. `span` is how long the peeling takes end to end.
+    function shatter(x, y, w, span) {
+        const hu = MCOLS - 1, hv = 0;          // he lies head-up-and-right
+        let far = 1;
+        const cells = [];
+        for (let v = 0; v < MROWS; v++) {
+            for (let u = 0; u < MCOLS; u++) {
+                const d = Math.hypot(u - hu, (v - hv) * 2.2);
+                far = Math.max(far, d);
+                cells.push({ u, v, d });
+            }
+        }
+        return {
+            x, y, w, t: 0,
+            pieces: cells.map(c => ({
+                u: c.u, v: c.v,
+                wait: (1 - c.d / far) * span,
+                // barely any push. they are not blown off him, they give up.
+                vx: (c.u - hu) * 0.9 + (Math.random() - 0.5) * 14,
+                vy: -4 - Math.random() * 12,
+                spin: (Math.random() - 0.5) * 0.9,
+                rot: 0, dx: 0, dy: 0, age: 0
+            }))
+        };
+    }
+
+    // Struck: the freeze and the white cut-out start here -- see HIT_HOLD.
+    function hitStop(x, y, w, rot) { impact = { t: 0, x, y, w, rot: rot || 0 }; }
+
+    // Returns true while the world is held -- callers use that to stop
+    // advancing everything else, which is the entire trick.
+    function stepImpact(dt) {
+        if (!impact) return false;
+        impact.t += dt;
+        if (impact.t >= HIT_HOLD + HIT_FADE) { impact = null; return false; }
+        return impact.t < HIT_HOLD;
+    }
+
+    // how hard the picture is jolting, 1 at the moment of the blow to 0 at the
+    // end of the whole thing
+    function impactShake() {
+        if (!impact) return 0;
+        return Math.max(0, 1 - impact.t / (HIT_HOLD + HIT_FADE));
+    }
+
+    // the white cut-out, full through the freeze and burning off after it
+    function drawImpact() {
+        if (!impact) return;
+        const a = impact.t < HIT_HOLD ? 1
+                : 1 - (impact.t - HIT_HOLD) / HIT_FADE;
+        if (a <= 0.002) return;
+        const s = shapeSprite('hitstop', '#f2efe9', 900, 900 / SHAPE_ASPECT, true);
+        if (!s) return;
+        const h = impact.w / SHAPE_ASPECT;
+        ctx.globalAlpha = a;
+        ctx.save();
+        ctx.translate(impact.x, impact.y);
+        ctx.rotate((impact.rot || 0) * levelLeft());   // at whatever angle he was struck
+        if (impact.flip) ctx.scale(-1, 1);
+        ctx.drawImage(s, -impact.w / 2, -h / 2, impact.w, h);
+        ctx.restore();
+        ctx.globalAlpha = 1;
+    }
+
+    function stepCrumble(c, dt, from) {
+        if (!c) return;
+        c.t += dt;
+        // scale the drift with the body, or a big one comes apart in the same
+        // tiny increments a small one does and looks glued together
+        const s = c.w / 300;
+        for (const p of c.pieces) {
+            if (c.t < from + p.wait) continue;
+            p.age += dt;
+            p.dx += p.vx * s * dt;
+            p.dy += p.vy * s * dt;
+            p.vy += 26 * dt;               // a sixth of real gravity. sinking.
+            p.rot += p.spin * dt;
+        }
+    }
+
+    // Where everybody on the floor IS, as opposed to what they are doing. Kept
+    // apart from the firing because it has to run in every state -- including
+    // the ones where the clock is stopped. The introduction walks on during the
+    // ceremony and during the pause before your first throw, and if his climb
+    // only ticked once the game proper started he would drop back off the
+    // bottom of the screen the instant you threw and climb in a second time.
+    function stepShipMotion(dt) {
+        for (const s of ships) {
+            if (!s.alive) { s.dead = Math.max(0, s.dead - dt); continue; }
+            if (s.held > 0) s.held = Math.max(0, s.held - dt);
+            else if (s.flash > 0) s.flash = Math.max(0, s.flash - dt * 4);
+            s.rise = Math.min(1, s.rise + dt / s.riseT);
+            s.ph += G_SWEEP * s.rate * dt;
+            s.bobPh += G_SHIP_HZ * s.bobRate * 6.283 * dt;
+            s.x = slotX(s.slot) + Math.sin(s.ph) * s.amp * s.rise;
+            s.x = Math.max(s.w / 2, Math.min(LW - s.w / 2, s.x));
+            // eased hard at the end, so an arrival decelerates into its place
+            // instead of sliding to a stop on a rail
+            const r = 1 - Math.pow(1 - s.rise, 3);
+            s.y = slotY(s.slot) + (1 - r) * s.riseFrom
+                + Math.sin(s.bobPh) * G_SHIP_BOB * s.rise;
+        }
+        ships = ships.filter(s => s.alive || s.dead > 0);
+    }
+
+    // ---- the gauntlet's clock ------------------------------------------------
+    function updateGauntlet(dt) {
+        // the handover ramp, before anything reads it. it runs through the
+        // ceremony as well, which is where most of it is spent.
+        if (gIn < G_IN) gIn = Math.min(G_IN, gIn + dt);
+        // the bar's length follows the total on the same clock his body does
+        gBarMax += (king.hpMax - gBarMax) * (1 - Math.exp(-dt / G_SHRINK_EASE));
+        if (gShake > 0) gShake = Math.max(0, gShake - dt * 2.4);
+        if (king.flash > 0) king.flash = Math.max(0, king.flash - dt * 5);
+        sparks = sparks.filter(s => {
+            s.x += s.vx * dt; s.y += s.vy * dt; s.vy += 320 * dt;
+            return (s.life -= dt * 1.6) > 0;
+        });
+        // up here with the sparks rather than down in the live-play block, for
+        // the same reason: a bounty taken on the frame before you go leaves a
+        // ring in the air, and the fall would hold it there for fourteen
+        // seconds because everything below returns.
+        gBlast = gBlast.filter(b => (b.t -= dt) > 0);
+        // up here with the sparks for the same reason they are: a number still
+        // rising off the kill that finished you should finish rising.
+        popups = popups.filter(p => (p.life -= dt * 1.4) > 0);
+
+        if (phase === 'fall') {
+            if (!stepImpact(dt)) {
+                fallT += dt;
+                stepCrumble(kingFall, dt, F_BREAK);
+            }
+            // the main update never runs out here, so the screen's clock has to
+            // be stepped twice, once on each side of the fork
+            stepBonus(dt);
+            return;
+        }
+
+        // one life at a time, out of the corner and into him. it lands, the bar
+        // goes up, and he gets a little bigger for it -- which is also the last
+        // time being bigger is good news.
+        if (phase === 'absorb') {
+            stepShipMotion(dt);           // he walks on during the ceremony
+            kingShown += (kingW() - kingShown) * (1 - Math.exp(-dt / G_SHRINK_EASE));
+            if ((gAbsorbT -= dt) <= 0) {
+                gAbsorbLeft--;
+                lives--;
+                king.hpMax += G_OVERHEAL;
+                king.hp += G_OVERHEAL;
+                king.grow += G_GROW;
+                king.flash = 1;
+                gShake = Math.min(1, gShake + 0.35);
+                gAbsorbT = F_ABSORB + F_ABSORB_G;
+                if (gAbsorbLeft <= 0) { phase = 'gauntlet'; addShip(true); }
+            }
+            return;
+        }
+
+        // his size eases toward where the damage says it should be
+        kingShown += (kingW() - kingShown) *
+                     (1 - Math.exp(-dt / G_SHRINK_EASE));
+
+        if (king.hurt > 0) king.hurt = Math.max(0, king.hurt - dt);
+        if (king.jt > 0) king.jt = Math.max(0, king.jt - dt * JIG_DECAY);
+        if (gCool > 0) gCool = Math.max(0, gCool - dt);
+
+        // He does not steer until the first throw. The throw is the surprise,
+        // and finding out that you are the one at the top comes with it -- being
+        // able to slide him about first gave that away. The pointer is ignored
+        // until then (see steerBy and track), so this only holds him in place.
+        const edge0 = kingEdge();
+        king.x = Math.max(edge0, Math.min(LW - edge0, king.tx));
+
+        // frozen until you throw the first one. he is on the floor, settled,
+        // doing nothing, which is most of the lesson.
+        if (gReady) {
+            stepShipMotion(dt);
+            gLead = Math.max(0, gLead - dt);
+            return;
+        }
+
+        gRunT += dt;
+        // The time bonus is NOT paid by the second. A score ticking up on its
+        // own while you dodge is a number you stop reading, and it makes
+        // surviving feel like idling rather than like holding on. It lands in
+        // one lump at the end, next to the words, where it can be a result.
+        // Kills still pay as they happen -- those you did.
+
+        // He may hang off the edges, exactly as the boss did on arrival. At 760
+        // across an 800 field there is no honest way to keep him inside it, and
+        // clamping on his half-width would pin him dead centre and unable to
+        // move during the very stretch that is supposed to feel hopeless.
+        // Hopeless is not the same as frozen.
+        const edge = kingEdge();
+        king.x = Math.max(edge, Math.min(LW - edge, king.tx));
+
+        const alive = ships.reduce((n, s) => n + (s.alive ? 1 : 0), 0);
+        // an empty floor is dead air. whatever the batch clock had left,
+        // clearing them buys you a second and a half.
+        if (alive === 0 && gSpawnT > G_REFILL) gSpawnT = G_REFILL * (0.6 + Math.random() * 0.6);
+        if ((gSpawnT -= dt) <= 0) {
+            gSpawnT = G_GAP0 + Math.random() * (G_GAP1 - G_GAP0);
+            const n = 1 + ((Math.random() * batchMax()) | 0);
+            for (let i = 0; i < n; i++) addShip(false);
+            markBounty();               // at most one, and only ever with a batch
+        }
+
+
+        stepShipMotion(dt);        // <- everything below needs this to have run
+
+        // The streak bleeds if you stop taking anybody down -- see G_MULT_HOLD.
+        // Kills reset the clock where they happen, in hitShip.
+        gMultT += dt;
+        if (gMultT > G_MULT_HOLD && gMult > 1)
+            gMult = Math.max(1, gMult - G_MULT_DECAY * dt);
+
+        if (gMark && !gMark.alive) gMark = null;
+        if (gMark) gMarkT = Math.min(G_MARK_IN, gMarkT + dt);
+
+        for (const s of ships) {
+            if (!s.alive || s.rise < 1) continue;  // no serving while climbing in
+            if ((s.fire -= dt) <= 0) {
+                s.fire = nextServe(alive);
+                shipServe(s);
+            }
+        }
+
+        // Their heads, loose in the world. Off the side walls and off the
+        // ceiling; out of the bottom of the screen is the only way one leaves.
+        // Coming off YOU is a paddle bounce read from the other side: where it
+        // lands on your body sets the angle it goes away at, exactly as it did
+        // when you were the one down there with a bat.
+        const half = kingShown / 2;
+        for (let i = gBul.length - 1; i >= 0; i--) {
+            const b = gBul[i];
+            b.x += b.vx * dt; b.y += b.vy * dt; b.angle += b.spin * dt;
+            if (b.x < G_BUL_R && b.vx < 0) { b.x = G_BUL_R; b.vx = -b.vx; b.spin *= -0.55; }
+            if (b.x > LW - G_BUL_R && b.vx > 0) { b.x = LW - G_BUL_R; b.vx = -b.vx; b.spin *= -0.55; }
+            if (b.y < G_BUL_R && b.vy < 0) { b.y = G_BUL_R; b.vy = -b.vy; b.spin *= -0.55; }
+            if (b.y > LH + 50 || (b.life -= dt) <= 0) { gBul.splice(i, 1); continue; }
+
+            // On the way back DOWN it can come off one of them too, and that
+            // completes the joke: they are paddles at the bottom of the screen
+            // and you are a paddle at the top, and the head goes back and forth
+            // between you until somebody misses. It does not hurt them -- only
+            // your own thrown heads do that -- it just gets returned. Only
+            // while it is descending, or a fresh serve would collide with the
+            // man who served it.
+            if (b.vy > 0) {
+                let hit = null;
+                for (const s of ships) {
+                    if (!s.alive) continue;
+                    const sh = s.w / SHAPE_ASPECT;
+                    if (Math.abs(b.x - s.x) < s.w / 2 + G_BUL_R &&
+                        Math.abs(b.y - s.y) < sh / 2 + G_BUL_R) { hit = s; break; }
+                }
+                if (hit) {
+                    const sp = Math.hypot(b.vx, b.vy) || 1;
+                    const off = Math.max(-1, Math.min(1, (b.x - hit.x) / (hit.w / 2)));
+                    const a = off * MAX_ANGLE;
+                    b.vx = Math.sin(a) * sp;
+                    b.vy = -Math.abs(Math.cos(a) * sp);
+                    b.y = hit.y - hit.w / SHAPE_ASPECT / 2 - G_BUL_R - 1;
+                    b.spin += off * SPIN_EDGE;
+                    continue;
+                }
+            }
+
+            if (hitsKing(b.x, b.y)) {
+                // he takes the knock the old boss took off your ball: shoved away
+                // from where it struck, the same wobble at the same size
+                const kd = Math.hypot(king.x - b.x, kingY() - b.y) || 1;
+                kick(king, (king.x - b.x) / kd, (kingY() - b.y) / kd, 1);
+                const s = Math.hypot(b.vx, b.vy) || 1;
+                const off = Math.max(-1, Math.min(1, (b.x - king.x) / Math.max(1, half)));
+                const a = off * MAX_ANGLE;
+                // sent back down the way it came up
+                b.vx = Math.sin(a) * s;
+                b.vy = Math.abs(Math.cos(a) * s);
+                b.y = kingY() + kingH() / 2 + G_BUL_R + 1;
+                b.spin += off * SPIN_EDGE;
+                hurtKing();
+            }
+        }
+
+        while (gVolley.length && clock >= gVolley[0]) { gVolley.shift(); volley(); }
+
+        for (let i = gDrop.length - 1; i >= 0; i--) {
+            const d = gDrop[i];
+            // one left by a corpse drifts straight up; one that was SERVED at
+            // you carries the arc it was thrown on
+            d.x += (d.vx || 0) * dt;
+            d.y += (d.vy === undefined ? -G_DROP_RISE : d.vy) * dt;
+            d.angle += d.spin * dt;
+            if (d.x < -40 || d.x > LW + 40 ||
+                d.y < -40 || (d.life -= dt) <= 0) { gDrop.splice(i, 1); continue; }
+            if (hitsKing(d.x, d.y)) {
+                    if (d.kind === 'S') gSpread = G_SPREAD_S;
+                else if (d.kind === 'B') gBurst = G_BURST_S;
+                else gRapid = G_RAPID_S;
+                king.flash = 0.6;
+                gDrop.splice(i, 1);
+            }
+        }
+        if (gSpread > 0) gSpread = Math.max(0, gSpread - dt);
+        if (gBurst > 0) gBurst = Math.max(0, gBurst - dt);
+        if (gRapid > 0) gRapid = Math.max(0, gRapid - dt);
+
+        for (let i = gThrow.length - 1; i >= 0; i--) {
+            const t = gThrow[i];
+            t.x += t.vx * dt; t.y += t.vy * dt; t.angle += t.spin * dt;
+            if (t.y > LH + 40 || t.x < -40 || t.x > LW + 40) {
+                gThrow.splice(i, 1); continue;
+            }
+            // The NEAREST body it overlaps, not the first one the array
+            // happens to hold. Ranks sit G_STEP apart and their bands are
+            // deeper than that, so two of them overlap by about 19px, and
+            // taking whichever was spawned first resolved that stretch at
+            // random. Smallest y is the one closest to the throne, which is
+            // the one a falling head reaches first.
+            //
+            // That makes the army shield itself, which is the only aiming
+            // problem the mode has: a man in the back rank is under three
+            // other men, and the bounty is always in the back rank.
+            let near = null;
+            for (const s of ships) {
+                if (!s.alive) continue;
+                if (Math.abs(t.x - s.x) < G_SHIP_W / 2 &&
+                    Math.abs(t.y - s.y) < G_SHIP_H / 2 + 6 &&
+                    (!near || s.y < near.y)) near = s;
+            }
+            if (near) { hitShip(near); gThrow.splice(i, 1); }
+        }
+    }
+
+    // ---- drawing -----------------------------------------------------------
+    const SS = 3;
+    const spriteCache = new Map();
+
+    // t > 0 lifts a colour toward the page cream, t < 0 sinks it toward black
+    function shade(hex, t) {
+        const n = parseInt(hex.slice(1), 16);
+        const to = t > 0 ? [242, 239, 233] : [0, 0, 0];
+        const k = Math.abs(t);
+        const ch = i => {
+            const v = (n >> (16 - i * 8)) & 255;
+            return Math.round(v + (to[i] - v) * k);
+        };
+        return `rgb(${ch(0)},${ch(1)},${ch(2)})`;
+    }
+
+    // lay him into a w x h box, levelled, with his outline filling it exactly
+    function placeShape(g, w, h, grey) {
+        g.save();
+        g.scale(w / SHAPE.bw, h / SHAPE.bh);
+        g.translate(-SHAPE.bx, -SHAPE.by);
+        g.translate(SHAPE.RW / 2, SHAPE.RH / 2);
+        g.rotate(PADDLE_LEVEL);
+        if (grey) g.filter = 'grayscale(1) contrast(1.1) brightness(1.95)';
+        g.drawImage(paddleImg, -SHAPE.SW / 2, -SHAPE.SH / 2, SHAPE.SW, SHAPE.SH);
+        g.filter = 'none';
+        g.restore();
+    }
+
+    // one tinted brandon at a given size, cached. `flat` true gives a solid
+    // silhouette (the white hit flash); 'statue' gives stone with a whisper of
+    // carved relief, which is how the unbreakable ones read as a different
+    // material rather than just a different colour.
+    function shapeSprite(key, color, w, h, flat) {
+        const k = key + '@' + Math.round(w);
+        if (spriteCache.has(k)) return spriteCache.get(k);
+        if (!ready(paddleImg)) return null;
+
+        const c = document.createElement('canvas');
+        c.width = Math.round(w * SS);
+        c.height = Math.round(h * SS);
+        const g = c.getContext('2d');
+        g.scale(SS, SS);
+
+        if (color === null) {
+            placeShape(g, w, h, false);        // raw: the actual photograph
+        } else if (flat) {
+            placeShape(g, w, h, false);
+            g.globalCompositeOperation = 'source-in';
+            g.fillStyle = color;
+            g.fillRect(0, 0, w, h);
+            if (flat === 'statue') {
+                // a faint pass of his own shading back over the stone, so it
+                // reads as carved rather than as a missing texture
+                g.globalCompositeOperation = 'source-atop';
+                g.globalAlpha = 0.18;
+                placeShape(g, w, h, true);
+                g.globalAlpha = 1;
+            }
+        } else {
+            // he is nearly all black shirt and dark denim, so multiplying a
+            // colour through him just makes mud. lift him to near-white first,
+            // then wash the colour over only his own pixels.
+            placeShape(g, w, h, true);
+            g.globalCompositeOperation = 'source-atop';
+            g.globalAlpha = 0.8;
+            g.fillStyle = shade(color, 0.12);
+            g.fillRect(0, 0, w, h);
+            g.globalAlpha = 1;
+        }
+
+        g.globalCompositeOperation = 'source-over';
+        spriteCache.set(k, c);
+        return c;
+    }
+
+    // A statue, rim and all: the one thing on the wall that says it will not
+    // come apart. The rim is only paint -- the ball meets the outline it always
+    // did -- so the sprite is STONE_RIM_PAD bigger than his box all round, and
+    // drawBrick draws it that much further out. The rim is his silhouette
+    // grown by STONE_RIM_W: copies of it shifted round rings out that far.
+    function statueSprite() {
+        const k = 'statue@' + Math.round(bw);
+        if (spriteCache.has(k)) return spriteCache.get(k);
+        const base = shapeSprite('X', STONE, bw, bh, 'statue');
+        const sil = shapeSprite('rim', STONE_RIM, bw, bh, true);
+        if (!base || !sil) return null;
+
+        const m = STONE_RIM_PAD;
+        const c = document.createElement('canvas');
+        c.width = Math.round((bw + 2 * m) * SS);
+        c.height = Math.round((bh + 2 * m) * SS);
+        const g = c.getContext('2d');
+        g.scale(SS, SS);
+        for (let r = 0.5; r <= STONE_RIM_W + 1e-6; r += 0.5) {
+            const n = Math.max(12, Math.ceil(r * 12));
+            for (let i = 0; i < n; i++) {
+                const a = i / n * Math.PI * 2;
+                g.drawImage(sil, m + Math.cos(a) * r, m + Math.sin(a) * r, bw, bh);
+            }
+        }
+        g.drawImage(base, m, m, bw, bh);
+        spriteCache.set(k, c);
+        return c;
+    }
+
+    function brickColor(kind) {
+        return kind === 'X'  ? STONE
+             : kind === 'A'  ? GOLD
+             : kind === 'S'  ? SILVER
+             : kind === 'S2' ? SILVER_HIT
+             : TIERS[kind].fill;
+    }
+
+    // The boss is drawn from the untinted photograph -- every brick so far has
+    // been a coloured copy of him, so the real one showing up in full colour
+    // reads as the genuine article. He is cached once at full size and scaled
+    // down as he shrinks, rather than re-baking a sprite at every width.
+    const BOSS_H = BOSS_W0 / SHAPE_ASPECT;
+
+    function drawBoss(b) {
+        if (labB) { labB.draw(b); return; }
+        const sprite = shapeSprite('boss', null, BOSS_W0, BOSS_H, false);
+        if (!sprite) return;
+        const o = b.jt > 0 ? wobble(b.jt) * JIG_BRICK : 0;
+
+        ctx.save();
+        ctx.translate(b.x + b.jnx * o + bw / 2, b.y + b.jny * o + bh / 2);
+        if (b.wigA) ctx.rotate(b.wigA);
+        ctx.drawImage(sprite, -bw / 2, -bh / 2, bw, bh);
+        // the red swell, under the hit flash -- see RAGE_AT
+        const rage = Math.max(0, Math.min(1, (RAGE_AT - b.hp / b.maxHp) / RAGE_AT));
+        const swell = 0.5 - 0.5 * Math.cos(clock * RAGE_HZ * Math.PI * 2);
+        const redA = rage * swell * RAGE_A;
+        const red = redA > 0.002 && shapeSprite('rage', RAGE_COLOR, BOSS_W0, BOSS_H, true);
+        if (red) {
+            ctx.globalAlpha = redA;
+            ctx.drawImage(red, -bw / 2, -bh / 2, bw, bh);
+            ctx.globalAlpha = 1;
+        }
+        if (b.flash > 0) {
+            ctx.globalAlpha = Math.min(1, b.flash) * 0.7;
+            ctx.drawImage(shapeSprite('flash', '#f2efe9', BOSS_W0, BOSS_H, true),
+                          -bw / 2, -bh / 2, bw, bh);
+            ctx.globalAlpha = 1;
+        }
+        ctx.restore();
+
+        // his health, riding just above him. during the entrance it grows out
+        // from nothing, so you learn how big the problem is as he arrives.
+        const frac = Math.max(0, b.hp / b.maxHp);
+        const grow = phase === 'entrance' ? enterK() : 1;
+        if (grow <= 0.001) return;
+        const barW = Math.min(bw * 0.72, LW - 120) * grow;
+        const barX = Math.max(12, Math.min(LW - 12 - barW, b.x + bw / 2 - barW / 2));
+        const barY = Math.max(10, b.y - 16);
+        ctx.fillStyle = 'rgba(242,239,233,0.14)';
+        ctx.fillRect(barX, barY, barW, 5);
+        ctx.fillStyle = '#c4703c';
+        ctx.fillRect(barX, barY, barW * frac, 5);
+    }
+
+    function drawBrick(b) {
+        if (b.kind === 'Z') { drawBoss(b); return; }
+        if (labDrawBrick(b)) return;
+        // silver and gold wear how many hits they have left, stepping down the
+        // same ladder the gauntlet's army does: gold for three, silver for two,
+        // a struck silver's slate blue for the last. each rung is its own tint,
+        // never a dark wash over the top of him
+        const multi = b.kind === 'S' || b.kind === 'A';
+        const kind = !multi ? b.kind : b.hp >= 3 ? 'A' : b.hp === 2 ? 'S' : 'S2';
+        const statue = kind === 'X';
+        const sprite = statue ? statueSprite() : shapeSprite(kind, brickColor(kind), bw, bh, false);
+        if (!sprite) return;
+        const m = statue ? STONE_RIM_PAD : 0;
+
+        const o = b.jt > 0 ? wobble(b.jt) * JIG_BRICK : 0;
+        ctx.save();
+        ctx.translate(b.x + b.jnx * o + bw / 2, b.y + b.jny * o + bh / 2);
+        if (b.wigA) ctx.rotate(b.wigA);
+        ctx.drawImage(sprite, -bw / 2 - m, -bh / 2 - m, bw + 2 * m, bh + 2 * m);
+        if (b.flash > 0) {
+            ctx.globalAlpha = Math.min(1, b.flash) * 0.75;
+            ctx.drawImage(shapeSprite('flash', '#f2efe9', bw, bh, true), -bw / 2, -bh / 2, bw, bh);
+            ctx.globalAlpha = 1;
+        }
+        ctx.restore();
+    }
+
+    // the capsule is a small brandon in the effect's colour, with the letter
+    // that matches the name it will shout
+    function drawCapsule() {
+        if (!capsule) return;
+        const cap = CAPS[capsule.kind];
+        const sprite = shapeSprite('cap' + capsule.kind, cap.color, CAP_W, CAP_H, false);
+        if (sprite) ctx.drawImage(sprite, capsule.x - CAP_W / 2, capsule.y - CAP_H / 2, CAP_W, CAP_H);
+        text(capsule.kind, capsule.x, capsule.y + 5, 15, '#f2efe9', 'center');
+        text(cap.short, capsule.x, capsule.y + CAP_H / 2 + 13, 11, cap.color, 'center');
+    }
+
+    // how bright the storm is right now: a triangular ramp up and back down
+    // around each swell, never an instantaneous step
+    function stormGlow() {
+        let v = 0;
+        for (const s of SWELLS) {
+            const d = ascendT - s;
+            if (d < -SWELL_UP || d > SWELL_DOWN) continue;
+            v = Math.max(v, d < 0 ? (d + SWELL_UP) / SWELL_UP : 1 - d / SWELL_DOWN);
+        }
+        return v * SWELL_PEAK;
+    }
+
+    // the colour bleeding out of the world as he takes the throne -- it starts
+    // when he does, not when the old one began falling
+    function drain() {
+        return Math.min(1, Math.max(0, (ascendT - A_RISE) / DRAIN_SECS));
+    }
+
+    function drawPaddle() {
+        // the recoil is his own: under DOUBLE only the one the ball landed on
+        // shakes, and he shakes for as long as his own knock lasts
+        const jig = i => (paddle.jt[i] > 0 ? wobble(paddle.jt[i]) : 0) + menuStep(i);
+
+        // the takeover: he climbs into the dead boss's place and swells to
+        // fill it. drawn as one brandon regardless of DOUBLE -- whatever you
+        // were carrying, only one of you gets the throne.
+        if (ascendT > 0) {
+            // he waits while the old one comes apart, and only then starts up.
+            // nothing about the takeover happens until there is a vacancy.
+            const raw = Math.max(0, Math.min(1, (ascendT - A_RISE) / A_RISE_T));
+            const k = raw * raw * (3 - 2 * raw);
+            const y = ascendFrom.y + (BOSS_Y - ascendFrom.y) * k;
+            const w = ascendFrom.w + (ASCEND_W - ascendFrom.w) * k;
+            const artW = w / BODY_LEN_PER_W, artH = artW / PADDLE_ASPECT;
+            ctx.save();
+            ctx.translate(LW / 2 + (paddle.x - LW / 2) * (1 - k), y);
+            ctx.rotate(PADDLE_LEVEL);
+            // the colour drains out of him as he rises -- one slow transition,
+            // which is where the black and white comes from now
+            ctx.filter = 'grayscale(' + drain().toFixed(3) + ')';
+            if (ready(paddleImg)) {
+                ctx.drawImage(paddleImg, -artW / 2 - ART_OFF_X * artW,
+                              -artH / 2 - ART_OFF_Y * artH, artW, artH);
+            }
+            ctx.filter = 'none';
+            ctx.restore();
+            return;
+        }
+
+        // the tail first, so the echoes sit UNDER him rather than over his face.
+        // it hangs off the LAG, not off the clock, so it thins out as the lag
+        // unwinds instead of vanishing on the frame the clock hits zero -- the
+        // tail going out at the same instant he lunged for the pointer was half
+        // of what made the old expiry read as a glitch.
+        if (padLag > 0) {
+            const tw = padW(), th = tw / SHAPE_ASPECT;
+            const ghost = shapeSprite('dragflat', DRAG_TINT, DRAG_BAKE,
+                                      DRAG_BAKE / SHAPE_ASPECT, true);
+            if (ghost) for (const sg of segs()) {
+                const o = jig(sg.i);
+                for (const e of TRAIL) {
+                    const tx = trailAt(e.back);
+                    if (tx === null) continue;
+                    const dx = tx - paddle.x;
+                    if (Math.abs(dx) < 1.5) continue;     // standing still, no tail
+                    ctx.save();
+                    ctx.translate(sg.cx + dx, padY() + o * JIG_PADDLE);
+                    ctx.rotate(segWig(sg.i) + paddle.dip[sg.i]);
+                    ctx.globalAlpha = e.a;
+                    ctx.drawImage(ghost, -tw / 2, -th / 2, tw, th);
+                    ctx.globalAlpha = 1;
+                    ctx.restore();
+                }
+            }
+        }
+
+        labPadUnder();
+        for (const sg of segs()) {
+            const o = jig(sg.i);
+            const artW = sg.w / BODY_LEN_PER_W;
+            const artH = artW / PADDLE_ASPECT;
+            ctx.save();
+            ctx.translate(sg.cx, padY() + o * JIG_PADDLE);
+            ctx.rotate(PADDLE_LEVEL + o * 0.07 * paddle.tilt[sg.i] + segWig(sg.i) + paddle.dip[sg.i]);
+            if (ready(paddleImg)) {
+                ctx.drawImage(paddleImg,
+                    -artW / 2 - ART_OFF_X * artW,
+                    -artH / 2 - ART_OFF_Y * artH, artW, artH);
+            } else {
+                ctx.fillStyle = '#2b2b2e';
+                ctx.fillRect(-artW / 2, -artH * 0.15, artW, artH * 0.3);
+            }
+            ctx.restore();
+            labPadSkin(sg, o);
+
+            // the phantom hanging off him, washed over the photograph. the
+            // tint sprite is the lift-then-colour one the capsules use, so he
+            // goes PALE and cold rather than dark -- and it is baked once at a
+            // fixed width and scaled, because padW() slides continuously during
+            // the boss climb and a sprite per pixel of it would be hundreds of
+            // cached canvases.
+            if (dragT > 0) {
+                const tw = sg.w, th = tw / SHAPE_ASPECT;
+                const tint = shapeSprite('drag', DRAG_TINT, DRAG_BAKE, DRAG_BAKE / SHAPE_ASPECT, false);
+                if (tint) {
+                    ctx.save();
+                    ctx.translate(sg.cx, padY() + o * JIG_PADDLE);
+                    ctx.rotate(segWig(sg.i) + paddle.dip[sg.i]);   // the sprite is already level
+                    ctx.globalAlpha = dragAlpha();
+                    ctx.drawImage(tint, -tw / 2, -th / 2, tw, th);
+                    ctx.globalAlpha = 1;
+                    ctx.restore();
+                }
+            }
+            // ...and while his second wind drinks from you, you pulse red: the same
+            // flat red he swells with, see RAGE_AT
+            const redA = siphonRed() * RAGE_A;
+            if (redA > 0.002) {
+                const red = shapeSprite('rage', RAGE_COLOR, BOSS_W0, BOSS_H, true);
+                if (red) {
+                    const tw = sg.w, th = tw / SHAPE_ASPECT;
+                    ctx.save();
+                    ctx.translate(sg.cx, padY() + o * JIG_PADDLE);
+                    ctx.rotate(segWig(sg.i) + paddle.dip[sg.i]);
+                    ctx.globalAlpha = redA;
+                    ctx.drawImage(red, -tw / 2, -th / 2, tw, th);
+                    ctx.globalAlpha = 1;
+                    ctx.restore();
+                }
+            }
+        }
+        labPadOver();
+    }
+
+    function drawBall(x, y, rx, angle) {
+        const w = rx * 2, h = w * (BALL_RY / BALL_RX);
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        if (ready(ballImg)) ctx.drawImage(ballImg, -w / 2, -h / 2, w, h);
+        else { ctx.fillStyle = '#c8a08c'; ctx.beginPath(); ctx.arc(0, 0, rx, 0, 7); ctx.fill(); }
+        ctx.restore();
+    }
+
+    // the hud scales up on small screens, which would run a long line straight
+    // off both edges -- shrink the type until it fits instead
+    function fitSize(str, size, maxW) {
+        ctx.font = size + 'px "Trebuchet MS", sans-serif';
+        const w = ctx.measureText(str).width;
+        return w > maxW ? size * (maxW / w) : size;
+    }
+
+    // the clang off an unbreakable brick: a ring spreading from the point of
+    // contact. deliberately nothing like the damage flash -- it says "solid",
+    // not "nearly".
+    function drawRings() {
+        if (!rings.length) return;
+        ctx.lineWidth = 2;
+        for (const r of rings) {
+            ctx.globalAlpha = r.t * 0.7;
+            ctx.strokeStyle = '#cfc7b6';
+            ctx.beginPath();
+            ctx.arc(r.x, r.y, 7 + (1 - r.t) * 26, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+    }
+
+    // a head with his colour washed through it. Cached per look, and built the
+    // same way a tinted brandon is: lift the pixels first, then wash, because
+    // multiplying a colour straight through a dark photograph only makes mud.
+    function headSprite(key, color, wash) {
+        if (spriteCache.has(key)) return spriteCache.get(key);
+        if (!ready(ballImg)) return null;
+
+        const w = BALL_RX * 2, h = BALL_RY * 2;
+        const c = document.createElement('canvas');
+        c.width = Math.round(w * SS); c.height = Math.round(h * SS);
+        const g = c.getContext('2d');
+        g.scale(SS, SS);
+        g.filter = 'grayscale(1) contrast(1.05) brightness(1.55)';
+        g.drawImage(ballImg, 0, 0, w, h);
+        g.filter = 'none';
+        g.globalCompositeOperation = 'source-atop';
+        g.globalAlpha = wash;
+        g.fillStyle = color;
+        g.fillRect(0, 0, w, h);
+        g.globalAlpha = 1;
+        g.globalCompositeOperation = 'source-over';
+        spriteCache.set(key, c);
+        return c;
+    }
+
+    function phantomSprite(look) {
+        return headSprite('phantom', look.color, look.wash);
+    }
+
+    // his phantoms, drawn under the real ball so the one that matters stays
+    // the most solid thing on screen. The transparency is still the tell for
+    // WHICH head to track; the colour is the tell for where it came from.
+    function drawPhantoms() {
+        if (!phantoms.length) return;
+        const look = PH_LOOK;
+        const sprite = look.color ? phantomSprite(look) : null;
+        const w = BALL_RX * 2, h = BALL_RY * 2;
+
+        for (const p of phantoms) {
+            const fade = Math.min(1, p.life / 0.5);      // fade as they die
+
+            // the glow goes down first and is not rotated -- it is an aura,
+            // not part of the head. it is also what makes the thing read at
+            // all on a black field, where a dark overlay would vanish.
+            if (look.glow) {
+                const r = BALL_RY * 1.9;
+                const grd = ctx.createRadialGradient(p.x, p.y, BALL_RX * 0.2, p.x, p.y, r);
+                grd.addColorStop(0, look.color);
+                grd.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.globalAlpha = look.glow * fade;
+                ctx.fillStyle = grd;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            ctx.globalAlpha = PH_ALPHA * fade;
+            if (sprite) {
+                ctx.save();
+                ctx.translate(p.x, p.y);
+                ctx.rotate(p.angle);
+                ctx.drawImage(sprite, -w / 2, -h / 2, w, h);
+                ctx.restore();
+            } else {
+                drawBall(p.x, p.y, BALL_RX, p.angle);
+            }
+        }
+        ctx.globalAlpha = 1;
+    }
+
+    function drawShout() {
+        if (!shout) return;
+        const txt = shout.text || 'BRANDON!';
+        const size = 22;
+        ctx.font = 'bold ' + size + 'px "Trebuchet MS", sans-serif';
+        const w = ctx.measureText(txt).width + 30, h = size + 18;
+        // one shouted during the drain rides on him, since he grows under it
+        const boss = bricks && bricks[0];
+        const sx = shout.follow && boss ? boss.x + bw * 0.88 : shout.x;
+        const sy = shout.follow && boss ? boss.y + bh + 8 : shout.y;
+        const x = Math.max(12 + w / 2, Math.min(LW - 12 - w / 2, sx));
+        const y = Math.max(20, Math.min(LH - h - 90, sy));
+
+        ctx.globalAlpha = Math.min(1, shout.life / 0.35);
+        ctx.fillStyle = '#f2efe9';
+        ctx.beginPath();
+        ctx.roundRect(x - w / 2, y, w, h, 9);
+        ctx.fill();
+        ctx.beginPath();                       // the tail, pointing back at him
+        ctx.moveTo(x - 10, y + 3);
+        ctx.lineTo(x + 10, y + 3);
+        ctx.lineTo(x + 1, y - 14);
+        ctx.closePath();
+        ctx.fill();
+        text(txt, x, y + h / 2 + 8, size, '#12100e', 'center');
+        ctx.globalAlpha = 1;
+    }
+
+    // a shout over someone, its tail pointing down at them; `top` is the top of
+    // whoever is shouting. the tail keeps pointing at them when the bubble has
+    // to shift to stay on screen
+    function shoutDown(txt, x, top, life) {
+        const size = 22;
+        ctx.font = 'bold ' + size + 'px "Trebuchet MS", sans-serif';
+        const w = ctx.measureText(txt).width + 30, h = size + 18;
+        const bx = Math.max(12 + w / 2, Math.min(LW - 12 - w / 2, x));
+        const tx = Math.max(bx - w / 2 + 14, Math.min(bx + w / 2 - 14, x));
+        const y = top - 18 - h;
+        ctx.globalAlpha = Math.min(1, life / 0.35);
+        ctx.fillStyle = '#f2efe9';
+        ctx.beginPath();
+        ctx.roundRect(bx - w / 2, y, w, h, 9);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(tx - 10, y + h - 3);
+        ctx.lineTo(tx + 10, y + h - 3);
+        ctx.lineTo(tx - 1, y + h + 14);
+        ctx.closePath();
+        ctx.fill();
+        text(txt, bx, y + h / 2 + 8, size, '#12100e', 'center');
+        ctx.globalAlpha = 1;
+    }
+
+    // yours during his second wind, over you
+    function drawYell() {
+        if (yell) shoutDown(yell.text || 'BRANDON!', paddle.x, padY() - padH() / 2, yell.life);
+    }
+
+    // life on its way out of you and up into him: small, soft, pale specks on
+    // a bowed path. nothing flashes -- each one only fades in and out as it goes
+    function drawMotes() {
+        const b = bricks && bricks[0];
+        if (!motes.length || !b) return;
+        const bx = b.x + bw / 2, by = b.y + bh / 2;
+        for (const m of motes) {
+            const p = m.t / MOTE_SECS;
+            const e = p * p * (3 - 2 * p);
+            const x = m.sx + (bx - m.sx) * e + Math.sin(p * Math.PI) * m.sway;
+            const y = m.sy + (by - m.sy) * e;
+            const a = Math.sin(p * Math.PI);
+            ctx.globalAlpha = 0.25 * a;
+            ctx.fillStyle = DRAG_TINT;
+            ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2); ctx.fill();
+            ctx.globalAlpha = 0.85 * a;
+            ctx.fillStyle = '#e8f2f7';
+            ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+    }
+
+    // a hat-stage brandon getting a word in: the boss's bubble, shrunk to his
+    // size, over his head -- which is the right-hand end of him. it stays put
+    // over the gap if the hit finished him, and follows him if he is walking.
+    function drawTalk() {
+        const size = 12 * uiScale;
+        for (const t of talk) {
+            const b = t.brick;
+            ctx.font = size + 'px "Trebuchet MS", sans-serif';
+            const w = ctx.measureText(t.text).width + size, h = size * 1.7;
+            const hx = b.x + bw * 0.84;
+            const x = Math.max(8 + w / 2, Math.min(LW - 8 - w / 2, hx));
+            const y = Math.max(6, b.y - 7 - h);           // top of the bubble
+            ctx.globalAlpha = Math.min(1, t.life / 0.35);
+            ctx.fillStyle = '#f2efe9';
+            ctx.beginPath();
+            ctx.roundRect(x - w / 2, y, w, h, 6);
+            ctx.fill();
+            const tx = Math.max(x - w / 2 + 8, Math.min(x + w / 2 - 8, hx));
+            ctx.beginPath();                              // the tail, down at him
+            ctx.moveTo(tx - 5, y + h - 2);
+            ctx.lineTo(tx + 5, y + h - 2);
+            ctx.lineTo(tx, y + h + 6);
+            ctx.closePath();
+            ctx.fill();
+            text(t.text, x, y + h / 2 + size * 0.36, size, '#12100e', 'center');
+        }
+        ctx.globalAlpha = 1;
+    }
+
+    function text(str, x, y, size, color, align) {
+        ctx.fillStyle = color;
+        ctx.font = size + 'px "Trebuchet MS", sans-serif';
+        ctx.textAlign = align || 'left';
+        ctx.fillText(str, x, y);
+    }
+
+    // One pass of SPIN along the rule under BONUS, clipped to a slice of it.
+    // Drawn twice, once for the gold and once for the bed, which is what splits
+    // a letter sitting on the fill's edge down the middle. The letters are laid
+    // out from the rule's own origin and not from the slice, so the two passes
+    // land on exactly the same glyphs.
+    function spinWord(x, y, w, ink, clipX, clipW) {
+        if (clipW <= 0.01) return;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(clipX, y, clipW, SPIN_RULE_H);
+        ctx.clip();
+        ctx.fillStyle = ink;
+        ctx.font = (SPIN_WORD_BOLD ? 'bold ' : '') + SPIN_WORD_SIZE + 'px "Trebuchet MS", sans-serif';
+        ctx.textAlign = 'center';
+        // the outer two letters pin to the ends and the rest space evenly
+        // between, so the word stretches over the whole bar however wide the
+        // label above it has grown
+        const span = w - SPIN_WORD_INSET * 2, last = SPIN_WORD.length - 1;
+        for (let i = 0; i <= last; i++) {
+            ctx.fillText(SPIN_WORD[i], x + SPIN_WORD_INSET + span * (i / last),
+                         y + SPIN_RULE_H - SPIN_WORD_DROP);
+        }
+        ctx.restore();
+    }
+
+    // The ten rows, fitted between a top edge (the title's baseline) and the
+    // lowest point the last row may reach. They come out at BOARD_PITCH, or at
+    // the biggest pitch that fits if that is smaller. A fixed size was small
+    // on a desktop, where the table is the whole point of the screen, and at
+    // phone scale it ran the tenth row straight through the game-over clock.
+    const BOARD_PITCH = 32;       // row to row at full size
+    function drawBoard(top, bottom, hudU) {
+        // title baseline to the foot of the tenth row is 10.5 pitches
+        const pitch = Math.min(BOARD_PITCH * Math.min(hudU, 1.25), (bottom - top) / 10.5);
+        const size = pitch * 0.76, k = size / 16;
+        text('HIGH SCORES', LW / 2, top, pitch * 0.62, '#6d685f', 'center');
+        if (!boardLive) {
+            text('leaderboard unreachable', LW / 2, top + pitch * 1.43, pitch * 0.67, '#4a453e', 'center');
+            return;
+        }
+        if (!board.length) {
+            text('nobody yet. be first.', LW / 2, top + pitch * 1.43, pitch * 0.67, '#6d685f', 'center');
+            return;
+        }
+        for (let i = 0; i < board.length; i++) {
+            const r = board[i];
+            const y = top + pitch * (1.33 + i);
+            const mine = i === entryRank;
+            const col = mine ? '#c9a94e' : i === 0 ? '#f2efe9' : '#9a958c';
+            // right-aligned, so 9 and 10 end in the same column
+            text(String(i + 1), LW / 2 - 128 * k, y, size, col, 'right');
+            text(r.ini, LW / 2 - 60 * k, y, size, col);
+            text(String(r.score), LW / 2 + 160 * k, y, size, col, 'right');
+        }
+    }
+
+    // The end-of-round screen: the title, one row per bonus, a rule, the total,
+    // and the line underneath. Everything is sized off ONE pitch, and the pitch
+    // is whatever fits the whole list between EOR_TOP and the screen's own
+    // floor -- so a round that earned every bonus shrinks to fit instead of
+    // running off the bottom, the same trick the leaderboard uses on its ten
+    // rows.
+    //
+    // The list is laid out at its FINAL height from the first frame and the
+    // rows only fade up, so nothing moves under you while you are reading it.
+    // A long label is shrunk on its own against the points beside it, so the
+    // two columns can never collide however wide a name gets.
+    //
+    // No band behind it: it is a list floating on whatever is already there,
+    // which over the takeover is a photograph. Every line is knocked out of the
+    // background instead -- the same outline the game-over choices wear over
+    // him -- so the type reads on his shirt without a slab to sit on.
+    //
+    // On the takeover it also has to LEAVE, because nothing there waits for a
+    // tap. It goes the way it came, over EOR_OUT, and the handover waits for
+    // it -- see bonusGone. On a stage clear, and at the end of a reign, it
+    // stands until you move on.
+    function drawBonus(u) {
+        const out = eorOut();
+        const n = eor.rows.length;
+        // a list of one line has a total identical to it, and printing the
+        // same number twice reads as a fault
+        const sum = n > 1;
+        const units = EOR_TITLE_U + n + (sum ? EOR_RULE_U + 1 : 0) + EOR_HINT_U;
+        const pitch = Math.min(EOR_PITCH * Math.min(u, 1.25), (eor.bot - EOR_TOP) / units);
+        const h = pitch * units;
+        const top = (EOR_TOP + eor.bot) / 2 - h / 2;
+        const lx = LW / 2 - EOR_W / 2, rx = LW / 2 + EOR_W / 2;
+
+        // lineJoin is set below and nothing else in the file sets it -- without
+        // the save every stroked box drawn after this one would inherit it
+        ctx.save();
+        ctx.globalAlpha = out;              // the whole screen leaves together
+        const cut = (str, x, y, size, color, align) => {
+            ctx.font = size + 'px "Trebuchet MS", sans-serif';
+            ctx.textAlign = align || 'left';
+            ctx.lineWidth = Math.max(3, size * 0.22);
+            ctx.lineJoin = 'round';                    // no spikes off the corners
+            ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+            ctx.strokeText(str, x, y);
+            ctx.fillStyle = color;
+            ctx.fillText(str, x, y);
+        };
+
+        cut(banner, LW / 2, top + pitch * EOR_TITLE_U,
+            Math.min(32 * u, pitch * 1.15), '#f2efe9', 'center');
+
+        // one row, with its points right-aligned and its label fitted to what
+        // is left of the width
+        const row = (label, pts, y, size, color) => {
+            const money = '+' + pts;
+            cut(money, rx, y, size, color, 'right');
+            const room = EOR_W - ctx.measureText(money).width - pitch * 0.8;
+            cut(label, lx, y, fitSize(label, size, room), color);
+        };
+
+        for (let i = 0; i < n; i++) {
+            const a = Math.max(0, Math.min(1, (eor.t - EOR_IN - EOR_ROW * i) / EOR_FADE));
+            if (a <= 0) continue;
+            ctx.globalAlpha = a * out;
+            // the base is the one you were always getting; the rest you earned,
+            // and they are gold to say so
+            row(eor.rows[i].label, eor.rows[i].pts,
+                top + pitch * (EOR_TITLE_U + i + 1), pitch * 0.72,
+                i === 0 ? '#9a958c' : '#c9a94e');
+            ctx.globalAlpha = out;
+        }
+
+        const done = Math.max(0, Math.min(1, (eor.t - eorTotalAt(eor)) / EOR_FADE));
+        if (sum && done > 0) {
+            ctx.globalAlpha = done * out;
+            ctx.fillStyle = 'rgba(242,239,233,0.35)';
+            ctx.fillRect(lx, top + pitch * (EOR_TITLE_U + n + EOR_RULE_U * 0.6), EOR_W, 1);
+            row('TOTAL', eor.total, top + pitch * (EOR_TITLE_U + n + EOR_RULE_U + 1),
+                pitch * 0.86, '#f2efe9');
+            ctx.globalAlpha = out;
+        }
+
+        // what a tap does now, once a tap does anything. the takeover gets no
+        // line: nothing there is waiting on you. the fall keeps its own rule
+        // about when you may leave -- see F_AGAIN.
+        const hint = phase === 'cleared' ? 'click/tap to continue'
+                   : phase === 'fall' && fallT > F_AGAIN ? 'click/tap to end the run' : '';
+        if (hint && bonusRead()) {
+            cut(hint, LW / 2, top + h, Math.min(15 * u, pitch * 0.55), '#9a958c', 'center');
+        }
+        ctx.restore();
+    }
+
+    function drawInitials(u) {
+        ctx.fillStyle = 'rgba(0,0,0,0.86)';
+        ctx.fillRect(0, 0, LW, LH);
+
+        text('NEW HIGH SCORE', LW / 2, 150, 34 * u, '#c9a94e', 'center');
+        text('score ' + score, LW / 2, 182, 15 * u, '#9a958c', 'center');
+
+        // the three slots
+        for (let i = 0; i < 3; i++) {
+            const x = LW / 2 - 66 + i * 66;
+            const on = i === entry.length;
+            text(entry[i] || (on ? '_' : '-'), x, 250, 44, on ? '#f2efe9' : '#c9a94e', 'center');
+        }
+
+        for (const c of GRID) {
+            const ok = c.k === 'OK';
+            const live = !ok || entry.length === 3;
+            ctx.strokeStyle = live ? (ok ? '#c9a94e' : '#2e2a24') : '#1a1815';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(c.x, c.y, c.w, c.h);
+            text(c.k, c.x + c.w / 2, c.y + c.h / 2 + 6, c.k.length > 1 ? 13 : 18,
+                 live ? (ok ? '#c9a94e' : '#9a958c') : '#3a352f', 'center');
+        }
+
+        // Spelled out, because it was not. Typing three letters and pressing
+        // RETURN has always been the fast way in and nothing on this screen
+        // ever said so -- which left everybody hunting for a submit button they
+        // could not see the pointer to click.
+        if (sending) {
+            text('sending...', LW / 2, 556, 14 * u, '#6d685f', 'center');
+        } else {
+            const ready = entry.length === 3;
+            text('type three letters, then press RETURN', LW / 2, 552, 14 * u,
+                 ready ? '#c9a94e' : '#6d685f', 'center');
+            text('or click/tap the keys above', LW / 2, 574, 13 * u, '#4a453e', 'center');
+        }
+    }
+
+    // ---- drawing the gauntlet ------------------------------------------------
+    // the photograph on the diagonal at a given width. one place, because the
+    // king, his corpse and his successor are all the same drawing.
+    function drawFigure(x, y, w, alpha, grey, lean) {
+        if (!ready(paddleImg) || alpha <= 0.001) return;
+        const artW = w / BODY_LEN_PER_W, artH = artW / PADDLE_ASPECT;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.translate(x, y);
+        ctx.rotate(PADDLE_LEVEL + (lean || 0));
+        if (grey > 0.001) ctx.filter = 'grayscale(' + grey.toFixed(3) + ')';
+        ctx.drawImage(paddleImg, -artW / 2 - ART_OFF_X * artW,
+                      -artH / 2 - ART_OFF_Y * artH, artW, artH);
+        ctx.filter = 'none';
+        ctx.restore();
+    }
+
+    // him, level and already grey, so the pieces need no per-shard filter --
+    // two hundred of those a frame is not a thing to ask a canvas for, and the
+    // colour has finished leaving him before the first one lets go anyway
+    function greySprite() {
+        if (spriteCache.has('kingGrey')) return spriteCache.get('kingGrey');
+        if (!ready(paddleImg)) return null;
+        const w = 900, h = w / SHAPE_ASPECT;
+        const c = document.createElement('canvas');
+        c.width = Math.round(w * SS); c.height = Math.round(h * SS);
+        const g = c.getContext('2d');
+        g.scale(SS, SS);
+        g.filter = 'grayscale(1) brightness(0.94)';
+        placeShape(g, w, h, false);
+        spriteCache.set('kingGrey', c);
+        return c;
+    }
+
+    function gHead(sprite, x, y, r, angle, alpha, glowCol, glow) {
+        if (glow) {
+            const gr = r * 2.4;
+            const grd = ctx.createRadialGradient(x, y, r * 0.2, x, y, gr);
+            grd.addColorStop(0, glowCol);
+            grd.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.globalAlpha = glow * alpha;
+            ctx.fillStyle = grd;
+            ctx.beginPath(); ctx.arc(x, y, gr, 0, 6.284); ctx.fill();
+        }
+        const w = r * 2, h = w * (BALL_RY / BALL_RX);
+        ctx.globalAlpha = alpha;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        if (sprite) ctx.drawImage(sprite, -w / 2, -h / 2, w, h);
+        else if (ready(ballImg)) ctx.drawImage(ballImg, -w / 2, -h / 2, w, h);
+        ctx.restore();
+        ctx.globalAlpha = 1;
+    }
+
+    // One sprite per look, cached. The top two rungs are the same for
+    // everybody, so damage is legible at a glance across a whole rank; only
+    // the last rung is personal. They are the bricks' own gold and silver, so
+    // three hits and two look the same on the wall and in the army.
+    function shipSprite(hp, tint) {
+        if (hp >= 3) return shapeSprite('gs3', GOLD, 300, 300 / SHAPE_ASPECT, false);
+        if (hp === 2) return shapeSprite('gs2', SILVER, 300, 300 / SHAPE_ASPECT, false);
+        if (!tint) return shapeSprite('gsRaw', null, 300, 300 / SHAPE_ASPECT, false);
+        return shapeSprite('gs1' + tint, TIERS[tint].fill, 300,
+                           300 / SHAPE_ASPECT, false);
+    }
+
+    function drawShips() {
+        // back rank first, so the ones nearer you end up on top
+        for (const s of ships.slice().sort((a, b) => a.y - b.y)) {
+            const sprite = shipSprite(s.hp, s.tint);
+            if (!sprite) continue;
+            const t = s.alive ? 1 : s.dead / G_DEATH;
+            const w = s.w * (s.alive ? 1 : 1 + (1 - t) * 0.4);
+            const h = w / SHAPE_ASPECT;
+            ctx.globalAlpha = s.alive ? 1 : t;
+            ctx.drawImage(sprite, s.x - w / 2, s.y - h / 2, w, h);
+            // The bounty is the one nobody dyed. Every other man on the floor
+            // is wearing a colour off the wall you spent four stages knocking
+            // down; he is the photograph, which is the same thing the very
+            // first arrival is and the same thing you are.
+            //
+            // It arrives as the colour DRAINING OUT of him over G_MARK_IN,
+            // which is the move this game already makes when somebody stops
+            // being part of the crowd -- it is what happened to you on the way
+            // up to the throne. Nothing is added: no glow, no ring, no marker
+            // hung off him. The floor is busy enough without one more thing
+            // drawn on top of it, and a man who is simply not the colour of
+            // his neighbours is found faster than a man with a badge.
+            //
+            // Only while there is a game to spend it on -- once you are
+            // falling, the man who was worth going after is not.
+            if (s === gMark && s.alive && phase === 'gauntlet') {
+                const raw = shapeSprite('gsRaw', null, 300,
+                                        300 / SHAPE_ASPECT, false);
+                if (raw) {
+                    ctx.globalAlpha = ease01(gMarkT / G_MARK_IN);
+                    ctx.drawImage(raw, s.x - w / 2, s.y - h / 2, w, h);
+                }
+            }
+            // the same white knock the bricks give: "I hurt it", distinct from
+            // the colour change that says "and there is still some left"
+            if (s.flash > 0) {
+                const f = shapeSprite('gflash', '#f2efe9', 300,
+                                      300 / SHAPE_ASPECT, true);
+                if (f) {
+                    ctx.globalAlpha = Math.min(1, s.flash) * 0.7;
+                    ctx.drawImage(f, s.x - w / 2, s.y - h / 2, w, h);
+                }
+            }
+            ctx.globalAlpha = 1;
+        }
+    }
+
+    // His health bar, the same one he had, in the same place, and the overheal
+    // makes it LONGER. The span his own G_HP occupies is fixed off his size and
+    // never moves; every life absorbed hangs its G_OVERHEAL off the end of that
+    // span in its own colour, so the meter grows out past where full used to be
+    // instead of the orange giving up room to the yellow. The whole point of
+    // having saved a spare is that you end up with more bar than he ever had,
+    // and at a full pair it very nearly spans the field.
+    // ...and it arrives with the rest of the handover rather than being there
+    // the instant the throne is yours
+    function drawKingBar() {
+        ctx.globalAlpha = gInK();
+        const edge = 12;                // the margin even the longest bar keeps
+        const w = kingShown;
+        // his own health, at his own size -- the bar he would have had
+        const base = Math.min(Math.max(w * 0.72, 260), LW - 120);
+        // ...extended by what the lives added. norm puts the seam back exactly
+        // at the end of `base`, so the orange span is the one constant here.
+        const barW = Math.min(base * (gBarMax / king.hpBase), LW - 2 * edge);
+        const norm = king.hpBase / gBarMax;
+        const barX = Math.max(edge, Math.min(LW - edge - barW, king.x - barW / 2));
+        const barY = Math.max(10, kingY() - kingH() / 2 - 16);
+        const over = gBarMax - king.hpBase;
+        const hp = Math.max(0, king.hp);
+
+        ctx.fillStyle = 'rgba(242,239,233,0.14)';
+        ctx.fillRect(barX, barY, barW, 6);
+        ctx.fillStyle = '#c4703c';
+        ctx.fillRect(barX, barY, barW * norm * (Math.min(hp, king.hpBase) / king.hpBase), 6);
+        if (over > 0 && hp > king.hpBase) {
+            // clamped because the health lands whole and the length catches up
+            // to it: mid-grow there is more overheal than there is yet bar, and
+            // the extension reads best full while it sweeps out
+            const f = Math.min(1, (hp - king.hpBase) / over);
+            ctx.fillStyle = '#c9a94e';
+            ctx.fillRect(barX + barW * norm, barY, barW * (1 - norm) * f, 6);
+        }
+        if (over > 0) {   // the seam: visibly BEYOND full, not just a longer bar
+            ctx.fillStyle = '#000';
+            ctx.fillRect(barX + barW * norm - 1, barY, 2, 6);
+        }
+        ctx.globalAlpha = 1;
+    }
+
+    // The pieces of him. EVERY cell is drawn every frame -- the ones that have
+    // not let go are sitting at their own address with no drift, no spin and no
+    // fade, which is indistinguishable from him being whole. So no body is ever
+    // swapped for a pile, and nothing is drawn twice. The sag and lean go on
+    // the whole mosaic so it picks up exactly where the intact drawing left off.
+    function drawCrumble(c, sag, lean, grey) {
+        if (!c) return;
+        const sp = c.sprite ? c.sprite : grey ? greySprite()
+                        : shapeSprite('kingRaw', null, 900, 900 / SHAPE_ASPECT, false);
+        if (!sp) return;
+        const w = c.w, h = w / SHAPE_ASPECT;
+        const cy = c.y + sag;
+        const x0 = c.x - w / 2, y0 = cy - h / 2;
+        const cw = w / MCOLS, ch = h / MROWS;
+        const sw = sp.width / MCOLS, sh = sp.height / MROWS;
+
+        ctx.save();
+        ctx.translate(c.x, cy); ctx.rotate(lean); ctx.translate(-c.x, -cy);
+        for (const s of c.pieces) {
+            const a = Math.max(0, 1 - s.age / F_GONE);
+            if (a <= 0.002) continue;
+            ctx.save();
+            ctx.globalAlpha = a;
+            ctx.translate(x0 + (s.u + 0.5) * cw + s.dx,
+                          y0 + (s.v + 0.5) * ch + s.dy);
+            ctx.rotate(s.rot);
+            // half a pixel of bleed, or the grid shows as hairlines between
+            // the pieces that have not moved yet
+            ctx.drawImage(sp, s.u * sw, s.v * sh, sw, sh,
+                          -cw / 2 - 0.5, -ch / 2 - 0.5, cw + 1, ch + 1);
+            ctx.restore();
+        }
+        ctx.restore();
+        ctx.globalAlpha = 1;
+    }
+
+    // You. The colour goes, then you sag, then you let go a piece at a time.
+    // No black wash over any of it -- the screen going grey IS the death, and a
+    // photograph of a man is not a thing to fade to black.
+    function drawFall() {
+        const wilt = Math.max(0, Math.min(1, (fallT - F_HOLD) / (F_WILT - F_HOLD)));
+        const e = wilt * wilt * (3 - 2 * wilt);
+        const sag = e * F_SAG, lean = e * F_LEAN;
+        if (fallT < F_BREAK) {
+            drawFigure(kingFall.x, G_Y + sag, kingFall.w, 1, e, lean);
+            return;
+        }
+        drawCrumble(kingFall, sag, lean, true);
+    }
+
+    // The successor, climbing into the space you are leaving. He walks on from
+    // below the screen at an arrival's size, the way every one of them does,
+    // and sets off with his head just under the bottom edge, so he comes into
+    // view a sliver at a time and there is no frame on which he appears. Then,
+    // instead of stopping in a rank, he keeps coming. He arrives at the width
+    // YOU started at, because that is what he inherits, and the tint comes off
+    // him on the way up -- he stops being one of a crowd and becomes the
+    // photograph. The ease is quintic rather than smoothstep so the first
+    // seconds are almost imperceptible: he is not charging the throne, he is
+    // arriving at something already decided.
+    function drawVictor() {
+        if (!victor || fallT < F_RISE_AT) return;
+        const raw = Math.min(1, (fallT - F_RISE_AT) / F_RISE);
+        const t = raw * raw * raw * (raw * (raw * 6 - 15) + 10);
+        const y0 = LH + G_SHIP_H / 2;
+        const w = G_SHIP_W + (G_W0 - G_SHIP_W) * t;
+        const y = y0 + (G_Y - y0) * t;
+        const x = victor.x + (LW / 2 - victor.x) * t;
+        const sprite = shipSprite(1, victor.tint);
+        if (sprite && t < 1) {
+            ctx.globalAlpha = 1 - t;
+            ctx.drawImage(sprite, x - w / 2, y - w / SHAPE_ASPECT / 2,
+                          w, w / SHAPE_ASPECT);
+            ctx.globalAlpha = 1;
+        }
+        // he arrives in black and white -- the exact state you were in with
+        // BRANDON WINS across your chest. the picture of a new king in this
+        // game has never once been in colour.
+        drawFigure(x, y, w, t, 1, 0);
+    }
+
+    function drawGauntlet(u) {
+        ctx.save();
+        // the ordinary knock, plus the much bigger one off a killing blow
+        const jolt = Math.max(gShake * 7, impactShake() * HIT_SHAKE);
+        if (jolt > 0) {
+            ctx.translate((Math.random() - 0.5) * jolt,
+                          (Math.random() - 0.5) * jolt);
+        }
+
+        // The shots that killed you clear out of the air -- frozen bullets over
+        // the ceremony read as a bug. The ARMY stays exactly where it is, and
+        // that is the whole ending: they are still down there, still lined up,
+        // and the only thing that has changed is which brandon is on the throne
+        // for them to shoot at.
+        const live = phase === 'fall'
+            ? Math.max(0, 1 - Math.max(0, fallT - F_HOLD) / 1.4) : 1;
+
+        drawShips();
+
+        if (live > 0.01) {
+            // theirs: the plain photograph, the way the player's ball always
+            // was. these are the heads you used to be the one throwing.
+            for (const b of gBul) gHead(null, b.x, b.y, G_BUL_R, b.angle, 0.95 * live);
+
+            // yours: his colour, because it is his weapon
+            const look = PH_LOOK;
+            const ph = look.color ? phantomSprite(look) : null;
+            for (const t of gThrow) {
+                gHead(ph, t.x, t.y, G_THROW_R, t.angle, G_PH_A * live,
+                      look.color || '#fff', (look.glow || 0) * live);
+            }
+            for (const d of gDrop) {
+                const cfg = G_DROPS[d.kind];
+                const fade = Math.min(1, d.life / 1.2);
+                gHead(headSprite('gdrop' + d.kind, cfg.color, 0.6),
+                      d.x, d.y, G_DROP_R, d.angle, 0.95 * fade * live,
+                      cfg.color, 0.3 * live);
+                ctx.globalAlpha = fade * live;
+                text(d.kind, d.x, d.y + 4, 13, '#f2efe9', 'center');
+                ctx.globalAlpha = 1;
+            }
+        }
+
+        if (phase === 'fall') { drawFall(); drawImpact(); drawVictor(); }
+        else {
+            const a = king.hurt > 0 ? 0.62 + 0.3 * Math.sin(clock * 13) : 1;
+            // the knock, drawn the way the boss's is: the picture moves, the
+            // bar over him does not
+            const o = king.jt > 0 ? wobble(king.jt) * JIG_BRICK : 0;
+            const kx = king.x + king.jnx * o, ky = kingY() + king.jny * o;
+            // the takeover left you grey; the colour comes back over G_IN
+            drawFigure(kx, ky, kingShown, a, 1 - gInK(), 0);
+            if (king.flash > 0) {
+                const w = kingShown, h = kingH();
+                const s = shapeSprite('gkflash', '#f2efe9', 900,
+                                      900 / SHAPE_ASPECT, true);
+                if (s) {
+                    ctx.globalAlpha = Math.min(1, king.flash) * 0.42;
+                    ctx.drawImage(s, kx - w / 2, ky - h / 2, w, h);
+                    ctx.globalAlpha = 1;
+                }
+            }
+            drawKingBar();
+        }
+
+        // What the bounty left. The same expanding ring a solid brick gives
+        // when the ball glances off it, in the bounty's own gold and at the
+        // radius it actually cleared -- so the hole in the rank and the ring
+        // that made it are the same size, and you can see what you just won.
+        for (const b of gBlast) {
+            const k = 1 - b.t / G_BLAST_T;
+            ctx.globalAlpha = (b.t / G_BLAST_T) * 0.8;
+            ctx.strokeStyle = '#c9a94e';
+            ctx.lineWidth = 2 + 3 * (1 - k);
+            ctx.beginPath();
+            ctx.arc(b.x, b.y, G_BLAST_R * ease01(k), 0, 6.284);
+            ctx.stroke();
+        }
+        ctx.lineWidth = 1;
+
+        for (const s of sparks) {
+            ctx.globalAlpha = Math.max(0, s.life) * 0.8;
+            ctx.fillStyle = '#c9a94e';
+            ctx.fillRect(s.x - 2, s.y - 2, 4, 4);
+        }
+        ctx.globalAlpha = 1;
+
+        // The same rising number a brick gives, drawn the same way -- this is
+        // the second copy of it, because the gauntlet forks out of both update
+        // and draw and neither half of the main game's reaches here.
+        for (const p of popups) {
+            ctx.globalAlpha = Math.min(1, p.life);
+            text(p.text, p.x, p.y - 26 * (1 - p.life), 15, p.color, 'center');
+            ctx.globalAlpha = 1;
+        }
+
+        // The spares you never spent, coming out of the corner they have sat in
+        // all game -- as many as the counter was showing, no more. The one in
+        // flight swells and brightens on the way across and goes into his
+        // chest; the ones still waiting sit exactly where the counter has
+        // always drawn them, so it reads as the counter emptying rather than as
+        // heads appearing from nowhere.
+        if (phase === 'absorb') {
+            const u2 = uiScale;
+            const home = i => ({ x: LW - (25 + i * 29) * u2, y: 25 * u2 });
+            for (let i = 0; i < gAbsorbLeft; i++) {
+                const h0 = home(i);
+                if (i > 0) { gHead(null, h0.x, h0.y, 9 * u2, 0, 1); continue; }
+                const raw = Math.max(0, Math.min(1, 1 - (gAbsorbT - F_ABSORB_G) / F_ABSORB));
+                const t = raw * raw * (3 - 2 * raw);
+                const cX = king.x + kingShown * G_CHEST_X;
+                const cY = kingY() + kingH() * G_CHEST_Y;
+                const x = h0.x + (cX - h0.x) * t;
+                const y = h0.y + (cY - h0.y) * t;
+                const r = 9 * u2 + 9 * t;
+                // it brightens as it commits -- a glow that is nothing early
+                // and is the loudest thing on screen as it lands
+                gHead(null, x, y, r, clock * 2.4, 1, '#c9a94e', 0.15 + 0.5 * t * t);
+            }
+        }
+        ctx.restore();
+
+        // Score, and the streak, and nothing else. No clock and no headcount:
+        // those tell you where you are in a thing that is not supposed to have
+        // a where -- they turn an unwinnable slide into a progress bar, and you
+        // start playing the numbers instead of the screen. The streak is not
+        // one of those. It says how well you are playing, not how far in you
+        // are, and a number you can send back up is the opposite of a gauge
+        // counting down to the end. The screen already says how bad it is.
+        text('SCORE ' + Math.floor(score), 15 * u, 27 * u, 15 * u, '#f2efe9');
+        // Printed only once it is worth something, so it is the reward turning
+        // up rather than a field sitting at x1 for the whole opening. It is in
+        // the bounty's gold: both of them are the mode saying "this is what
+        // there is to want".
+        if (phase === 'gauntlet' && gMult > 1.001) {
+            // measured in the font the line above just set, the same way the
+            // capsule row spaces itself
+            const sw = ctx.measureText('SCORE ' + Math.floor(score)).width;
+            text(multText(gMult), 15 * u + sw + 10 * u, 27 * u, 15 * u, '#c9a94e');
+        }
+
+        // What you are carrying, in the same words and colours the stages
+        // print their capsules in. The stages keep that row along the bottom,
+        // under the paddle; up here you ARE the top of the screen, so it sits
+        // under the score.
+        if (phase === 'gauntlet') {
+            let x = 15 * u;
+            for (const [k, left] of [['S', gSpread], ['B', gBurst], ['R', gRapid]]) {
+                if (left <= 0) continue;
+                const label = G_DROPS[k].short + ' ' + Math.ceil(left);
+                text(label, x, 46 * u, 12 * u, G_DROPS[k].color);
+                x += ctx.measureText(label).width + 14 * u;
+            }
+        }
+
+
+        // ...and, once, the fact that you can throw at all -- but only after he
+        // has walked on and stood there a moment. the first thing that happens
+        // should be somebody arriving, not a caption. nothing moves until you
+        // throw, so it can sit there as long as it needs to.
+        if (gReady && gLead <= 0 && phase === 'gauntlet') {
+            ctx.globalAlpha = 0.65 + 0.35 * Math.sin(clock * 2.2);
+            // clear of the front rank, which sits at LH-78 -- the prompt was
+            // printing straight through the man it is telling you about
+            text('CLICK/TAP TO THROW', LW / 2, 432, 22 * u, '#f2efe9', 'center');
+            ctx.globalAlpha = 1;
+        }
+
+        // the throw cooldown, drawn where your hands are rather than in a
+        // corner
+        if (phase === 'gauntlet') {
+            const cw = 90, cx = king.x - cw / 2, cy = LH - 26;
+            const green = PH_LOOK.color || '#f2efe9';
+            const cool0 = G_COOL * (gRapid > 0 ? G_RAPID_MUL : 1);
+            ctx.fillStyle = 'rgba(242,239,233,0.13)';
+            ctx.fillRect(cx, cy, cw, 4);
+            ctx.fillStyle = gCool <= 0 ? green : '#5a6b46';
+            ctx.fillRect(cx, cy, cw * (1 - gCool / Math.max(0.001, cool0)), 4);
+        }
+
+
+        // the end of a reign gets the screen every round gets -- see drawBonus
+        if (eorShowing()) drawBonus(u);
+    }
+
+    // how much of the angle the boss died at is still on him: all of it through
+    // the freeze, since ascendT does not run during that, then easing to none
+    // over LEVEL_SECS. his figure and the white cut-out of the blow share it,
+    // so the two straighten together.
+    function levelLeft() {
+        const k = Math.max(0, 1 - ascendT / LEVEL_SECS);
+        return k * k * (3 - 2 * k);
+    }
+
+    // the old one letting go, during the takeover. identical to what happens to
+    // you at the end -- hold, drain, then peel boot-first with his face last.
+    function drawBossFall() {
+        if (!bossFall) return;
+        if (labB) { labB.drawFall(); return; }
+        const wilt = Math.max(0, Math.min(1, ascendT / A_DIE));
+        const e = wilt * wilt * (3 - 2 * wilt);
+        const sag = e * F_SAG;
+        // any angle a turn left him at eases back out as he goes -- see levelLeft
+        const lean = e * F_LEAN + (bossFall.tilt || 0) * levelLeft();
+        if (ascendT < A_DIE) {
+            drawFigure(bossFall.x, bossFall.y + sag, bossFall.w, 1, e, lean);
+            return;
+        }
+        drawCrumble(bossFall, sag, lean, true);
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, LW, LH);
+        if (king && (phase === 'gauntlet' || phase === 'absorb' || phase === 'fall')) {
+            drawGauntlet(uiScale);
+            return;
+        }
+
+        // the jolt off the killing blow, over the playfield only -- the score
+        // and the banners stay nailed down
+        const jolt = impactShake();
+        ctx.save();
+        if (jolt > 0) {
+            ctx.translate((Math.random() - 0.5) * HIT_SHAKE * jolt,
+                          (Math.random() - 0.5) * HIT_SHAKE * jolt);
+        }
+
+        // the reverse of the order the ball meets them in, so where two
+        // overlap, the one on top is the one it hits -- see hitOrder
+        const drawn = [...hitOrder()];
+        for (let i = drawn.length - 1; i >= 0; i--) if (drawn[i].alive) drawBrick(drawn[i]);
+        labDrawMini();
+        if (phase === 'ascend') { drawBossFall(); drawImpact(); }
+        drawRings();
+        drawCapsule();
+        drawOverChoices(false);   // boxes under him
+        drawPaddle();
+        drawOverChoices(true);    // labels over him, so they stay readable
+        drawPhantoms();
+        drawMotes();
+        drawShout();
+        drawYell();
+        drawTalk();
+
+        // no ball once the fight is settled, the takeover included
+        if (phase === 'ready' || phase === 'play' || phase === 'cleared') {
+            for (const b of balls) if (!labSkipBall(b)) drawBall(b.x, b.y, labBallR(b), b.angle);
+        }
+
+        for (const p of popups) {
+            ctx.globalAlpha = Math.min(1, p.life);
+            text(p.text, p.x, p.y - 26 * (1 - p.life), 15, p.color, 'center');
+            ctx.globalAlpha = 1;
+        }
+        ctx.restore();                       // end of the jolt
+
+        const u = uiScale;
+
+        // the pickup shout -- punches in oversized and settles as it fades
+        if (callout) {
+            const k = callout.life / CALLOUT_SECS;
+            ctx.globalAlpha = Math.min(1, k * 3);
+            text(callout.text, LW / 2, 392, (34 + 10 * k) * u, callout.color, 'center');
+            ctx.globalAlpha = 1;
+        }
+
+        // SCORE is the one number that survives the handover -- the gauntlet
+        // prints it in this same spot, so it is the thread through the cut and
+        // it stays. BEST does not carry over, and a reading that only ever
+        // disappears is better not put up over the ending in the first place.
+        text('SCORE ' + score, 15 * u, 27 * u, 15 * u, '#f2efe9');
+        if (phase !== 'ascend') text('BEST ' + best, 15 * u, 46 * u, 13 * u, '#6d685f');
+
+        // no lives counter over the ending -- it is meaningless by then, and it
+        // was landing squarely on the new king's face
+        //
+        // It counts spares, so a fresh run reads 2, 1, 0 and an empty corner
+        // means the next one you lose ends it -- see spares()
+        if (phase !== 'ascend') {
+            for (let i = 0; i < spares(); i++) drawBall(LW - (25 + i * 29) * u, 25 * u, 9 * u, 0);
+        }
+
+        // active effects along the bottom, out of the playfield.
+        //
+        // BONUS is nailed to the left edge and everything else queues up behind
+        // it. It is the only one of these that is ALWAYS there, and a number
+        // you are meant to watch cannot be a number that slides two inches
+        // sideways every time a capsule lands or lapses. The transient ones can
+        // do the moving; they are transient.
+        //
+        // The whole row goes out with the colour over the takeover -- see
+        // drain(). These are readings off a fight that is over, and a gold
+        // x17.5 BONUS blinking off at the handover is a cut in the middle of
+        // what is otherwise one long fade.
+        ctx.globalAlpha = menuUp() ? 0 : 1 - drain();
+        const by = LH - 12;
+        // ONE number for everything the next hit is multiplied by: the run of
+        // hits, the spin, and the chaos capsules. The run used to be its own
+        // x2.0 at the top of the screen, and two multipliers to multiply in
+        // your head mid-rally was one too many. What a jump in it came from is
+        // in the row behind it.
+        // to a tenth, and everything below reads the rounded number, so the
+        // size can never disagree with the digits about which whole x it is on
+        const mul = bonusNow();
+        const mulLabel = 'x' + mul.toFixed(1) + ' BONUS';
+        // a size up from the rest of the row, since it is the one to watch,
+        // and a point bigger again for every whole x past the first, so x2.0
+        // is the first step up. it stops growing at x11.0, past which it would
+        // climb into him and shove the rest of the row off the screen
+        const mulSize = 15 + Math.min(10, Math.max(0, Math.floor(mul) - 1));
+        text(mulLabel, 15 * u, by, mulSize * u, mul > 1 ? '#c9a94e' : '#6d685f');
+        const mulW = ctx.measureText(mulLabel).width;
+
+        // What the spin is contributing to that number, as a rule under it.
+        //
+        // Of the three things feeding BONUS, spin is the only one with a
+        // ceiling -- SPIN_MUL once the head is turning at SPIN_FULL -- so it is
+        // the only one a gauge fits. The run of hits and the capsules are a
+        // count and a clock, they have no full, and they already say what they
+        // are in the row behind. Spin was the one you could feel in your hands
+        // with nothing on screen keeping score of it.
+        //
+        // It reads liveSpinMul, which is what award pays out of too, so the
+        // rule, the digits and the money are all one number. During multiball
+        // that number is the quickest head on the field and not the one that
+        // struck, which is the only way the bar can be believed.
+        const spinK = (liveSpinMul() - 1) / (SPIN_MUL - 1);
+        const ruleY = by + SPIN_RULE_DROP;
+        const ruleX = 15 * u;
+        ctx.fillStyle = SPIN_RULE_BED;
+        ctx.fillRect(ruleX, ruleY, mulW, SPIN_RULE_H);
+        ctx.fillStyle = '#c9a94e';
+        ctx.fillRect(ruleX, ruleY, mulW * spinK, SPIN_RULE_H);
+
+        // SPIN spelled the whole way along the rule, so the bar names itself
+        // even at rest. What the fill changes is how loudly: near-black on the
+        // bed, where it is barely there, and bone on the gold, where it is
+        // meant to be read. Topping the bar out is what makes the word plain.
+        const fillW = mulW * spinK;
+        spinWord(ruleX, ruleY, mulW, SPIN_WORD_DIM, ruleX + fillW, mulW - fillW);
+        spinWord(ruleX, ruleY, mulW, SPIN_WORD_INK, ruleX, fillW);
+
+        let x = ruleX + mulW + 18 * u;
+
+        for (const k of TIMED) {
+            if (fx[k] <= 0) continue;
+            const label = CAPS[k].short + ' ' + Math.ceil(fx[k]);
+            text(label, x, by, 12 * u, CAPS[k].color);
+            x += ctx.measureText(label).width + 14 * u;
+        }
+        if (dragT > 0) {
+            const label = DRAG_SHORT + ' ' + Math.ceil(dragT);
+            text(label, x, by, 12 * u, DRAG_TINT);
+            x += ctx.measureText(label).width + 14 * u;
+        }
+        if (balls.length > 1) {
+            const label = balls.length + ' BALLS';
+            text(label, x, by, 12 * u, CAPS.M.color);
+            x += ctx.measureText(label).width + 14 * u;
+        }
+        // the run, last in the row: it comes and goes every rally, and the
+        // capsules' clocks should not jump sideways every time it does
+        if (combo > 0) {
+            const label = 'COMBO ' + combo;
+            text(label, x, by, 12 * u, '#c9a94e');
+            x += ctx.measureText(label).width + 14 * u;
+        }
+        ctx.globalAlpha = 1;               // end of the row's share of the drain
+
+        // ---- the storm over the takeover -----------------------------------
+        if (phase === 'ascend') {
+            const glow = stormGlow();
+            if (glow > 0.001) {
+                ctx.globalAlpha = glow;
+                ctx.fillStyle = '#f2efe9';
+                ctx.fillRect(0, 0, LW, LH);
+                ctx.globalAlpha = 1;
+            }
+            if (ascendT < A_TITLE) {
+                // it lands once the old one is gone and you are most of the
+                // way into his chair -- the line is about what you have turned
+                // into, so it wants you already standing there. fades up once
+                // and holds, lifting a little with each swell, which is a
+                // gradual change rather than a flash.
+                const a = Math.min(1, Math.max(0, (ascendT - A_CREED) / 0.9));
+                ctx.globalAlpha = a * (0.72 + 0.7 * (glow / SWELL_PEAK));
+                text(CREED, LW / 2, 330, fitSize(CREED, 26 * u, LW - 56), '#f2efe9', 'center');
+                ctx.globalAlpha = 1;
+            }
+        }
+
+        if (phase === 'initials') { drawInitials(u); return; }
+
+        // the table on its own, after a winning run has been recorded
+        if (phase === 'scores') {
+            ctx.fillStyle = 'rgba(0,0,0,0.86)';
+            ctx.fillRect(0, 0, LW, LH);
+            // down to just above the line under it
+            drawBoard(120, 520 - 15 * u - 16, u);
+            text('click/tap to play again', LW / 2, 520, 15 * u, '#9a958c', 'center');
+            return;
+        }
+
+        // game over gets the table too, above the two choices. the dim goes on
+        // first and the choices and paddle are laid back over it, or the dim
+        // would bury the very thing you are meant to be picking.
+        if (phase === 'over' && BOARD_ON) {
+            ctx.fillStyle = 'rgba(0,0,0,0.82)';
+            ctx.fillRect(0, 0, LW, LH);
+            text('GAME OVER', LW / 2, 70, 30 * u, '#f2efe9', 'center');
+            text('final score ' + score, LW / 2, 96, 15 * u, '#9a958c', 'center');
+            // the clock and its caption sit down against the choices, and the
+            // table gets everything above the clock's digits
+            const clockY = 452, clockSize = 40 * u;
+            drawBoard(126, clockY - clockSize * 0.72 - 14, u);
+            // the clock, steady rather than pulsing -- the digit changing once
+            // a second is motion enough, and nothing here should flash
+            text(String(Math.ceil(overT)), LW / 2, clockY, clockSize, '#c9a94e', 'center');
+            text('click/tap a choice', LW / 2, 480, 14 * u, '#6d685f', 'center');
+            drawOverChoices(false);
+            drawPaddle();
+            drawOverChoices(true);
+            return;
+        }
+
+        // the end-of-round screen stands in for the band, and takes the same
+        // beat on the takeover that the band used to -- see drawBonus
+        if (eorShowing()) {
+            drawBonus(u);
+            return;
+        }
+
+        // the band stays away until the title beat, so the rise plays clean --
+        // and out of his second wind entirely, which has nothing to tap and
+        // plays out right where the band would sit
+        if (!menuUp() && phase !== 'play' && phase !== 'entrance' && phase !== 'siphon'
+            && (phase !== 'ascend' || ascendT >= A_TITLE)) {
+            const my = 424;
+            const bandH = 104 * u;
+            ctx.fillStyle = 'rgba(0,0,0,0.72)';
+            ctx.fillRect(0, my - bandH / 2, LW, bandH);
+
+            const msg = phase === 'ready' ? (stage === 0 && lives === 3 && score === 0
+                            ? 'BRANDON' : 'READY')
+                      : banner;
+            text(msg, LW / 2, my - 4 * u, 32 * u, '#f2efe9', 'center');
+
+            // nothing to tap during the takeover any more -- it no longer ends
+            // the run, it hands over, and an instruction here would be a lie
+            const sub = phase === 'over' ? 'final score ' + score
+                            + '   ·   click/tap a choice   ·   '
+                            + Math.ceil(overT)
+                      : phase === 'ready' ? 'click/tap or space to serve'
+                      : phase === 'ascend' ? ''
+                      : 'click/tap to continue';
+            if (sub) text(sub, LW / 2, my + 26 * u, 15 * u, '#9a958c', 'center');
+        }
+        labDrawTop();
+    }
+
+    // ---- loop --------------------------------------------------------------
+    // What you can actually SEE. iOS reports innerHeight as the layout viewport
+    // -- the tall one, as if the address bar were already gone -- so sizing the
+    // field off it hides the bottom of the field, and brandon with it, behind
+    // the toolbar. visualViewport is the visible part. It also shrinks under a
+    // pinch, though, and a zoom should not re-scale the game, so only trust it
+    // while the page is at rest.
+    function seenH() {
+        const vv = window.visualViewport;
+        return vv && Math.abs(vv.scale - 1) < 0.01
+             ? Math.min(vv.height, innerHeight) : innerHeight;
+    }
+    function seenW() {
+        const vv = window.visualViewport;
+        return vv && Math.abs(vv.scale - 1) < 0.01
+             ? Math.min(vv.width, innerWidth) : innerWidth;
+    }
+
+    const hintEl = document.querySelector('.hint');
+    let lastFit = '';
+
+    function resize() {
+        const dpr = Math.min(devicePixelRatio || 1, 2);
+        // Measure the furniture rather than guessing at it. The old fixed 24/68
+        // was wrong on most phones in both directions: the safe-area padding is
+        // a different size on every handset, and the hint line takes itself out
+        // of the layout entirely on a short screen.
+        const cs = getComputedStyle(document.body);
+        const px = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+        const py = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+        const gap = parseFloat(cs.rowGap) || 0;
+        // offsetParent is null exactly when it is display:none
+        const hintH = hintEl.offsetParent ? hintEl.offsetHeight + gap : 0;
+
+        // The body box is 100svh, which is the stable number; the visible
+        // viewport is what a retracted address bar or an overlay has actually
+        // left showing. Take whichever is SMALLER and the field can never end
+        // up bigger than either its own box or the part of the screen you can
+        // see -- which is the two ways it used to go wrong.
+        const box = document.body;
+        const availW = Math.min(box.clientWidth, seenW()) - px;
+        const availH = Math.min(box.clientHeight, seenH()) - py - hintH;
+
+        // fit BOTH ways -- on a phone in landscape the height is what runs out
+        // first, and fitting only the width would push the paddle off-screen
+        const scale = Math.min(availW / LW, availH / LH, 1);
+
+        // Assigning canvas.width reallocates the bitmap even when the value is
+        // identical, and resize now hangs off visualViewport too, which on iOS
+        // chatters as the address bar moves. draw() repaints from scratch every
+        // frame so nothing would look wrong, but there is no reason to throw a
+        // 1600x1200 buffer away forty times while a phone settles.
+        const fit = scale.toFixed(4) + ':' + dpr;
+        if (fit === lastFit) return;
+        lastFit = fit;
+
+        canvas.style.width = Math.floor(LW * scale) + 'px';
+        canvas.style.height = Math.floor(LH * scale) + 'px';
+        canvas.width = LW * dpr;
+        canvas.height = LH * dpr;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        // the whole field shrinks on a phone, which would leave the hud at
+        // about 7px. draw it proportionally larger so it stays readable.
+        uiScale = Math.min(2.2, Math.max(1, 13 / (15 * scale)));
+    }
+    addEventListener('resize', resize);
+    // the window `resize` above does not fire when only the address bar moves,
+    // which is exactly the case that used to leave brandon under the toolbar
+    if (window.visualViewport) {
+        visualViewport.addEventListener('resize', resize);
+        visualViewport.addEventListener('scroll', resize);
+    }
+    // iOS fires this before the new metrics have settled, so ask twice
+    addEventListener('orientationchange', () => { resize(); setTimeout(resize, 150); });
+    resize();
+
+    // the READY screen's own band, saying the one thing you need to know
+    function drawPaused() {
+        const u = uiScale, my = 424, bandH = 104 * u;
+        ctx.fillStyle = 'rgba(0,0,0,0.72)';
+        ctx.fillRect(0, my - bandH / 2, LW, bandH);
+        text('PAUSED', LW / 2, my - 4 * u, 32 * u, '#f2efe9', 'center');
+        text('click to resume', LW / 2, my + 26 * u, 15 * u, '#9a958c', 'center');
+    }
+
+    let last = performance.now();
+    (function frame(now) {
+        const dt = Math.min((now - last) / 1000, 0.05); // clamped so tab-outs don't teleport
+        last = now;
+        // the lock belongs to the field. one that landed just as the game moved
+        // on to a screen with buttons -- or under the stage menu -- goes back.
+        if (locked() && (!PLAYING.has(phase) || !debugEl.hidden)) freeMouse();
+        // held still while the mouse has got away from you -- see
+        // pointerlockchange. the picture keeps drawing; the world does not move.
+        // the stage menu can move you on from under a pause, and then there is
+        // nothing left to hold.
+        if (paused && !pausable()) hold(false);
+        if (!paused) update(dt);
+        draw();
+        if (paused) drawPaused();
+        requestAnimationFrame(frame);
+    })(last);

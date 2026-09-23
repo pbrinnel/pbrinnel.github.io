@@ -28,6 +28,27 @@ A game with a shared online leaderboard.
 - Feel numbers (spin, speeds, angles, timings) stay flat named `const`s. When a change is about how something feels, offer Paul a slider page to tune it himself instead of guessing values.
 - Don't rebuild the spin lab. If `.claude/spinlab/` exists, write what the next build will need into `.claude/spinlab/TODO.md` instead — new sliders, hooks, panel rows — and say so when you finish. Paul rebuilds it when he next wants it: `node .claude/spinlab/spinlab-build.js`.
 
+## fourkeys.html
+
+The sequel, under a codename. `brandon.html` is the released game and sequel work never
+touches it.
+
+- **Unlisted, like brandon.html**: `noindex, nofollow`, not linked from anywhere, and no
+  `og:`/`twitter:` tags at all, so a pasted link shows nothing. Its `BOARD_URL` is empty
+  and its `BEST_KEY` is its own — nothing it does can reach brandon's live leaderboard.
+- Its code is in `js/fourkeys/`: `engine.js` (brandon.html's game, forked 22 Sep 2026 and
+  edited here from now on), `runtime.js` (the seam the bosses plug into), a file per boss,
+  mini-boss and paddle, `menu.js` (the town), and `start.js` (the one line that begins it).
+- **Load order is the whole design and `fourkeys.html` sets it.** They are plain scripts
+  sharing one scope: runtime and modules first, `engine.js` after them, `start.js` last.
+  Nothing in a module may READ an engine const at load time — inside a function is fine.
+- Every `<script src>` carries `?v=N`. Pages are cached for ten minutes, so **bump all of
+  them together on every deploy** or someone gets one new file and one old one.
+- The boss lab builds from these same files; only the panel is the lab's own. Tuning a boss
+  in the lab is tuning what the game ships. The lab still wraps `brandon.html`'s engine
+  rather than `engine.js`, so the two engines will drift — repoint it when that starts to
+  matter.
+
 ## Comments
 
 - A comment says why the code is the way it is now.

@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <!-- viewport-fit=cover lets the field run under the notch and the home
+         indicator; the padding below hands that space back where it matters -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <!-- The codename, which is all this page says about itself anywhere: the
+         title screen inside it is the real one. Every page on the site carries
+         its own head, so no other page's title changes. -->
+    <title>FOUR KEYS</title>
+
+    <!-- not linked from anywhere, and kept out of search results -->
+    <meta name="robots" content="noindex, nofollow">
+
+    <!-- No og: or twitter: tags at all, unlike brandon.html. That page is
+         meant to be pasted to people and has a preview built to give nothing
+         away; this one is not meant to be pasted to anyone yet, and a preview
+         it does not have is a preview that cannot leak. A link to it comes out
+         as a bare URL. -->
+
+    <!-- an iPhone will not give up its address bar for the Fullscreen API --
+         Safari does not implement it on the phone at all. Added to the home
+         screen with these, though, the page opens with no browser chrome
+         whatsoever, which is the only route to a genuinely full screen there.
+         Android honours the API, so it never needs this path. -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Four Keys">
+
+    <!-- his head, the one you serve, in place of the site's icon. these sit
+         with the game's other art, so the site's own favicons are untouched.
+         the touch icon is what a home-screen shortcut shows, so that is his
+         head too. -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/images/brandon/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/images/brandon/favicon-16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/images/brandon/apple-touch-icon.png">
+    <meta name="theme-color" content="#000000">
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html {
+            background: #000;
+            /* safari inflates text of its own accord in landscape, which was
+               pushing the hint line taller and stealing it back off the field */
+            -webkit-text-size-adjust: 100%;
+            /* body's copies of these only reach the viewport while html leaves
+               them alone, so say it in both places and stop guessing */
+            overflow: hidden;
+            overscroll-behavior: none;
+        }
+
+        body {
+            /* svh, not vh -- same reason as cardsforcowboys (see its
+               css/theme.css): iOS pins `vh` to the LARGE viewport, the one with
+               the chrome already retracted, so 100vh is about a toolbar taller
+               than what you can actually see and the bottom of the field --
+               where brandon stands -- ends up under the ribbon.
+               svh rather than dvh on purpose, too: dvh tracks the ribbon as it
+               slides away, and every one of those changes would re-scale the
+               field mid-rally. svh is the stable, conservative height, and
+               fullscreen makes the two identical anyway. Keep both lines; the
+               vh fallback covers pre-iOS-15.4 / pre-Chrome-108. */
+            min-height: 100vh;
+            min-height: 100svh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            background-color: #000;
+            color: #f2efe9;
+            font-family: 'Trebuchet MS', sans-serif;
+            /* the notch and the home indicator sit inside the viewport now that
+               it is cover-fit, so keep clear of them -- but only by as much as
+               the device actually asks for */
+            padding: 20px max(20px, env(safe-area-inset-right))
+                     max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+
+            /* nothing here scrolls, so a drag that runs past the edge of the
+               field should not rubber-band the page or pull down a refresh */
+            overflow: hidden;
+            overscroll-behavior: none;
+            /* kills double-tap-to-zoom. the canvas already had its own
+               touch-action, so taps ON the field were always safe -- but the
+               splash and the black margins either side were not, and those
+               margins now steer him, so they are somewhere you tap in earnest.
+               pinch zoom is deliberately left alone: nothing here needs a whole
+               gesture taken away from someone who wants a closer look. */
+            touch-action: manipulation;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+        }
+
+        #stage {
+            display: block;
+            background: #090908;
+            border: 1px solid #2e2a24;
+            border-radius: 3px;
+            touch-action: none;
+            cursor: none;
+            max-width: 100%;
+            box-shadow: inset 0 0 90px rgba(0, 0, 0, 0.85);
+        }
+
+        .hint {
+            font-size: 0.76rem;
+            font-style: italic;
+            color: #6d685f;
+            text-align: center;
+        }
+
+        #splash {
+            position: fixed;
+            inset: 0;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* the id selector above outranks the browser's own [hidden] rule, so
+           this has to be spelled out or hiding it would do nothing */
+        #splash[hidden] { display: none; }
+
+        /* the sequel's mark: small enough that the title still reads as one
+           word with a number after it, rather than two things of equal weight */
+        #splash i {
+            font-style: normal;
+            font-size: 0.15em;
+            letter-spacing: 0;
+            margin-left: 0.25em;
+            vertical-align: baseline;
+        }
+
+        #splash span {
+            font-size: clamp(3rem, 17vw, 13rem);
+            font-weight: bold;
+            letter-spacing: -0.03em;
+            line-height: 1;
+            color: #f2efe9;
+        }
+
+        /* stage select, unlocked with the konami code or ?debug */
+        #debug {
+            position: fixed;
+            inset: 0;
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            background: rgba(0, 0, 0, 0.92);
+        }
+
+        #debug[hidden] { display: none; }
+
+        #debug h2 {
+            font-size: 0.78rem;
+            font-weight: normal;
+            letter-spacing: 0.22em;
+            color: #6d685f;
+        }
+
+        #debug button {
+            width: 210px;
+            padding: 9px 0;
+            background: #090908;
+            border: 1px solid #2e2a24;
+            border-radius: 3px;
+            color: #f2efe9;
+            font-family: inherit;
+            font-size: 0.92rem;
+            letter-spacing: 0.06em;
+            cursor: pointer;
+        }
+
+        #debug button:hover { border-color: #6d685f; }
+
+        /* resetting your best: small, in a corner well away from the stages,
+           and only a long hold sets it off -- see RESET_HOLD. out of the
+           column, it takes no room from them on a short screen. */
+        #debug button.wipe {
+            position: absolute;
+            top: calc(10px + env(safe-area-inset-top, 0px));
+            right: calc(14px + env(safe-area-inset-right, 0px));
+            width: auto;
+            padding: 6px 0;
+            border: 0;
+            border-radius: 0;
+            /* the hold's progress, an underline drawn across as it goes */
+            background: linear-gradient(#9a958c, #9a958c) left bottom / 0 1px no-repeat;
+            font-size: 0.72rem;
+            font-style: italic;
+            letter-spacing: normal;
+            color: #4a453e;
+            /* a long press on a phone would otherwise select the words, raise
+               the browser's own menu or be taken for a gesture, and any of
+               those ends the hold */
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+            touch-action: none;
+        }
+
+        /* the duration is RESET_HOLD, set on the element as a hold starts */
+        #debug button.wipe.holding {
+            background-size: 100% 1px;
+            transition-property: background-size;
+            transition-timing-function: linear;
+            color: #9a958c;
+        }
+
+        #debug button.wipe:disabled { cursor: default; }
+
+        #debug p {
+            margin-top: 6px;
+            font-size: 0.72rem;
+            font-style: italic;
+            color: #4a453e;
+        }
+
+        /* a landscape phone is about 390px tall and the field scales off the
+           height, so every pixel of page furniture costs real playfield. the
+           hint is a mouse instruction and there is no mouse down here. */
+        @media (max-height: 560px) {
+            body {
+                gap: 0;
+                /* vertically, give back exactly what the hardware asks for and
+                   not one pixel more -- in landscape that is the home indicator
+                   at the bottom and usually nothing at the top. the 20px either
+                   side stays, since width is never the binding constraint on a
+                   screen this shape. */
+                padding-top: env(safe-area-inset-top, 0px);
+                padding-bottom: env(safe-area-inset-bottom, 0px);
+            }
+            .hint { display: none; }
+            /* at this size the screen's own edge is the border */
+            #stage { border-color: transparent; }
+        }
+
+        /* in one column the stage menu stands taller than a landscape phone,
+           so there the stages pair up. portrait keeps the column: a phone that
+           short is too narrow for two. */
+        @media (max-height: 560px) and (orientation: landscape) {
+            #debug {
+                display: grid;
+                grid-template-columns: repeat(2, auto);
+                align-content: center;
+                justify-content: center;
+                gap: 10px;
+            }
+            #debug h2, #debug p {
+                grid-column: 1 / -1;
+                justify-self: center;
+            }
+        }
+
+        /* the field is 4:3, which leaves a portrait phone showing a postage
+           stamp -- ask for landscape instead of shipping something unplayable.
+           820px used to be the cut, which caught tablets too; an iPad in
+           portrait renders the field at nearly full size and was being turned
+           away from a screen it fits perfectly well. 700px is the real line:
+           above it is a tablet, below it a phone. */
+        #rotate { display: none; }
+
+        @media (max-width: 700px) and (orientation: portrait) {
+            #stage, .hint { display: none; }
+
+            #rotate {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 18px;
+                padding: 0 32px;
+                text-align: center;
+                color: #9a958c;
+                font-size: 1rem;
+                font-style: italic;
+                line-height: 1.5;
+            }
+
+            #rotate b {
+                font-size: 2.4rem;
+                font-style: normal;
+                letter-spacing: -0.02em;
+                color: #f2efe9;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="splash"><span>BRANDON<i>2</i></span></div>
+
+    <div id="rotate"><b>BRANDON</b>turn your phone sideways</div>
+
+    <div id="debug" hidden><h2>STAGE SELECT</h2></div>
+
+    <canvas id="stage"></canvas>
+    <p class="hint">move to slide brandon &middot; hold to walk him</p>
+
+<!-- The game, in load order, and the order matters.
+     Every one of these is a plain script, so they all share one scope: what a
+     file declares at its top level the next one can see. The runtime and the
+     modules go first because the engine's setup, at the bottom of engine.js,
+     calls into them; start.js goes last because it opens the town, and the
+     town is one of the modules.
+
+     ?v= is a cache-buster. GitHub Pages holds a page for ten minutes, so a
+     deploy that changes two of these can otherwise reach someone as one new
+     file and one old one. Bump all of them together, every deploy. -->
+<script src="js/fourkeys/runtime.js?v=1"></script>
+<script src="js/fourkeys/headless.js?v=1"></script>
+<script src="js/fourkeys/idol.js?v=1"></script>
+<script src="js/fourkeys/windmill.js?v=1"></script>
+<script src="js/fourkeys/twins.js?v=1"></script>
+<script src="js/fourkeys/gleeok.js?v=1"></script>
+<script src="js/fourkeys/agahnim.js?v=1"></script>
+<script src="js/fourkeys/lamps.js?v=1"></script>
+<script src="js/fourkeys/dodongo.js?v=1"></script>
+<script src="js/fourkeys/mole.js?v=1"></script>
+<script src="js/fourkeys/conga.js?v=1"></script>
+<script src="js/fourkeys/pong.js?v=1"></script>
+<script src="js/fourkeys/boot.js?v=1"></script>
+<script src="js/fourkeys/splitter.js?v=1"></script>
+<script src="js/fourkeys/armos.js?v=1"></script>
+<script src="js/fourkeys/guard.js?v=1"></script>
+<script src="js/fourkeys/pillars.js?v=1"></script>
+<script src="js/fourkeys/chain.js?v=1"></script>
+<script src="js/fourkeys/paddles.js?v=1"></script>
+<script src="js/fourkeys/menu.js?v=1"></script>
+<script src="js/fourkeys/engine.js?v=1"></script>
+<script src="js/fourkeys/start.js?v=1"></script>
+</body>
+</html>
