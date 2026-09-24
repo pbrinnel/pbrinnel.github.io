@@ -16,7 +16,7 @@
     let LAMP_W      = 143;    // how long a lamp is
     let LAMP_Y      = 250;    // the line they drift about
     let LAMP_BOB    = 75;     // px either side of it they drift, a quarter of the field top to bottom
-    let LAMP_BOB_RATE = 0.8;  // rad/s of that drift
+    let LAMP_BOB_RATE = 0.4;  // rad/s of that drift
     let LAMP_BOSS_W = 420;    // how long he is
     let LAMP_BOSS_Y = 105;    // ...and where he hangs
     let LAMP_SWEEP  = 0.4;    // rad/s of his patrol
