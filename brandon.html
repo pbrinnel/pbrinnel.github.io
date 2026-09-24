@@ -3850,12 +3850,17 @@
         if (slot >= G_MAX) return;                 // the floor is full
         const hp = intro ? 1 : pickHp();
         const w = intro ? G_INTRO_W : G_SHIP_W;
+        // he takes his time getting here, and comes from further down, so it
+        // reads as somebody arriving rather than a unit spawning
+        const riseFrom = intro ? 300 : 140;
         ships.push({
-            slot, x: slotX(slot), y: slotY(slot), w,
-            // he takes his time getting here, and comes from further down, so
-            // it reads as somebody arriving rather than a unit spawning
+            // placed where the walk on starts, not where it ends: he can be
+            // drawn before stepShipMotion first moves him, and the introduction
+            // always is, because both places that add him do it after that
+            // frame's step
+            slot, x: slotX(slot), y: slotY(slot) + riseFrom, w,
             riseT: intro ? G_INTRO_RISE : G_RISE,
-            riseFrom: intro ? 300 : 140,
+            riseFrom,
             // the introduction is the untouched photograph, same as you. every
             // one after it wears a brick's colour on its last rung.
             tint: intro ? null : TIER_KEYS[(Math.random() * TIER_KEYS.length) | 0],
