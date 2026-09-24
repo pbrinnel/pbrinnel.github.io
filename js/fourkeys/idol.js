@@ -8,8 +8,15 @@
     // photograph shows through. Only a hit on bare face hurts him, and the stone
     // creeps back over whatever is open, so the fight is putting the next head
     // where the last one went. A spinning head takes a bigger bite, so the SPIN
-    // rule under BONUS reads how much the next hit will knock off. He has no
-    // attack: his face is a curve, so anything off its middle comes back at a slant.
+    // rule under BONUS reads how much the next hit will knock off. His face is
+    // a curve, so anything off its middle comes back at a slant.
+    //
+    // He wanders along the top, slowly, to places of his own choosing. Every
+    // so often he shakes for IDOL_SHAKE and then drops like the stone he is,
+    // all the way to the floor. Land on you and he pins you where you stand
+    // until he rises again, IDOL_DOWN later and slowly. Down there he is a
+    // wall: you cannot get past him, and nor can the ball, so whichever side
+    // of him you are on is the side you play from until he goes back up.
     let IDOL_HP        = 10;     // hits on bare face to finish him
     let IDOL_W         = 290;    // how wide he is
     let IDOL_Y         = 105;    // where his middle hangs; his crown is off the top
@@ -18,14 +25,25 @@
     let IDOL_BARE      = 0.3;    // stone at or under this is bare face
     let IDOL_REGROW_AT = 5;      // seconds bare before the stone starts back
     let IDOL_REGROW    = 0.4;    // ...and how fast it comes, in whole blocks a second
-    let IDOL_SWAY      = 24;     // px he drifts either side
+    let IDOL_WALK      = 45;     // px/s he wanders at
+    let IDOL_WAIT_MIN  = 1.5;    // seconds he heads for one place before picking another, at least...
+    let IDOL_WAIT_MAX  = 4.5;    // ...and at most
+    let IDOL_DROP_MIN  = 7;      // seconds between drops, at least...
+    let IDOL_DROP_MAX  = 13;     // ...and at most
+    let IDOL_SHAKE     = 3;      // the shaking before a drop, which is the tell
+    let IDOL_SHAKE_PX  = 5;      // ...and how hard
+    let IDOL_G         = 2600;   // px/s^2 he falls at
+    let IDOL_DOWN      = 3;      // seconds he stays down
+    let IDOL_RISE      = 75;     // px/s he goes back up at
     let IDOL_CLIMB     = 0.4;    // how much of the original's climb this fight has
     // The act a run draws him from, 1 easy to 3 hard. He has no attack and, at
     // Paul's numbers, a bite stays open for several returns, so the only thing
     // he asks for is aim.
     let IDOL_LVL       = 2;
     LAB_KNOBS.push('IDOL_LVL', 'IDOL_HP', 'IDOL_W', 'IDOL_Y', 'IDOL_BITE', 'IDOL_SPIN',
-                   'IDOL_BARE', 'IDOL_REGROW_AT', 'IDOL_REGROW', 'IDOL_SWAY', 'IDOL_CLIMB');
+                   'IDOL_BARE', 'IDOL_REGROW_AT', 'IDOL_REGROW', 'IDOL_WALK', 'IDOL_WAIT_MIN',
+                   'IDOL_WAIT_MAX', 'IDOL_DROP_MIN', 'IDOL_DROP_MAX', 'IDOL_SHAKE', 'IDOL_SHAKE_PX',
+                   'IDOL_G', 'IDOL_DOWN', 'IDOL_RISE', 'IDOL_CLIMB');
 
     const IDOL_COLS = 12, IDOL_ROWS = 18;    // his stone, in blocks
     const IDOL_N = IDOL_COLS * IDOL_ROWS;
@@ -40,7 +58,10 @@
             b.x = (LW - bw) / 2;
             b.y = -(bh + 40);
             idol = { stone: new Float32Array(IDOL_N).fill(1), wait: new Float32Array(IDOL_N),
-                     inside: new Uint8Array(IDOL_N), chips: [], t: 0, pend: null, bites: 0 };
+                     inside: new Uint8Array(IDOL_N), chips: [], t: 0, pend: null, bites: 0,
+                     x: LW / 2, tx: LW / 2, wander: IDOL_WAIT_MIN, cy: IDOL_Y,
+                     stage: 'idle', st: 0, vy: 0, jx: 0, pin: null, side: 0, drops: 0,
+                     next: IDOL_DROP_MIN + Math.random() * (IDOL_DROP_MAX - IDOL_DROP_MIN) };
             for (let r = 0; r < IDOL_ROWS; r++) {
                 for (let c = 0; c < IDOL_COLS; c++) {
                     const du = (c + 0.5) / IDOL_COLS - 0.5, dv = (r + 0.5) / IDOL_ROWS - 0.5;
@@ -60,8 +81,9 @@
                 return;
             }
             if (phase === 'play') idol.t += dt;
-            b.x = LW / 2 + Math.sin(idol.t * 0.35) * IDOL_SWAY - bw / 2;
-            b.y = IDOL_Y - bh / 2;
+            idolMove(dt);
+            b.x = idol.x + idol.jx - bw / 2;
+            b.y = idol.cy - bh / 2;
             // the stone creeping back over whatever has been bare long enough
             if (phase === 'play') {
                 for (let i = 0; i < IDOL_N; i++) {
@@ -76,6 +98,15 @@
             idol.pend = hit ? { bare: idolStoneAt(br, hit.cx, hit.cy) <= IDOL_BARE } : null;
             return hit;
         },
+        // falling, he only knocks the ball down ahead of him: no chip, no wound
+        touch(br, ball, hit) {
+            if (idol.stage !== 'fall') return false;
+            labBounce(ball, hit);
+            ball.vy = Math.abs(ball.vy);
+            idol.pend = null;
+            return true;
+        },
+        fence: idolFence,
         // stone clacks like a statue; bare face flashes like any boss
         glances() { return !idol.pend || !idol.pend.bare || bossIF > 0; },
         hit(b, cx, cy) {
@@ -121,9 +152,118 @@
                 if (idol.stone[i] <= IDOL_BARE) bare++;
             }
             return { name: 'IDOL', hp: b.hp, max: b.maxHp, w: bw,
-                     line: 'bare ' + Math.round(100 * bare / n) + '% of his face · ' + idol.bites + ' bites' };
+                     line: 'bare ' + Math.round(100 * bare / n) + '% of his face · ' + idol.bites + ' bites · ' +
+                           idol.stage + (idol.pin ? ', pinning you' : '') + ' · ' + idol.drops + ' drops' };
         }
     };
+
+    const idolRand = (a, b) => a + Math.random() * (b - a);
+
+    // Wandering while he is up; the shake, the drop, the wait and the climb
+    // back otherwise. The cycle runs through a lost head and a serve like
+    // anything that is already falling would, and only a rally starts one.
+    function idolMove(dt) {
+        const h = bw * (BALL_RY / BALL_RX);
+        idol.jx = 0;
+        switch (idol.stage) {
+            case 'idle': {
+                if ((idol.wander -= dt) <= 0) {
+                    idol.tx = idolRand(bw / 2 + 20, LW - bw / 2 - 20);
+                    idol.wander = idolRand(IDOL_WAIT_MIN, IDOL_WAIT_MAX);
+                }
+                // easing in to where he is going, so he settles rather than stops
+                const d = idol.tx - idol.x;
+                const v = Math.sign(d) * IDOL_WALK * Math.min(1, Math.abs(d) / 40);
+                idol.x += Math.abs(v * dt) > Math.abs(d) ? d : v * dt;
+                if (phase === 'play' && (idol.next -= dt) <= 0) { idol.stage = 'shake'; idol.st = 0; }
+                break;
+            }
+            case 'shake':
+                idol.st += dt;
+                // a tremor that builds, not a strobe: he moves, nothing flashes
+                idol.jx = Math.sin(idol.st * 55) * IDOL_SHAKE_PX * Math.min(1, idol.st / 0.6);
+                if (idol.st >= IDOL_SHAKE) { idol.stage = 'fall'; idol.vy = 0; idol.drops++; }
+                break;
+            case 'fall': {
+                idol.vy += IDOL_G * dt;
+                idol.cy += idol.vy * dt;
+                const floor = padY() + padH() / 2 + 6;
+                // on you: he stops where he met you, and you are his until he rises
+                if (idolOver() > 0) {
+                    idol.pin = { x: paddle.x };
+                    idolLand();
+                } else if (idol.cy + h / 2 >= floor) {
+                    idol.cy = floor - h / 2;
+                    idolLand();
+                }
+                break;
+            }
+            case 'down':
+                if ((idol.st += dt) >= IDOL_DOWN) {
+                    idol.stage = 'rise';
+                    idol.pin = null;
+                    idol.side = 0;          // he may be over you: no fence until you are clear
+                }
+                break;
+            case 'rise':
+                idol.cy = Math.max(IDOL_Y, idol.cy - IDOL_RISE * dt);
+                if (idol.cy <= IDOL_Y) {
+                    idol.stage = 'idle';
+                    idol.next = idolRand(IDOL_DROP_MIN, IDOL_DROP_MAX);
+                }
+                break;
+        }
+    }
+
+    function idolLand() {
+        idol.stage = 'down';
+        idol.st = 0;
+        idol.vy = 0;
+        // stone off his chin where he hit
+        const b = bricks[0];
+        b.x = idol.x - bw / 2;
+        b.y = idol.cy - bw * (BALL_RY / BALL_RX) / 2;
+        for (let c = 3; c < IDOL_COLS - 3; c++) idolDebris(b, (IDOL_ROWS - 2) * IDOL_COLS + c, 1);
+    }
+
+    // how far into the paddle's span his outline reaches across the band the
+    // paddle lies in, or 0 if it does not: the widest chord of him in that band
+    function idolChord() {
+        const a = bw / 2, e = bw * (BALL_RY / BALL_RX) / 2;
+        const top = padY() - padH() / 2, bot = padY() + padH() / 2;
+        const dy = Math.max(top, Math.min(bot, idol.cy)) - idol.cy;
+        if (Math.abs(dy) >= e) return 0;
+        return a * Math.sqrt(1 - (dy / e) * (dy / e));
+    }
+    function idolOver() {
+        const c = idolChord();
+        if (!c) return 0;
+        const hs = halfSpan();
+        return Math.min(paddle.x + hs, idol.x + c) - Math.max(paddle.x - hs, idol.x - c);
+    }
+
+    // After the paddle has moved: pinned, he stays put; otherwise, while any
+    // of the IDOL is down in the paddle's band, he cannot cross it.
+    function idolFence() {
+        if (phase === 'entrance') return;
+        const was = paddle.x;
+        if (idol.pin) {
+            paddle.x = idol.pin.x;
+        } else {
+            const c = idolChord();
+            if (!c) { idol.side = 0; return; }
+            const hs = halfSpan();
+            if (!idol.side) {
+                // clear of him now, so from here on this is your side
+                if (idolOver() <= 0) idol.side = paddle.x < idol.x ? -1 : 1;
+                return;
+            }
+            paddle.x = idol.side < 0 ? Math.min(paddle.x, idol.x - c - hs)
+                                     : Math.max(paddle.x, idol.x + c + hs);
+            paddle.x = Math.max(hs, Math.min(LW - hs, paddle.x));
+        }
+        if (paddle.x !== was) { paddle.prevX = paddle.x; paddle.vx = 0; }
+    }
 
     // every block of his face within r of (x, y): fn(index, distance)
     function idolEach(b, x, y, r, fn) {

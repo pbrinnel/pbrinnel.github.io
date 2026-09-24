@@ -166,6 +166,9 @@
         labPadUpdate(dt);
         menuWatch(dt);           // outside labM: it is what notices a level ending
         if (labM) labM.update(dt);
+        // after the paddle has gone where the hand sent it, and before the
+        // physics: a boss standing on the floor can hold him back from it
+        if (labB && labB.fence && bricks && bricks[0] && bricks[0].kind === 'Z' && bricks[0].alive) labB.fence();
     }
     function labDrawBrick(b) { return !!(b.lab && labM && labM.drawBrick && labM.drawBrick(b)); }
     function labDrawMini() { if (labM && labM.draw) labM.draw(); }

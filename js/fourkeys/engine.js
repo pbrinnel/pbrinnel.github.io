@@ -396,15 +396,17 @@
     // two places -- under the ball, and out from under everything else. The
     // head is spent doing it, so one phantom is one helping.
     //
-    // There is ONE strength of it, and the duration is what accumulates --
-    // exactly the way a second copy of a capsule behaves. Being hit while
-    // already sluggish does not make him worse, it makes it last longer.
+    // It stacks: every head adds to the clock, and the number on the clock is
+    // how heavy he is. One helping is DRAG_LAG; a full clock is DRAG_SLOWEST
+    // times that, and he closes the gap to your finger that many times more
+    // slowly. As the clock runs down he lightens with it.
     //
     // It is a LAG, not a speed limit: he still goes wherever you point him,
     // he just takes his time about it. Nothing is ever put out of reach, which
     // matters on a phone, where the finger IS the paddle and a clamp on how
     // fast he may travel would read as the game ignoring you.
-    const DRAG_LAG   = 0.20;     // seconds of lag while it is up -- the whole strength of it
+    const DRAG_LAG   = 0.20;     // seconds of lag at one helping or less
+    const DRAG_SLOWEST = 4;      // ...times that at DRAG_CAP, so a quarter of the pace
     const DRAG_SECS  = 3.0;      // what one head adds to the clock
     // ...and a ceiling on the clock. Without one, the end of the fight throws
     // a head every 0.45s and the total would run away to something that is
@@ -1001,7 +1003,7 @@
     // ---- state -------------------------------------------------------------
     let bricks, stage, score, best, lives, combo, phase, banner;
     let paddle, balls, popups, hits, tierSeen, bw, bh;
-    let speed, capsule, fx, callout, clock = 0, spreadT = 0, bossPhase = 0;
+    let speed, capsule, fx, callout, clock = 0, spreadT = 0, spread4T = 0, bossPhase = 0;
     let bossHits = 0;             // landed on him, however much each was worth
     let bossServed = false;       // your first ball has gone up at him
     let shoutT = -1;              // ...and the seconds until he yells at it, negative once nothing waits
@@ -1123,26 +1125,50 @@
         return Math.hypot(bRX() * s, bRY() * c);
     }
 
-    // ---- the paddle, which may be one brandon or two ------------------------
+    // ---- the paddle, which may be one brandon, two or four -------------------
     // `spreadT` runs 0 -> 1 when DOUBLE comes up and back down when it lapses,
     // so the pair slides apart and rejoins instead of snapping. at rest the
     // two are exactly on top of each other, which is indistinguishable from
     // the single brandon -- so there is no pop at either end.
+    //
+    // THE PAIR is already two, held apart for good, so DOUBLE doubles them:
+    // `spread4T` runs the same way and each of the two slides a third and
+    // fourth out from under himself, one pitch further out, until there are
+    // four in a row with the same gap between every one.
     function spread() {
         const t = spreadT;
         return t * t * (3 - 2 * t);        // smoothstep, no overshoot either way
     }
+    function spread4() {
+        const t = spread4T;
+        return t * t * (3 - 2 * t);
+    }
+    // Four of him under BIG would want more than the field, and the clamp
+    // would pin him dead centre, so each of the four gives up length until the
+    // row fits in SPAN4_MAX of it.
+    const SPAN4_MAX = 0.84;
+    function segW() {
+        const w = padW(), k4 = spread4();
+        if (k4 < 0.001) return w;
+        const want = w * (0.5 + (1 + DBL_GAP) * (spread() / 2 + k4));
+        return w * Math.min(1, LW * SPAN4_MAX / 2 / want);
+    }
     function segs() {
-        const w = padW();
+        const w = segW();
         const k = spread();
         if (k < 0.001) return [{ cx: paddle.x, w, i: 0 }];
-        const off = (w + w * DBL_GAP) / 2 * k;
-        return [{ cx: paddle.x - off, w, i: 0 },
-                { cx: paddle.x + off, w, i: 1 }];
+        const pitch = w + w * DBL_GAP;
+        const off = pitch / 2 * k;
+        const two = [{ cx: paddle.x - off, w, i: 0 },
+                     { cx: paddle.x + off, w, i: 1 }];
+        const k4 = spread4();
+        if (k4 < 0.001) return two;
+        return two.concat([{ cx: paddle.x - off - pitch * k4, w, i: 2 },
+                           { cx: paddle.x + off + pitch * k4, w, i: 3 }]);
     }
     function halfSpan() {
-        const w = padW();
-        return w / 2 + (w + w * DBL_GAP) / 2 * spread();
+        const w = segW();
+        return w / 2 + (w + w * DBL_GAP) * (spread() / 2 + spread4());
     }
 
     // ---- the wiggle ---------------------------------------------------------
@@ -1176,7 +1202,8 @@
     // Every road to zero goes through here, so the clock being cleared outright
     // -- the boss dying, the run ending -- eases out the same way.
     function dragLag(dt) {
-        const want = dragT > 0 ? DRAG_LAG : 0;
+        const heavy = Math.max(0, Math.min(1, (dragT - DRAG_SECS) / (DRAG_CAP - DRAG_SECS)));
+        const want = dragT > 0 ? DRAG_LAG * (1 + (DRAG_SLOWEST - 1) * heavy) : 0;
         padLag = want > padLag ? want
                                : Math.max(want, padLag - dt * DRAG_LAG / DRAG_EASE);
         return padLag;
@@ -1282,7 +1309,8 @@
         capsule = null;
         callout = null;
         spreadT = 0;                      // a fresh ball starts as one brandon
-        paddle.dip = [0, 0];              // ...lying level
+        spread4T = 0;
+        paddle.dip = [0, 0, 0, 0];        // ...lying level
         phantoms = [];
         shout = null;
         talk = [];                        // ...though one that is running keeps running
@@ -1659,7 +1687,7 @@
     // same number unless something is dragging on him. jt, tilt and dip are one
     // entry per segment, because under DOUBLE a knock lands on one of the two.
     paddle = { x: LW / 2, tx: LW / 2, prevX: LW / 2, vx: 0, w: PADDLE_W,
-               jt: [0, 0], tilt: [0, 0], dip: [0, 0] };
+               jt: [0, 0, 0, 0], tilt: [0, 0, 0, 0], dip: [0, 0, 0, 0] };
     fx = { B: 0, D: 0, S: 0, R: 0, P: 0, W: 0, E: 0 };
     best = loadBest();
     fetchBoard();                 // async; the game never waits on it
@@ -3113,10 +3141,15 @@
         // done before the clamp below so the widening span is what keeps him
         // on screen as he comes apart.
         const want = (fx.D > 0 || labPadSplit()) ? 1 : 0;
+        const want4 = fx.D > 0 && labPadSplit() ? 1 : 0;
+        const step = dt / DBL_SPLIT;
         if (spreadT !== want) {
-            const step = dt / DBL_SPLIT;
             spreadT = want > spreadT ? Math.min(want, spreadT + step)
                                      : Math.max(want, spreadT - step);
+        }
+        if (spread4T !== want4) {
+            spread4T = want4 > spread4T ? Math.min(want4, spread4T + step)
+                                        : Math.max(want4, spread4T - step);
         }
 
         if (siphon) stepSiphon(dt);
@@ -5251,6 +5284,7 @@
 
     function draw() {
         ctx.clearRect(0, 0, LW, LH);
+        if (introDraw(uiScale)) return;      // the opening cards, before the town
         if (king && (phase === 'gauntlet' || phase === 'absorb' || phase === 'fall')) {
             drawGauntlet(uiScale);
             return;

@@ -2,12 +2,15 @@
 
     // ---- TWINS (boss) -----------------------------------------------------------------
     // Two of him, facing each other across the top: a big slow one who throws
-    // the original's phantom heads, and a small quick one who meets the ball
-    // and sends it off at whichever of the original's angles lands furthest
-    // from you. Put one down and the other gets his health back and takes up
-    // the dead one's move as well as his own, so the order you kill them in
-    // picks the fight you finish on: a big one who slams, or a small one who
-    // throws.
+    // the original's phantom heads, and a small quick one who fights the way
+    // the original does after his second wind -- as a head comes up at him he
+    // may turn to meet it at an angle, or draw back, turn to an angle of his
+    // choosing and slam it back off that, or draw back, catch it, and hand it
+    // back so gently you are early for it. It is the original's own machine
+    // (reactToBall), his numbers and all, run for one twin instead of the boss.
+    // Put one down and the other gets his health back and takes up the dead
+    // one's move as well as his own, so the order you kill them in picks the
+    // fight you finish on: a big one who slams, or a small one who throws.
     let TW_HP_BIG      = 8;       // hits to put the big one down
     let TW_HP_SMALL    = 6;       // ...and the small one
     let TW_W_BIG       = 430;     // how long the big one is
@@ -32,7 +35,8 @@
             const one = (key, w, hp, sweep, mir, dy, ph) => ({
                 key, w, h: w / SHAPE_ASPECT, x: LW / 2, y: -200, dy, hp, maxHp: hp, flash: 0,
                 jt: 0, jnx: 0, jny: 0, iframes: 0, alive: true, sweep, mir, ph,
-                throws: key === 'big', slams: key === 'small', throwT: TW_THROW, fall: null
+                throws: key === 'big', slams: key === 'small', throwT: TW_THROW, fall: null,
+                tilt: null, lunge: null, seen: new Set()
             });
             tw = { t: 0, pend: null, order: [],
                    twins: [one('small', TW_W_SMALL, TW_HP_SMALL, TW_SWEEP_SMALL, true, 34, Math.PI / 2),
@@ -64,6 +68,7 @@
                                         angle: Math.random() * 6.28, spin: (Math.random() - 0.5) * 18, life: PH_LIFE });
                     }
                 }
+                twReact(t, dt);
             }
             b.hp = tw.twins.reduce((s, t) => s + (t.alive ? t.hp : 0), 0);
             twBox(b);
@@ -71,30 +76,37 @@
         contact(br, ball) {
             for (const t of tw.twins) {       // the small one first: he hangs in front
                 if (!t.alive) continue;
-                const hit = maskContact(ball, t.x, t.y, 0, t.w, t.h, MASK, t.mir);
+                const hit = maskContact(ball, t.x, twY(t), twAng(t), t.w, t.h, MASK, t.mir);
                 if (hit) { tw.pend = t; return hit; }
             }
             tw.pend = null;
             return null;
         },
-        // the slammer does his own bouncing: off at an angle of his choosing
+        // He came forward into this one: it goes back off the angle he turned
+        // to, square off his face, at the rally's speed. On a fake he only
+        // catches it, and holds it (see holds). Anything else is an ordinary
+        // bounce off however he is turned.
         touch(br, ball, hit) {
             const t = tw.pend;
-            if (!t || !t.slams || ball.y < t.y) return false;
-            const s = effSpeed() * (ball.boost || 1);
-            ball.y = Math.max(ball.y, t.y + t.h / 2 + extY(ball) + 2);
-            let pick = 0, far = -1;
-            for (const a of SLAM_ANGLES) {
-                const d = Math.abs(labFold(ball.x - Math.tan(a) * Math.max(0, padY() - ball.y)) - paddle.x);
-                if (d > far) { far = d; pick = a; }
-            }
-            ball.vx = -Math.sin(pick) * s;
-            ball.vy = Math.cos(pick) * s;
-            bumpSpeed(BRICK_BUMP);
+            const l = t && t.lunge;
+            if (!l || l.ball !== ball || l.stage === 'back') return false;
+            if (!l.fake) {
+                const s = effSpeed() * (ball.boost || 1);
+                labBounce(ball, hit);
+                ball.vx = -Math.sin(l.aim) * s;
+                ball.vy = Math.cos(l.aim) * s;
+                l.stage = 'back';
+            } else if (l.stage === 'rear') {
+                l.stage = 'hold';
+                l.wait = FAKE_MIN + Math.random() * (FAKE_MAX - FAKE_MIN);
+                l.dx = ball.x - t.x;
+                l.dy = ball.y - twY(t);
+            } else return false;
             twHit(t, hit.cx, hit.cy);
             tw.pend = null;
             return true;
         },
+        holds(ball) { return tw.twins.some(t => t.alive && twCaught(t, ball)); },
         glances() { return !!tw.pend && tw.pend.iframes > 0; },
         hit(b, cx, cy) {
             const t = tw.pend;
@@ -118,13 +130,92 @@
         }
     };
 
-    // the box the physics looks for them in: round both of them
+    // where he is drawn and met: drawn back or come forward by his lunge...
+    function twY(t) { return t.y + (t.lunge ? t.lunge.off : 0); }
+    // ...and turned by his tilt, eased in and out
+    function twAng(t) {
+        const k = t.tilt ? t.tilt.k : 0;
+        return t.tilt ? t.tilt.a * k * k * (3 - 2 * k) : 0;
+    }
+
+    function twCaught(t, ball) {
+        return !!t.lunge && t.lunge.ball === ball && (t.lunge.stage === 'hold' || t.lunge.stage === 'touch');
+    }
+
+    // The original's reactToBall, for one twin: a head coming up under him
+    // gets one roll, a turn to meet it, a draw back to hit it, both, or
+    // neither, and each lets go once its ball has turned back.
+    function twReact(t, dt) {
+        const live = t.slams && phase === 'play';
+        if (live) {
+            for (const ball of balls) {
+                if (ball.stuck) continue;
+                if (ball.vy >= 0) { t.seen.delete(ball); continue; }
+                const gap = ball.y - (twY(t) + t.h / 2);
+                if (t.seen.has(ball) || gap < 0 || gap > NOTICE_PX) continue;
+                if (Math.abs(ball.x - t.x) > t.w / 2 + NOTICE_PX * 0.5) continue;   // headed for the other one
+                t.seen.add(ball);
+                if (!t.tilt && Math.random() < TILT_ODDS) {
+                    const a = TILT_MIN + Math.random() * (TILT_MAX - TILT_MIN);
+                    t.tilt = { ball, a: Math.random() < 0.5 ? -a : a, k: 0, out: false };
+                }
+                if (!t.lunge && Math.random() < LUNGE_ODDS) {
+                    const aim = SLAM_ANGLES[(Math.random() * SLAM_ANGLES.length) | 0];
+                    t.lunge = { ball, off: 0, stage: 'rear', fake: Math.random() < FAKE_ODDS, aim };
+                    if (!t.tilt || t.tilt.ball === ball) t.tilt = { ball, a: aim, k: t.tilt ? t.tilt.k : 0, out: false };
+                }
+            }
+            for (const ball of t.seen) if (!balls.includes(ball)) t.seen.delete(ball);
+        }
+        if (t.tilt) {
+            const tb = t.tilt.ball;
+            if (!live || !balls.includes(tb) || (tb.vy >= 0 && !twCaught(t, tb))) t.tilt.out = true;
+            t.tilt.k = t.tilt.out ? t.tilt.k - dt / TILT_OUT : Math.min(1, t.tilt.k + dt / TILT_IN);
+            if (t.tilt.out && t.tilt.k <= 0) t.tilt = null;
+        }
+        const l = t.lunge;
+        if (!l) return;
+        const ball = l.ball;
+        const gone = !live || !balls.includes(ball);
+        if (twCaught(t, ball)) {
+            if (gone) l.stage = 'back';
+            if (l.stage === 'hold' && (l.wait -= dt) <= 0) l.stage = 'touch';
+        } else if (l.stage !== 'back' && (gone || ball.vy >= 0)) {
+            l.stage = 'back';
+        }
+        if (l.stage === 'rear' && !l.fake) {
+            // forward once the gap left is what the rest of the swing takes
+            const swing = (LUNGE_PX - l.off) / LUNGE_SPEED;
+            const gap = ball.y - extY(ball) - (twY(t) + t.h / 2);
+            if (gap <= (Math.abs(ball.vy) + LUNGE_SPEED) * swing) l.stage = 'lunge';
+        }
+        const st = l.stage;
+        const want = st === 'rear' || st === 'hold' ? -REAR_PX
+                   : st === 'lunge' ? LUNGE_PX : st === 'touch' ? TOUCH_PX : 0;
+        const rate = (st === 'lunge' ? LUNGE_SPEED : st === 'touch' ? TOUCH_SPEED : REAR_SPEED) * dt;
+        l.off += Math.max(-rate, Math.min(rate, want - l.off));
+        // the one he caught goes where he went
+        if (twCaught(t, ball) && !gone) { ball.x = t.x + l.dx; ball.y = twY(t) + l.dy; }
+        if (st === 'touch' && l.off >= TOUCH_PX - 0.5) {
+            // let go at the end of the reach, barely moving, off the angle he turned to
+            const m = Math.hypot(ball.vx, ball.vy) || 1;
+            ball.vx = -Math.sin(l.aim) * m;
+            ball.vy = Math.cos(l.aim) * m;
+            ball.boost = TOUCH_MUL;
+            l.stage = 'back';
+        }
+        if (l.stage === 'back' && Math.abs(l.off) < 0.5) t.lunge = null;
+    }
+
+    // the box the physics looks for them in: round both of them, however far
+    // they have drawn back, come forward or turned
     function twBox(b) {
         let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
         for (const t of tw.twins) {
             if (!t.alive) continue;
+            const tall = t.h / 2 + Math.abs(Math.sin(twAng(t))) * t.w / 2;
             x0 = Math.min(x0, t.x - t.w / 2); x1 = Math.max(x1, t.x + t.w / 2);
-            y0 = Math.min(y0, t.y - t.h / 2); y1 = Math.max(y1, t.y + t.h / 2);
+            y0 = Math.min(y0, twY(t) - tall); y1 = Math.max(y1, twY(t) + tall);
         }
         if (x0 === Infinity) return;
         b.x = x0; b.y = y0; bw = x1 - x0; bh = y1 - y0;
@@ -145,6 +236,13 @@
     }
 
     function twDown(t) {
+        // whatever he was holding falls out of his hands, down at you
+        if (t.lunge && twCaught(t, t.lunge.ball)) {
+            const ball = t.lunge.ball;
+            ball.vy = Math.abs(ball.vy) || effSpeed();
+        }
+        t.lunge = null;
+        t.tilt = null;
         t.alive = false;
         t.hp = 0;
         tw.order.push(t.key);
@@ -176,7 +274,8 @@
         if (!sp) return;
         const o = t.jt > 0 ? wobble(t.jt) * JIG_BRICK : 0;
         ctx.save();
-        ctx.translate(t.x + t.jnx * o, t.y + t.jny * o);
+        ctx.translate(t.x + t.jnx * o, twY(t) + t.jny * o);
+        ctx.rotate(twAng(t));
         if (t.mir) ctx.scale(-1, 1);
         ctx.drawImage(sp, -t.w / 2, -t.h / 2, t.w, t.h);
         if (t.flash > 0) {

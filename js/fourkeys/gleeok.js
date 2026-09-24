@@ -12,16 +12,23 @@
     // He is HEADLESS's body, cut at the same collar, and all three necks come
     // out of the one hole where his head was -- three heads on one neck, not
     // three heads bolted along a torso. That puts the fight in the top middle
-    // of the screen, so the body is turned by GL_TILT to bring the collar there
-    // and the rest of him runs off the top-left corner. Losing some of him off
-    // the edge is the price of the heads hanging where they should.
+    // of the screen, so the body is stood on its end by GL_TILT, legs in the
+    // air, with the collar at the bottom and most of him off the top of the
+    // screen. Losing him off the edge is the price of the heads hanging where
+    // they should.
+    //
+    // Every head still on its neck fires now and then: it swells green for
+    // GL_CHARGE, then looses GL_BURST_ROWS volleys of GL_BURST_COLS phantoms,
+    // fanned GL_BURST_ARC apart down the line of its neck -- the gauntlet's
+    // BURST and SPREAD at once, thrown at you. Each one that lands is a
+    // helping of SLUGGISH, and SLUGGISH stacks.
     let GL_LVL      = 5;
     let GL_HEADS    = 3;      // how many he has
     let GL_HEAD_HP  = 3;      // hits to tear one loose
     let GL_LOOSE_HP = 2;      // ...and to finish it once it is off
     let GL_W        = 560;    // how long his body is
     let GL_Y        = 140;    // where the collar hangs
-    let GL_TILT     = 0.32;   // rad his body is turned by, about the collar
+    let GL_TILT     = 1.5708; // rad his body is turned by, about the collar: on end, legs up
     let GL_DRIFT    = 90;     // px either side the collar drifts
     let GL_HEAD_W   = 78;     // how wide a head is
     let GL_NECK     = 145;    // px from the collar out to a head
@@ -32,9 +39,18 @@
     let GL_LOOSE    = 210;    // px/s a loose head flies at
     let GL_THICK    = 0.17;   // how thick his body is to a head, as a share of it
     let GL_CLIMB    = 0.5;    // how much of the original's climb this fight has
+    let GL_FIRE_MIN = 6;      // seconds between one head's bursts, at least...
+    let GL_FIRE_MAX = 11;     // ...and at most
+    let GL_CHARGE   = 0.7;    // the green swell before it fires, which is the tell
+    let GL_BURST_COLS = 4;    // phantoms side by side in a volley
+    let GL_BURST_ROWS = 5;    // volleys in a burst
+    let GL_BURST_GAP  = 0.13; // seconds between volleys
+    let GL_BURST_ARC  = 0.17; // rad between one column and the next
+    let GL_BURST_MAX  = 60;   // phantoms in the air at most, all heads together
     LAB_KNOBS.push('GL_LVL', 'GL_HEADS', 'GL_HEAD_HP', 'GL_LOOSE_HP', 'GL_W', 'GL_Y', 'GL_TILT',
                    'GL_DRIFT', 'GL_HEAD_W', 'GL_NECK', 'GL_FAN', 'GL_SWING', 'GL_RATE',
-                   'GL_LOOSE', 'GL_THICK', 'GL_CLIMB');
+                   'GL_LOOSE', 'GL_THICK', 'GL_CLIMB', 'GL_FIRE_MIN', 'GL_FIRE_MAX', 'GL_CHARGE',
+                   'GL_BURST_COLS', 'GL_BURST_ROWS', 'GL_BURST_GAP', 'GL_BURST_ARC', 'GL_BURST_MAX');
 
     const GL_BEADS = 5;       // the neck, in heads shrinking into his body
 
@@ -47,7 +63,9 @@
                    heads: Array.from({ length: n }, (_, i) => ({
                        hp: GL_HEAD_HP, alive: true, loose: false, flash: 0, spent: 0,
                        // where in the fan this neck sits, middle one at 0
-                       fan: i - (n - 1) / 2, ph: i * 2.1, x: LW / 2, y: 0, vx: 0, vy: 0
+                       fan: i - (n - 1) / 2, ph: i * 2.1, x: LW / 2, y: 0, vx: 0, vy: 0,
+                       // staggered, so the first bursts come one head at a time
+                       fire: GL_FIRE_MIN * (0.6 + i * 0.55) + Math.random() * 2, charge: 0, shots: 0, shotT: 0
                    })) };
             b.maxHp = n * (GL_HEAD_HP + GL_LOOSE_HP);
             b.hp = b.maxHp;
@@ -74,6 +92,8 @@
                     k.ax = gl.cx; k.ay = gl.cy;
                     k.x = gl.cx + Math.cos(a) * GL_NECK;
                     k.y = gl.cy + Math.sin(a) * GL_NECK;
+                    if (phase === 'play') glFire(k, a, dt);
+                    else { k.charge = 0; k.shots = 0; }
                     continue;
                 }
                 if (phase !== 'play') continue;
@@ -134,11 +154,12 @@
             // the last head: the body has nothing left to hold up
             b.alive = false;
             clearStage();
-            // he comes apart from his middle, which is halfway back along him
-            const boot = glBoot();
-            const mx = (gl.cx + boot.x) / 2, my = (gl.cy + boot.y) / 2;
-            bossFall = shatter(mx, my, GL_W, A_DIE_T);
-            if (impact) { impact.x = mx; impact.y = my; impact.w = GL_W; }
+            // he comes apart about the middle of his box, turned as he stood
+            const m = glMiddle();
+            bossFall = shatter(m.x, m.y, GL_W, A_DIE_T);
+            // the white cut-out levels itself as it burns off, and he is on
+            // end, so it would swing through the air; his colour going says it
+            if (impact) impact.w = 0;
         },
         draw: glDraw,
         drawFall() {
@@ -146,8 +167,8 @@
             if (!c) return;
             const wilt = Math.max(0, Math.min(1, ascendT / A_DIE));
             const e = wilt * wilt * (3 - 2 * wilt);
-            if (ascendT < A_DIE) drawFigure(c.x, c.y + e * F_SAG, c.w, 1, e, e * F_LEAN);
-            else drawCrumble(c, e * F_SAG, e * F_LEAN, true);
+            if (ascendT < A_DIE) drawFigure(c.x, c.y, c.w, 1, e, GL_TILT);
+            else drawCrumble(c, 0, GL_TILT, true);
         },
         climb() { return GL_CLIMB; },
         finish(b) {
@@ -166,6 +187,41 @@
     function glBoot() {
         const back = GL_W * HL_HEAD_U;
         return { x: gl.cx - Math.cos(GL_TILT) * back, y: gl.cy - Math.sin(GL_TILT) * back };
+    }
+
+    // the middle of the box his body is drawn in, which is where drawFigure
+    // and the crumble turn him about
+    function glMiddle() {
+        const h = GL_W / SHAPE_ASPECT;
+        const lx = GL_W / 2 - GL_W * HL_HEAD_U, ly = h / 2 - h * HL_HEAD_V;
+        const c = Math.cos(GL_TILT), s = Math.sin(GL_TILT);
+        return { x: gl.cx + lx * c - ly * s, y: gl.cy + lx * s + ly * c };
+    }
+
+    // One head on its neck: counting down to a burst, swelling green, then
+    // firing it a volley at a time down the line its neck points along.
+    function glFire(k, a, dt) {
+        if (k.shots > 0) {
+            if ((k.shotT -= dt) > 0) return;
+            k.shotT = GL_BURST_GAP;
+            k.shots--;
+            const n = Math.max(1, Math.round(GL_BURST_COLS));
+            for (let i = 0; i < n && phantoms.length < GL_BURST_MAX; i++) {
+                const d = a + (i - (n - 1) / 2) * GL_BURST_ARC;
+                phantoms.push({ x: k.x, y: k.y, vx: Math.cos(d) * PH_SPEED, vy: Math.sin(d) * PH_SPEED,
+                                angle: Math.random() * 6.28, spin: (Math.random() - 0.5) * 18, life: PH_LIFE });
+            }
+            if (!k.shots) k.fire = GL_FIRE_MIN + Math.random() * (GL_FIRE_MAX - GL_FIRE_MIN);
+            return;
+        }
+        if (k.charge > 0) {
+            if ((k.charge += dt) < GL_CHARGE) return;
+            k.charge = 0;
+            k.shots = Math.max(1, Math.round(GL_BURST_ROWS));
+            k.shotT = 0;
+            return;
+        }
+        if ((k.fire -= dt) <= 0) k.charge = 1e-6;
     }
 
     // the box the physics looks for him in: his body and wherever his heads are
@@ -209,7 +265,28 @@
         ctx.restore();
         for (const k of gl.heads) {
             if (!k.alive) continue;
+            // the swell before a burst: green washing up over him and a glow
+            // round him, rising once -- a tell, not a flash
+            const sw = k.charge > 0 ? Math.min(1, k.charge / GL_CHARGE) : k.shots > 0 ? 1 : 0;
+            if (sw > 0) {
+                const r = hw * 0.95;
+                const g = ctx.createRadialGradient(k.x, k.y, hw * 0.2, k.x, k.y, r);
+                g.addColorStop(0, PH_LOOK.color);
+                g.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.globalAlpha = PH_LOOK.glow * 1.6 * sw;
+                ctx.fillStyle = g;
+                ctx.beginPath();
+                ctx.arc(k.x, k.y, r, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            }
             ctx.drawImage(ballImg, k.x - hw / 2, k.y - hh / 2, hw, hh);
+            const green = sw > 0 ? phantomSprite(PH_LOOK) : null;
+            if (green) {
+                ctx.globalAlpha = 0.55 * sw;
+                ctx.drawImage(green, k.x - hw / 2, k.y - hh / 2, hw, hh);
+                ctx.globalAlpha = 1;
+            }
             if (k.flash > 0) {
                 ctx.globalAlpha = Math.min(1, k.flash) * 0.7;
                 ctx.drawImage(headSprite2('flat', '#f2efe9'), k.x - hw / 2, k.y - hh / 2, hw, hh);

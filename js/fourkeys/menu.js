@@ -132,7 +132,8 @@
     // He walks up from y 542, so the near pair is a short walk and the far one
     // is a long one. Their x spans never overlap and each is a lane straight up
     // to one building: 25-161 is the FARM's, 187-305 the RUINS', 331-469 goes
-    // all the way up the middle to the CASTLE, and the right is the mirror.
+    // all the way up the middle to the CASTLE, and the right is the mirror --
+    // except hard against either wall, which is the lane of a corner (M_SIDES).
     //
     // The five stand 26px apart all the way across, between the two gates at
     // 0-24 and 776-800. Evenly spaced is the whole of the arrangement: the
@@ -152,6 +153,21 @@
         5: { x: 400, y: 160, w: 138, h: 94 }
     };
 
+    // Two more in the top corners that are not levels: forgetting everything
+    // on the left, the boards on the right. Every lane across the floor is
+    // taken, so theirs is the wall itself -- walk up hard against the left or
+    // right edge and that is where you arrive, past the FARM or the VOLCANO
+    // rather than into it. Erasing wants a second, longer hold once you are in
+    // the doorway, because it cannot be taken back.
+    const M_SIDES = [
+        { key: 'reset', side: -1, lines: ['RESET', 'SAVE DATA'], ink: '#c0594a',
+          at: { x: 70, y: 150, w: 116, h: 84 } },
+        { key: 'board', side: 1, lines: ['LEADER', 'BOARD'], ink: '#c9a94e',
+          at: { x: 730, y: 150, w: 116, h: 84 } }
+    ];
+    const ERASE_HOLD = 1.6;          // the second hold, on top of DOOR_HOLD
+    const M_WALL = 3;                // px off his clamp that still counts as against the wall
+
     function menuBuild() {
         menuLoad();
         menu.sw = null;
@@ -161,7 +177,22 @@
         menu.lift = 0;
         menu.into = null;
         menu.gait = 0;
-        menu.cards = MENU_ALL.map(l => Object.assign({ level: l }, M_TOWN[l.n]));
+        menu.cards = MENU_ALL.map(l => Object.assign({ level: l }, M_TOWN[l.n]))
+            .concat(M_SIDES.map(s => Object.assign({ level: s }, s.at)));
+    }
+
+    // which wall he is walking up against, if either
+    function menuWall() {
+        const hs = halfSpan();
+        return paddle.x <= hs + M_WALL ? -1 : paddle.x >= LW - hs - M_WALL ? 1 : 0;
+    }
+
+    // whether he is lined up with this one: a corner's lane is its wall, and
+    // against a wall only the corner is lined up
+    function menuLane(c) {
+        const wall = menuWall();
+        if (c.level.key) return wall === c.level.side;
+        return !wall && paddle.x >= c.x - c.w / 2 && paddle.x <= c.x + c.w / 2;
     }
 
     function menuSay(t) { menu.say = t; menu.sayT = 2.6; }
@@ -205,8 +236,18 @@
             const over = (c.y + c.h / 2) - (padY() - padH() / 2);
             if (over > 0) menu.lift -= over;
             if (menu.into && menu.into.card !== c) menu.into = null;
-            if (!menu.into) menu.into = { card: c, t: 0 };
-            if (menu.march && (menu.into.t += dt) >= DOOR_HOLD) { menu.into = null; menuEnter(c.level); return; }
+            if (!menu.into) menu.into = { card: c, t: 0, armed: false };
+            if (menu.march && (menu.into.t += dt) >= (menu.into.armed ? ERASE_HOLD : DOOR_HOLD)) {
+                // the first hold at RESET only arms it; the second one erases
+                if (c.level.key === 'reset' && !menu.into.armed) {
+                    menu.into.armed = true;
+                    menu.into.t = 0;
+                } else {
+                    menu.into = null;
+                    menuEnter(c.level);
+                    return;
+                }
+            }
             if (!menu.march) menu.into = null;
         } else menu.into = null;
         // the walk itself: a pace only runs while he is covering ground
@@ -217,9 +258,9 @@
 
     // the building his middle has reached, if any
     function menuAt() {
-        const x = paddle.x, y = padY() - padH() / 2;
+        const y = padY() - padH() / 2;
         for (const c of menu.cards) {
-            if (x < c.x - c.w / 2 || x > c.x + c.w / 2) continue;
+            if (!menuLane(c)) continue;
             if (y > c.y + c.h / 2 || y < c.y - c.h / 2) continue;
             return c;
         }
@@ -242,6 +283,18 @@
     // hub to tell a clean run from a costly one.
     function menuEnter(level) {
         menuLoad();
+        if (level.key === 'board') {
+            menuSay('LEADERBOARD · COMING SOON');
+            menu.march = false;
+            return;
+        }
+        if (level.key === 'reset') {
+            LAB_MINI.menu.acts.wipe();
+            clearBest();                    // everything means the best as well
+            menuSay('SAVE DATA ERASED');
+            menu.march = false;
+            return;
+        }
         if (level.n === 5 && !menuOpened()) {
             const short = MENU_LEVELS.length - menuProgress().keys.length;
             menuSay('THE CASTLE WANTS ' + short + (short === 1 ? ' MORE KEY' : ' MORE KEYS'));
@@ -499,13 +552,39 @@
         menuDrawLine();
     }
 
+    // A corner: no roof and no key, just a sign. RESET's doorway fills twice,
+    // the second time in its own red and saying what it is about to do.
+    function menuDrawSide(c) {
+        const s = c.level;
+        const x = c.x - c.w / 2, y = c.y - c.h / 2;
+        const aimed = menuLane(c);
+        menuPanel(x, y, c.w, c.h, aimed, s.ink);
+        const into = menu.into && menu.into.card === c ? menu.into : null;
+        if (into) {
+            const k = Math.min(1, into.t / (into.armed ? ERASE_HOLD : DOOR_HOLD));
+            ctx.globalAlpha = into.armed ? 0.75 : 0.5;
+            ctx.fillStyle = s.ink;
+            ctx.fillRect(x + 1, y + c.h * (1 - k) - 1, c.w - 2, c.h * k);
+            ctx.globalAlpha = 1;
+        }
+        if (into && into.armed) {
+            text('KEEP HOLDING', c.x, y + c.h * 0.42, 14, '#f2efe9', 'center');
+            text('to erase everything', c.x, y + c.h * 0.7, 11, '#f2efe9', 'center');
+            return;
+        }
+        const ink = aimed ? s.ink : '#8d877d';
+        text(s.lines[0], c.x, y + c.h * 0.44, 17, ink, 'center');
+        text(s.lines[1], c.x, y + c.h * 0.72, 13, ink, 'center');
+    }
+
     function menuDrawLevel(c) {
         const l = c.level;
+        if (l.key) { menuDrawSide(c); return; }
         const shut = l.n === 5 && !menuOpened();
         const x = c.x - c.w / 2, y = c.y - c.h / 2;
         // lit while he is standing in its lane, walking or not, so a walk is
         // aimed before it is started
-        const aimed = paddle.x >= x && paddle.x <= x + c.w;
+        const aimed = menuLane(c);
         const ink = shut ? '#4a453d' : l.ink;
         menuCap(c, aimed ? ink : shut ? '#241f1b' : '#2e2a24');
         menuPanel(x, y, c.w, c.h, aimed, ink);
@@ -558,10 +637,13 @@
         text(side < 0 ? '◀' : '▶', x + M_GATE.w / 2, M_GATE.y + 16, 12,
              on ? '#f2efe9' : '#6d685f', 'center');
         if (!p) return;
-        const name = p.name.replace(/ /g, '');
-        for (let i = 0; i < name.length; i++) {
-            text(name[i], x + M_GATE.w / 2, M_GATE.y + 34 + i * 11, 10,
-                 on ? '#f2efe9' : '#6d685f', 'center');
+        // a space is a gap down the post, the height of half a letter, so a
+        // name of two words still reads as two
+        let y = M_GATE.y + 34;
+        for (const ch of p.name) {
+            if (ch === ' ') { y += 6; continue; }
+            text(ch, x + M_GATE.w / 2, y, 10, on ? '#f2efe9' : '#6d685f', 'center');
+            y += 11;
         }
     }
 
@@ -592,7 +674,13 @@
     // The game's own tap serves a ball; there is no ball here, so the hub takes
     // the press for itself (see the action() hook) and only watches whether it
     // is still down.
-    const menuHeld = down => { if (menu && (!down || menuUp())) menu.march = down; };
+    // A press that turns over one of the opening cards is the card's, not his.
+    // Asked as typeof since the boss lab builds this file without the opening.
+    const introHas = () => typeof introUp === 'function' && introUp();
+    const menuHeld = down => {
+        if (down && introHas()) return;
+        if (menu && (!down || menuUp())) menu.march = down;
+    };
     addEventListener('pointerdown', e => {
         if (e.target && e.target.closest && e.target.closest('#lab')) return;
         menuHeld(true);

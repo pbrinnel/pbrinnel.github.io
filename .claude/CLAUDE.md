@@ -39,8 +39,13 @@ touches it.
 - Its code is in `js/fourkeys/`: `engine.js` (brandon.html's game, forked 22 Sep 2026 and
   edited here from now on), `runtime.js` (the seam the bosses plug into), a file per boss,
   mini-boss and paddle, `menu.js` (the town), `debug.js` (what the konami code and
-  `?debug` open: the keys, the paddles, and a hold to forget it all), and `start.js`, which
-  is where the game begins.
+  `?debug` open: the keys, the paddles, and a hold to forget it all), `intro.js` (the
+  BRANDON WINS and 2000 YEARS LATER cards before the town), and `start.js`, which is where
+  the game begins.
+- The boss lab builds from these files but not from `intro.js` or `debug.js`, and it runs
+  brandon.html's engine. So a module that calls something only fourkeys has must check
+  it with `typeof` first, and a new top-level name must not already be used in
+  brandon.html (the lab refuses a name declared twice).
 - **Load order is the whole design and `fourkeys.html` sets it.** They are plain scripts
   sharing one scope: runtime and modules first, `engine.js` after them, `start.js` last.
   Nothing in a module may READ an engine const at load time — inside a function is fine.

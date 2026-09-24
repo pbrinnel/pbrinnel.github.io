@@ -33,16 +33,18 @@
     let FROST_EDGE = 1.5;    // ...spin off his ends...
     let FROST_SWIPE = 2.2;   // ...and off his travel, both far easier
     let FROST_DECK = 0.6;    // ...on a narrower flat, so more of him is a curve
+    let FROST_FLAKES = 14;   // snowflakes a second coming off him
     let EMB_LEN    = 0.88;   // ember: shorter...
     let EMB_ANGLE  = 1.35;   // ...and his ends throw a head much harder
     let EMB_GLOW   = 0.45;   // how much light he gives off
+    let EMB_SPARKS = 34;     // sparks a second rising off him
     let PAIR_LEN   = 0.62;   // the pair: two of him, each this much of one
-    let V2_GLOSS   = 0.22;   // 2.0: how bright the gloss along his top is...
+    let V2_GLOSS   = 0.22;   // MODERN: how bright the gloss along his top is...
     let V2_GLINT   = 5;      // ...seconds between one glint and the next...
     let V2_SWEEP   = 0.9;    // ...and how long a glint takes to cross him
     LAB_KNOBS.push('GILT_LEN', 'GILT_CAPS', 'GILT_SHINE', 'STAT_LEN', 'STAT_ANGLE', 'STAT_SPIN',
-                   'STAT_DIP', 'FROST_LEN', 'FROST_EDGE', 'FROST_SWIPE', 'FROST_DECK',
-                   'EMB_LEN', 'EMB_ANGLE', 'EMB_GLOW', 'PAIR_LEN', 'V2_GLOSS', 'V2_GLINT', 'V2_SWEEP');
+                   'STAT_DIP', 'FROST_LEN', 'FROST_EDGE', 'FROST_SWIPE', 'FROST_DECK', 'FROST_FLAKES',
+                   'EMB_LEN', 'EMB_ANGLE', 'EMB_GLOW', 'EMB_SPARKS', 'PAIR_LEN', 'V2_GLOSS', 'V2_GLINT', 'V2_SWEEP');
 
     const V2_RIM    = '#e6edf5';
     const GILT_INK  = '#efb920', GILT_RIM = '#ffe9a3';
@@ -80,13 +82,16 @@
         return { name: (labP && labP.name) || LAB_PAD.standard.name, line: say.join(' · ') || 'as the game has him' };
     }
 
+    // Whatever he sheds, he sheds wherever he is on screen -- the town
+    // included, which is where a paddle is chosen and has to show what it is.
     function labPadUpdate(dt) {
-        if (labP && labP.step && phase === 'play') labP.step(dt);
+        if (labP && labP.step && !(king && phase === 'fall')) labP.step(dt);
         for (const b of padBits) {
             b.t += dt;
             b.x += b.vx * dt;
             b.y += b.vy * dt;
             b.vy += b.g * dt;
+            if (b.sway) b.x += Math.sin(b.t * 3 + b.ph) * b.sway * dt;
         }
         padBits = padBits.filter(b => b.t < b.life);
     }
@@ -96,7 +101,38 @@
     function labPadOver() {
         if (labP && labP.over) labP.over();
         for (const b of padBits) {
-            ctx.globalAlpha = Math.max(0, 1 - b.t / b.life) * b.a;
+            const a = Math.max(0, 1 - b.t / b.life) * b.a;
+            if (b.kind === 'flake') {
+                // a six-armed speck of ice, turning as it goes
+                ctx.globalAlpha = a;
+                ctx.strokeStyle = b.ink;
+                ctx.lineWidth = 1.2;
+                ctx.beginPath();
+                for (let k = 0; k < 3; k++) {
+                    const r = b.ph + b.t * 1.5 + k * Math.PI / 3;
+                    const dx = Math.cos(r) * b.s, dy = Math.sin(r) * b.s;
+                    ctx.moveTo(b.x - dx, b.y - dy);
+                    ctx.lineTo(b.x + dx, b.y + dy);
+                }
+                ctx.stroke();
+                continue;
+            }
+            if (b.kind === 'glow') {
+                // a spark with light round it, added to what is under it
+                ctx.globalCompositeOperation = 'lighter';
+                const g = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.s * 2.4);
+                g.addColorStop(0, b.ink);
+                g.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.globalAlpha = a * 0.55;
+                ctx.fillStyle = g;
+                ctx.fillRect(b.x - b.s * 2.4, b.y - b.s * 2.4, b.s * 4.8, b.s * 4.8);
+                ctx.globalAlpha = a;
+                ctx.fillStyle = '#fff1d6';
+                ctx.fillRect(b.x - b.s / 4, b.y - b.s / 4, b.s / 2, b.s / 2);
+                ctx.globalCompositeOperation = 'source-over';
+                continue;
+            }
+            ctx.globalAlpha = a;
             ctx.fillStyle = b.ink;
             ctx.fillRect(b.x - b.s / 2, b.y - b.s / 2, b.s, b.s);
         }
@@ -104,10 +140,18 @@
     }
 
     // one speck of whatever he is shedding
-    function padBit(x, y, ink, life, vx, vy, g, s, a) {
-        if (padBits.length > 160) return;
+    function padBit(x, y, ink, life, vx, vy, g, s, a, kind, sway) {
+        if (padBits.length > 220) return;
         padBits.push({ x, y, ink, t: 0, life, vx: vx || 0, vy: vy || 0, g: g === undefined ? 90 : g,
-                       s: s || 2 + Math.random() * 2, a: a === undefined ? 0.9 : a });
+                       s: s || 2 + Math.random() * 2, a: a === undefined ? 0.9 : a,
+                       kind: kind || 'speck', sway: sway || 0, ph: Math.random() * 6.28 });
+    }
+
+    // somewhere along one of him, picked at random
+    function padSomewhere(spread) {
+        const all = segs();
+        const sg = all[(Math.random() * all.length) | 0];
+        return { sg, x: sg.cx + (Math.random() - 0.5) * sg.w * spread };
     }
 
     // a level sprite laid over one of him, the way the sluggish tint is
@@ -177,13 +221,13 @@
     }
 
     // ---- the variants -------------------------------------------------------------
-    // 2.0: what you start with. The first game's paddle with a coat of polish
+    // MODERN: what you start with. The first game's paddle with a coat of polish
     // -- a pale rim, a gloss along his top and a glint now and then -- and not
     // one number changed, so everything the other variants trade against is
     // still him. The key stays 'standard' so progress already saved still has
     // him in it.
     LAB_PAD.standard = {
-        name: 'V2.0',
+        name: 'MODERN',
         rim: V2_RIM,
         blurb: 'the paddle you start with, polished',
         under() { padRim('padRimV', V2_RIM, 2, 0.45); },
@@ -233,9 +277,9 @@
     }
 
     // CLASSIC: the first game's paddle, bare. Nothing but the photograph and
-    // nothing changed about how he plays -- he is 2.0 without the polish,
+    // nothing changed about how he plays -- he is MODERN without the polish,
     // there to be carried for old times' sake. The first level you win gives him.
-    LAB_PAD.classic = { name: 'CLASSIC', blurb: 'him, as the first game had him · plays the same as 2.0' };
+    LAB_PAD.classic = { name: 'CLASSIC', blurb: 'him, as the first game had him · plays the same as MODERN' };
 
     // GILT: gold leaf over the photograph, with a sweep of light crossing him
     // every few seconds. Shorter than standard, and everything he catches
@@ -306,13 +350,24 @@
         under() { padRim('padRimF', FROST_RIM, 2.5, 0.55); },
         skin(sg, o) { padLay(sg, o, padTint('padFrost', FROST_INK), 0.82); },
         step(dt) {
+            // flakes coming off him all the time, drifting down and wandering
+            // as they go...
+            if (Math.random() < dt * FROST_FLAKES) {
+                const p = padSomewhere(0.95);
+                padBit(p.x, padY() + (Math.random() - 0.5) * padH() * 0.6,
+                       Math.random() < 0.5 ? FROST_RIM : FROST_INK, 1.4 + Math.random() * 1.2,
+                       (Math.random() - 0.5) * 14, 6 + Math.random() * 14, 8,
+                       2 + Math.random() * 2.2, 0.85, 'flake', 18 + Math.random() * 16);
+            }
+            // ...and a spray of ice behind him when he travels
             const fast = Math.min(1, Math.abs(paddle.vx) / 500);
-            if (Math.random() > fast * 0.8) return;
-            const segsNow = segs();
-            const sg = segsNow[(Math.random() * segsNow.length) | 0];
-            padBit(sg.cx + (Math.random() - 0.5) * sg.w, padY() + (Math.random() - 0.5) * padH(),
-                   FROST_RIM, 0.5 + Math.random() * 0.4, -paddle.vx * 0.12 + (Math.random() - 0.5) * 40,
-                   -30 - Math.random() * 40, 40, 1.5 + Math.random() * 2);
+            for (let n = 0; n < 2; n++) {
+                if (Math.random() > fast * 0.8) continue;
+                const p = padSomewhere(1);
+                padBit(p.x, padY() + (Math.random() - 0.5) * padH(),
+                       FROST_RIM, 0.5 + Math.random() * 0.4, -paddle.vx * 0.12 + (Math.random() - 0.5) * 40,
+                       -30 - Math.random() * 40, 40, 1.5 + Math.random() * 2);
+            }
         }
     };
 
@@ -341,12 +396,25 @@
         },
         skin(sg, o) { padLay(sg, o, padTint('padEmber', EMB_INK), 0.72); },
         step(dt) {
-            if (Math.random() > dt * 22) return;
-            const segsNow = segs();
-            const sg = segsNow[(Math.random() * segsNow.length) | 0];
-            padBit(sg.cx + (Math.random() - 0.5) * sg.w * 0.9, padY() - padH() * 0.2,
-                   Math.random() < 0.4 ? EMB_RIM : EMB_INK, 0.8 + Math.random() * 0.7,
-                   (Math.random() - 0.5) * 30, -40 - Math.random() * 60, -30, 1.5 + Math.random() * 2.5);
+            // sparks lifting off him with light round them, weaving as they
+            // climb, and left behind when he moves
+            let n = EMB_SPARKS * dt;
+            while (n > 0) {
+                if (Math.random() < n) {
+                    const p = padSomewhere(0.9);
+                    padBit(p.x, padY() - padH() * (0.1 + Math.random() * 0.3),
+                           Math.random() < 0.4 ? EMB_RIM : EMB_INK, 0.8 + Math.random() * 0.9,
+                           (Math.random() - 0.5) * 30 - paddle.vx * 0.08, -40 - Math.random() * 70, -30,
+                           2 + Math.random() * 2.5, 0.95, 'glow', 20 + Math.random() * 30);
+                }
+                n -= 1;
+            }
+            // now and then a flake of ash, drifting up slower and greyer
+            if (Math.random() < dt * 3) {
+                const p = padSomewhere(0.8);
+                padBit(p.x, padY() - padH() * 0.2, '#8a7f76', 1.8 + Math.random(),
+                       (Math.random() - 0.5) * 20, -18 - Math.random() * 20, -4, 2 + Math.random() * 1.5, 0.6);
+            }
         }
     };
 
