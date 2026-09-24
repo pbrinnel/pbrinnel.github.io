@@ -2004,85 +2004,17 @@
         }
     }
 
-    // ---- stage select, on the konami code -----------------------------------
+    // ---- the debug menu, on the konami code ---------------------------------
     const KONAMI = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft',
                     'ArrowRight', 'ArrowLeft', 'ArrowRight', 'KeyB', 'KeyA'];
     const debugEl = document.getElementById('debug');
     let konami = [];
 
-    LEVELS.forEach((lvl, i) => {
-        const btn = document.createElement('button');
-        btn.textContent = (i + 1) + '  ·  ' + lvl.dbg;
-        btn.addEventListener('click', () => startAt(i));
-        debugEl.appendChild(btn);
-    });
-    // The throne is not a LEVEL -- it has no bricks and no entry in the table
-    // above -- so it needs its own way in. Without one the only route to half
-    // the game is landing thirty-three hits on him first, which is a poor way
-    // to look at something twice.
-    (() => {
-        const btn = document.createElement('button');
-        btn.textContent = (LEVELS.length + 1) + '  ·  GAUNTLET';
-        btn.addEventListener('click', startGauntletAt);
-        debugEl.appendChild(btn);
-    })();
-    // Your best is kept in this browser and nothing in the game ever lowers
-    // it, so one set while testing, or under scoring that has since changed,
-    // would otherwise stand until someone cleared the site's data by hand.
-    //
-    // Any player can find this menu, and a cleared best does not come back,
-    // so it sits in a corner away from the stages and only a press held for
-    // RESET_HOLD sets it off. A stray click, a double-click and a quick tap
-    // all let go too soon. It is out of the tab order because no key can
-    // hold it down.
-    const RESET_HOLD = 2;                     // seconds
-    const resetBtn = document.createElement('button');
-    resetBtn.className = 'wipe';
-    resetBtn.tabIndex = -1;
-    let resetT = 0;                           // the hold under way, or 0
-    function holdReset(on) {
-        clearTimeout(resetT);
-        resetT = on ? setTimeout(wipeBest, RESET_HOLD * 1000) : 0;
-        resetBtn.classList.toggle('holding', on);
-        resetBtn.style.transitionDuration = on ? RESET_HOLD + 's' : '';
-    }
-    // what it says each time the menu opens, and gone when there is no best
-    function labelReset() {
-        holdReset(false);
-        resetBtn.disabled = false;
-        resetBtn.textContent = 'hold to reset your best';
-        resetBtn.hidden = best === 0;
-    }
-    function wipeBest() {
-        holdReset(false);
-        if (debugEl.hidden) return;           // the menu shut under the hold
-        clearBest();
-        resetBtn.textContent = 'best reset';
-        resetBtn.disabled = true;             // until the menu next opens
-    }
-    resetBtn.addEventListener('pointerdown', e => {
-        if (e.button === 0 && !resetBtn.disabled) holdReset(true);
-    });
-    for (const t of ['pointerup', 'pointerleave', 'pointercancel'])
-        resetBtn.addEventListener(t, () => holdReset(false));
-    // Android raises this on a long press, whatever is under the finger
-    resetBtn.addEventListener('contextmenu', e => e.preventDefault());
-    debugEl.appendChild(resetBtn);
-    debugEl.appendChild(Object.assign(document.createElement('p'),
-        { textContent: 'esc to go back' }));
-
-    // stand his stage up, take him off the board, and hand over -- the same
-    // handover the takeover performs, minus the fight and the ceremony
-    function startGauntletAt() {
-        score = 0; lives = 3;
-        popups = [];
-        stage = LEVELS.length - 1;
-        buildStage(stage);
-        bricks[0].alive = false;
-        startGauntlet();
-        banner = '';
-        debugEl.hidden = true;
-    }
+    // What goes in the panel is debug.js's: the keys and paddles the town
+    // hands out, and a way to put it all back. brandon.html's stage list and
+    // its best-reset are gone -- there are no stages to pick here yet, and the
+    // best it offered to clear is not a number this game shows you.
+    debugBuild();
 
     function startAt(n) {
         score = 0; lives = 3; stage = n;
@@ -2095,10 +2027,6 @@
     addEventListener('keydown', e => {
         if (!debugEl.hidden) {                    // menu is open
             if (e.code === 'Escape') debugEl.hidden = true;
-            const n = '12345'.indexOf(e.key);
-            if (n >= 0 && n < LEVELS.length) startAt(n);
-            // ...and one past the last stage for the throne
-            if (e.key === String(LEVELS.length + 1)) startGauntletAt();
             e.stopPropagation();
             return;
         }
@@ -2110,19 +2038,8 @@
     function openMenu() {
         konami = [];
         freeMouse();                              // the menu is all buttons
-        labelReset();                             // the best as it stands now
+        debugSync();                              // what you have, as it stands now
         debugEl.hidden = false;
-    }
-
-    // A phone has no keys to enter the code with, so the address can ask for
-    // the menu instead: brandon.html?debug opens it as the page loads. The
-    // splash is cleared first and the wake lock taken, as a tap on it would:
-    // a tap that clears the splash can lose its click (see splash), and the
-    // first tap here chooses a stage.
-    if (new URLSearchParams(location.search).has('debug')) {
-        splash.hidden = true;
-        keepAwake();
-        openMenu();
     }
 
     // ---- initials ------------------------------------------------------------

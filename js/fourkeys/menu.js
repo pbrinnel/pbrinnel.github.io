@@ -100,6 +100,21 @@
 
     function menuOpened() { return menuProgress().keys.length >= MENU_LEVELS.length; }
 
+    // ---- what the debug menu reaches in through ---------------------------------------
+    // Everything the town knows about you is in `menu`, and `menu` is this
+    // file's. These four are the whole of the way in, so nothing else has to
+    // know how progress is stored or that it is saved at all.
+    function menuLevels() { menuLoad(); return MENU_ALL; }
+    function menuPads() { menuLoad(); return MENU_PADS; }
+    function menuHas(what, k) { menuLoad(); return !!menu[what][k]; }
+    function menuSet(what, k, on) {
+        menuLoad();
+        if (on) menu[what][k] = true; else delete menu[what][k];
+        // a paddle taken back out from under you leaves you holding nothing
+        if (what === 'pads' && !on && LAB.pad === k) LAB.usePad('standard');
+        menuSave();
+    }
+
     function menuName(n) { const l = MENU_ALL.find(o => o.n === n); return l ? l.name : 'LEVEL ' + n; }
 
     // the first boss whose level slider points at this one, if any
@@ -110,19 +125,26 @@
 
     // ---- the town -------------------------------------------------------------------
     // He walks up from y 542, so the near pair is a short walk and the far one
-    // is a long one. Their x spans never overlap: 28-172 is the FARM's lane,
-    // 184-316 the RUINS', 322-478 goes all the way up the middle to the CASTLE,
-    // and the right is the mirror of it.
+    // is a long one. Their x spans never overlap and each is a lane straight up
+    // to one building: 25-161 is the FARM's, 187-305 the RUINS', 331-469 goes
+    // all the way up the middle to the CASTLE, and the right is the mirror.
+    //
+    // The five stand 26px apart all the way across, between the two gates at
+    // 0-24 and 776-800. Evenly spaced is the whole of the arrangement: the
+    // CASTLE used to sit in a 6px slot between its neighbours, which read as
+    // the middle of the town being crowded rather than as the far end of it.
+    // Buying that room cost every building some width, and the far pair lost
+    // most -- which is what being further away should look like anyway.
     const M_TOP = 78;                        // the band the objective sits in
     // the one line of patter goes in the gap between the far row and the near
     // one -- the floor is the gates' now, and the near pair reach down to 454
     const M_SAY_Y = 334;
     const M_TOWN = {
-        1: { x: 100, y: 400, w: 144, h: 108 },
-        2: { x: 250, y: 254, w: 132, h: 100 },
-        3: { x: 550, y: 254, w: 132, h: 100 },
-        4: { x: 700, y: 400, w: 144, h: 108 },
-        5: { x: 400, y: 160, w: 156, h: 94 }
+        1: { x: 93, y: 400, w: 136, h: 108 },
+        2: { x: 246, y: 254, w: 118, h: 100 },
+        3: { x: 554, y: 254, w: 118, h: 100 },
+        4: { x: 707, y: 400, w: 136, h: 108 },
+        5: { x: 400, y: 160, w: 138, h: 94 }
     };
 
     function menuBuild() {
@@ -487,14 +509,17 @@
             ctx.fillRect(x + 1, y + c.h * (1 - k) - 1, c.w - 2, c.h * k);
             ctx.globalAlpha = 1;
         }
+        // Its name and what it has given you, and no number on it: the town is
+        // walked in whatever order you like, so numbering the buildings only
+        // suggested an order that is not there. Laid out in shares of the card
+        // rather than in pixels, since the five are not the same size.
         const lit = menu.keys[l.n] ? ink : shut ? '#4a453d' : '#8d877d';
         const big = l.n === 5;
-        text(String(l.n), c.x, y + (big ? 34 : 40), big ? 30 : 38, lit, 'center');
-        text(l.name, c.x, y + (big ? 56 : 64), big ? 14 : 13, lit, 'center');
+        text(l.name, c.x, y + c.h * 0.4, big ? 19 : 20, lit, 'center');
         // the last one keeps the four slots on it: what it is waiting for is the
         // only thing about it worth saying
-        if (big) MENU_LEVELS.forEach((o, i) => menuKey(c.x - 42 + i * 28, y + 80, 8, !!menu.keys[o.n], o.ink));
-        else menuKey(c.x, y + 88, 11, !!menu.keys[l.n], l.ink);
+        if (big) MENU_LEVELS.forEach((o, i) => menuKey(c.x - 42 + i * 28, y + c.h * 0.72, 8, !!menu.keys[o.n], o.ink));
+        else menuKey(c.x, y + c.h * 0.72, 12, !!menu.keys[l.n], l.ink);
     }
 
     // A gate on each wall, standing where he stands, naming the paddle it leads

@@ -38,7 +38,9 @@ touches it.
   and its `BEST_KEY` is its own — nothing it does can reach brandon's live leaderboard.
 - Its code is in `js/fourkeys/`: `engine.js` (brandon.html's game, forked 22 Sep 2026 and
   edited here from now on), `runtime.js` (the seam the bosses plug into), a file per boss,
-  mini-boss and paddle, `menu.js` (the town), and `start.js` (the one line that begins it).
+  mini-boss and paddle, `menu.js` (the town), `debug.js` (what the konami code and
+  `?debug` open: the keys, the paddles, and a hold to forget it all), and `start.js`, which
+  is where the game begins.
 - **Load order is the whole design and `fourkeys.html` sets it.** They are plain scripts
   sharing one scope: runtime and modules first, `engine.js` after them, `start.js` last.
   Nothing in a module may READ an engine const at load time — inside a function is fine.

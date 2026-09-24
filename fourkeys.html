@@ -184,9 +184,10 @@
 
         #debug button:hover { border-color: #6d685f; }
 
-        /* resetting your best: small, in a corner well away from the stages,
-           and only a long hold sets it off -- see RESET_HOLD. out of the
-           column, it takes no room from them on a short screen. */
+        /* forgetting everything you have: small, in a corner well away from
+           the keys and the paddles, and only a long hold sets it off -- see
+           DBG_WIPE_HOLD. out of the column, it takes no room from them on a
+           short screen. */
         #debug button.wipe {
             position: absolute;
             top: calc(10px + env(safe-area-inset-top, 0px));
@@ -210,15 +211,13 @@
             touch-action: none;
         }
 
-        /* the duration is RESET_HOLD, set on the element as a hold starts */
+        /* the duration is DBG_WIPE_HOLD, set on the element as a hold starts */
         #debug button.wipe.holding {
             background-size: 100% 1px;
             transition-property: background-size;
             transition-timing-function: linear;
             color: #9a958c;
         }
-
-        #debug button.wipe:disabled { cursor: default; }
 
         #debug p {
             margin-top: 6px;
@@ -316,27 +315,28 @@
      ?v= is a cache-buster. GitHub Pages holds a page for ten minutes, so a
      deploy that changes two of these can otherwise reach someone as one new
      file and one old one. Bump all of them together, every deploy. -->
-<script src="js/fourkeys/runtime.js?v=1"></script>
-<script src="js/fourkeys/headless.js?v=1"></script>
-<script src="js/fourkeys/idol.js?v=1"></script>
-<script src="js/fourkeys/windmill.js?v=1"></script>
-<script src="js/fourkeys/twins.js?v=1"></script>
-<script src="js/fourkeys/gleeok.js?v=1"></script>
-<script src="js/fourkeys/agahnim.js?v=1"></script>
-<script src="js/fourkeys/lamps.js?v=1"></script>
-<script src="js/fourkeys/dodongo.js?v=1"></script>
-<script src="js/fourkeys/mole.js?v=1"></script>
-<script src="js/fourkeys/conga.js?v=1"></script>
-<script src="js/fourkeys/pong.js?v=1"></script>
-<script src="js/fourkeys/boot.js?v=1"></script>
-<script src="js/fourkeys/splitter.js?v=1"></script>
-<script src="js/fourkeys/armos.js?v=1"></script>
-<script src="js/fourkeys/guard.js?v=1"></script>
-<script src="js/fourkeys/pillars.js?v=1"></script>
-<script src="js/fourkeys/chain.js?v=1"></script>
-<script src="js/fourkeys/paddles.js?v=1"></script>
-<script src="js/fourkeys/menu.js?v=1"></script>
-<script src="js/fourkeys/engine.js?v=1"></script>
-<script src="js/fourkeys/start.js?v=1"></script>
+<script src="js/fourkeys/runtime.js?v=2"></script>
+<script src="js/fourkeys/headless.js?v=2"></script>
+<script src="js/fourkeys/idol.js?v=2"></script>
+<script src="js/fourkeys/windmill.js?v=2"></script>
+<script src="js/fourkeys/twins.js?v=2"></script>
+<script src="js/fourkeys/gleeok.js?v=2"></script>
+<script src="js/fourkeys/agahnim.js?v=2"></script>
+<script src="js/fourkeys/lamps.js?v=2"></script>
+<script src="js/fourkeys/dodongo.js?v=2"></script>
+<script src="js/fourkeys/mole.js?v=2"></script>
+<script src="js/fourkeys/conga.js?v=2"></script>
+<script src="js/fourkeys/pong.js?v=2"></script>
+<script src="js/fourkeys/boot.js?v=2"></script>
+<script src="js/fourkeys/splitter.js?v=2"></script>
+<script src="js/fourkeys/armos.js?v=2"></script>
+<script src="js/fourkeys/guard.js?v=2"></script>
+<script src="js/fourkeys/pillars.js?v=2"></script>
+<script src="js/fourkeys/chain.js?v=2"></script>
+<script src="js/fourkeys/paddles.js?v=2"></script>
+<script src="js/fourkeys/menu.js?v=2"></script>
+<script src="js/fourkeys/debug.js?v=2"></script>
+<script src="js/fourkeys/engine.js?v=2"></script>
+<script src="js/fourkeys/start.js?v=2"></script>
 </body>
 </html>
