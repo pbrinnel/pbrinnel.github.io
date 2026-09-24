@@ -37,10 +37,14 @@
     let EMB_ANGLE  = 1.35;   // ...and his ends throw a head much harder
     let EMB_GLOW   = 0.45;   // how much light he gives off
     let PAIR_LEN   = 0.62;   // the pair: two of him, each this much of one
+    let V2_GLOSS   = 0.22;   // 2.0: how bright the gloss along his top is...
+    let V2_GLINT   = 5;      // ...seconds between one glint and the next...
+    let V2_SWEEP   = 0.9;    // ...and how long a glint takes to cross him
     LAB_KNOBS.push('GILT_LEN', 'GILT_CAPS', 'GILT_SHINE', 'STAT_LEN', 'STAT_ANGLE', 'STAT_SPIN',
                    'STAT_DIP', 'FROST_LEN', 'FROST_EDGE', 'FROST_SWIPE', 'FROST_DECK',
-                   'EMB_LEN', 'EMB_ANGLE', 'EMB_GLOW', 'PAIR_LEN');
+                   'EMB_LEN', 'EMB_ANGLE', 'EMB_GLOW', 'PAIR_LEN', 'V2_GLOSS', 'V2_GLINT', 'V2_SWEEP');
 
+    const V2_RIM    = '#e6edf5';
     const GILT_INK  = '#efb920', GILT_RIM = '#ffe9a3';
     const FROST_INK = '#8fe3f2', FROST_RIM = '#dff6ff';
     const EMB_INK   = '#e2683a', EMB_RIM = '#ffb072';
@@ -73,7 +77,7 @@
         if (labPadDip() !== 1) say.push('lean ×' + labPadDip().toFixed(2));
         if (labPadCaps() !== 1) say.push('capsules ×' + labPadCaps().toFixed(2));
         if (labPadSplit()) say.push('two of him');
-        return { name: (labP && labP.name) || 'STANDARD', line: say.join(' · ') || 'as the game has him' };
+        return { name: (labP && labP.name) || LAB_PAD.standard.name, line: say.join(' · ') || 'as the game has him' };
     }
 
     function labPadUpdate(dt) {
@@ -173,7 +177,65 @@
     }
 
     // ---- the variants -------------------------------------------------------------
-    LAB_PAD.standard = { name: 'STANDARD', blurb: 'him, as the game has always had him' };
+    // 2.0: what you start with. The first game's paddle with a coat of polish
+    // -- a pale rim, a gloss along his top and a glint now and then -- and not
+    // one number changed, so everything the other variants trade against is
+    // still him. The key stays 'standard' so progress already saved still has
+    // him in it.
+    LAB_PAD.standard = {
+        name: 'V2.0',
+        rim: V2_RIM,
+        blurb: 'the paddle you start with, polished',
+        under() { padRim('padRimV', V2_RIM, 2, 0.45); },
+        skin(sg, o) {
+            const sp = padFlat('padGloss', '#ffffff');
+            const gl = padGloss(sp);
+            if (!sp) return;
+            const tw = sg.w, th = tw / SHAPE_ASPECT;
+            ctx.save();
+            ctx.translate(sg.cx, padY() + o * JIG_PADDLE);
+            ctx.rotate(segWig(sg.i) + paddle.dip[sg.i]);
+            ctx.globalAlpha = V2_GLOSS;
+            ctx.drawImage(gl, -tw / 2, -th / 2, tw, th);
+            // the glint: a narrow band crossing him, then nothing until the next
+            const t = (clock % V2_GLINT) / V2_SWEEP;
+            if (t < 1) {
+                ctx.beginPath();
+                ctx.rect(-tw / 2 + (t * 1.2 - 0.1) * tw, -th, tw * 0.08, th * 2);
+                ctx.clip();
+                ctx.globalAlpha = 0.3;
+                ctx.drawImage(sp, -tw / 2, -th / 2, tw, th);
+            }
+            ctx.globalAlpha = 1;
+            ctx.restore();
+        }
+    };
+    // in hand from the first frame: nothing picks a paddle until a gate does,
+    // and he has a look of his own to show before then
+    labP = LAB_PAD.standard;
+
+    // His outline in white, fading out down him, baked once: a hard-edged
+    // band of light reads as a seam across his legs, not as a shine.
+    let padGlossBake = null;
+    function padGloss(sp) {
+        if (padGlossBake || !sp) return padGlossBake;
+        const c = document.createElement('canvas');
+        c.width = sp.width; c.height = sp.height;
+        const g = c.getContext('2d');
+        g.drawImage(sp, 0, 0);
+        g.globalCompositeOperation = 'destination-in';
+        const fade = g.createLinearGradient(0, 0, 0, c.height);
+        fade.addColorStop(0, 'rgba(0,0,0,1)');
+        fade.addColorStop(0.6, 'rgba(0,0,0,0)');
+        g.fillStyle = fade;
+        g.fillRect(0, 0, c.width, c.height);
+        return (padGlossBake = c);
+    }
+
+    // CLASSIC: the first game's paddle, bare. Nothing but the photograph and
+    // nothing changed about how he plays -- he is 2.0 without the polish,
+    // there to be carried for old times' sake. The first level you win gives him.
+    LAB_PAD.classic = { name: 'CLASSIC', blurb: 'him, as the first game had him · plays the same as 2.0' };
 
     // GILT: gold leaf over the photograph, with a sweep of light crossing him
     // every few seconds. Shorter than standard, and everything he catches

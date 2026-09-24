@@ -9,6 +9,7 @@
     //   four levels, in any order, and each one you finish gives a key
     //   four keys open the CASTLE
     //   finish a level without losing a head and you keep the paddle it guarded
+    //   win any level at all and CLASSIC, the first game's paddle, is yours
     //
     // The five are laid out as a town: the FARM and the RUINS out on the left,
     // the CITY and the VOLCANO on the right, and the CASTLE far off in the
@@ -25,6 +26,10 @@
         { n: 4, name: 'VOLCANO', ink: '#d2622f', cap: 'cone', pad: 'ember' }
     ];
     const MENU_LAST = { n: 5, name: 'CASTLE', ink: '#9a7fc9', cap: 'crown', pad: 'pair' };
+    // The first win anywhere, clean or not, also hands over CLASSIC. He plays
+    // exactly as the paddle you started with, so there is nothing in him to
+    // earn -- he is a souvenir, and the first one a player picks up.
+    const MENU_SOUVENIR = 'classic';
     // Who a level hands you is whoever the level sliders say, so moving a boss
     // in his own tab moves him in the town too. No second copy of the roster to
     // fall out of step with the first.
@@ -36,8 +41,8 @@
     // the line under the field: in the town there is nothing to serve
     const M_HINT = 'move to slide brandon · hold to walk him';
     // the rack, in the order the gates walk through it: the one you start with,
-    // then the one each level is guarding
-    const MENU_PADS = ['standard'].concat(MENU_LEVELS.map(l => l.pad), MENU_LAST.pad);
+    // then the one each level is guarding, then the souvenir
+    const MENU_PADS = ['standard'].concat(MENU_LEVELS.map(l => l.pad), MENU_LAST.pad, MENU_SOUVENIR);
 
     let menu = null;                 // the hub outlives a stage: see menuWatch
 
@@ -298,6 +303,10 @@
             got += ' AND ' + (LAB_PAD[level.pad] ? LAB_PAD[level.pad].name : level.pad.toUpperCase());
         } else if (!clean && !menu.pads[level.pad]) {
             got += ' · the paddle stays locked';
+        }
+        if (!menu.pads[MENU_SOUVENIR]) {
+            menu.pads[MENU_SOUVENIR] = true;
+            got += ' · AND ' + LAB_PAD[MENU_SOUVENIR].name;
         }
         menuSave();
         menuSay(got);
