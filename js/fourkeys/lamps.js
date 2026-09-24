@@ -8,10 +8,10 @@
     // clocks and one target, and the head can only be in one place: top up the
     // one that is fading, or take the shot while the window is open.
     let LAMP_LVL    = 4;
-    let LAMP_HP     = 8;      // hits to finish him, once you can reach him
+    let LAMP_HP     = 16;     // hits to finish him, once you can reach him
     let LAMP_N      = 4;      // how many lamps there are
     let LAMP_SECS   = 8;      // how long a hit keeps one lit
-    let LAMP_W      = 110;    // how long a lamp is
+    let LAMP_W      = 143;    // how long a lamp is
     let LAMP_Y      = 250;    // the line they stand on
     let LAMP_BOSS_W = 420;    // how long he is
     let LAMP_BOSS_Y = 105;    // ...and where he hangs
