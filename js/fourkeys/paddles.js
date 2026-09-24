@@ -39,12 +39,14 @@
     let EMB_GLOW   = 0.45;   // how much light he gives off
     let EMB_SPARKS = 34;     // sparks a second rising off him
     let PAIR_LEN   = 0.62;   // the pair: two of him, each this much of one
+    let PAIR_QUAD  = 0.7;    // ...and under DOUBLE, four, each this much of one of the two
+    let PAD_MARK   = 3;      // seconds a head FROST or EMBER hits wears his frost or fire
     let V2_GLOSS   = 0.22;   // MODERN: how bright the gloss along his top is...
     let V2_GLINT   = 5;      // ...seconds between one glint and the next...
     let V2_SWEEP   = 0.9;    // ...and how long a glint takes to cross him
     LAB_KNOBS.push('GILT_LEN', 'GILT_CAPS', 'GILT_SHINE', 'STAT_LEN', 'STAT_ANGLE', 'STAT_SPIN',
                    'STAT_DIP', 'FROST_LEN', 'FROST_EDGE', 'FROST_SWIPE', 'FROST_DECK', 'FROST_FLAKES',
-                   'EMB_LEN', 'EMB_ANGLE', 'EMB_GLOW', 'EMB_SPARKS', 'PAIR_LEN', 'V2_GLOSS', 'V2_GLINT', 'V2_SWEEP');
+                   'EMB_LEN', 'EMB_ANGLE', 'EMB_GLOW', 'EMB_SPARKS', 'PAIR_LEN', 'PAIR_QUAD', 'PAD_MARK', 'V2_GLOSS', 'V2_GLINT', 'V2_SWEEP');
 
     const V2_RIM    = '#e6edf5';
     const GILT_INK  = '#efb920', GILT_RIM = '#ffe9a3';
@@ -66,6 +68,7 @@
     const labPadDeck  = () => labP && labP.deck ? labP.deck() : 1;
     const labPadCaps  = () => labP && labP.caps ? labP.caps() : 1;
     const labPadSplit = () => !!(labP && labP.split);
+    const labPadQuad  = () => labP && labP.quad ? labP.quad() : 1;
 
     // what the panel prints about whatever is in hand
     function labPadState() {
@@ -86,6 +89,7 @@
     // included, which is where a paddle is chosen and has to show what it is.
     function labPadUpdate(dt) {
         if (labP && labP.step && !(king && phase === 'fall')) labP.step(dt);
+        padMarkStep(dt);
         for (const b of padBits) {
             b.t += dt;
             b.x += b.vx * dt;
@@ -145,6 +149,44 @@
         padBits.push({ x, y, ink, t: 0, life, vx: vx || 0, vy: vy || 0, g: g === undefined ? 90 : g,
                        s: s || 2 + Math.random() * 2, a: a === undefined ? 0.9 : a,
                        kind: kind || 'speck', sway: sway || 0, ph: Math.random() * 6.28 });
+    }
+
+    // ---- the mark he leaves on a head ----------------------------------------------
+    // A head FROST or EMBER sends back carries a little of him away with it:
+    // his tint over it and his specks coming off it, both fading out over
+    // PAD_MARK. It changes nothing about the head -- it is how you see which
+    // paddle hit it, and a thing to watch as it goes.
+    function labPadHit(ball) {
+        if (labP && labP.mark) ball.mark = { key: labP.mark, t: PAD_MARK };
+    }
+
+    function padMarkStep(dt) {
+        if (!balls) return;
+        for (const b of balls) {
+            const m = b.mark;
+            if (!m) continue;
+            if ((m.t -= dt) <= 0) { b.mark = null; continue; }
+            const k = m.t / PAD_MARK;
+            const p = LAB_PAD[m.key];
+            if (p && p.shed && Math.random() < dt * p.shedRate * k) p.shed(b.x + (Math.random() - 0.5) * BALL_RX * 1.4,
+                                                                      b.y + (Math.random() - 0.5) * BALL_RY * 1.4, k);
+        }
+    }
+
+    // his tint over the head, turned with it, as strong as the mark has left
+    function labPadBall(b, rx) {
+        const m = b.mark;
+        const p = m && LAB_PAD[m.key];
+        if (!p) return;
+        const sp = headSprite2('flat', p.ink);
+        if (!sp) return;
+        const w = rx * 2, h = w * (BALL_RY / BALL_RX);
+        ctx.save();
+        ctx.translate(b.x, b.y);
+        ctx.rotate(b.angle);
+        ctx.globalAlpha = 0.5 * (m.t / PAD_MARK);
+        ctx.drawImage(sp, -w / 2, -h / 2, w, h);
+        ctx.restore();
     }
 
     // somewhere along one of him, picked at random
@@ -349,6 +391,14 @@
         deck: () => FROST_DECK,
         under() { padRim('padRimF', FROST_RIM, 2.5, 0.55); },
         skin(sg, o) { padLay(sg, o, padTint('padFrost', FROST_INK), 0.82); },
+        mark: 'frost',
+        shedRate: 30,
+        // one of his flakes, off a head he has hit
+        shed(x, y, k) {
+            padBit(x, y, Math.random() < 0.5 ? FROST_RIM : FROST_INK, 0.9 + Math.random() * 0.6,
+                   (Math.random() - 0.5) * 16, 8 + Math.random() * 12, 8, 1.8 + Math.random() * 1.8,
+                   0.85 * k + 0.15, 'flake', 16);
+        },
         step(dt) {
             // flakes coming off him all the time, drifting down and wandering
             // as they go...
@@ -395,6 +445,14 @@
             padRim('padRimE', EMB_RIM, 2.5, 0.5);
         },
         skin(sg, o) { padLay(sg, o, padTint('padEmber', EMB_INK), 0.72); },
+        mark: 'ember',
+        shedRate: 40,
+        // one of his sparks, off a head he has hit
+        shed(x, y, k) {
+            padBit(x, y, Math.random() < 0.4 ? EMB_RIM : EMB_INK, 0.5 + Math.random() * 0.5,
+                   (Math.random() - 0.5) * 30, -30 - Math.random() * 40, -20, 1.8 + Math.random() * 2,
+                   0.95 * k + 0.05, 'glow', 20);
+        },
         step(dt) {
             // sparks lifting off him with light round them, weaving as they
             // climb, and left behind when he moves
@@ -420,13 +478,14 @@
 
     // THE PAIR: two of him, always, in DOUBLE's own colour, each one shorter
     // than standard. Wider reach than anybody and a hole down the middle of
-    // it -- and DOUBLE, when it drops, only widens the gap.
+    // it -- and DOUBLE, when it drops, makes four of him, smaller again.
     LAB_PAD.pair = {
         name: 'THE PAIR',
         ink: PAIR_INK, twin: true,
         blurb: 'two of him · a hole down the middle',
         len: () => PAIR_LEN,
         split: () => true,
+        quad: () => PAIR_QUAD,
         under() {
             // an echo of where each of them was, so the hole is easy to read
             const sp = padFlat('padPairGhost', PAIR_INK);

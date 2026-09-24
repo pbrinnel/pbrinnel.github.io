@@ -1134,7 +1134,9 @@
     // THE PAIR is already two, held apart for good, so DOUBLE doubles them:
     // `spread4T` runs the same way and each of the two slides a third and
     // fourth out from under himself, one pitch further out, until there are
-    // four in a row with the same gap between every one.
+    // four in a row with the same gap between every one -- each of them
+    // shrinking to labPadQuad() of a half as they go, so four is a lot of
+    // little brandons rather than twice the span.
     function spread() {
         const t = spreadT;
         return t * t * (3 - 2 * t);        // smoothstep, no overshoot either way
@@ -1148,8 +1150,9 @@
     // row fits in SPAN4_MAX of it.
     const SPAN4_MAX = 0.84;
     function segW() {
-        const w = padW(), k4 = spread4();
-        if (k4 < 0.001) return w;
+        const k4 = spread4();
+        if (k4 < 0.001) return padW();
+        const w = padW() * (1 + (labPadQuad() - 1) * k4);
         const want = w * (0.5 + (1 + DBL_GAP) * (spread() / 2 + k4));
         return w * Math.min(1, LW * SPAN4_MAX / 2 / want);
     }
@@ -3098,6 +3101,7 @@
 
                 paddle.jt[sg.i] = 1;        // recoil, tilting toward the end he took it on
                 paddle.tilt[sg.i] = off;
+                labPadHit(b);               // FROST and EMBER leave their mark on it
 
                 combo = 0;                  // the run ends when it comes home
                 b.pierced.clear();          // ...and so does what it has been through
@@ -5318,7 +5322,11 @@
 
         // no ball once the fight is settled, the takeover included
         if (phase === 'ready' || phase === 'play' || phase === 'cleared') {
-            for (const b of balls) if (!labSkipBall(b)) drawBall(b.x, b.y, labBallR(b), b.angle);
+            for (const b of balls) {
+                if (labSkipBall(b)) continue;
+                drawBall(b.x, b.y, labBallR(b), b.angle);
+                labPadBall(b, labBallR(b));
+            }
         }
 
         for (const p of popups) {
@@ -5342,15 +5350,17 @@
         // prints it in this same spot, so it is the thread through the cut and
         // it stays. BEST does not carry over, and a reading that only ever
         // disappears is better not put up over the ending in the first place.
-        text('SCORE ' + score, 15 * u, 27 * u, 15 * u, '#f2efe9');
-        if (phase !== 'ascend') text('BEST ' + best, 15 * u, 46 * u, 13 * u, '#6d685f');
+        // None of it in the town, which has no score and nothing to lose.
+        const hud = !menuUp();
+        if (hud) text('SCORE ' + score, 15 * u, 27 * u, 15 * u, '#f2efe9');
+        if (hud && phase !== 'ascend') text('BEST ' + best, 15 * u, 46 * u, 13 * u, '#6d685f');
 
         // no lives counter over the ending -- it is meaningless by then, and it
         // was landing squarely on the new king's face
         //
         // It counts spares, so a fresh run reads 2, 1, 0 and an empty corner
         // means the next one you lose ends it -- see spares()
-        if (phase !== 'ascend') {
+        if (hud && phase !== 'ascend') {
             for (let i = 0; i < spares(); i++) drawBall(LW - (25 + i * 29) * u, 25 * u, 9 * u, 0);
         }
 

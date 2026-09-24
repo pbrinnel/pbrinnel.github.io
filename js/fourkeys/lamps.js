@@ -12,7 +12,7 @@
     let LAMP_LVL    = 4;
     let LAMP_HP     = 16;     // hits to finish him, once you can reach him
     let LAMP_N      = 3;      // how many lamps there are
-    let LAMP_SECS   = 8;      // how long a hit keeps one lit
+    let LAMP_SECS   = 12.8;   // how long a hit keeps one lit
     let LAMP_W      = 143;    // how long a lamp is
     let LAMP_Y      = 250;    // the line they drift about
     let LAMP_BOB    = 75;     // px either side of it they drift, a quarter of the field top to bottom

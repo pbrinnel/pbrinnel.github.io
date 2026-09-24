@@ -66,13 +66,14 @@
                 menuLoad();
                 for (const l of MENU_ALL) menu.keys[l.n] = true;
                 for (const k of MENU_PADS) menu.pads[k] = true;
+                for (const l of MENU_ALL) menu.seen[l.n] = true;
                 menuSave();
                 menuSay('EVERYTHING OPEN');
                 return true;
             },
             wipe() {
                 menuLoad();
-                menu.keys = {}; menu.pads = { standard: true }; menu.best = {};
+                menu.keys = {}; menu.pads = { standard: true }; menu.best = {}; menu.seen = {};
                 menuSave();
                 LAB.usePad('standard');
                 return true;
@@ -85,15 +86,18 @@
         let saved = null;
         try { saved = JSON.parse(localStorage.getItem(MENU_KEY) || 'null'); } catch (e) { saved = null; }
         menu = { keys: (saved && saved.keys) || {}, pads: (saved && saved.pads) || { standard: true },
-                 best: (saved && saved.best) || {}, sel: 1, say: null, sayT: 0,
+                 best: (saved && saved.best) || {}, seen: (saved && saved.seen) || {},
+                 dusting: null, sel: 1, say: null, sayT: 0,
                  cards: [], run: null, side: 0, hold: 0, sw: null,
-                 march: false, lift: 0, into: null, walk: 0, gait: 0 };
+                 march: false, lift: 0, into: null, walk: 0, gait: 0, arriveT: -1,
+                 shows: [], showT: 0 };
         return menu;
     }
 
     function menuSave() {
         try {
-            localStorage.setItem(MENU_KEY, JSON.stringify({ keys: menu.keys, pads: menu.pads, best: menu.best }));
+            localStorage.setItem(MENU_KEY, JSON.stringify({ keys: menu.keys, pads: menu.pads, best: menu.best,
+                                                            seen: menu.seen }));
         } catch (e) { /* a private window just will not remember */ }
     }
 
@@ -141,16 +145,21 @@
     // the middle of the town being crowded rather than as the far end of it.
     // Buying that room cost every building some width, and the far pair lost
     // most -- which is what being further away should look like anyway.
-    const M_TOP = 78;                        // the band the objective sits in
+    //
+    // Top to bottom the town has the whole field: the CASTLE's crenellations
+    // and the corners sit a margin under the top edge, the far pair halfway
+    // down, the near pair just above the gates. The near pair are the same
+    // 0.6 s walk they always were; the far pair and the CASTLE are a little
+    // further off than they were under the old title band, 2.0 s and 3.2 s.
     // the one line of patter goes in the gap between the far row and the near
-    // one -- the floor is the gates' now, and the near pair reach down to 454
-    const M_SAY_Y = 334;
+    // one -- the floor is the gates' now, and the near pair reach down to 452
+    const M_SAY_Y = 306;
     const M_TOWN = {
-        1: { x: 93, y: 400, w: 136, h: 108 },
-        2: { x: 246, y: 254, w: 118, h: 100 },
-        3: { x: 554, y: 254, w: 118, h: 100 },
-        4: { x: 707, y: 400, w: 136, h: 108 },
-        5: { x: 400, y: 160, w: 138, h: 94 }
+        1: { x: 93, y: 392, w: 136, h: 120 },
+        2: { x: 246, y: 228, w: 118, h: 112 },
+        3: { x: 554, y: 228, w: 118, h: 112 },
+        4: { x: 707, y: 392, w: 136, h: 120 },
+        5: { x: 400, y: 92, w: 138, h: 110 }
     };
 
     // Two more in the top corners that are not levels: forgetting everything
@@ -161,9 +170,9 @@
     // the doorway, because it cannot be taken back.
     const M_SIDES = [
         { key: 'reset', side: -1, lines: ['RESET', 'SAVE DATA'], ink: '#c0594a',
-          at: { x: 70, y: 150, w: 116, h: 84 } },
+          at: { x: 70, y: 80, w: 116, h: 90 } },
         { key: 'board', side: 1, lines: ['LEADER', 'BOARD'], ink: '#c9a94e',
-          at: { x: 730, y: 150, w: 116, h: 84 } }
+          at: { x: 730, y: 80, w: 116, h: 90 } }
     ];
     const ERASE_HOLD = 1.6;          // the second hold, on top of DOOR_HOLD
     const M_WALL = 3;                // px off his clamp that still counts as against the wall
@@ -215,7 +224,7 @@
     // second takes it all back.
     const MARCH_UP = 118;            // px/s forward
     const MARCH_BACK = 300;          // px/s back home
-    const MARCH_MAX = 340;           // past the last door, for the empty lanes
+    const MARCH_MAX = 410;           // past the last door, for the empty lanes
     const DOOR_HOLD = 0.8;           // stood in the doorway before it opens
     const WALK_HZ = 2.3;             // paces a second, which is what the bob is
     const WALK_BOB = 0.8;            // how much he rises and falls, in jig units
@@ -229,6 +238,7 @@
         // He is wider than the gaps between the buildings, so what counts as
         // reaching one is his middle arriving, not his shoulder brushing it.
         const c = menu.lift > 0 ? menuAt() : null;
+        if (c && c.level.n && !menu.seen[c.level.n]) menuDust(c.level.n);
         if (c) {
             // stopped on the step, however fast he was walking at it: padY()
             // reads menu.lift, so backing the overshoot out of it puts his
@@ -303,6 +313,7 @@
         }
         const boss = menuBossFor(level.n);
         if (!boss) { menuSay(level.name + ' · no boss is set to this level'); return; }
+        menu.arriveT = -1;          // walked in before the town finished arriving
         menu.run = { n: level.n, lost: 0, out: 0 };
         menu.sel = level.n;
         menu.march = false;
@@ -353,12 +364,14 @@
         let got = level.name + (first ? ' · A KEY' : ' · DONE AGAIN');
         if (clean && !menu.pads[level.pad]) {
             menu.pads[level.pad] = true;
+            menu.shows.push(level.pad);
             got += ' AND ' + (LAB_PAD[level.pad] ? LAB_PAD[level.pad].name : level.pad.toUpperCase());
         } else if (!clean && !menu.pads[level.pad]) {
             got += ' · the paddle stays locked';
         }
         if (!menu.pads[MENU_SOUVENIR]) {
             menu.pads[MENU_SOUVENIR] = true;
+            menu.shows.push(MENU_SOUVENIR);
             got += ' · AND ' + LAB_PAD[MENU_SOUVENIR].name;
         }
         menuSave();
@@ -378,9 +391,63 @@
 
     function menuUpdate(dt) {
         if (!menu) return;
+        if (menuUnlockUp()) { menu.showT += dt; menu.march = false; return; }
+        menuDustStep(dt);
         if (menu.sayT > 0) menu.sayT = Math.max(0, menu.sayT - dt);
         menuSwapStep(dt);
         menuMarch(dt);
+        if (menuArriving()) menuArriveStep(dt);
+    }
+
+    // ---- arriving -----------------------------------------------------------------------
+    // Out of the opening cards, the town comes into view as if he were walking
+    // into it: he paces on the spot, and every building grows out of a point
+    // on the horizon (ARRIVE_AT) into its place. The near ones start smaller
+    // and travel further than the far ones, which is what makes it read as
+    // coming closer rather than as the picture zooming. He is yours from the
+    // first frame of it: the town is where it will be, only not drawn there
+    // yet, so a walk started now arrives at the building it is aimed at.
+    const ARRIVE_SECS = 3;
+    const ARRIVE_AT = { x: 400, y: 60 };
+    const ARRIVE_FAR = 0.55;         // the size the CASTLE's row starts at...
+    const ARRIVE_NEAR = 0.2;         // ...and the FARM's
+    const ARRIVE_SETTLE = 0.4;       // the last of it, where his pace slows to a stop
+
+    function menuArrive() { menuLoad(); menu.arriveT = 0; }
+    function menuArriving() { return menu.arriveT >= 0; }
+
+    // his pace on the spot, on top of whatever walking you have him doing
+    function menuArriveStep(dt) {
+        menu.arriveT += dt;
+        const left = ARRIVE_SECS - menu.arriveT;
+        const pace = Math.max(0, Math.min(1, left / ARRIVE_SETTLE));
+        if (pace > menu.gait) {
+            if (menu.gait <= 0) menu.walk += dt;     // menuMarch only paces a moving walk
+            menu.gait = pace;
+        }
+        if (left <= 0) menu.arriveT = -1;
+    }
+
+    // how far along the arrival is, eased so it slows into place; 1 once it is over
+    function menuArriveK() {
+        if (!menuArriving()) return 1;
+        const t = Math.min(1, menu.arriveT / ARRIVE_SECS);
+        return 1 - Math.pow(1 - t, 3);
+    }
+
+    // draw one building as it would be `k` of the way in
+    function menuArriveCard(c, k, draw) {
+        if (k >= 1) { draw(); return; }
+        const near = Math.max(0, Math.min(1, (c.y - M_TOWN[5].y) / (M_TOWN[1].y - M_TOWN[5].y)));
+        const z = ARRIVE_FAR + (ARRIVE_NEAR - ARRIVE_FAR) * near;
+        const s = z + (1 - z) * k;
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, k * 2.5);
+        ctx.translate(ARRIVE_AT.x, ARRIVE_AT.y);
+        ctx.scale(s, s);
+        ctx.translate(-ARRIVE_AT.x, -ARRIVE_AT.y);
+        draw();
+        ctx.restore();
     }
 
     // ---- the gates: changing paddle by leaning on a wall ------------------------------
@@ -483,10 +550,17 @@
     // glance from the other end of the field, not to be looked at closely.
     const ROOF_H = 22;
     function menuCap(c, ink) {
-        const x = c.x - c.w / 2, y = c.y - c.h / 2, w = c.w;
-        const top = y - ROOF_H;
         ctx.fillStyle = ink;
         ctx.beginPath();
+        menuCapPath(c);
+        ctx.fill();
+    }
+
+    // the roofline, added to whatever path is open -- menuCap fills it, and
+    // the dust cuts itself to it together with the building under it
+    function menuCapPath(c) {
+        const x = c.x - c.w / 2, y = c.y - c.h / 2, w = c.w;
+        const top = y - ROOF_H;
         switch (c.level.cap) {
             case 'gable':           // a barn
                 ctx.moveTo(x, y);
@@ -531,23 +605,24 @@
                 }
                 ctx.rect(x, y - 8, w, 8);
         }
-        ctx.fill();
     }
 
-    // drawn last of all, so it covers the score and the READY band: in the hub
-    // there is no score and nothing to be ready for
+    // Drawn last of all, over the READY band. The town says nothing about
+    // itself -- no title, no rules, no instructions; the buildings and the
+    // gates are the whole of it.
     function labDrawTop() {
         if (!menuUp()) return;
+        if (menuUnlockDraw()) return;
 
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, LW, M_TOP);
-        text('FOUR KEYS OPEN THE CASTLE', LW / 2, 34, 24, '#f2efe9', 'center');
-        text('one · two · three · four, in any order — and finish one without losing a head to keep its paddle',
-             LW / 2, 58, 12, '#9a958c', 'center');
-
-        for (const c of menu.cards) menuDrawLevel(c);
+        const k = menuArriveK();
+        // the far ones first, so a near one growing past them is drawn over them
+        for (const c of menu.cards.slice().sort((a, b) => a.y - b.y)) menuArriveCard(c, k, () => menuDrawLevel(c));
+        // the gates are at his feet, so they are simply there once the town is
+        ctx.globalAlpha = k;
         menuDrawGate(-1);
         menuDrawGate(1);
+        ctx.globalAlpha = 1;
+        if (k < 1) return;
         menuPadPeek();
         menuDrawLine();
     }
@@ -577,15 +652,101 @@
         text(s.lines[1], c.x, y + c.h * 0.72, 13, ink, 'center');
     }
 
+    // ---- the dust -------------------------------------------------------------------
+    // The five start out as old buildings nobody has been near: grey, soft at
+    // the edges and flecked with dust. Walk up and touch one and the dust
+    // dissolves off it, a fleck at a time over DUST_WIPE, and it stays clean
+    // for good -- `seen` is saved with the keys and the paddles, and
+    // forgotten with them. The softness is the building drawn several times
+    // slightly out of place, not a canvas filter: Safari ignores ctx.filter,
+    // and this is a phone game. The film and the flecks are cut to the
+    // building's own outline, roof and all, so the dust is ON it.
+    const DUST_WIPE = 0.8;           // seconds the dissolve takes
+    const DUST_INK = '#5b564e';      // what every colour on it is under the dust
+    const DUST_BLUR = 3.2;           // px each soft copy sits off true
+    const DUST_SPECKS = 46;          // flecks on each
+    const DUST_CELL = 5;             // px, the grain the dissolve goes in
+
+    function menuDust(n) {
+        menu.seen[n] = true;
+        menuSave();
+        menu.dusting = { n, t: 0 };
+    }
+
+    function menuDustStep(dt) {
+        if (menu.dusting && (menu.dusting.t += dt) >= DUST_WIPE) menu.dusting = null;
+    }
+
     function menuDrawLevel(c) {
         const l = c.level;
         if (l.key) { menuDrawSide(c); return; }
+        const w = menu.dusting && menu.dusting.n === l.n ? menu.dusting : null;
+        if (menu.seen[l.n] && !w) { menuDrawClean(c, false); return; }
+        if (!w) { menuDrawDusty(c); return; }
+        // Dissolving: the clean building under it, and the dust only in the
+        // grains whose own moment has not come yet. Each grain's moment is a
+        // hash of where it is, so the pattern holds still from frame to frame.
+        const k = Math.min(1, w.t / DUST_WIPE);
+        const pad = DUST_BLUR * 2 + 2;
+        const x0 = c.x - c.w / 2 - pad, x1 = c.x + c.w / 2 + pad;
+        const y0 = c.y - c.h / 2 - ROOF_H - pad, y1 = c.y + c.h / 2 + pad;
+        menuDrawClean(c, false);
+        ctx.save();
+        ctx.beginPath();
+        for (let gy = y0, j = 0; gy < y1; gy += DUST_CELL, j++) {
+            for (let gx = x0, i = 0; gx < x1; gx += DUST_CELL, i++) {
+                const h = Math.sin(i * 12.9898 + j * 78.233 + c.level.n * 37.719) * 43758.5453;
+                if (h - Math.floor(h) > k) ctx.rect(gx, gy, DUST_CELL, DUST_CELL);
+            }
+        }
+        ctx.clip();
+        menuDrawDusty(c);
+        ctx.restore();
+    }
+
+    function menuDrawDusty(c) {
+        const a0 = ctx.globalAlpha;
+        // eight soft copies round a circle, which is what makes it fuzzy
+        // rather than doubled
+        for (let i = 0; i < 8; i++) {
+            const a = i * Math.PI / 4;
+            ctx.save();
+            ctx.globalAlpha = a0 * 0.2;
+            ctx.translate(Math.cos(a) * DUST_BLUR, Math.sin(a) * DUST_BLUR);
+            menuDrawClean(c, true);
+            ctx.restore();
+        }
+        // a film over it and the flecks, the same ones every frame, both cut
+        // to the building's outline
+        const x = c.x - c.w / 2, y = c.y - c.h / 2;
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(x, y, c.w, c.h, 8);
+        menuCapPath(c);
+        ctx.clip();
+        ctx.globalAlpha = a0 * 0.22;
+        ctx.fillStyle = '#8a8378';
+        ctx.fillRect(x, y - ROOF_H, c.w, c.h + ROOF_H);
+        ctx.globalAlpha = a0 * 0.45;
+        ctx.fillStyle = '#a39c90';
+        let seed = c.level.n * 9301 + 49297;
+        const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+        for (let i = 0; i < DUST_SPECKS; i++) {
+            const s = 1 + rnd() * 2;
+            ctx.fillRect(x + rnd() * c.w, y - ROOF_H + rnd() * (c.h + ROOF_H), s, s);
+        }
+        ctx.restore();
+        ctx.globalAlpha = a0;
+    }
+
+    function menuDrawClean(c, dusty) {
+        const l = c.level;
         const shut = l.n === 5 && !menuOpened();
         const x = c.x - c.w / 2, y = c.y - c.h / 2;
         // lit while he is standing in its lane, walking or not, so a walk is
         // aimed before it is started
         const aimed = menuLane(c);
-        const ink = shut ? '#4a453d' : l.ink;
+        const ink = dusty ? DUST_INK : shut ? '#4a453d' : l.ink;
         menuCap(c, aimed ? ink : shut ? '#241f1b' : '#2e2a24');
         menuPanel(x, y, c.w, c.h, aimed, ink);
         // stood in the doorway: the level fills up under him, and going in is
@@ -601,13 +762,14 @@
         // walked in whatever order you like, so numbering the buildings only
         // suggested an order that is not there. Laid out in shares of the card
         // rather than in pixels, since the five are not the same size.
-        const lit = menu.keys[l.n] ? ink : shut ? '#4a453d' : '#8d877d';
+        const lit = dusty ? DUST_INK : menu.keys[l.n] ? ink : shut ? '#4a453d' : '#8d877d';
         const big = l.n === 5;
         text(l.name, c.x, y + c.h * 0.4, big ? 19 : 20, lit, 'center');
         // the last one keeps the four slots on it: what it is waiting for is the
         // only thing about it worth saying
-        if (big) MENU_LEVELS.forEach((o, i) => menuKey(c.x - 42 + i * 28, y + c.h * 0.72, 8, !!menu.keys[o.n], o.ink));
-        else menuKey(c.x, y + c.h * 0.72, 12, !!menu.keys[l.n], l.ink);
+        const keyInk = o => dusty ? DUST_INK : o.ink;
+        if (big) MENU_LEVELS.forEach((o, i) => menuKey(c.x - 42 + i * 28, y + c.h * 0.72, 8, !!menu.keys[o.n], keyInk(o)));
+        else menuKey(c.x, y + c.h * 0.72, 12, !!menu.keys[l.n], keyInk(l));
     }
 
     // A gate on each wall, standing where he stands, naming the paddle it leads
@@ -647,7 +809,8 @@
         }
     }
 
-    // one line under the town, and the gate you are leaning on gets it first
+    // one line under the town, and only when there is something to say: the
+    // gate you are leaning on, or what just happened
     function menuDrawLine() {
         if (menu.sw) return;
         if (menu.side && menu.lift <= 1) {
@@ -662,12 +825,46 @@
             ctx.globalAlpha = 1;
             return;
         }
-        // and it goes as he sets off: it is what to do, not what is happening,
-        // and he walks straight through where it sits
-        ctx.globalAlpha = Math.max(0, 1 - menu.lift / 70);
-        text('hold to walk him forward · into a building to go in · lean on a gate to change paddle',
-             LW / 2, M_SAY_Y, 12, '#6d685f', 'center');
+    }
+
+    // ---- PADDLE UNLOCKED ----------------------------------------------------------------
+    // Every paddle you earn gets the whole screen to itself on the way back
+    // into the town: his name, and him, big, on a field of his own colour. One
+    // at a time, in the order they were won, each held until you tap. Only a
+    // win shows one (menuBeat, which the lab's "count it beaten" buttons also
+    // call); the debug menu's toggles and "unlock everything" do not.
+    const UNLOCK_WAIT = 0.6;         // seconds up before a tap takes it away
+    const UNLOCK_IN = 0.45;          // him rising into place
+    const UNLOCK_W = 500;            // how long he is drawn
+    const UNLOCK_BACK = 0.22;        // his colour, this much of it over black, behind him
+
+    function menuUnlockUp() { return !!(menu && menu.shows.length && menuUp()); }
+
+    // a tap: true if it was the unlock screen's to take
+    function menuUnlockNext() {
+        if (!menuUnlockUp()) return false;
+        if (menu.showT >= UNLOCK_WAIT) { menu.shows.shift(); menu.showT = 0; }
+        return true;
+    }
+
+    function menuUnlockDraw() {
+        if (!menuUnlockUp()) return false;
+        const key = menu.shows[0], p = LAB_PAD[key];
+        const ink = (p && (p.ink || p.rim)) || '#8d877d';
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, LW, LH);
+        ctx.globalAlpha = UNLOCK_BACK;
+        ctx.fillStyle = ink;
+        ctx.fillRect(0, 0, LW, LH);
         ctx.globalAlpha = 1;
+        const k = Math.min(1, menu.showT / UNLOCK_IN), e = 1 - Math.pow(1 - k, 3);
+        text('PADDLE UNLOCKED', LW / 2, 130, 34, '#f2efe9', 'center');
+        labPadIcon(key, LW / 2, LH / 2 + 10 + (1 - e) * 40, UNLOCK_W, false, e);
+        ctx.globalAlpha = e;
+        text(p ? p.name : key.toUpperCase(), LW / 2, 440, 40, ink, 'center');
+        if (p && p.blurb) text(p.blurb, LW / 2, 475, 15, '#c9c4ba', 'center');
+        ctx.globalAlpha = 1;
+        return true;
     }
 
     // ---- holding, which is the whole of the input ------------------------------------
@@ -679,6 +876,7 @@
     const introHas = () => typeof introUp === 'function' && introUp();
     const menuHeld = down => {
         if (down && introHas()) return;
+        if (down && menuUnlockNext()) return;
         if (menu && (!down || menuUp())) menu.march = down;
     };
     addEventListener('pointerdown', e => {

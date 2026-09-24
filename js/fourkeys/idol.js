@@ -13,8 +13,9 @@
     //
     // He wanders along the top, slowly, to places of his own choosing. Every
     // so often he shakes for IDOL_SHAKE and then drops like the stone he is,
-    // all the way to the floor. Land on you and he pins you where you stand
-    // until he rises again, IDOL_DOWN later and slowly. Down there he is a
+    // all the way to the floor. Land on your middle and he pins you where you
+    // stand until he rises again, IDOL_DOWN later and slowly; land on your
+    // end and he only shoves you aside. Down there he is a
     // wall: you cannot get past him, and nor can the ball, so whichever side
     // of him you are on is the side you play from until he goes back up.
     let IDOL_HP        = 10;     // hits on bare face to finish him
@@ -36,9 +37,9 @@
     let IDOL_DOWN      = 3;      // seconds he stays down
     let IDOL_RISE      = 75;     // px/s he goes back up at
     let IDOL_CLIMB     = 0.4;    // how much of the original's climb this fight has
-    // The act a run draws him from, 1 easy to 3 hard. He has no attack and, at
-    // Paul's numbers, a bite stays open for several returns, so the only thing
-    // he asks for is aim.
+    // The act a run draws him from, 1 easy to 3 hard. The drop is his only
+    // attack and it is telegraphed, and at Paul's numbers a bite stays open
+    // for several returns, so what he mostly asks for is aim.
     let IDOL_LVL       = 2;
     LAB_KNOBS.push('IDOL_LVL', 'IDOL_HP', 'IDOL_W', 'IDOL_Y', 'IDOL_BITE', 'IDOL_SPIN',
                    'IDOL_BARE', 'IDOL_REGROW_AT', 'IDOL_REGROW', 'IDOL_WALK', 'IDOL_WAIT_MIN',
@@ -188,11 +189,20 @@
                 idol.vy += IDOL_G * dt;
                 idol.cy += idol.vy * dt;
                 const floor = padY() + padH() / 2 + 6;
-                // on you: he stops where he met you, and you are his until he rises
-                if (idolOver() > 0) {
+                // Your middle under where he will land: he stops where he met
+                // you, and you are his until he rises. Anything less is a
+                // graze, and he shoves you out to the side you were on
+                // (idolFence) on his way down. Judged on his footprint on the
+                // floor, because the slice of him at your height starts at
+                // nothing and grows, and a middle is never under it at first.
+                const c = idolChord();
+                if (c && Math.abs(paddle.x - idol.x) < idolChord(floor - h / 2)) {
                     idol.pin = { x: paddle.x };
                     idolLand();
-                } else if (idol.cy + h / 2 >= floor) {
+                } else if (c && idolOver() > 0 && !idol.side) {
+                    idol.side = paddle.x < idol.x ? -1 : 1;
+                }
+                if (idol.stage === 'fall' && idol.cy + h / 2 >= floor) {
                     idol.cy = floor - h / 2;
                     idolLand();
                 }
@@ -228,10 +238,10 @@
 
     // how far into the paddle's span his outline reaches across the band the
     // paddle lies in, or 0 if it does not: the widest chord of him in that band
-    function idolChord() {
+    function idolChord(cy = idol.cy) {
         const a = bw / 2, e = bw * (BALL_RY / BALL_RX) / 2;
         const top = padY() - padH() / 2, bot = padY() + padH() / 2;
-        const dy = Math.max(top, Math.min(bot, idol.cy)) - idol.cy;
+        const dy = Math.max(top, Math.min(bot, cy)) - cy;
         if (Math.abs(dy) >= e) return 0;
         return a * Math.sqrt(1 - (dy / e) * (dy / e));
     }

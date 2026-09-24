@@ -38,6 +38,12 @@
     let GL_RATE     = 0.7;    // rad/s of that sway
     let GL_LOOSE    = 210;    // px/s a loose head flies at
     let GL_THICK    = 0.17;   // how thick his body is to a head, as a share of it
+    // The hole his head left is where its middle was, not where his neck
+    // meets his shoulders, and his spine runs to one side of it. So he is slid
+    // along his length onto the necks by GL_SEAT_U, and across by GL_SEAT_V
+    // until his spine is over the collar.
+    let GL_SEAT_U   = 12;     // px toward the necks
+    let GL_SEAT_V   = -55;    // px across him
     let GL_CLIMB    = 0.5;    // how much of the original's climb this fight has
     let GL_FIRE_MIN = 6;      // seconds between one head's bursts, at least...
     let GL_FIRE_MAX = 11;     // ...and at most
@@ -49,10 +55,10 @@
     let GL_BURST_MAX  = 60;   // phantoms in the air at most, all heads together
     LAB_KNOBS.push('GL_LVL', 'GL_HEADS', 'GL_HEAD_HP', 'GL_LOOSE_HP', 'GL_W', 'GL_Y', 'GL_TILT',
                    'GL_DRIFT', 'GL_HEAD_W', 'GL_NECK', 'GL_FAN', 'GL_SWING', 'GL_RATE',
-                   'GL_LOOSE', 'GL_THICK', 'GL_CLIMB', 'GL_FIRE_MIN', 'GL_FIRE_MAX', 'GL_CHARGE',
+                   'GL_LOOSE', 'GL_THICK', 'GL_SEAT_U', 'GL_SEAT_V', 'GL_CLIMB', 'GL_FIRE_MIN', 'GL_FIRE_MAX', 'GL_CHARGE',
                    'GL_BURST_COLS', 'GL_BURST_ROWS', 'GL_BURST_GAP', 'GL_BURST_ARC', 'GL_BURST_MAX');
 
-    const GL_BEADS = 5;       // the neck, in heads shrinking into his body
+    const GL_BEADS = 9;       // the neck, in heads shrinking into his body, from the collar out
 
     let gl = null;
 
@@ -124,8 +130,8 @@
             gl.pend = null;
             // his body as one turned capsule: a mask is a grid of upright cells
             // and his body is not upright any more
-            const b0 = glBoot();
-            return capsuleContact(ball, gl.cx, gl.cy, b0.x, b0.y, GL_W / SHAPE_ASPECT * GL_THICK);
+            const a = glSpine(0), z = glSpine(1);
+            return capsuleContact(ball, a.x, a.y, z.x, z.y, GL_W / SHAPE_ASPECT * GL_THICK);
         },
         // his body is not a thing you can hurt, and it says so
         glances() { return !gl.pend; },
@@ -183,19 +189,31 @@
         }
     };
 
-    // his boot end, which is where the turned body reaches to from the collar
-    function glBoot() {
-        const back = GL_W * HL_HEAD_U;
-        return { x: gl.cx - Math.cos(GL_TILT) * back, y: gl.cy - Math.sin(GL_TILT) * back };
+    // a point in his own frame -- x along him toward his head, y across,
+    // both from the collar -- out in the field, where he is turned
+    function glLocal(lx, ly) {
+        const c = Math.cos(GL_TILT), s = Math.sin(GL_TILT);
+        return { x: gl.cx + lx * c - ly * s, y: gl.cy + lx * s + ly * c };
+    }
+
+    // the top left of the box his body is drawn in, in his own frame
+    function glOrigin() {
+        const h = GL_W / SHAPE_ASPECT;
+        return { x: GL_SEAT_U - GL_W * HL_HEAD_U, y: GL_SEAT_V - h * HL_HEAD_V };
+    }
+
+    // along the middle of his box, 0 at his shoulders to 1 at his boot
+    function glSpine(t) {
+        const o = glOrigin(), h = GL_W / SHAPE_ASPECT;
+        const x0 = o.x + GL_W * (HL_HEAD_U - 0.1), x1 = o.x;
+        return glLocal(x0 + (x1 - x0) * t, o.y + h / 2);
     }
 
     // the middle of the box his body is drawn in, which is where drawFigure
     // and the crumble turn him about
     function glMiddle() {
-        const h = GL_W / SHAPE_ASPECT;
-        const lx = GL_W / 2 - GL_W * HL_HEAD_U, ly = h / 2 - h * HL_HEAD_V;
-        const c = Math.cos(GL_TILT), s = Math.sin(GL_TILT);
-        return { x: gl.cx + lx * c - ly * s, y: gl.cy + lx * s + ly * c };
+        const o = glOrigin(), h = GL_W / SHAPE_ASPECT;
+        return glLocal(o.x + GL_W / 2, o.y + h / 2);
     }
 
     // One head on its neck: counting down to a burst, swelling green, then
@@ -227,9 +245,9 @@
     // the box the physics looks for him in: his body and wherever his heads are
     function glBox(b) {
         const h = GL_W / SHAPE_ASPECT, r = GL_HEAD_W;
-        const boot = glBoot();
-        let x0 = Math.min(gl.cx, boot.x) - h / 2, x1 = Math.max(gl.cx, boot.x) + h / 2;
-        let y0 = Math.min(gl.cy, boot.y) - h / 2, y1 = Math.max(gl.cy, boot.y) + h / 2;
+        const a = glSpine(0), boot = glSpine(1);
+        let x0 = Math.min(gl.cx, a.x, boot.x) - h / 2, x1 = Math.max(gl.cx, a.x, boot.x) + h / 2;
+        let y0 = Math.min(gl.cy, a.y, boot.y) - h / 2, y1 = Math.max(gl.cy, a.y, boot.y) + h / 2;
         for (const k of gl.heads) {
             if (!k.alive) continue;
             x0 = Math.min(x0, k.x - r); x1 = Math.max(x1, k.x + r);
@@ -249,19 +267,20 @@
         // the necks first: heads shrinking into him, so they read as one animal
         for (const k of gl.heads) {
             if (!k.alive || k.loose) continue;
-            for (let i = 1; i <= GL_BEADS; i++) {
-                const t = i / (GL_BEADS + 1);
-                const w = hw * (0.3 + 0.5 * t), hgt = w * (BALL_RY / BALL_RX);
+            for (let i = 0; i < GL_BEADS; i++) {
+                const t = i / GL_BEADS;
+                const w = hw * (0.45 + 0.35 * t), hgt = w * (BALL_RY / BALL_RX);
                 ctx.drawImage(ballImg, k.ax + (k.x - k.ax) * t - w / 2,
                               k.ay + (k.y - k.ay) * t - hgt / 2, w, hgt);
             }
         }
-        // turned about the collar, so the hole his necks leave by lands on
-        // (gl.cx, gl.cy) whatever GL_TILT is
+        // turned about the collar and seated on it, so his shoulders are
+        // where his necks come out whatever GL_TILT is
+        const o = glOrigin();
         ctx.save();
         ctx.translate(gl.cx, gl.cy);
         ctx.rotate(GL_TILT);
-        ctx.drawImage(body, -GL_W * HL_HEAD_U, -h * HL_HEAD_V, GL_W, h);
+        ctx.drawImage(body, o.x, o.y, GL_W, h);
         ctx.restore();
         for (const k of gl.heads) {
             if (!k.alive) continue;

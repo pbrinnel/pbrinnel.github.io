@@ -53,6 +53,8 @@
         fight(who) { LAB.boss = who; LAB.open = false; startAt(LEVELS.length - 1); },
         usePad(key) { LAB.pad = key; labPadUse(key); },
         stageAt(n, open) { LAB.open = !!open; startAt(n); },
+        // every capsule the game has, for the lab's give buttons
+        get caps() { return CAP_KEYS.map(k => ({ key: k, name: CAPS[k].short })); },
         give(kind) {
             if (phase !== 'play' && phase !== 'ready') return false;
             applyCapsule(kind);

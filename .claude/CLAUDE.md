@@ -45,7 +45,9 @@ touches it.
 - The boss lab builds from these files but not from `intro.js` or `debug.js`, and it runs
   brandon.html's engine. So a module that calls something only fourkeys has must check
   it with `typeof` first, and a new top-level name must not already be used in
-  brandon.html (the lab refuses a name declared twice).
+  brandon.html (the lab refuses a name declared twice). Where the lab needs an engine
+  change of fourkeys', the build lifts it out of `engine.js` rather than copying it (the
+  paddle split, `spread()`..`halfSpan()`, is the first).
 - **Load order is the whole design and `fourkeys.html` sets it.** They are plain scripts
   sharing one scope: runtime and modules first, `engine.js` after them, `start.js` last.
   Nothing in a module may READ an engine const at load time — inside a function is fine.
