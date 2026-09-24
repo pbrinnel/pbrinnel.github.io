@@ -4315,6 +4315,7 @@
     }
 
     function drawPaddle() {
+        if (menuPadHidden()) return;          // going into a building: the town draws him
         // the recoil is his own: under DOUBLE only the one the ball landed on
         // shakes, and he shakes for as long as his own knock lasts
         const jig = i => (paddle.jt[i] > 0 ? wobble(paddle.jt[i]) : 0) + menuStep(i);

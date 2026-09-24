@@ -10,6 +10,7 @@
     //   four keys open the CASTLE
     //   finish a level without losing a head and you keep the paddle it guarded
     //   win any level at all and CLASSIC, the first game's paddle, is yours
+    //   the first win on each level plays its memory, kept in MEMORIES to watch again
     //
     // The five are laid out as a town: the FARM and the RUINS out on the left,
     // the CITY and the VOLCANO on the right, and the CASTLE far off in the
@@ -67,13 +68,14 @@
                 for (const l of MENU_ALL) menu.keys[l.n] = true;
                 for (const k of MENU_PADS) menu.pads[k] = true;
                 for (const l of MENU_ALL) menu.seen[l.n] = true;
+                for (const l of MENU_ALL) menu.mems[l.n] = true;
                 menuSave();
                 menuSay('EVERYTHING OPEN');
                 return true;
             },
             wipe() {
                 menuLoad();
-                menu.keys = {}; menu.pads = { standard: true }; menu.best = {}; menu.seen = {};
+                menu.keys = {}; menu.pads = { standard: true }; menu.best = {}; menu.seen = {}; menu.mems = {};
                 menuSave();
                 LAB.usePad('standard');
                 return true;
@@ -87,9 +89,11 @@
         try { saved = JSON.parse(localStorage.getItem(MENU_KEY) || 'null'); } catch (e) { saved = null; }
         menu = { keys: (saved && saved.keys) || {}, pads: (saved && saved.pads) || { standard: true },
                  best: (saved && saved.best) || {}, seen: (saved && saved.seen) || {},
+                 mems: (saved && saved.mems) || {},
                  dusting: null, sel: 1, say: null, sayT: 0,
                  cards: [], run: null, side: 0, hold: 0, sw: null,
                  march: false, lift: 0, into: null, walk: 0, gait: 0, arriveT: -1,
+                 going: null, screen: null, press: null,
                  shows: [], showT: 0 };
         return menu;
     }
@@ -97,7 +101,7 @@
     function menuSave() {
         try {
             localStorage.setItem(MENU_KEY, JSON.stringify({ keys: menu.keys, pads: menu.pads, best: menu.best,
-                                                            seen: menu.seen }));
+                                                            seen: menu.seen, mems: menu.mems }));
         } catch (e) { /* a private window just will not remember */ }
     }
 
@@ -162,19 +166,22 @@
         5: { x: 400, y: 92, w: 138, h: 110 }
     };
 
-    // Two more in the top corners that are not levels: forgetting everything
-    // on the left, the boards on the right. Every lane across the floor is
-    // taken, so theirs is the wall itself -- walk up hard against the left or
+    // More that are not levels. MEMORIES and the boards take the top corners,
+    // and a corner's lane is the wall itself: walk up hard against the left or
     // right edge and that is where you arrive, past the FARM or the VOLCANO
-    // rather than into it. Erasing wants a second, longer hold once you are in
-    // the doorway, because it cannot be taken back.
+    // rather than into it. MEMORIES is not there at all until the first memory
+    // is (menuShown). RESET is the least of them, a small sign up and to the
+    // right of MEMORIES, and its lane is the gap between the FARM and the
+    // RUINS -- narrower than the sign, so nobody wanders into it. Going in
+    // only asks the question (menuShow); erasing is a button in there.
     const M_SIDES = [
-        { key: 'reset', side: -1, lines: ['RESET', 'SAVE DATA'], ink: '#c0594a',
+        { key: 'memories', side: -1, lines: ['MEMORIES'], ink: '#d9a5b3',
           at: { x: 70, y: 80, w: 116, h: 90 } },
+        { key: 'reset', lines: ['RESET'], ink: '#c0594a', small: true,
+          at: { x: 174, y: 44, w: 60, h: 28, lane: [162, 186] } },
         { key: 'board', side: 1, lines: ['LEADER', 'BOARD'], ink: '#c9a94e',
           at: { x: 730, y: 80, w: 116, h: 90 } }
     ];
-    const ERASE_HOLD = 1.6;          // the second hold, on top of DOOR_HOLD
     const M_WALL = 3;                // px off his clamp that still counts as against the wall
 
     function menuBuild() {
@@ -185,6 +192,8 @@
         menu.march = false;
         menu.lift = 0;
         menu.into = null;
+        menu.going = null;
+        menu.screen = null;
         menu.gait = 0;
         menu.cards = MENU_ALL.map(l => Object.assign({ level: l }, M_TOWN[l.n]))
             .concat(M_SIDES.map(s => Object.assign({ level: s }, s.at)));
@@ -197,11 +206,18 @@
     }
 
     // whether he is lined up with this one: a corner's lane is its wall, and
-    // against a wall only the corner is lined up
+    // against a wall only the corner is lined up. A lane is the width of what
+    // is drawn unless the card says otherwise.
     function menuLane(c) {
         const wall = menuWall();
-        if (c.level.key) return wall === c.level.side;
-        return !wall && paddle.x >= c.x - c.w / 2 && paddle.x <= c.x + c.w / 2;
+        if (c.level.side) return wall === c.level.side;
+        const [l, r] = c.lane || [c.x - c.w / 2, c.x + c.w / 2];
+        return !wall && paddle.x >= l && paddle.x <= r;
+    }
+
+    // whether it is in the town yet
+    function menuShown(c) {
+        return c.level.key !== 'memories' || Object.keys(menu.mems).some(n => menu.mems[n]);
     }
 
     function menuSay(t) { menu.say = t; menu.sayT = 2.6; }
@@ -224,7 +240,7 @@
     // second takes it all back.
     const MARCH_UP = 118;            // px/s forward
     const MARCH_BACK = 300;          // px/s back home
-    const MARCH_MAX = 410;           // past the last door, for the empty lanes
+    const MARCH_MAX = 470;           // past the last door, RESET's, for the empty lanes
     const DOOR_HOLD = 0.8;           // stood in the doorway before it opens
     const WALK_HZ = 2.3;             // paces a second, which is what the bob is
     const WALK_BOB = 0.8;            // how much he rises and falls, in jig units
@@ -246,17 +262,11 @@
             const over = (c.y + c.h / 2) - (padY() - padH() / 2);
             if (over > 0) menu.lift -= over;
             if (menu.into && menu.into.card !== c) menu.into = null;
-            if (!menu.into) menu.into = { card: c, t: 0, armed: false };
-            if (menu.march && (menu.into.t += dt) >= (menu.into.armed ? ERASE_HOLD : DOOR_HOLD)) {
-                // the first hold at RESET only arms it; the second one erases
-                if (c.level.key === 'reset' && !menu.into.armed) {
-                    menu.into.armed = true;
-                    menu.into.t = 0;
-                } else {
-                    menu.into = null;
-                    menuEnter(c.level);
-                    return;
-                }
+            if (!menu.into) menu.into = { card: c, t: 0 };
+            if (menu.march && (menu.into.t += dt) >= DOOR_HOLD) {
+                menu.into = null;
+                menuGo(c);
+                return;
             }
             if (!menu.march) menu.into = null;
         } else menu.into = null;
@@ -270,7 +280,7 @@
     function menuAt() {
         const y = padY() - padH() / 2;
         for (const c of menu.cards) {
-            if (!menuLane(c)) continue;
+            if (!menuShown(c) || !menuLane(c)) continue;
             if (y > c.y + c.h / 2 || y < c.y - c.h / 2) continue;
             return c;
         }
@@ -288,6 +298,76 @@
         return Math.cos(menu.walk * WALK_HZ * Math.PI * 2 + i * Math.PI) * WALK_ROCK * menu.gait;
     }
 
+    // ---- going in ------------------------------------------------------------------------
+    // The door hold is done: a doorway opens at the foot of the building and
+    // he goes through it, drifting to its middle and shrinking to its width,
+    // fading as he goes. The wall hides whatever of him is not in the doorway
+    // yet. Only then does the level, or the room, take over. A door that
+    // will not open (the boards, a shut CASTLE) just says why, and he stays out.
+    const GO_SECS = 0.7;
+    const GO_FADE = 0.45;            // the share of the way in he starts fading at
+    const DOOR_W = 0.3;              // the doorway, as shares of the building
+    const DOOR_H = 0.36;             // ...short enough to clear a corner's name
+
+    function menuCanEnter(l) {
+        if (l.key) return l.key !== 'board';
+        if (l.n === 5 && !menuOpened()) return false;
+        return !!menuBossFor(l.n);
+    }
+
+    function menuGo(c) {
+        menu.march = false;
+        if (!menuCanEnter(c.level)) { menuEnter(c.level); return; }
+        menu.going = { card: c, t: 0, x: paddle.x, y: padY() };
+    }
+
+    function menuGoStep(dt) {
+        const g = menu.going;
+        if ((g.t += dt) < GO_SECS) return;
+        menu.going = null;
+        const l = g.card.level;
+        if (l.key === 'reset' || l.key === 'memories') { menuShow(l.key); menu.screen.from = g.x; }
+        else menuEnter(l);
+    }
+
+    // engine.js asks, and leaves him undrawn while menuDrawGoing draws him
+    function menuPadHidden() { return !!(menu && menu.going && menuUp()); }
+
+    function menuDoor(c) {
+        const w = c.w * DOOR_W, h = c.h * DOOR_H;
+        return { x: c.x - w / 2, y: c.y + c.h / 2 - h, w, h };
+    }
+
+    function menuDrawGoing() {
+        const g = menu.going;
+        if (!g) return;
+        const c = g.card, d = menuDoor(c);
+        const k = Math.min(1, g.t / GO_SECS), e = k * k * (3 - 2 * k);
+        const x = c.x - c.w / 2, y = c.y - c.h / 2;
+        // the doorway, opening from the floor up over the first part of it
+        const o = Math.min(1, k * 3);
+        ctx.globalAlpha = 0.22;
+        ctx.fillStyle = c.level.ink;
+        ctx.fillRect(d.x, d.y + d.h * (1 - o), d.w, d.h * o);
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = c.level.ink;
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(d.x, d.y + d.h * (1 - o), d.w, d.h * o);
+        // him, cut to everything but the wall: outside the building, or in
+        // the doorway
+        const w0 = padW();
+        const s = 1 + (d.w / w0 - 1) * e;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, 0, LW, LH);
+        ctx.rect(x, y, c.w, c.h);
+        ctx.rect(d.x, d.y, d.w, d.h);
+        ctx.clip('evenodd');
+        labPadIcon(LAB.pad, g.x + (c.x - g.x) * e, g.y + (d.y + d.h / 2 - g.y) * e, w0 * s, false,
+                   1 - Math.max(0, (k - GO_FADE) / (1 - GO_FADE)));
+        ctx.restore();
+    }
+
     // Into a level. There are no levels yet, so the prototype hands you that
     // level's boss and remembers what you went in with, which is enough for the
     // hub to tell a clean run from a costly one.
@@ -295,13 +375,6 @@
         menuLoad();
         if (level.key === 'board') {
             menuSay('LEADERBOARD · COMING SOON');
-            menu.march = false;
-            return;
-        }
-        if (level.key === 'reset') {
-            LAB_MINI.menu.acts.wipe();
-            clearBest();                    // everything means the best as well
-            menuSay('SAVE DATA ERASED');
             menu.march = false;
             return;
         }
@@ -362,16 +435,22 @@
         // somewhere else
         menu.best[level.n] = Math.max(menu.best[level.n] || 0, score || 0);
         let got = level.name + (first ? ' · A KEY' : ' · DONE AGAIN');
+        // its memory plays the first time only, before any paddle is shown:
+        // after that it is in MEMORIES
+        if (!menu.mems[level.n]) {
+            menu.mems[level.n] = true;
+            menu.shows.push({ mem: level.n });
+        }
         if (clean && !menu.pads[level.pad]) {
             menu.pads[level.pad] = true;
-            menu.shows.push(level.pad);
+            menu.shows.push({ pad: level.pad });
             got += ' AND ' + (LAB_PAD[level.pad] ? LAB_PAD[level.pad].name : level.pad.toUpperCase());
         } else if (!clean && !menu.pads[level.pad]) {
             got += ' · the paddle stays locked';
         }
         if (!menu.pads[MENU_SOUVENIR]) {
             menu.pads[MENU_SOUVENIR] = true;
-            menu.shows.push(MENU_SOUVENIR);
+            menu.shows.push({ pad: MENU_SOUVENIR });
             got += ' · AND ' + LAB_PAD[MENU_SOUVENIR].name;
         }
         menuSave();
@@ -392,6 +471,8 @@
     function menuUpdate(dt) {
         if (!menu) return;
         if (menuUnlockUp()) { menu.showT += dt; menu.march = false; return; }
+        if (menuScreenUp()) { menu.screen.t += dt; menu.march = false; return; }
+        if (menu.going) { menuGoStep(dt); return; }
         menuDustStep(dt);
         if (menu.sayT > 0) menu.sayT = Math.max(0, menu.sayT - dt);
         menuSwapStep(dt);
@@ -613,10 +694,14 @@
     function labDrawTop() {
         if (!menuUp()) return;
         if (menuUnlockDraw()) return;
+        if (menuScreenDraw()) return;
 
         const k = menuArriveK();
         // the far ones first, so a near one growing past them is drawn over them
-        for (const c of menu.cards.slice().sort((a, b) => a.y - b.y)) menuArriveCard(c, k, () => menuDrawLevel(c));
+        for (const c of menu.cards.slice().sort((a, b) => a.y - b.y)) {
+            if (menuShown(c)) menuArriveCard(c, k, () => menuDrawLevel(c));
+        }
+        menuDrawGoing();
         // the gates are at his feet, so they are simply there once the town is
         ctx.globalAlpha = k;
         menuDrawGate(-1);
@@ -627,27 +712,22 @@
         menuDrawLine();
     }
 
-    // A corner: no roof and no key, just a sign. RESET's doorway fills twice,
-    // the second time in its own red and saying what it is about to do.
+    // Not a level: no roof and no key, just a sign.
     function menuDrawSide(c) {
         const s = c.level;
         const x = c.x - c.w / 2, y = c.y - c.h / 2;
         const aimed = menuLane(c);
         menuPanel(x, y, c.w, c.h, aimed, s.ink);
-        const into = menu.into && menu.into.card === c ? menu.into : null;
-        if (into) {
-            const k = Math.min(1, into.t / (into.armed ? ERASE_HOLD : DOOR_HOLD));
-            ctx.globalAlpha = into.armed ? 0.75 : 0.5;
+        if (menu.into && menu.into.card === c) {
+            const k = Math.min(1, menu.into.t / DOOR_HOLD);
+            ctx.globalAlpha = 0.5;
             ctx.fillStyle = s.ink;
             ctx.fillRect(x + 1, y + c.h * (1 - k) - 1, c.w - 2, c.h * k);
             ctx.globalAlpha = 1;
         }
-        if (into && into.armed) {
-            text('KEEP HOLDING', c.x, y + c.h * 0.42, 14, '#f2efe9', 'center');
-            text('to erase everything', c.x, y + c.h * 0.7, 11, '#f2efe9', 'center');
-            return;
-        }
         const ink = aimed ? s.ink : '#8d877d';
+        if (s.small) { text(s.lines[0], c.x, c.y + 4, 11, ink, 'center'); return; }
+        if (s.lines.length === 1) { text(s.lines[0], c.x, c.y + 6, 17, ink, 'center'); return; }
         text(s.lines[0], c.x, y + c.h * 0.44, 17, ink, 'center');
         text(s.lines[1], c.x, y + c.h * 0.72, 13, ink, 'center');
     }
@@ -812,7 +892,7 @@
     // one line under the town, and only when there is something to say: the
     // gate you are leaning on, or what just happened
     function menuDrawLine() {
-        if (menu.sw) return;
+        if (menu.sw || menu.going) return;
         if (menu.side && menu.lift <= 1) {
             const to = menuNextPad(menu.side);
             text(to && LAB_PAD[to] ? 'lean to take ' + LAB_PAD[to].name : 'nothing else to lean for',
@@ -827,12 +907,13 @@
         }
     }
 
-    // ---- PADDLE UNLOCKED ----------------------------------------------------------------
-    // Every paddle you earn gets the whole screen to itself on the way back
-    // into the town: his name, and him, big, on a field of his own colour. One
-    // at a time, in the order they were won, each held until you tap. Only a
-    // win shows one (menuBeat, which the lab's "count it beaten" buttons also
-    // call); the debug menu's toggles and "unlock everything" do not.
+    // ---- PADDLE UNLOCKED, and a memory ------------------------------------------------
+    // What a win hands you gets the whole screen on the way back into the
+    // town, one at a time, each held until you tap: the level's memory first,
+    // the first time it is beaten, then every paddle earned -- his name, and
+    // him, big, on a field of his own colour. Only a win shows them (menuBeat,
+    // which the lab's "count it beaten" buttons also call); the debug menu's
+    // toggles and "unlock everything" do not.
     const UNLOCK_WAIT = 0.6;         // seconds up before a tap takes it away
     const UNLOCK_IN = 0.45;          // him rising into place
     const UNLOCK_W = 500;            // how long he is drawn
@@ -849,7 +930,9 @@
 
     function menuUnlockDraw() {
         if (!menuUnlockUp()) return false;
-        const key = menu.shows[0], p = LAB_PAD[key];
+        const show = menu.shows[0];
+        if (show.mem) { menuMemoryCard(show.mem, menu.showT); return true; }
+        const key = show.pad, p = LAB_PAD[key];
         const ink = (p && (p.ink || p.rim)) || '#8d877d';
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, LW, LH);
@@ -867,6 +950,150 @@
         return true;
     }
 
+    // A memory. For now only its title card: the cutscenes come later, and
+    // this is the one place that will draw them.
+    function menuMemoryCard(n, t) {
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, LW, LH);
+        ctx.globalAlpha = Math.min(1, t / UNLOCK_IN);
+        text('MEMORY ' + n, LW / 2, LH / 2 + 14, 44, '#f2efe9', 'center');
+        ctx.globalAlpha = 1;
+    }
+
+    // ---- inside: RESET's question and the MEMORIES room ------------------------------
+    // The two buildings you go into without leaving the town. Their choices
+    // are picked the way the game-over screen's are: he is down at the bottom
+    // with them in a row over him, the one he is under is lit, and a press
+    // takes it -- a click, a tap or Space. That is the one way that works
+    // everywhere: a mouse is locked to him in the town, so there is no cursor
+    // to aim with, and a finger that taps a choice puts him under it anyway.
+    // Erasing is its own deliberate press on a word that says so, never the
+    // end of a hold that ran on a moment too long, and it is on the right,
+    // away from the gap he walks up to get there, so he always arrives under
+    // KEEP.
+    const M_CHOICE_Y = 330;          // the row of choices
+    const M_CHOICE_H = 84;
+
+    function menuScreenUp() { return !!(menu && menu.screen && menuUp()); }
+    function menuShow(kind, n) {
+        // where he went in, kept from the room to a memory and back
+        const from = menu.screen ? menu.screen.from : undefined;
+        menu.screen = { kind, n, t: 0, from };
+        menu.press = null;
+        setHint(kind === 'memory' ? 'click/tap or space to go back'
+                                  : 'move to choose · click/tap or space to pick');
+    }
+    // out the way he went in: the choosing moved him, and letting him walk
+    // home down some other lane would drag him through whatever is in it
+    function menuLeave() {
+        if (menu.screen.from !== undefined) paddle.x = paddle.tx = menu.screen.from;
+        menu.screen = null;
+        setHint(M_HINT);
+    }
+
+    function menuErase() {
+        LAB_MINI.menu.acts.wipe();
+        clearBest();                        // everything means the best as well
+        menuLeave();
+        menuSay('SAVE DATA ERASED');
+    }
+
+    // What there is to pick on this screen, left to right. Spread over the
+    // whole of where his middle can go, so every one of them is somewhere he
+    // can stand.
+    function menuChoices() {
+        const sc = menu.screen;
+        if (sc.kind === 'reset') {
+            return [{ id: 'keep', label: 'KEEP', cx: 250, w: 200, ink: '#f2efe9', act: menuLeave },
+                    { id: 'erase', label: 'ERASE', cx: 550, w: 200, ink: '#c0594a', act: menuErase }];
+        }
+        // the room: BACK first, where he comes in off the wall, then one door
+        // per level, and only the ones you have been through open
+        const hs = halfSpan(), step = (LW - hs * 2) / MENU_ALL.length;
+        return [{ id: 'back', label: 'BACK', cx: hs, w: 112, ink: '#8d877d', act: menuLeave }]
+            .concat(MENU_ALL.map((l, i) => {
+                const got = !!menu.mems[l.n];
+                return { id: 'mem' + l.n, label: got ? 'MEMORY ' + l.n : '?', cx: hs + step * (i + 1), w: 112,
+                         ink: l.ink, act: got ? () => menuShow('memory', l.n) : null };
+            }));
+    }
+
+    // the one nearest him
+    function menuChoiceAt(x) {
+        let best = null;
+        for (const c of menuChoices()) if (!best || Math.abs(c.cx - x) < Math.abs(best.cx - x)) best = c;
+        return best;
+    }
+
+    function menuScreenDraw() {
+        if (!menuScreenUp()) return false;
+        const sc = menu.screen;
+        if (sc.kind === 'memory') { menuMemoryCard(sc.n, sc.t); return true; }
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, LW, LH);
+        if (sc.kind === 'reset') {
+            text('ERASE SAVE DATA?', LW / 2, 150, 34, '#f2efe9', 'center');
+            text('every key, paddle and memory, gone for good', LW / 2, 195, 15, '#9a958c', 'center');
+        } else text('MEMORIES', LW / 2, 150, 34, '#d9a5b3', 'center');
+        const lit = menuChoiceAt(paddle.x);
+        for (const c of menuChoices()) {
+            const on = c === lit || c.id === lit.id;
+            const x = c.cx - c.w / 2, y = M_CHOICE_Y - M_CHOICE_H / 2;
+            menuPanel(x, y, c.w, M_CHOICE_H, on, c.ink);
+            if (on) {
+                ctx.globalAlpha = menu.press === c.id ? 0.4 : 0.18;
+                ctx.fillStyle = c.ink;
+                ctx.fillRect(x + 1, y + 1, c.w - 2, M_CHOICE_H - 2);
+                ctx.globalAlpha = 1;
+            }
+            text(c.label, c.cx, M_CHOICE_Y + 6, 17, on ? (c.act ? '#f2efe9' : '#6d685f') : (c.act ? c.ink : '#4a453d'),
+                 'center');
+        }
+        // a line from him up to what he is under, so it is plain he is the pointer
+        ctx.strokeStyle = lit.ink;
+        ctx.globalAlpha = 0.5;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 6]);
+        ctx.beginPath();
+        ctx.moveTo(paddle.x, PADDLE_Y - padH() / 2 - 8);
+        ctx.lineTo(lit.cx, M_CHOICE_Y + M_CHOICE_H / 2 + 8);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 1;
+        text('move under one · click, tap or space to pick it', LW / 2, 245, 17, '#6d685f', 'center');
+        labPadIcon(LAB.pad, paddle.x, PADDLE_Y, padW(), false, 1);
+        return true;
+    }
+
+    // Where a press is aiming. A free pointer (a finger, or a mouse the
+    // browser would not lock) aims where it is; a locked mouse, or a key,
+    // aims where he is -- the hand, not where he has got to yet.
+    function menuAimOf(e) {
+        const free = e && e.clientX !== undefined && !(typeof locked === 'function' && locked());
+        if (!free) return paddle.tx;
+        const r = canvas.getBoundingClientRect();
+        return (e.clientX - r.left) / r.width * LW;
+    }
+
+    // A press while one is up is the screen's, never his. It arms the choice
+    // it is aimed at and letting go on the same one takes it, so the finger
+    // or key still down from the door hold cannot pick anything by lifting,
+    // and sliding off before letting go takes it back.
+    function menuScreenPress(e, down) {
+        if (!menuScreenUp()) return false;
+        if (menu.screen.kind === 'memory') {
+            if (down && menu.screen.t >= UNLOCK_WAIT) menuShow('memories');
+            return true;
+        }
+        const c = menuChoiceAt(menuAimOf(e));
+        if (down) menu.press = c.act ? c.id : null;
+        else {
+            if (menu.press && c.id === menu.press) c.act();
+            menu.press = null;
+        }
+        return true;
+    }
+
     // ---- holding, which is the whole of the input ------------------------------------
     // The game's own tap serves a ball; there is no ball here, so the hub takes
     // the press for itself (see the action() hook) and only watches whether it
@@ -874,21 +1101,23 @@
     // A press that turns over one of the opening cards is the card's, not his.
     // Asked as typeof since the boss lab builds this file without the opening.
     const introHas = () => typeof introUp === 'function' && introUp();
-    const menuHeld = down => {
+    const menuHeld = (down, e) => {
         if (down && introHas()) return;
         if (down && menuUnlockNext()) return;
+        if (menuScreenPress(e, down)) { menu.march = false; return; }
         if (menu && (!down || menuUp())) menu.march = down;
     };
     addEventListener('pointerdown', e => {
         if (e.target && e.target.closest && e.target.closest('#lab')) return;
-        menuHeld(true);
+        menuHeld(true, e);
     }, true);
-    addEventListener('pointerup', () => menuHeld(false), true);
-    addEventListener('pointercancel', () => menuHeld(false), true);
-    addEventListener('blur', () => menuHeld(false));
+    addEventListener('pointerup', e => menuHeld(false, e), true);
+    addEventListener('pointercancel', () => { if (menu) menu.press = null; menuHeld(false); }, true);
+    addEventListener('blur', () => { if (menu) menu.press = null; menuHeld(false); });
     addEventListener('keydown', e => {
         if (e.code !== 'Space' || !menuUp()) return;
         e.preventDefault();
+        if (e.repeat) return;               // a key held on from the door is not a press
         menuHeld(true);
     }, true);
     addEventListener('keyup', e => { if (e.code === 'Space') menuHeld(false); }, true);

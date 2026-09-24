@@ -3,7 +3,7 @@
     // ---- FOUR KEYS: the debug menu ---------------------------------------------------
     // What the konami code opens, and fourkeys.html?debug on a phone. The town
     // is the whole of the game's progress, so this is the whole of the cheat
-    // menu: hand yourself a key, hand yourself a paddle, or put it all back.
+    // menu: hand yourself a key, a paddle or a memory, or put it all back.
     //
     // It reaches the town through menuLevels/menuPads/menuHas/menuSet and
     // nothing else, so it never has to know where any of it is kept.
@@ -16,6 +16,9 @@
     // the game's own reset asked for.
     const DBG_WIPE_HOLD = 1.2;
 
+    const DBG_HEADS = { keys: 'keys — four of them open the CASTLE', pads: 'paddles',
+                        mems: 'memories — one after each level' };
+
     let dbgSync = [];                 // one per row: bring its look up to date
 
     function debugBuild() {
@@ -25,6 +28,7 @@
 
         debugRow(el, 'keys', menuLevels().filter(l => l.n <= 4));
         debugRow(el, 'pads', menuPads().map(k => ({ k, name: (LAB_PAD[k] || {}).name || k.toUpperCase() })));
+        debugRow(el, 'mems', menuLevels().map(l => ({ n: l.n, name: 'MEMORY ' + l.n, ink: l.ink })));
 
         // and the way back out of all of it
         const wipe = document.createElement('button');
@@ -45,10 +49,10 @@
     // one line of buttons, each one a thing you either have or do not
     function debugRow(el, what, items) {
         const head = document.createElement('p');
-        head.textContent = what === 'keys' ? 'keys — four of them open the CASTLE' : 'paddles';
+        head.textContent = DBG_HEADS[what];
         el.appendChild(head);
         for (const it of items) {
-            const key = what === 'keys' ? it.n : it.k;
+            const key = what === 'pads' ? it.k : it.n;
             const btn = document.createElement('button');
             btn.addEventListener('click', () => {
                 menuSet(what, key, !menuHas(what, key));
