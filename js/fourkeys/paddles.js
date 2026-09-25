@@ -23,7 +23,7 @@
     const PAD_BAKE = 320;           // tints are baked this long and scaled
 
     let GILT_LEN   = 0.85;   // gilt: shorter...
-    let GILT_CAPS  = 1.6;    // ...and every capsule lasts him half again as long
+    let GILT_CAPS  = 1.6;    // ...and every capsule lasts him longer, by this much
     let GILT_SHINE = 3;      // seconds a sweep of light takes to cross him
     let STAT_LEN   = 1.2;    // statue: longer...
     let STAT_ANGLE = 0.65;   // ...flatter off his ends...
@@ -35,7 +35,7 @@
     let FROST_DECK = 0.6;    // ...on a narrower flat, so more of him is a curve
     let FROST_FLAKES = 14;   // snowflakes a second coming off him
     let EMB_LEN    = 0.88;   // ember: shorter...
-    let EMB_ANGLE  = 1.35;   // ...and his ends throw a head much harder
+    let EMB_ANGLE  = 1.35;   // ...and his ends send a head off at a much sharper angle
     let EMB_GLOW   = 0.45;   // how much light he gives off
     let EMB_SPARKS = 34;     // sparks a second rising off him
     let PAIR_LEN   = 0.62;   // the pair: two of him, each this much of one
@@ -321,7 +321,7 @@
     // CLASSIC: the first game's paddle, bare. Nothing but the photograph and
     // nothing changed about how he plays -- he is MODERN without the polish,
     // there to be carried for old times' sake. The first level you win gives him.
-    LAB_PAD.classic = { name: 'CLASSIC', blurb: 'him, as the first game had him · plays the same as MODERN' };
+    LAB_PAD.classic = { name: 'CLASSIC', blurb: 'the original · plays the same as MODERN' };
 
     // GILT: gold leaf over the photograph, with a sweep of light crossing him
     // every few seconds. Shorter than standard, and everything he catches
@@ -329,7 +329,7 @@
     LAB_PAD.gilt = {
         name: 'GILT',
         ink: GILT_INK, rim: GILT_RIM,
-        blurb: 'shorter · capsules last half again as long',
+        blurb: 'shorter · power-ups last longer',
         len: () => GILT_LEN,
         caps: () => GILT_CAPS,
         under() { padRim('padRimG', GILT_RIM, 3, 0.5); },
@@ -384,7 +384,7 @@
     LAB_PAD.frost = {
         name: 'FROST',
         ink: FROST_INK, rim: FROST_RIM,
-        blurb: 'spin goes on easily · a narrow flat to land on',
+        blurb: 'easier to add spin · smaller sweet spot',
         len: () => FROST_LEN,
         edge: () => FROST_EDGE,
         swipe: () => FROST_SWIPE,
@@ -422,12 +422,12 @@
     };
 
     // EMBER: lit from underneath, throwing sparks that rise. Shorter than
-    // standard, and his ends throw a head much harder than anyone else's --
+    // standard, and his ends send a head off sharper than anyone else's --
     // the whole field is reachable off him, and so is the wall beside you.
     LAB_PAD.ember = {
         name: 'EMBER',
         ink: EMB_INK, rim: EMB_RIM,
-        blurb: 'his ends throw hardest · shorter than standard',
+        blurb: 'sharper angles off his ends · shorter',
         len: () => EMB_LEN,
         angle: () => EMB_ANGLE,
         under() {

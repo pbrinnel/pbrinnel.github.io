@@ -709,6 +709,8 @@
         ctx.globalAlpha = 1;
         if (k < 1) return;
         menuPadPeek();
+        menuDrawGateNote(-1);
+        menuDrawGateNote(1);
         menuDrawLine();
     }
 
@@ -887,6 +889,31 @@
             text(ch, x + M_GATE.w / 2, y, 10, on ? '#f2efe9' : '#6d685f', 'center');
             y += 11;
         }
+    }
+
+    // Beside each gate, what the paddle through it would change: his name and
+    // the unlock screen's blurb, a bullet to each ' · ' part. It comes up as he
+    // walks toward that wall, so the far gate never says anything and the
+    // floor is empty while he is out in the middle.
+    const GATE_NEAR = 240;           // px from the wall where it starts to show
+    function menuDrawGateNote(side) {
+        if (menu.sw || menu.lift > 1) return;
+        const to = menuNextPad(side);
+        const p = to && LAB_PAD[to];
+        if (!p) return;
+        const hs = halfSpan();
+        const d = side < 0 ? paddle.x - hs : LW - hs - paddle.x;
+        const a = Math.max(0, Math.min(1, 1 - d / GATE_NEAR));
+        if (a <= 0) return;
+        const x = side < 0 ? M_GATE.w + 10 : LW - M_GATE.w - 10;
+        const align = side < 0 ? 'left' : 'right';
+        ctx.globalAlpha = a * a;
+        // packed into the strip between the near building and his head, which
+        // at the wall is right under it
+        text(p.name, x, M_GATE.y + 2, 13, p.ink || p.rim || '#f2efe9', align);
+        (p.blurb ? p.blurb.split(' · ') : []).forEach((b, i) =>
+            text('• ' + b, x, M_GATE.y + 17 + i * 13, 11, '#b8b2a8', align));
+        ctx.globalAlpha = 1;
     }
 
     // one line under the town, and only when there is something to say: the
