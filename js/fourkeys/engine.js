@@ -2643,6 +2643,7 @@
     function overChoose(key) {
         overPress = null;
         showCursor(false);             // endRun brings it back for the initials
+        if (key === 'end' && menuQuit()) return;     // a level ends in the town
         key === 'continue' ? continueGame() : endRun();
     }
 

@@ -8,7 +8,7 @@
     //
     //   four levels, in any order, and each one you finish gives a key
     //   four keys open the CASTLE
-    //   finish a level without losing a head and you keep the paddle it guarded
+    //   finish a level without using a continue and you keep the paddle it guarded
     //   win any level at all and CLASSIC, the first game's paddle, is yours
     //   the first win on each level plays its memory, kept in MEMORIES to watch again
     //
@@ -369,8 +369,8 @@
     }
 
     // Into a level. There are no levels yet, so the prototype hands you that
-    // level's boss and remembers what you went in with, which is enough for the
-    // hub to tell a clean run from a costly one.
+    // level's boss and remembers which one, and menuWatch keeps an eye on
+    // whether you had to buy it back.
     function menuEnter(level) {
         menuLoad();
         if (level.key === 'board') {
@@ -387,7 +387,7 @@
         const boss = menuBossFor(level.n);
         if (!boss) { menuSay(level.name + ' · no boss is set to this level'); return; }
         menu.arriveT = -1;          // walked in before the town finished arriving
-        menu.run = { n: level.n, lost: 0, out: 0 };
+        menu.run = { n: level.n, over: false, cont: false, out: 0 };
         menu.sel = level.n;
         menu.march = false;
         LAB.mini = null;
@@ -396,12 +396,17 @@
     }
 
     // A head went off the bottom. True means it cost nothing: there is nothing
-    // to lose in the hub. In a level it is counted here rather than read off
-    // `lives`, since the lab's endless lives would make every run a clean one.
-    function menuLost() {
-        if (menuUp()) return true;
-        if (menu && menu.run) menu.run.lost++;
-        return false;
+    // to lose in the hub.
+    function menuLost() { return menuUp(); }
+
+    // END RUN in a level, or the CONTINUE clock running out: back to the town
+    // with nothing, rather than on to the initials. True means the town took it.
+    function menuQuit() {
+        if (!menu || !menu.run) return false;
+        const n = menu.run.n;
+        menuOpen();
+        menuSay(menuName(n) + ' · NOT THIS TIME');
+        return true;
     }
 
     // Runs every frame, hub or no hub -- it is what brings you back out of a
@@ -410,20 +415,25 @@
     const M_OUT = 2.6;
     function menuWatch(dt) {
         if (!menu || !menu.run) return;
-        const won = phase === 'ascend' || phase === 'cleared';
-        // and the other way it can end: the heads ran out, and the hub takes
-        // you back with nothing. Whether a lost level costs you the whole run
-        // is a question for the game, not for this.
-        if (!won && phase !== 'over') return;
-        if ((menu.run.out += dt) < M_OUT) return;
         const run = menu.run;
+        // The heads running out is the CONTINUE screen, and the level waits on
+        // it. Coming off it straight back into play is a continue. Coming off
+        // it anywhere else is END RUN on an engine that does not ask menuQuit
+        // first (the lab's), and it goes the same way.
+        if (phase === 'over') { run.over = true; return; }
+        if (run.over) {
+            run.over = false;
+            if (phase === 'ready' || phase === 'play') run.cont = true;
+            else { menuQuit(); return; }
+        }
+        if (phase !== 'ascend' && phase !== 'cleared') return;
+        if ((run.out += dt) < M_OUT) return;
         menu.run = null;
-        if (won) menuBeat(run.lost === 0, run.n);
+        menuBeat(!run.cont, run.n);
         menuOpen();
-        if (!won) menuSay(menuName(run.n) + ' · NOT THIS TIME');
     }
 
-    // a level finished: the key always, the paddle only if it cost you nothing
+    // a level finished: the key always, the paddle only if you never continued
     function menuBeat(clean, n) {
         menuLoad();
         const which = n || menu.sel || 1;
