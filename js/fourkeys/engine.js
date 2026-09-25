@@ -1384,7 +1384,7 @@
 
     // 0 while the screen is still empty, then 0 -> 1 as he lowers into frame
     function enterK() {
-        return Math.min(1, Math.max(0, (enterT - ENTER_WAIT) / ENTER_SECS));
+        return Math.min(1, Math.max(0, (enterT - ENTER_WAIT) / labEnterSecs()));
     }
 
     // once BOSS_STILL of his health is gone he starts patrolling, and he
@@ -1603,10 +1603,12 @@
     // phantom's real ellipse -- phantoms never grow, so they use the bare
     // constants rather than the player ball's BIG BRAIN ones
     // which of him it came down on, so only that one wears it
+    //
+    // A phantom may carry a `scale`, for a boss that throws smaller ones.
     function phantomOnPaddle(p) {
-        const c = Math.cos(p.angle), s = Math.sin(p.angle);
-        const rx = Math.hypot(BALL_RX * c, BALL_RY * s);
-        const ry = Math.hypot(BALL_RX * s, BALL_RY * c);
+        const c = Math.cos(p.angle), s = Math.sin(p.angle), k = p.scale || 1;
+        const rx = Math.hypot(BALL_RX * c, BALL_RY * s) * k;
+        const ry = Math.hypot(BALL_RX * s, BALL_RY * c) * k;
         const halfH = padH() / 2, py = padY();
         if (p.y + ry < py - halfH || p.y - ry > py + halfH) return null;
         for (const sg of segs()) {
@@ -1623,9 +1625,10 @@
             p.angle += p.spin * dt;
             // they bounce off the sides like the real thing, which is the
             // whole point
-            if (p.x < BALL_RX && p.vx < 0) p.vx = -p.vx;
-            if (p.x > LW - BALL_RX && p.vx > 0) p.vx = -p.vx;
-            if (p.y < BALL_RY && p.vy < 0) p.vy = -p.vy;
+            const k = p.scale || 1;
+            if (p.x < BALL_RX * k && p.vx < 0) p.vx = -p.vx;
+            if (p.x > LW - BALL_RX * k && p.vx > 0) p.vx = -p.vx;
+            if (p.y < BALL_RY * k && p.vy < 0) p.vy = -p.vy;
             // one that lands on him is SPENT landing on him. only during the
             // rally: nothing should be able to stick to him while he is
             // holding a serve, or standing on a CONTINUE.
@@ -3164,7 +3167,7 @@
 
         if (phase === 'entrance') {
             enterT += dt;
-            if (enterT >= ENTER_WAIT + ENTER_SECS) phase = 'ready';
+            if (enterT >= ENTER_WAIT + labEnterSecs()) phase = 'ready';
         }
 
         // the continue clock. dt is clamped and rAF sleeps in a hidden tab, so
@@ -4501,17 +4504,17 @@
         if (!phantoms.length) return;
         const look = PH_LOOK;
         const sprite = look.color ? phantomSprite(look) : null;
-        const w = BALL_RX * 2, h = BALL_RY * 2;
 
         for (const p of phantoms) {
             const fade = Math.min(1, p.life / 0.5);      // fade as they die
+            const k = p.scale || 1, w = BALL_RX * 2 * k, h = BALL_RY * 2 * k;
 
             // the glow goes down first and is not rotated -- it is an aura,
             // not part of the head. it is also what makes the thing read at
             // all on a black field, where a dark overlay would vanish.
             if (look.glow) {
-                const r = BALL_RY * 1.9;
-                const grd = ctx.createRadialGradient(p.x, p.y, BALL_RX * 0.2, p.x, p.y, r);
+                const r = BALL_RY * 1.9 * k;
+                const grd = ctx.createRadialGradient(p.x, p.y, BALL_RX * 0.2 * k, p.x, p.y, r);
                 grd.addColorStop(0, look.color);
                 grd.addColorStop(1, 'rgba(0,0,0,0)');
                 ctx.globalAlpha = look.glow * fade;
@@ -4529,7 +4532,7 @@
                 ctx.drawImage(sprite, -w / 2, -h / 2, w, h);
                 ctx.restore();
             } else {
-                drawBall(p.x, p.y, BALL_RX, p.angle);
+                drawBall(p.x, p.y, BALL_RX * k, p.angle);
             }
         }
         ctx.globalAlpha = 1;
@@ -5318,6 +5321,7 @@
         drawPhantoms();
         drawMotes();
         drawShout();
+        labDrawShouts();
         drawYell();
         drawTalk();
 

@@ -162,6 +162,23 @@
 
         #debug[hidden] { display: none; }
 
+        /* keys, paddles and memories side by side, a column each: in one
+           column they stand taller than the screen */
+        #debug .cols {
+            display: flex;
+            gap: 28px;
+            align-items: flex-start;
+            justify-content: center;
+            max-height: calc(100vh - 120px);
+        }
+        #debug .col {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+        #debug .col p { max-width: 210px; text-align: center; }
+
         #debug h2 {
             font-size: 0.78rem;
             font-weight: normal;
@@ -245,21 +262,13 @@
             #stage { border-color: transparent; }
         }
 
-        /* in one column the stage menu stands taller than a landscape phone,
-           so there the stages pair up. portrait keeps the column: a phone that
-           short is too narrow for two. */
+        /* a landscape phone is short: the columns tighten up, and the
+           buttons with them */
         @media (max-height: 560px) and (orientation: landscape) {
-            #debug {
-                display: grid;
-                grid-template-columns: repeat(2, auto);
-                align-content: center;
-                justify-content: center;
-                gap: 10px;
-            }
-            #debug h2, #debug p {
-                grid-column: 1 / -1;
-                justify-self: center;
-            }
+            #debug { gap: 8px; }
+            #debug .cols { gap: 16px; }
+            #debug .col { gap: 5px; }
+            #debug button { width: 170px; padding: 5px 0; font-size: 0.8rem; }
         }
 
         /* the field is 4:3, which leaves a portrait phone showing a postage
@@ -315,30 +324,30 @@
      ?v= is a cache-buster. GitHub Pages holds a page for ten minutes, so a
      deploy that changes two of these can otherwise reach someone as one new
      file and one old one. Bump all of them together, every deploy. -->
-<script src="js/fourkeys/runtime.js?v=9"></script>
-<script src="js/fourkeys/headless.js?v=9"></script>
-<script src="js/fourkeys/idol.js?v=9"></script>
-<script src="js/fourkeys/windmill.js?v=9"></script>
-<script src="js/fourkeys/twins.js?v=9"></script>
-<script src="js/fourkeys/gleeok.js?v=9"></script>
-<script src="js/fourkeys/agahnim.js?v=9"></script>
-<script src="js/fourkeys/lamps.js?v=9"></script>
-<script src="js/fourkeys/dodongo.js?v=9"></script>
-<script src="js/fourkeys/mole.js?v=9"></script>
-<script src="js/fourkeys/conga.js?v=9"></script>
-<script src="js/fourkeys/pong.js?v=9"></script>
-<script src="js/fourkeys/boot.js?v=9"></script>
-<script src="js/fourkeys/splitter.js?v=9"></script>
-<script src="js/fourkeys/armos.js?v=9"></script>
-<script src="js/fourkeys/guard.js?v=9"></script>
-<script src="js/fourkeys/pillars.js?v=9"></script>
-<script src="js/fourkeys/chain.js?v=9"></script>
-<script src="js/fourkeys/paddles.js?v=9"></script>
-<script src="js/fourkeys/menu.js?v=9"></script>
-<script src="js/fourkeys/debug.js?v=9"></script>
-<script src="js/fourkeys/intro.js?v=9"></script>
-<script src="js/fourkeys/memory.js?v=9"></script>
-<script src="js/fourkeys/engine.js?v=9"></script>
-<script src="js/fourkeys/start.js?v=9"></script>
+<script src="js/fourkeys/runtime.js?v=10"></script>
+<script src="js/fourkeys/headless.js?v=10"></script>
+<script src="js/fourkeys/idol.js?v=10"></script>
+<script src="js/fourkeys/windmill.js?v=10"></script>
+<script src="js/fourkeys/twins.js?v=10"></script>
+<script src="js/fourkeys/gleeok.js?v=10"></script>
+<script src="js/fourkeys/agahnim.js?v=10"></script>
+<script src="js/fourkeys/lamps.js?v=10"></script>
+<script src="js/fourkeys/dodongo.js?v=10"></script>
+<script src="js/fourkeys/mole.js?v=10"></script>
+<script src="js/fourkeys/conga.js?v=10"></script>
+<script src="js/fourkeys/pong.js?v=10"></script>
+<script src="js/fourkeys/boot.js?v=10"></script>
+<script src="js/fourkeys/splitter.js?v=10"></script>
+<script src="js/fourkeys/armos.js?v=10"></script>
+<script src="js/fourkeys/guard.js?v=10"></script>
+<script src="js/fourkeys/pillars.js?v=10"></script>
+<script src="js/fourkeys/chain.js?v=10"></script>
+<script src="js/fourkeys/paddles.js?v=10"></script>
+<script src="js/fourkeys/menu.js?v=10"></script>
+<script src="js/fourkeys/debug.js?v=10"></script>
+<script src="js/fourkeys/intro.js?v=10"></script>
+<script src="js/fourkeys/memory.js?v=10"></script>
+<script src="js/fourkeys/engine.js?v=10"></script>
+<script src="js/fourkeys/start.js?v=10"></script>
 </body>
 </html>

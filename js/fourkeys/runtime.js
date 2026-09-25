@@ -90,6 +90,7 @@
     // ---- the game's questions, and who answers them -----------------------------
     // A stage is being stood up, and nobody from the last one survives it.
     function labStageReset() {
+        labShouts = [];
         if (labB && labB.reset) labB.reset();
         if (labM && labM.reset) labM.reset();
         labB = null;
@@ -166,6 +167,8 @@
 
     function labUpdate(dt) {
         labPadUpdate(dt);
+        for (const s of labShouts) s.life -= dt;
+        labShouts = labShouts.filter(s => s.life > 0);
         menuWatch(dt);           // outside labM: it is what notices a level ending
         if (labM) labM.update(dt);
         // after the paddle has gone where the hand sent it, and before the
@@ -177,6 +180,29 @@
     // the hub has no ball in it: he carries his head, and nothing is served
     function labSkipBall(b) { return menuUp() || !!(labB && labB.skipBall && labB.skipBall(b)); }
     function labBallR(b) { return labB && labB.ballR ? labB.ballR(b) : bRX(); }
+    // how long this boss takes to arrive: his own, or the original's
+    function labEnterSecs() { return labB && labB.enterSecs ? labB.enterSecs() : ENTER_SECS; }
+
+    // Bubbles from anyone, as many at once as there are shouters -- the
+    // engine only has room for the one. Each is drawn by the engine's own
+    // drawShout, lent the slot for a moment, so they look exactly like his.
+    // `at`, if given, is asked each frame where the shouter is now, so a
+    // bubble can ride on someone who is moving.
+    let labShouts = [];
+    function labShout(x, y, text, life, at) {
+        labShouts.push({ x, y, text: text || 'BRANDON!', life: life || SHOUT_SECS, at });
+    }
+    function labDrawShouts() {
+        if (!labShouts.length) return;
+        const keep = shout;
+        for (const s of labShouts) {
+            if (s.at) Object.assign(s, s.at());
+            shout = s;
+            drawShout();
+        }
+        shout = keep;
+    }
+
     // how much of the original's climb this fight has
     function labClimb() { return labB && labB.climb ? labB.climb() : 1; }
 

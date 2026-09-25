@@ -8,37 +8,50 @@
     // choosing and slam it back off that, or draw back, catch it, and hand it
     // back so gently you are early for it. It is the original's own machine
     // (reactToBall), his numbers and all, run for one twin instead of the boss.
-    // Put one down and the other gets his health back and takes up the dead
-    // one's move as well as his own, so the order you kill them in picks the
-    // fight you finish on: a big one who slams, or a small one who throws.
-    let TW_HP_BIG      = 8;       // hits to put the big one down
-    let TW_HP_SMALL    = 6;       // ...and the small one
+    // Put one down and the other gets some health back, goes twice as fast
+    // and takes up the dead one's move as well as his own, so the order you
+    // kill them in picks the fight you finish on: a big one who slams, or a
+    // small one who throws.
+    //
+    // They come on one at a time: the small one alone for TW_SOLO, then he
+    // goes back up and the big one comes down alone for as long, and then
+    // both of them for the rest of it. They shout BRANDON! together, and the
+    // one left only says "...".
+
+    let TW_HP_BIG      = 24;      // hits to put the big one down
+    let TW_HP_SMALL    = 18;      // ...and the small one
+    let TW_SOLO        = 5;       // seconds of play each has alone before they fight together
     let TW_W_BIG       = 430;     // how long the big one is
     let TW_W_SMALL     = 210;     // ...and the small one
     let TW_SWEEP_BIG   = 0.35;    // rad/s the big one patrols at
     let TW_SWEEP_SMALL = 1.25;    // ...and the small one
     let TW_THROW       = 2.4;     // seconds between phantom heads, for whoever throws them
-    let TW_HEAL        = 1;       // share of his health the survivor gets back
+    let TW_HEAL        = 0.33;    // share of his health the survivor gets back
+    let TW_ALONE_PACE  = 2;       // how much faster the survivor goes
+    let TW_YELL_MIN    = 4;       // seconds between their shouts, at least...
+    let TW_YELL_MAX    = 8;       // ...and at most
     let TW_Y           = 135;     // where they hang
     let TW_CLIMB       = 0.8;     // how much of the original's climb this fight has
     // The act a run draws them from, 1 easy to 3 hard. Two targets, a barrage
-    // and a slam at once, and the survivor heals to full and picks up the other
-    // move -- the longest fight of the new ones.
+    // and a slam at once, and the survivor heals and picks up the other move
+    // -- the longest fight of the new ones.
     let TW_LVL         = 3;
     LAB_KNOBS.push('TW_LVL', 'TW_HP_BIG', 'TW_HP_SMALL', 'TW_W_BIG', 'TW_W_SMALL', 'TW_SWEEP_BIG',
-                   'TW_SWEEP_SMALL', 'TW_THROW', 'TW_HEAL', 'TW_Y', 'TW_CLIMB');
+                   'TW_SWEEP_SMALL', 'TW_THROW', 'TW_HEAL', 'TW_Y', 'TW_CLIMB', 'TW_ALONE_PACE', 'TW_YELL_MIN', 'TW_YELL_MAX', 'TW_SOLO');
 
     let tw = null;
 
     LAB_BOSS.twins = {
         start(b) {
             const one = (key, w, hp, sweep, mir, dy, ph) => ({
-                key, w, h: w / SHAPE_ASPECT, x: LW / 2, y: -200, dy, hp, maxHp: hp, flash: 0,
+                key, w, h: w / SHAPE_ASPECT,
+                x: LW / 2, y: -200, dy, hp, maxHp: hp, flash: 0, pace: 1,
                 jt: 0, jnx: 0, jny: 0, iframes: 0, alive: true, sweep, mir, ph,
                 throws: key === 'big', slams: key === 'small', throwT: TW_THROW, fall: null,
-                tilt: null, lunge: null, seen: new Set()
+                tilt: null, lunge: null, seen: new Set(),
+                away: key === 'small' ? 0 : 1        // 1 when he is up out of the field
             });
-            tw = { t: 0, pend: null, order: [],
+            tw = { t: 0, pend: null, order: [], yell: TW_YELL_MIN, open: 0,
                    twins: [one('small', TW_W_SMALL, TW_HP_SMALL, TW_SWEEP_SMALL, true, 34, Math.PI / 2),
                            one('big', TW_W_BIG, TW_HP_BIG, TW_SWEEP_BIG, false, -8, -Math.PI / 2)] };
             b.maxHp = TW_HP_BIG + TW_HP_SMALL;
@@ -49,16 +62,22 @@
         update(b, dt) {
             const entering = phase === 'entrance';
             const raw = enterK(), e = raw * raw * (3 - 2 * raw);
+            if (phase === 'play') tw.open += dt;
             for (const t of tw.twins) {
                 if (t.fall) stepCrumble(t.fall, dt, 0.5);
                 if (!t.alive) continue;
                 if (t.iframes > 0) t.iframes = Math.max(0, t.iframes - dt);
                 if (t.flash > 0) t.flash = Math.max(0, t.flash - dt * 6);
                 if (t.jt > 0) t.jt = Math.max(0, t.jt - dt * JIG_DECAY);
-                if (phase === 'play') t.ph += (t.key === 'big' ? TW_SWEEP_BIG : TW_SWEEP_SMALL) * dt;
+                if (phase === 'play') t.ph += (t.key === 'big' ? TW_SWEEP_BIG : TW_SWEEP_SMALL) * t.pace * dt;
                 t.x = LW / 2 + Math.sin(t.ph) * Math.max(0, (LW - t.w) / 2) * 0.92;
                 const y = TW_Y + t.dy;
-                t.y = entering ? -(t.h + 40) + (y + t.h + 40) * e : y;
+                const at = entering ? -(t.h + 40) + (y + t.h + 40) * e : y;
+                // up out of the field while it is not his turn, eased there and back
+                t.away += Math.max(-dt / TW_TURN, Math.min(dt / TW_TURN, (twOn(t) ? 0 : 1) - t.away));
+                const aw = t.away * t.away * (3 - 2 * t.away);
+                t.y = at - (at + t.h / 2 + 40) * aw;
+                if (t.away > 0.05) { t.tilt = null; t.lunge = null; continue; }
                 // the thrower's barrage, the original's phantoms, only in a rally
                 if (t.throws && phase === 'play' && (t.throwT -= dt) <= 0) {
                     t.throwT = TW_THROW;
@@ -70,12 +89,20 @@
                 }
                 twReact(t, dt);
             }
+            // together, the same word at the same moment; the one left alone
+            // has nothing to say
+            if (phase === 'play' && (tw.yell -= dt) <= 0) {
+                tw.yell = TW_YELL_MIN + Math.random() * (TW_YELL_MAX - TW_YELL_MIN);
+                const live = tw.twins.filter(t => t.alive);
+                const here = live.filter(t => t.away < 0.05);
+                for (const t of here) labShout(t.x, twY(t) + t.h / 2 + 8, live.length > 1 ? 'BRANDON!' : '...');
+            }
             b.hp = tw.twins.reduce((s, t) => s + (t.alive ? t.hp : 0), 0);
             twBox(b);
         },
         contact(br, ball) {
             for (const t of tw.twins) {       // the small one first: he hangs in front
-                if (!t.alive) continue;
+                if (!t.alive || t.away > 0.5) continue;
                 const hit = maskContact(ball, t.x, twY(t), twAng(t), t.w, t.h, MASK, t.mir);
                 if (hit) { tw.pend = t; return hit; }
             }
@@ -145,6 +172,16 @@
     // The original's reactToBall, for one twin: a head coming up under him
     // gets one roll, a turn to meet it, a draw back to hit it, both, or
     // neither, and each lets go once its ball has turned back.
+    // Whose turn it is: the small one's, then the big one's, then both --
+    // and whoever is left, once one is down.
+    const TW_TURN = 0.8;              // seconds going up out of the field, or coming down
+    function twOn(t) {
+        if (tw.twins.some(o => o !== t && !o.alive)) return true;
+        if (tw.open < TW_SOLO) return t.key === 'small';
+        if (tw.open < TW_SOLO * 2) return t.key === 'big';
+        return true;
+    }
+
     function twReact(t, dt) {
         const live = t.slams && phase === 'play';
         if (live) {
@@ -255,7 +292,8 @@
             other.throws = other.throws || t.throws;
             other.slams = other.slams || t.slams;
             other.hp = Math.min(other.maxHp, other.hp + Math.round(TW_HEAL * other.maxHp));
-            shout = { x: other.x, y: other.y + other.h / 2 + 8, life: SHOUT_SECS };
+            other.pace = TW_ALONE_PACE;
+            labShout(other.x, other.y + other.h / 2 + 8, '...');
             award(BOSS_PTS * 3, t.x, t.y);
             b.hp = other.hp;
             return;

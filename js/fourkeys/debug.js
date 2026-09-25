@@ -26,9 +26,13 @@
         if (!el) return;
         el.querySelector('h2').textContent = 'FOUR KEYS';
 
-        debugRow(el, 'keys', menuLevels().filter(l => l.n <= 4));
-        debugRow(el, 'pads', menuPads().map(k => ({ k, name: (LAB_PAD[k] || {}).name || k.toUpperCase() })));
-        debugRow(el, 'mems', menuLevels().map(l => ({ n: l.n, name: 'MEMORY ' + l.n, ink: l.ink })));
+        // a column each, side by side: stacked they stood taller than a screen
+        const cols = document.createElement('div');
+        cols.className = 'cols';
+        el.appendChild(cols);
+        debugRow(cols, 'keys', menuLevels().filter(l => l.n <= 4));
+        debugRow(cols, 'pads', menuPads().map(k => ({ k, name: (LAB_PAD[k] || {}).name || k.toUpperCase() })));
+        debugRow(cols, 'mems', menuLevels().map(l => ({ n: l.n, name: 'MEMORY ' + l.n, ink: l.ink })));
 
         // and the way back out of all of it
         const wipe = document.createElement('button');
@@ -46,8 +50,11 @@
         dbgSync.push(() => { wipe.textContent = 'hold to forget everything'; });
     }
 
-    // one line of buttons, each one a thing you either have or do not
-    function debugRow(el, what, items) {
+    // one column of buttons, each one a thing you either have or do not
+    function debugRow(cols, what, items) {
+        const el = document.createElement('div');
+        el.className = 'col';
+        cols.appendChild(el);
         const head = document.createElement('p');
         head.textContent = DBG_HEADS[what];
         el.appendChild(head);
