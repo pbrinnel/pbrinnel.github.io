@@ -951,7 +951,9 @@
     // a tap: true if it was the unlock screen's to take
     function menuUnlockNext() {
         if (!menuUnlockUp()) return false;
-        if (menu.showT >= UNLOCK_WAIT) { menu.shows.shift(); menu.showT = 0; }
+        const t = menu.shows[0].mem ? menuMemoryTap(menu.showT)
+                                    : menu.showT >= UNLOCK_WAIT ? -1 : menu.showT;
+        if (t < 0) { menu.shows.shift(); menu.showT = 0; } else menu.showT = t;
         return true;
     }
 
@@ -977,14 +979,27 @@
         return true;
     }
 
-    // A memory. For now only its title card: the cutscenes come later, and
-    // this is the one place that will draw them.
+    // A memory, which memory.js draws. The boss lab builds this file without
+    // it, and gets the bare title instead.
     function menuMemoryCard(n, t) {
+        if (typeof memoryDraw === 'function') { memoryDraw(n, t); return; }
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, LW, LH);
         ctx.globalAlpha = Math.min(1, t / UNLOCK_IN);
         text('MEMORY ' + n, LW / 2, LH / 2 + 14, 44, '#f2efe9', 'center');
         ctx.globalAlpha = 1;
+    }
+
+    // What a tap does to a memory that has been up t seconds: the time to put
+    // it at, or -1 to close it. A tap on its title card skips to what comes
+    // after, and that then has to be up as long as anything else before a tap
+    // takes it away, so the tap that skipped cannot close it too.
+    function menuMemoryTap(t) {
+        const card = typeof memoryCardSecs === 'function' ? memoryCardSecs() : 0;
+        if (t < UNLOCK_WAIT) return t;
+        if (t < card) return card;
+        if (t < card + UNLOCK_WAIT) return t;
+        return -1;
     }
 
     // ---- inside: RESET's question and the MEMORIES room ------------------------------
@@ -1109,7 +1124,9 @@
     function menuScreenPress(e, down) {
         if (!menuScreenUp()) return false;
         if (menu.screen.kind === 'memory') {
-            if (down && menu.screen.t >= UNLOCK_WAIT) menuShow('memories');
+            if (!down) return true;
+            const t = menuMemoryTap(menu.screen.t);
+            if (t < 0) menuShow('memories'); else menu.screen.t = t;
             return true;
         }
         const c = menuChoiceAt(menuAimOf(e));

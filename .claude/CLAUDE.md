@@ -40,11 +40,12 @@ touches it.
   edited here from now on), `runtime.js` (the seam the bosses plug into), a file per boss,
   mini-boss and paddle, `menu.js` (the town), `debug.js` (what the konami code and
   `?debug` open: the keys, the paddles, and a hold to forget it all), `intro.js` (the
-  BRANDON WINS and 2000 YEARS LATER cards before the town), and `start.js`, which is where
-  the game begins.
-- The boss lab builds from these files but not from `intro.js` or `debug.js`, and it runs
-  brandon.html's engine. So a module that calls something only fourkeys has must check
-  it with `typeof` first, and a new top-level name must not already be used in
+  BRANDON WINS and 2000 YEARS LATER cards before the town), `memory.js` (the cutscene a
+  level's first win plays and MEMORIES replays), and `start.js`, which is where the game
+  begins.
+- The boss lab builds from these files but not from `intro.js`, `debug.js` or `memory.js`,
+  and it runs brandon.html's engine. So a module that calls something only fourkeys has
+  must check it with `typeof` first, and a new top-level name must not already be used in
   brandon.html (the lab refuses a name declared twice). Where the lab needs an engine
   change of fourkeys', the build lifts it out of `engine.js` rather than copying it (the
   paddle split, `spread()`..`halfSpan()`, is the first).
