@@ -1,12 +1,14 @@
 'use strict';
 
     // ---- a memory ---------------------------------------------------------------------
-    // What the first win on a level shows, and MEMORIES shows again: a card
-    // saying how far back it is, then the scene. Oldest first: HIM rallying
-    // the army that ends the first game, 2784 years back; HIM facing the one
-    // they feared, 1701 years back; and 99 years back, how the Angel fell --
-    // those same bones that swirl round his head in brick colours draining the
-    // clay out of HIM and becoming arms. Not every level has one yet.
+    // What MEMORIES shows, and a level's first win shows once: a card saying
+    // how far back it is, then the scene. The list, years and titles are
+    // menu.js's (MENU_MEMS); the scenes are here, keyed by the same ids.
+    // Oldest first: HIM rallying the army that ends the first game; HIM facing
+    // the one they feared; the Angel leading a host against it; the Angel
+    // asking HIM whether it ever ends; how the Angel fell -- the bones that
+    // swirl round his head draining the clay out of HIM and becoming arms --
+    // and what he did with the world after.
     //
     // Every character is a Brandon, and so is everything they call each other.
     // Each speaks in his own voice, a face and a colour (MEM_VOICE), and a
@@ -319,34 +321,35 @@
         return { halo: out([hx, hy - 76]), head: out([hx, hy]), hands: [hand(1), hand(-1)] };
     }
 
-    // The end of the first game has no card: it is the opening's own frame.
-    function memoryCardSecs(n) {
-        return typeof n === 'number' ? MEM_CARD_IN + MEM_CARD_HOLD + MEM_CARD_OUT : 0;
-    }
+    // how long a memory's card is up; the menu asks, so a tap on the card
+    // can skip to the scene
+    function memoryCardSecs(n) { return MEM_CARD_IN + MEM_CARD_HOLD + MEM_CARD_OUT; }
 
-    // Which scene is which level's. A level with none has no memory (see
-    // `ago` in menu.js), and there is no card for it.
-    const MEM_SCENES = { 1: s => memRally(s), 2: s => memStand(s), 3: s => memCourt(s), 5: s => memFall(s) };
+    // Each memory's scene, by its id in MENU_MEMS...
+    const MEM_SCENES = {
+        exhortation: s => memRally(s), salvation: s => memStand(s), cycle: s => memCycle(s),
+        counsel: s => memCounsel(s), fall: s => memFall(s), consolidation: s => memCourt(s),
+    };
     // ...and when each is over, in seconds into it: all of them end on black
-    const MEM_ENDS = { 1: () => MR_CUT, 2: () => MS_CUT, 3: () => MC_CUT, 5: () => MF_BLACK[1] };
+    const MEM_ENDS = {
+        exhortation: () => MR_CUT, salvation: () => MS_CUT, cycle: () => MY_CUT,
+        counsel: () => MQ_CUT, fall: () => MF_BLACK[1], consolidation: () => MC_CUT,
+    };
     const MEM_AFTER = 2;             // seconds on the black before it goes back by itself
 
     // Whether a memory up t seconds is finished, black and all, and should go
-    // back without being asked. The end of the first game is a still frame
-    // that never ends, so it waits for a tap.
+    // back without being asked.
     function memoryDone(n, t) {
         const end = MEM_ENDS[n];
         return !!end && t - memHold.by >= memoryCardSecs(n) + end() + MEM_AFTER;
     }
 
-    // n is a level with a memory, or 'past', the end of the first game; t is
-    // seconds since it came up
+    // n is a memory's id in MENU_MEMS; t is seconds since it came up
     let memHold = { t: -1, by: 0 };
     function memoryDraw(n, t) {
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, LW, LH);
         memFontsLoad();
-        if (typeof n !== 'number') { memOpening(n, t); return; }
         // Waiting on the faces: the card stays full for as long as they are
         // not in, up to MEM_FONT_WAIT, and everything after it runs that much
         // later. A t that goes back is the memory starting over.
@@ -357,7 +360,7 @@
         t -= memHold.by;
         const card = memoryCardSecs(n);
         if (t < card) {
-            const y = MENU_ALL.find(l => l.n === n).ago;
+            const y = -MENU_MEMS.find(m => m.id === n).year;
             ctx.globalAlpha = Math.max(0, Math.min(1, t / MEM_CARD_IN, (card - t) / MEM_CARD_OUT));
             text(y + (y === 1 ? ' YEAR' : ' YEARS') + ' EARLIER', LW / 2, LH / 2 + 14,
                  MEM_CARD_PX, '#f2efe9', 'center');
@@ -368,14 +371,8 @@
         if (scene) scene(t - card);
     }
 
-    // The end of the first game, as the opening shows it (intro.js draws it).
     // Year 0 is not drawn here: it is the town, and MEMORIES takes you back
     // to it the way the game first did (menuReturn).
-    function memOpening(n, t) {
-        ctx.globalAlpha = Math.min(1, t / MEM_CARD_IN);
-        introWins(uiScale);
-        ctx.globalAlpha = 1;
-    }
 
     // the faces are asked for the first time a memory is up, so a player who
     // never sees one never fetches them; a face that fails still lets the
@@ -400,16 +397,17 @@
     // dead one's name, and goes up and out of the top of the frame.
     const MF_FADE_IN = 1.0;
     const MF_ENTER = [1.5, 4.5];         // the Angel drifts in from the left
-    const MF_SAY_1 = [5.0, 9.0];
-    const MF_DRAIN = [9.5, 15.5];        // the colour leaves the one he stood by
-    const MF_FALL = [10.0, 15.0];        // ...and the halo falls into arms
-    const MF_SCREAM = [11.0, 14.0];
-    const MF_BREAK = 16.0;               // grey, he starts to come apart
+    const MF_SAY_0 = [5.0, 7.8];
+    const MF_SAY_1 = [8.1, 12.1];
+    const MF_DRAIN = [12.6, 18.6];       // the colour leaves the one he stood by
+    const MF_FALL = [13.1, 18.1];        // ...and the halo falls into arms
+    const MF_SCREAM = [14.1, 17.1];
+    const MF_BREAK = 19.1;               // grey, he starts to come apart
     const MF_BREAK_SPAN = 4.5;           // first piece to last
-    const MF_SWELL = [15.5, 18.5, 23.0]; // his light rises, holds, and is gone by the last
-    const MF_SAY_2 = [23.5, 27.5];
-    const MF_FLY = [28.0, 30.0];         // up and out of the top
-    const MF_BLACK = [29.0, 31.0];
+    const MF_SWELL = [18.6, 21.6, 26.1]; // his light rises, holds, and is gone by the last
+    const MF_SAY_2 = [26.6, 30.6];
+    const MF_FLY = [31.1, 33.1];         // up and out of the top
+    const MF_BLACK = [32.1, 34.1];
     const MF_SAY_IN = 0.4;               // seconds a line takes to come up, and to go
     const MF_GROUND = 575;
     const MF_LU_X = 250, MF_LU_FROM = -170;
@@ -422,6 +420,7 @@
     // The Angel speaks first, and it is the Angel's name the dying one
     // screams; the Fallen is who asks forgiveness.
     const MF_LINES = {
+        say0: [['It was you all along.', 'angel']],
         say1: [['I do what must be done for our world to heal.', 'angel']],
         scream: [['BRANDON', 'angel'], ['!', 'odin']],
         say2: [['Forgive me, ', 'fallen'], ['BRANDON', 'odin'], ['.', 'fallen']],
@@ -460,6 +459,7 @@
         memStreams(s, drain, at);
 
         if (s < MF_BREAK + 1) {
+            memLine(MF_LINES.say0, at.head[0], 120, 24, span(MF_SAY_0), MF_SAY_0);
             memLine(MF_LINES.say1, at.head[0], 120, 24, span(MF_SAY_1), MF_SAY_1);
             memLine(MF_LINES.scream, MF_ODIN_X, 90, 44, span(MF_SCREAM), MF_SCREAM, 2);
         }
@@ -680,7 +680,8 @@
         g.globalCompositeOperation = 'source-over';
     });
 
-    function memSurtr(x, ground, L, s, strings) {
+    // `away` true turns him to face right, the way he leaves
+    function memSurtr(x, ground, L, s, strings, away) {
         const f = (s / MS_BEAT) % 1;
         const thump = (c, w) => Math.exp(-((f - c) * (f - c)) / (2 * w * w));
         const b = Math.min(1, thump(0.1, 0.05) + 0.7 * thump(0.3, 0.05));
@@ -720,6 +721,7 @@
         ctx.translate(x, pivotY);
         ctx.rotate(sway);
         ctx.translate(-x, -pivotY);
+        if (away) { ctx.translate(x, 0); ctx.scale(-1, 1); ctx.translate(-x, 0); }
         if (strings > 0) {
             ctx.save();
             ctx.globalAlpha *= strings;
@@ -948,9 +950,7 @@
         const span = ([a, b]) => memClamp((s - a) / (b - a));
         ctx.save();
         ctx.globalAlpha = memEase(s / MS_FADE_IN);
-        const [e0, e1, e2, e3] = MS_SEEN;
-        const seen = s < e0 ? 0 : s < e1 ? (s - e0) / (e1 - e0) : s < e2 ? 1 : 1 - memClamp((s - e2) / (e3 - e2));
-        memSurtr(MS_SURTR_X, MS_GROUND, MS_SURTR_H, s, seen);
+        memSurtr(MS_SURTR_X, MS_GROUND, MS_SURTR_H, s, memSeen(s, MS_SEEN));
         const back = span(MS_BACK);
         const shift = MS_SURGE_PX * memEase(span(MS_SURGE)) - MS_BACK_PX * back * back;
         memAngel(s, MS_ANGEL_X + shift, MS_GROUND - 40, MS_ANGEL_H);
@@ -1139,4 +1139,131 @@
         g.globalAlpha = 1;
         g.clearRect(0, 0, LW, LH);
         return g;
+    }
+
+    // how much of what Surtr hangs from shows at s: up across the first two
+    // of [up, held, going, gone], held, and down across the last two
+    function memSeen(s, [e0, e1, e2, e3]) {
+        return s < e0 ? 0 : s < e1 ? (s - e0) / (e1 - e0) : s < e2 ? 1 : 1 - memClamp((s - e2) / (e3 - e2));
+    }
+
+    // an army's "BRANDON!", `count` of them going up over `where` (a list of
+    // [x, y]) across [c0, c1], in `voice`
+    function memShouts(s, where, count, [c0, c1], voice, seed) {
+        if (s < c0 || s >= c1) return;
+        for (let i = 0; i < count; i++) {
+            const [x, y] = where[Math.floor(memHash(i + seed) * where.length)];
+            const t0 = c0 + (c1 - c0 - 1.2) * memHash(i + seed + 50);
+            const k = (s - t0) / 1.2;
+            if (k <= 0 || k >= 1) continue;
+            ctx.save();
+            ctx.globalAlpha *= Math.sin(k * Math.PI);
+            ctx.font = MEM_VOICE[voice].font.replace('{px}', 17);
+            ctx.textAlign = 'center';
+            ctx.fillStyle = MEM_VOICE[voice].ink;
+            ctx.fillText('BRANDON!', x, y - 26 - k * 22);
+            ctx.restore();
+        }
+    }
+
+    // ---- 1342 years back: the cycle ---------------------------------------------------
+    // The Angel at the head of a great host, facing the one they fear. They
+    // shout his name at him; he says nothing, and then his own name, and for a
+    // moment what he hangs from shows. Then he turns and runs, and they shout
+    // HIS name after him. It cuts on the cheer.
+    const MY_FADE_IN = 1.2;
+    const MY_JEER = [1.8, 4.6];      // the host shouts his name at him
+    const MY_NOTHING = [5.0, 7.4];
+    const MY_NAME = [7.8, 10.4];
+    const MY_SEEN = [10.6, 10.8, 11.1, 11.7];
+    const MY_RUN = [12.0, 14.2];     // he turns and is gone off the right
+    const MY_CHEER = [12.6, 15.6];   // ...and they shout HIS name
+    const MY_CUT = 16.2;
+    const MY_GROUND = 575;
+    const MY_ANGEL = [520, 170];     // where the Angel stands, and his height
+    const MY_SURTR = [660, 510];     // where it stands, and its height: three times his
+    const MY_RUN_PX = 900;
+    const MY_HOP = 14;
+    let myArmy = null;
+    function memCycleArmy() {
+        if (myArmy) return myArmy;
+        myArmy = [];
+        for (let r = 0; r < 4; r++) {
+            for (let c = 0; c < 8; c++) {
+                const i = r * 8 + c, h = memHash(i + 600);
+                myArmy.push({ x: 20 + c * 58 + (r % 2) * 28, y: 452 + r * 34, ph: memHash(i + 610) * 6.28,
+                              hp: h < 0.08 ? 3 : h < 0.22 ? 2 : 1,
+                              tint: TIER_KEYS[Math.floor(memHash(i + 620) * TIER_KEYS.length)] });
+            }
+        }
+        return myArmy;
+    }
+
+    function memCycle(s) {
+        if (s >= MY_CUT || !greySprite()) return;
+        const span = ([a, b]) => memClamp((s - a) / (b - a));
+        ctx.save();
+        ctx.globalAlpha = memEase(s / MY_FADE_IN);
+        const run = span(MY_RUN);
+        const sx = MY_SURTR[0] + run * run * MY_RUN_PX;
+        const bob = run > 0 ? Math.abs(Math.sin(s * 9)) * 10 : 0;
+        memSurtr(sx, MY_GROUND - bob, MY_SURTR[1], s, memSeen(s, MY_SEEN), run > 0);
+        const army = memCycleArmy();
+        const hopping = [MY_JEER, MY_CHEER].find(([a, b]) => s >= a && s < b);
+        for (const m of army) {
+            let y = m.y + Math.sin(s * G_SHIP_HZ * 2 * Math.PI + m.ph) * G_SHIP_BOB;
+            if (hopping) y -= Math.max(0, Math.sin(((s - hopping[0]) * 2.4 + m.ph) * Math.PI)) * MY_HOP;
+            memShip(m.x, y, m.hp, m.tint);
+        }
+        memAngel(s, MY_ANGEL[0], MY_GROUND, MY_ANGEL[1]);
+        const where = army.map(m => [m.x, m.y]);
+        memShouts(s, where, 16, MY_JEER, 'surtr', 700);
+        memShouts(s, where, 16, MY_CHEER, 'odin', 800);
+        const over = MY_GROUND - MY_SURTR[1] - 20;
+        memLine([['...', 'surtr']], MY_SURTR[0], over, 30, span(MY_NOTHING), MY_NOTHING);
+        memLine([['BRANDON', 'surtr']], MY_SURTR[0], over, 30, span(MY_NAME), MY_NAME);
+        ctx.restore();
+    }
+
+    // ---- 126 years back: counsel ------------------------------------------------------
+    // The one they fear walking away out of the frame, beaten back once more,
+    // what it hangs from showing for a moment as it goes. The Angel comes to
+    // HIM and asks whether this ever ends. HE says it does not, unless they
+    // let it. It cuts on HIS answer.
+    const MQ_FADE_IN = 1.2;
+    const MQ_LEAVES = [0.3, 6.5];    // it walks off the right
+    const MQ_SEEN = [1.8, 2.0, 2.3, 2.9];
+    const MQ_ENTER = [4.0, 7.0];     // the Angel comes in from the left
+    const MQ_ASK = [7.5, 13.5];
+    const MQ_ANSWER = [14.0, 22.5];
+    const MQ_CUT = 23.0;
+    const MQ_GROUND = 575;
+    const MQ_ANGEL_H = 170;
+    const MQ_ANGEL_X = [-120, 170];
+    const MQ_ODIN = [360, MQ_ANGEL_H * 1.5];
+    const MQ_SURTR = [640, MQ_ANGEL_H * 3];
+    const MQ_WALK_PX = 700;
+    const MQ_ASK_LINE = [['Are we destined to stave off annihilation forever? ' +
+                          'Or is our end inevitable and we only delay it?', 'angel']];
+    const MQ_ANSWER_LINE = [['There is no end unless we so choose one. We have kept ', 'odin'],
+                            ['BRANDON', 'surtr'],
+                            [' at bay countless times and we shall do so countless more times. ' +
+                             'It is our sacred duty to protect our world.', 'odin']];
+
+    function memCounsel(s) {
+        if (s >= MQ_CUT || !greySprite()) return;
+        const span = ([a, b]) => memClamp((s - a) / (b - a));
+        ctx.save();
+        ctx.globalAlpha = memEase(s / MQ_FADE_IN);
+        const leave = memEase(span(MQ_LEAVES));
+        if (leave < 1) {
+            memSurtr(MQ_SURTR[0] + leave * MQ_WALK_PX, MQ_GROUND - Math.abs(Math.sin(s * 3.2)) * 6,
+                     MQ_SURTR[1], s, memSeen(s, MQ_SEEN), true);
+        }
+        memOdin(MQ_ODIN[0], MQ_GROUND, MQ_ODIN[1], true, s, 1, 0, true);
+        const ax = memLerp(MQ_ANGEL_X[0], MQ_ANGEL_X[1], memEase(span(MQ_ENTER)));
+        memAngel(s, ax, MQ_GROUND, MQ_ANGEL_H);
+        memLine(MQ_ASK_LINE, ax, 200, 22, span(MQ_ASK), MQ_ASK);
+        memLine(MQ_ANSWER_LINE, MQ_ODIN[0], 200, 22, span(MQ_ANSWER), MQ_ANSWER);
+        ctx.restore();
     }

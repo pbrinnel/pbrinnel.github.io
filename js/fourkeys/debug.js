@@ -5,8 +5,9 @@
     // is the whole of the game's progress, so this is the whole of the cheat
     // menu: hand yourself a key, a paddle or a memory, or put it all back.
     //
-    // It reaches the town through menuLevels/menuPads/menuHas/menuSet and
-    // nothing else, so it never has to know where any of it is kept.
+    // It reaches the town through menuLevels/menuPads/menuMemories/menuHas/
+    // menuSet and nothing else, so it never has to know where any of it is
+    // kept.
     //
     // engine.js owns the panel itself -- the konami code, the escape key, the
     // ?debug in the address -- and calls debugBuild() once at setup and
@@ -17,7 +18,7 @@
     const DBG_WIPE_HOLD = 1.2;
 
     const DBG_HEADS = { keys: 'keys — four of them open the CASTLE', pads: 'paddles',
-                        mems: 'memories — after the levels that have one; the opening two are always yours' };
+                        mems: 'memories — year 0 is always yours' };
 
     let dbgSync = [];                 // one per row: bring its look up to date
 
@@ -32,7 +33,8 @@
         el.appendChild(cols);
         debugRow(cols, 'keys', menuLevels().filter(l => l.n <= 4));
         debugRow(cols, 'pads', menuPads().map(k => ({ k, name: (LAB_PAD[k] || {}).name || k.toUpperCase() })));
-        debugRow(cols, 'mems', menuLevels().filter(l => l.ago).map(l => ({ n: l.n, name: 'YEAR \u2212' + l.ago, ink: l.ink })));
+        debugRow(cols, 'mems', menuMemories().filter(m => !m.always)
+            .map(m => ({ n: m.id, name: 'YEAR \u2212' + -m.year + ' ' + m.title.toUpperCase(), ink: m.ink })));
 
         // and the way back out of all of it
         const wipe = document.createElement('button');

@@ -21,20 +21,29 @@
     // that can be told apart at a glance, and a town where every building reads
     // as its own place.
     const MENU_LEVELS = [
-        { n: 1, name: 'FARM', ink: '#7fa85a', cap: 'gable', pad: 'gilt', ago: 2784, title: 'Exhortation' },
-        { n: 2, name: 'RUINS', ink: '#b0a894', cap: 'broken', pad: 'statue', ago: 1701, title: 'Salvation' },
-        { n: 3, name: 'CITY', ink: '#6f9bc4', cap: 'skyline', pad: 'frost', ago: 92, title: 'Consolidation' },
+        { n: 1, name: 'FARM', ink: '#7fa85a', cap: 'gable', pad: 'gilt', mem: 'exhortation' },
+        { n: 2, name: 'RUINS', ink: '#b0a894', cap: 'broken', pad: 'statue', mem: 'salvation' },
+        { n: 3, name: 'CITY', ink: '#6f9bc4', cap: 'skyline', pad: 'frost', mem: 'consolidation' },
         { n: 4, name: 'VOLCANO', ink: '#d2622f', cap: 'cone', pad: 'ember' }
     ];
-    const MENU_LAST = { n: 5, name: 'CASTLE', ink: '#9a7fc9', cap: 'crown', pad: 'pair', ago: 99, title: 'Fall' };
-    // `ago` is how many years before the game starts a level's memory is set,
-    // and `title` what the timeline calls it; a level without them has no
-    // memory (yet). The game starts in year 0, and
-    // the opening is two more memories, always yours: the end of the first
-    // game, 2000 years back (as its card says), and year 0 itself -- the
-    // town, which is where it takes you back to (menuReturn).
-    const MENU_OPENING = [{ id: 'past', year: -2000, ink: '#b8b2a8', title: 'Brandon Wins' },
-                          { id: 'now', year: 0, ink: '#f2efe9', title: 'Reprisal' }];
+    const MENU_LAST = { n: 5, name: 'CASTLE', ink: '#9a7fc9', cap: 'crown', pad: 'pair', mem: 'fall' };
+    // `mem` is the memory a level's first win plays (MENU_MEMS); a level
+    // without one plays none.
+    //
+    // Every memory, by the year it is set in: the game starts in year 0. Each
+    // is named on the timeline by its year and its title, in its own colour.
+    // Year 0 itself -- the town, which is where it takes you back to
+    // (menuReturn) -- is always there; the rest belong to a level, or to
+    // nothing yet.
+    const MENU_MEMS = [
+        { id: 'exhortation', year: -2784, title: 'Exhortation', ink: '#7fa85a' },
+        { id: 'salvation', year: -1701, title: 'Salvation', ink: '#b0a894' },
+        { id: 'cycle', year: -1342, title: 'Cycle', ink: '#d2622f' },
+        { id: 'counsel', year: -126, title: 'Counsel', ink: '#c9a94e' },
+        { id: 'fall', year: -99, title: 'Fall', ink: '#9a7fc9' },
+        { id: 'consolidation', year: -92, title: 'Consolidation', ink: '#6f9bc4' },
+        { id: 'now', year: 0, title: 'Reprisal', ink: '#f2efe9', always: true },
+    ];
     // The first win anywhere, clean or not, also hands over CLASSIC. He plays
     // exactly as the paddle you started with, so there is nothing in him to
     // earn -- he is a souvenir, and the first one a player picks up.
@@ -76,7 +85,7 @@
                 for (const l of MENU_ALL) menu.keys[l.n] = true;
                 for (const k of MENU_PADS) menu.pads[k] = true;
                 for (const l of MENU_ALL) menu.seen[l.n] = true;
-                for (const l of MENU_ALL) menu.mems[l.n] = true;
+                for (const m of MENU_MEMS) menu.mems[m.id] = true;
                 menuSave();
                 menuSay('EVERYTHING OPEN');
                 return true;
@@ -123,9 +132,10 @@
 
     // ---- what the debug menu reaches in through ---------------------------------------
     // Everything the town knows about you is in `menu`, and `menu` is this
-    // file's. These four are the whole of the way in, so nothing else has to
+    // file's. These five are the whole of the way in, so nothing else has to
     // know how progress is stored or that it is saved at all.
     function menuLevels() { menuLoad(); return MENU_ALL; }
+    function menuMemories() { menuLoad(); return MENU_MEMS; }
     function menuPads() { menuLoad(); return MENU_PADS; }
     function menuHas(what, k) { menuLoad(); return !!menu[what][k]; }
     function menuSet(what, k, on) {
@@ -450,9 +460,9 @@
         let got = level.name + (first ? ' · A KEY' : ' · DONE AGAIN');
         // its memory plays the first time only, before any paddle is shown:
         // after that it is in MEMORIES
-        if (level.ago && !menu.mems[level.n]) {
-            menu.mems[level.n] = true;
-            menu.shows.push({ mem: level.n });
+        if (level.mem && !menu.mems[level.mem]) {
+            menu.mems[level.mem] = true;
+            menu.shows.push({ mem: level.mem });
         }
         if (clean && !menu.pads[level.pad]) {
             menu.pads[level.pad] = true;
@@ -1030,15 +1040,12 @@
         ctx.globalAlpha = 1;
     }
 
-    // Every memory, oldest first: the opening's two and one per level. A
-    // memory is named for the year it is set in and nothing else. Until how
-    // they are earned is decided, every one is open (MENU_MEMS_OPEN); a win
-    // still plays its level's the first time and records it.
+    // Every memory, oldest first. Until how they are earned is decided,
+    // every one is open (MENU_MEMS_OPEN); a win still plays its level's the
+    // first time and records it.
     const MENU_MEMS_OPEN = true;
     function menuTimeline() {
-        return MENU_OPENING.map(o => ({ id: o.id, year: o.year, ink: o.ink, title: o.title, got: true }))
-            .concat(MENU_ALL.filter(l => l.ago).map(l => ({ id: l.n, year: -l.ago, ink: l.ink, title: l.title,
-                                                            got: MENU_MEMS_OPEN || !!menu.mems[l.n] })))
+        return MENU_MEMS.map(m => Object.assign({}, m, { got: m.always || MENU_MEMS_OPEN || !!menu.mems[m.id] }))
             .sort((a, b) => a.year - b.year);
     }
     const menuYear = y => (y < 0 ? '\u2212' + -y : '' + y);
@@ -1105,12 +1112,14 @@
         // the room: the timeline, oldest on the left, across the whole of
         // where he can stand. Its stops are evenly spaced, not to scale --
         // there are no years on it but the memories' own -- and a memory you
-        // have not earned is a stop with no name. Under each is its title.
+        // have not earned is a stop with no name. Under each is its title,
+        // every other one a row lower so neighbours never share a line.
         // There is no way out but forward: year 0 is the town, so it is also
         // the way back to it, and says so under its title.
         const tl = menuTimeline();
         const hs = halfSpan(), step = (LW - hs * 2) / (tl.length - 1);
         return tl.map((m, i) => ({ id: 'mem' + m.id, stop: true, cx: hs + step * i, ink: m.ink,
+                                   drop: i % 2 ? M_UNDER_DROP : 0,
                                    label: m.got ? menuYear(m.year) : '?',
                                    under: !m.got ? [] : m.id === 'now' ? [m.title, 'BACK'] : [m.title],
                                    act: !m.got ? null : m.id === 'now' ? menuReturn
@@ -1132,6 +1141,7 @@
     const M_STOP_R = 7;              // a stop's dot
     const M_UNDER = 32;              // baseline of what a stop says under itself, off the line
     const M_UNDER_STEP = 17;         // ...and each line after the first, further down
+    const M_UNDER_DROP = 22;         // how much lower every other stop's lines start
 
     function menuDrawTimeline(stops) {
         const x0 = stops[0].cx - 30, x1 = stops[stops.length - 1].cx + 30;
@@ -1176,7 +1186,8 @@
         const ink = on ? (c.act ? '#f2efe9' : '#6d685f') : (c.act ? c.ink : '#4a453d');
         if (c.act) text('YEAR', c.cx, M_TL_Y - 44, 11, ink, 'center');
         text(c.label, c.cx, M_TL_Y - 24, on ? 19 : 16, ink, 'center');
-        c.under.forEach((line, i) => text(line, c.cx, M_TL_Y + M_UNDER + i * M_UNDER_STEP, 13, ink, 'center'));
+        c.under.forEach((line, i) => text(line, c.cx, M_TL_Y + M_UNDER + c.drop + i * M_UNDER_STEP, 13, ink,
+                                          'center'));
     }
 
     function menuScreenDraw() {
@@ -1215,7 +1226,7 @@
         ctx.beginPath();
         ctx.moveTo(paddle.x, PADDLE_Y - padH() / 2 - 8);
         ctx.lineTo(lit.cx, !lit.stop ? M_CHOICE_Y + M_CHOICE_H / 2 + 8
-                         : lit.under.length ? M_TL_Y + M_UNDER + (lit.under.length - 1) * M_UNDER_STEP + 8
+                         : lit.under.length ? M_TL_Y + M_UNDER + lit.drop + (lit.under.length - 1) * M_UNDER_STEP + 8
                          : M_TL_Y + M_STOP_R * 1.6 + 8);
         ctx.stroke();
         ctx.setLineDash([]);
