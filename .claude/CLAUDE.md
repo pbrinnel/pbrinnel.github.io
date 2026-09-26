@@ -52,6 +52,11 @@ touches it.
 - **Load order is the whole design and `fourkeys.html` sets it.** They are plain scripts
   sharing one scope: runtime and modules first, `engine.js` after them, `start.js` last.
   Nothing in a module may READ an engine const at load time — inside a function is fine.
+- **Every font ships with the game**, in `fonts/fourkeys/` (woff2, with each font's OFL
+  licence), declared by `@font-face` in `fourkeys.html`. Never a system font or a font
+  service: text must look the same on every machine. Fira Sans is the player's and the
+  UI's; each other Brandon speaks in his own font and colour (see `MEM_VOICE` in
+  `memory.js`).
 - Every `<script src>` carries `?v=N`. Pages are cached for ten minutes, so **bump all of
   them together on every deploy** or someone gets one new file and one old one.
 - The boss lab builds from these same files; only the panel is the lab's own. Tuning a boss

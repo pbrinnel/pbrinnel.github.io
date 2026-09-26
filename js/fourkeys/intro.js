@@ -90,7 +90,7 @@
         const top = (EOR_TOP + bot) / 2 - pitch * units / 2;
         const size = Math.min(32 * u, pitch * 1.15);
         ctx.save();
-        ctx.font = size + 'px "Trebuchet MS", sans-serif';
+        ctx.font = size + 'px "Fira Sans", "Trebuchet MS", sans-serif';
         ctx.textAlign = 'center';
         ctx.lineWidth = Math.max(3, size * 0.22);
         ctx.lineJoin = 'round';

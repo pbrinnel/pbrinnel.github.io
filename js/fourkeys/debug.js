@@ -17,7 +17,7 @@
     const DBG_WIPE_HOLD = 1.2;
 
     const DBG_HEADS = { keys: 'keys — four of them open the CASTLE', pads: 'paddles',
-                        mems: 'memories — one after each level' };
+                        mems: 'memories — after the levels that have one; the opening two are always yours' };
 
     let dbgSync = [];                 // one per row: bring its look up to date
 
@@ -32,7 +32,7 @@
         el.appendChild(cols);
         debugRow(cols, 'keys', menuLevels().filter(l => l.n <= 4));
         debugRow(cols, 'pads', menuPads().map(k => ({ k, name: (LAB_PAD[k] || {}).name || k.toUpperCase() })));
-        debugRow(cols, 'mems', menuLevels().map(l => ({ n: l.n, name: 'MEMORY ' + l.n, ink: l.ink })));
+        debugRow(cols, 'mems', menuLevels().filter(l => l.ago).map(l => ({ n: l.n, name: 'YEAR \u2212' + l.ago, ink: l.ink })));
 
         // and the way back out of all of it
         const wipe = document.createElement('button');

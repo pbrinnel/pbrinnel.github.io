@@ -21,12 +21,19 @@
     // that can be told apart at a glance, and a town where every building reads
     // as its own place.
     const MENU_LEVELS = [
-        { n: 1, name: 'FARM', ink: '#7fa85a', cap: 'gable', pad: 'gilt' },
-        { n: 2, name: 'RUINS', ink: '#b0a894', cap: 'broken', pad: 'statue' },
+        { n: 1, name: 'FARM', ink: '#7fa85a', cap: 'gable', pad: 'gilt', ago: 2784 },
+        { n: 2, name: 'RUINS', ink: '#b0a894', cap: 'broken', pad: 'statue', ago: 1701 },
         { n: 3, name: 'CITY', ink: '#6f9bc4', cap: 'skyline', pad: 'frost' },
         { n: 4, name: 'VOLCANO', ink: '#d2622f', cap: 'cone', pad: 'ember' }
     ];
-    const MENU_LAST = { n: 5, name: 'CASTLE', ink: '#9a7fc9', cap: 'crown', pad: 'pair' };
+    const MENU_LAST = { n: 5, name: 'CASTLE', ink: '#9a7fc9', cap: 'crown', pad: 'pair', ago: 99 };
+    // `ago` is how many years before the game starts a level's memory is set;
+    // a level without one has no memory (yet). The game starts in year 0, and
+    // the opening is two more memories, always yours: the end of the first
+    // game, 2000 years back (as its card says), and year 0 itself -- the
+    // town, which is where it takes you back to.
+    const MENU_OPENING = [{ id: 'past', year: -2000, ink: '#b8b2a8' },
+                          { id: 'now', year: 0, ink: '#f2efe9' }];
     // The first win anywhere, clean or not, also hands over CLASSIC. He plays
     // exactly as the paddle you started with, so there is nothing in him to
     // earn -- he is a souvenir, and the first one a player picks up.
@@ -169,8 +176,8 @@
     // More that are not levels. MEMORIES and the boards take the top corners,
     // and a corner's lane is the wall itself: walk up hard against the left or
     // right edge and that is where you arrive, past the FARM or the VOLCANO
-    // rather than into it. MEMORIES is not there at all until the first memory
-    // is (menuShown). RESET is the least of them, a small sign up and to the
+    // rather than into it. MEMORIES is always there: the opening is in it from
+    // the start. RESET is the least of them, a small sign up and to the
     // right of MEMORIES, and its lane is the gap between the FARM and the
     // RUINS -- narrower than the sign, so nobody wanders into it. Going in
     // only asks the question (menuShow); erasing is a button in there.
@@ -213,11 +220,6 @@
         if (c.level.side) return wall === c.level.side;
         const [l, r] = c.lane || [c.x - c.w / 2, c.x + c.w / 2];
         return !wall && paddle.x >= l && paddle.x <= r;
-    }
-
-    // whether it is in the town yet
-    function menuShown(c) {
-        return c.level.key !== 'memories' || Object.keys(menu.mems).some(n => menu.mems[n]);
     }
 
     function menuSay(t) { menu.say = t; menu.sayT = 2.6; }
@@ -280,7 +282,7 @@
     function menuAt() {
         const y = padY() - padH() / 2;
         for (const c of menu.cards) {
-            if (!menuShown(c) || !menuLane(c)) continue;
+            if (!menuLane(c)) continue;
             if (y > c.y + c.h / 2 || y < c.y - c.h / 2) continue;
             return c;
         }
@@ -447,7 +449,7 @@
         let got = level.name + (first ? ' · A KEY' : ' · DONE AGAIN');
         // its memory plays the first time only, before any paddle is shown:
         // after that it is in MEMORIES
-        if (!menu.mems[level.n]) {
+        if (level.ago && !menu.mems[level.n]) {
             menu.mems[level.n] = true;
             menu.shows.push({ mem: level.n });
         }
@@ -480,8 +482,21 @@
 
     function menuUpdate(dt) {
         if (!menu) return;
-        if (menuUnlockUp()) { menu.showT += dt; menu.march = false; return; }
-        if (menuScreenUp()) { menu.screen.t += dt; menu.march = false; return; }
+        // a memory that has finished goes on by itself (see memoryDone)
+        const over = (n, t) => typeof memoryDone === 'function' && memoryDone(n, t);
+        if (menuUnlockUp()) {
+            menu.showT += dt;
+            menu.march = false;
+            const m = menu.shows[0].mem;
+            if (m && over(m, menu.showT)) { menu.shows.shift(); menu.showT = 0; }
+            return;
+        }
+        if (menuScreenUp()) {
+            menu.screen.t += dt;
+            menu.march = false;
+            if (menu.screen.kind === 'memory' && over(menu.screen.n, menu.screen.t)) menuShow('memories');
+            return;
+        }
         if (menu.going) { menuGoStep(dt); return; }
         menuDustStep(dt);
         if (menu.sayT > 0) menu.sayT = Math.max(0, menu.sayT - dt);
@@ -709,7 +724,7 @@
         const k = menuArriveK();
         // the far ones first, so a near one growing past them is drawn over them
         for (const c of menu.cards.slice().sort((a, b) => a.y - b.y)) {
-            if (menuShown(c)) menuArriveCard(c, k, () => menuDrawLevel(c));
+            menuArriveCard(c, k, () => menuDrawLevel(c));
         }
         menuDrawGoing();
         // the gates are at his feet, so they are simply there once the town is
@@ -961,7 +976,7 @@
     // a tap: true if it was the unlock screen's to take
     function menuUnlockNext() {
         if (!menuUnlockUp()) return false;
-        const t = menu.shows[0].mem ? menuMemoryTap(menu.showT)
+        const t = menu.shows[0].mem ? menuMemoryTap(menu.shows[0].mem, menu.showT)
                                     : menu.showT >= UNLOCK_WAIT ? -1 : menu.showT;
         if (t < 0) { menu.shows.shift(); menu.showT = 0; } else menu.showT = t;
         return true;
@@ -990,22 +1005,36 @@
     }
 
     // A memory, which memory.js draws. The boss lab builds this file without
-    // it, and gets the bare title instead.
+    // it, and gets the bare year instead.
     function menuMemoryCard(n, t) {
         if (typeof memoryDraw === 'function') { memoryDraw(n, t); return; }
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, LW, LH);
         ctx.globalAlpha = Math.min(1, t / UNLOCK_IN);
-        text('MEMORY ' + n, LW / 2, LH / 2 + 14, 44, '#f2efe9', 'center');
+        text('YEAR ' + menuYear(menuTimeline().find(m => m.id === n).year), LW / 2, LH / 2 + 14, 44,
+             '#f2efe9', 'center');
         ctx.globalAlpha = 1;
     }
+
+    // Every memory, oldest first: the opening's two and one per level. A
+    // memory is named for the year it is set in and nothing else. Until how
+    // they are earned is decided, every one is open (MENU_MEMS_OPEN); a win
+    // still plays its level's the first time and records it.
+    const MENU_MEMS_OPEN = true;
+    function menuTimeline() {
+        return MENU_OPENING.map(o => ({ id: o.id, year: o.year, ink: o.ink, got: true }))
+            .concat(MENU_ALL.filter(l => l.ago).map(l => ({ id: l.n, year: -l.ago, ink: l.ink,
+                                                            got: MENU_MEMS_OPEN || !!menu.mems[l.n] })))
+            .sort((a, b) => a.year - b.year);
+    }
+    const menuYear = y => (y < 0 ? '\u2212' + -y : '' + y);
 
     // What a tap does to a memory that has been up t seconds: the time to put
     // it at, or -1 to close it. A tap on its title card skips to what comes
     // after, and that then has to be up as long as anything else before a tap
     // takes it away, so the tap that skipped cannot close it too.
-    function menuMemoryTap(t) {
-        const card = typeof memoryCardSecs === 'function' ? memoryCardSecs() : 0;
+    function menuMemoryTap(n, t) {
+        const card = typeof memoryCardSecs === 'function' ? memoryCardSecs(n) : 0;
         if (t < UNLOCK_WAIT) return t;
         if (t < card) return card;
         if (t < card + UNLOCK_WAIT) return t;
@@ -1059,15 +1088,19 @@
             return [{ id: 'keep', label: 'KEEP', cx: 250, w: 200, ink: '#f2efe9', act: menuLeave },
                     { id: 'erase', label: 'ERASE', cx: 550, w: 200, ink: '#c0594a', act: menuErase }];
         }
-        // the room: BACK first, where he comes in off the wall, then one door
-        // per level, and only the ones you have been through open
-        const hs = halfSpan(), step = (LW - hs * 2) / MENU_ALL.length;
-        return [{ id: 'back', label: 'BACK', cx: hs, w: 112, ink: '#8d877d', act: menuLeave }]
-            .concat(MENU_ALL.map((l, i) => {
-                const got = !!menu.mems[l.n];
-                return { id: 'mem' + l.n, label: got ? 'MEMORY ' + l.n : '?', cx: hs + step * (i + 1), w: 112,
-                         ink: l.ink, act: got ? () => menuShow('memory', l.n) : null };
-            }));
+        // the room: the timeline, oldest on the left, across the whole of
+        // where he can stand. Its stops are evenly spaced, not to scale --
+        // there are no years on it but the memories' own -- and a memory you
+        // have not earned is a stop with no name. There is no way out but
+        // forward: year 0 is the town, so it is also the way back to it, and
+        // says so under its year.
+        const tl = menuTimeline();
+        const hs = halfSpan(), step = (LW - hs * 2) / (tl.length - 1);
+        return tl.map((m, i) => ({ id: 'mem' + m.id, stop: true, cx: hs + step * i, ink: m.ink,
+                                   label: m.got ? menuYear(m.year) : '?',
+                                   under: m.id === 'now' ? 'BACK' : null,
+                                   act: !m.got ? null : m.id === 'now' ? menuLeave
+                                                      : () => menuShow('memory', m.id) }));
     }
 
     // the one nearest him
@@ -1075,6 +1108,60 @@
         let best = null;
         for (const c of menuChoices()) if (!best || Math.abs(c.cx - x) < Math.abs(best.cx - x)) best = c;
         return best;
+    }
+
+    // The timeline: one line, oldest at the left, running on past the last
+    // stop to an arrowhead so it reads as time going somewhere. Each stop is
+    // a dot with its year over it, and anything more it has to say under it;
+    // the lit one is bigger and ringed.
+    const M_TL_Y = 350;              // the line
+    const M_STOP_R = 7;              // a stop's dot
+    const M_UNDER = 32;              // baseline of what a stop says under itself, off the line
+
+    function menuDrawTimeline(stops) {
+        const x0 = stops[0].cx - 30, x1 = stops[stops.length - 1].cx + 30;
+        ctx.strokeStyle = '#4a453d';
+        ctx.fillStyle = '#4a453d';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x0, M_TL_Y);
+        ctx.lineTo(x1, M_TL_Y);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x1 + 12, M_TL_Y);
+        ctx.lineTo(x1, M_TL_Y - 6);
+        ctx.lineTo(x1, M_TL_Y + 6);
+        ctx.closePath();
+        ctx.fill();
+    }
+
+    function menuDrawStop(c, on) {
+        const r = on ? M_STOP_R * 1.6 : M_STOP_R;
+        ctx.beginPath();
+        ctx.arc(c.cx, M_TL_Y, r, 0, 2 * Math.PI);
+        if (c.act) {
+            ctx.fillStyle = c.ink;
+            ctx.globalAlpha = on && menu.press === c.id ? 0.6 : 1;
+            ctx.fill();
+            ctx.globalAlpha = 1;
+        } else {
+            ctx.fillStyle = '#000';
+            ctx.fill();
+            ctx.strokeStyle = on ? '#6d685f' : '#4a453d';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+        if (on) {
+            ctx.beginPath();
+            ctx.arc(c.cx, M_TL_Y, r + 5, 0, 2 * Math.PI);
+            ctx.strokeStyle = c.act ? c.ink : '#6d685f';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+        }
+        const ink = on ? (c.act ? '#f2efe9' : '#6d685f') : (c.act ? c.ink : '#4a453d');
+        if (c.act) text('YEAR', c.cx, M_TL_Y - 44, 11, ink, 'center');
+        text(c.label, c.cx, M_TL_Y - 24, on ? 19 : 16, ink, 'center');
+        if (c.under) text(c.under, c.cx, M_TL_Y + M_UNDER, 13, ink, 'center');
     }
 
     function menuScreenDraw() {
@@ -1088,8 +1175,12 @@
             text('every key, paddle and memory, gone for good', LW / 2, 195, 15, '#9a958c', 'center');
         } else text('MEMORIES', LW / 2, 150, 34, '#d9a5b3', 'center');
         const lit = menuChoiceAt(paddle.x);
-        for (const c of menuChoices()) {
+        const choices = menuChoices();
+        const stops = choices.filter(c => c.stop);
+        if (stops.length) menuDrawTimeline(stops);
+        for (const c of choices) {
             const on = c === lit || c.id === lit.id;
+            if (c.stop) { menuDrawStop(c, on); continue; }
             const x = c.cx - c.w / 2, y = M_CHOICE_Y - M_CHOICE_H / 2;
             menuPanel(x, y, c.w, M_CHOICE_H, on, c.ink);
             if (on) {
@@ -1108,7 +1199,8 @@
         ctx.setLineDash([4, 6]);
         ctx.beginPath();
         ctx.moveTo(paddle.x, PADDLE_Y - padH() / 2 - 8);
-        ctx.lineTo(lit.cx, M_CHOICE_Y + M_CHOICE_H / 2 + 8);
+        ctx.lineTo(lit.cx, !lit.stop ? M_CHOICE_Y + M_CHOICE_H / 2 + 8
+                         : lit.under ? M_TL_Y + M_UNDER + 8 : M_TL_Y + M_STOP_R * 1.6 + 8);
         ctx.stroke();
         ctx.setLineDash([]);
         ctx.globalAlpha = 1;
@@ -1135,7 +1227,7 @@
         if (!menuScreenUp()) return false;
         if (menu.screen.kind === 'memory') {
             if (!down) return true;
-            const t = menuMemoryTap(menu.screen.t);
+            const t = menuMemoryTap(menu.screen.n, menu.screen.t);
             if (t < 0) menuShow('memories'); else menu.screen.t = t;
             return true;
         }

@@ -2666,7 +2666,7 @@
             }
             const size = fitSize(b.label, 17 * uiScale, b.w - 24);
             const x = b.x + b.w / 2, y = b.y + b.h / 2 + size * 0.35;
-            ctx.font = size + 'px "Trebuchet MS", sans-serif';
+            ctx.font = size + 'px "Fira Sans", "Trebuchet MS", sans-serif';
             ctx.textAlign = 'center';
             ctx.lineWidth = 5;                       // knocked out of him
             ctx.strokeStyle = 'rgba(0,0,0,0.8)';
@@ -4448,7 +4448,7 @@
     // the hud scales up on small screens, which would run a long line straight
     // off both edges -- shrink the type until it fits instead
     function fitSize(str, size, maxW) {
-        ctx.font = size + 'px "Trebuchet MS", sans-serif';
+        ctx.font = size + 'px "Fira Sans", "Trebuchet MS", sans-serif';
         const w = ctx.measureText(str).width;
         return w > maxW ? size * (maxW / w) : size;
     }
@@ -4543,7 +4543,7 @@
         if (!shout) return;
         const txt = shout.text || 'BRANDON!';
         const size = 22;
-        ctx.font = 'bold ' + size + 'px "Trebuchet MS", sans-serif';
+        ctx.font = 'bold ' + size + 'px "Fira Sans", "Trebuchet MS", sans-serif';
         const w = ctx.measureText(txt).width + 30, h = size + 18;
         // one shouted during the drain rides on him, since he grows under it
         const boss = bricks && bricks[0];
@@ -4572,7 +4572,7 @@
     // to shift to stay on screen
     function shoutDown(txt, x, top, life) {
         const size = 22;
-        ctx.font = 'bold ' + size + 'px "Trebuchet MS", sans-serif';
+        ctx.font = 'bold ' + size + 'px "Fira Sans", "Trebuchet MS", sans-serif';
         const w = ctx.measureText(txt).width + 30, h = size + 18;
         const bx = Math.max(12 + w / 2, Math.min(LW - 12 - w / 2, x));
         const tx = Math.max(bx - w / 2 + 14, Math.min(bx + w / 2 - 14, x));
@@ -4626,7 +4626,7 @@
         const size = 12 * uiScale;
         for (const t of talk) {
             const b = t.brick;
-            ctx.font = size + 'px "Trebuchet MS", sans-serif';
+            ctx.font = size + 'px "Fira Sans", "Trebuchet MS", sans-serif';
             const w = ctx.measureText(t.text).width + size, h = size * 1.7;
             const hx = b.x + bw * 0.84;
             const x = Math.max(8 + w / 2, Math.min(LW - 8 - w / 2, hx));
@@ -4650,7 +4650,7 @@
 
     function text(str, x, y, size, color, align) {
         ctx.fillStyle = color;
-        ctx.font = size + 'px "Trebuchet MS", sans-serif';
+        ctx.font = size + 'px "Fira Sans", "Trebuchet MS", sans-serif';
         ctx.textAlign = align || 'left';
         ctx.fillText(str, x, y);
     }
@@ -4667,7 +4667,7 @@
         ctx.rect(clipX, y, clipW, SPIN_RULE_H);
         ctx.clip();
         ctx.fillStyle = ink;
-        ctx.font = (SPIN_WORD_BOLD ? 'bold ' : '') + SPIN_WORD_SIZE + 'px "Trebuchet MS", sans-serif';
+        ctx.font = (SPIN_WORD_BOLD ? 'bold ' : '') + SPIN_WORD_SIZE + 'px "Fira Sans", "Trebuchet MS", sans-serif';
         ctx.textAlign = 'center';
         // the outer two letters pin to the ends and the rest space evenly
         // between, so the word stretches over the whole bar however wide the
@@ -4749,7 +4749,7 @@
         ctx.save();
         ctx.globalAlpha = out;              // the whole screen leaves together
         const cut = (str, x, y, size, color, align) => {
-            ctx.font = size + 'px "Trebuchet MS", sans-serif';
+            ctx.font = size + 'px "Fira Sans", "Trebuchet MS", sans-serif';
             ctx.textAlign = align || 'left';
             ctx.lineWidth = Math.max(3, size * 0.22);
             ctx.lineJoin = 'round';                    // no spikes off the corners
