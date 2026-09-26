@@ -11,8 +11,11 @@
     // and what he did with the world after.
     //
     // Every character is a Brandon, and so is everything they call each other.
-    // Each speaks in his own voice, a face and a colour (MEM_VOICE), and a
-    // Brandon named is named in the voice of the one he is -- only the name.
+    // Each speaks in his own voice, a face and a colour (MEM_VOICE). A
+    // Brandon he names is set in the named one's face -- only the name -- but
+    // the whole line stays the speaker's colour, so who is talking is never
+    // in doubt. The ones with no name of their own (a crowd, the five before
+    // they are anyone) speak in `you`'s plain cream.
     // Who is who is never written down anywhere a player sees it. The Angel
     // and the Fallen have a voice each, so they read as two Brandons until
     // the memory 99 years back shows you they are one.
@@ -459,20 +462,21 @@
         memStreams(s, drain, at);
 
         if (s < MF_BREAK + 1) {
-            memLine(MF_LINES.say0, at.head[0], 120, 24, span(MF_SAY_0), MF_SAY_0);
-            memLine(MF_LINES.say1, at.head[0], 120, 24, span(MF_SAY_1), MF_SAY_1);
-            memLine(MF_LINES.scream, MF_ODIN_X, 90, 44, span(MF_SCREAM), MF_SCREAM, 2);
+            memLine(MF_LINES.say0, 'angel', at.head[0], 120, 24, span(MF_SAY_0), MF_SAY_0);
+            memLine(MF_LINES.say1, 'angel', at.head[0], 120, 24, span(MF_SAY_1), MF_SAY_1);
+            memLine(MF_LINES.scream, 'odin', MF_ODIN_X, 90, 44, span(MF_SCREAM), MF_SCREAM, 2);
         }
-        memLine(MF_LINES.say2, at.head[0], 120, 24, span(MF_SAY_2), MF_SAY_2);
+        memLine(MF_LINES.say2, 'fallen', at.head[0], 120, 24, span(MF_SAY_2), MF_SAY_2);
         ctx.restore();
     }
 
-    // A line said, faded up and down across [start, end]. Each part is
-    // [words, whose voice]. It wraps to fit the frame, each row centred over x
-    // and kept inside it, the first row's baseline at y. `shake` px of
-    // tremble, for a scream.
+    // A line said by `who`, faded up and down across [start, end], all of it
+    // in his colour so you can always tell who is talking. Each part is
+    // [words, whose face]: a Brandon he names is in that Brandon's face. It
+    // wraps to fit the frame, each row centred over x and kept inside it, the
+    // first row's baseline at y. `shake` px of tremble, for a scream.
     const MEM_LINE_PAD = 24;         // px a row keeps clear of each side of the frame
-    function memLine(parts, x, y, px, k, [a, b], shake) {
+    function memLine(parts, who, x, y, px, k, [a, b], shake) {
         if (k <= 0 || k >= 1) return;
         const secs = b - a, into = k * secs;
         const alpha = Math.min(1, into / MF_SAY_IN, (secs - into) / MF_SAY_IN);
@@ -480,7 +484,7 @@
         ctx.globalAlpha *= alpha;
         ctx.textAlign = 'left';
         const font = f => MEM_VOICE[f].font.replace('{px}', px);
-        // words, each keeping the space after it, and whose voice it is in
+        // words, each keeping the space after it, and whose face it is in
         const words = [];
         for (const [w, f] of parts) {
             for (const bit of w.split(/(?<=\s)/)) {
@@ -503,7 +507,7 @@
             let cx = Math.max(16, Math.min(LW - 16 - total, x - total / 2));
             for (const wd of row) {
                 ctx.font = font(wd.f);
-                ctx.fillStyle = MEM_VOICE[wd.f].ink;
+                ctx.fillStyle = MEM_VOICE[who].ink;
                 ctx.fillText(wd.w, cx + jx, y + r * px * 1.3 + jy);
                 cx += wd.width;
             }
@@ -823,10 +827,11 @@
         if (s >= MR_GO[0]) odin();
         memBolt(s, MR_ZAP, LW / 2, ground - up - MR_ODIN_H * 0.55, one.x, one.y, 'rgba(255,200,110,1)');
         for (const [when, parts] of MR_LINES) {
-            memLine(parts, LW / 2, 34, 22, memClamp((s - when[0]) / (when[1] - when[0])), when);
+            memLine(parts, 'odin', LW / 2, 34, 22, memClamp((s - when[0]) / (when[1] - when[0])), when);
         }
-        memLine([['BRANDON!', 'odin']], LW / 2, 62, 40, span(MR_SHOUT), MR_SHOUT);
-        // the cheer: their shout for HIM, in his voice, going up all over the crowd
+        memLine([['BRANDON!', 'odin']], 'you', LW / 2, 62, 40, span(MR_SHOUT), MR_SHOUT);
+        // the cheer: their shout for HIM, in his face and the crowd's own
+        // colour, going up all over them
         for (let i = 0; i < MR_SHOUTS && cheer; i++) {
             const m = army[Math.floor(memHash(i + 400) * army.length)];
             if (m === one) continue;
@@ -837,7 +842,7 @@
             ctx.globalAlpha *= Math.sin(k * Math.PI);
             ctx.font = MEM_VOICE.odin.font.replace('{px}', 17);
             ctx.textAlign = 'center';
-            ctx.fillStyle = MEM_VOICE.odin.ink;
+            ctx.fillStyle = MEM_VOICE.you.ink;
             ctx.fillText('BRANDON!', m.x, m.y - 26 - k * 22);
             ctx.restore();
         }
@@ -960,9 +965,9 @@
         const ox = memLerp(MS_ODIN_X[0], MS_ODIN_X[1], memEase(span(MS_STEP)));
         memOdin(ox, MS_GROUND, MS_ODIN_H, true, s, 1, 0, true);
         const over = MS_GROUND - MS_ODIN_H - 30;
-        memLine(MS_LINES.taunt, ox, over, 22, span(MS_TAUNT), MS_TAUNT);
-        memLine(MS_LINES.halt, ox, over, 22, span(MS_HALT), MS_HALT);
-        memLine(MS_LINES.last, ox, over, 22, span(MS_LAST), MS_LAST);
+        memLine(MS_LINES.taunt, 'odin', ox, over, 22, span(MS_TAUNT), MS_TAUNT);
+        memLine(MS_LINES.halt, 'odin', ox, over, 22, span(MS_HALT), MS_HALT);
+        memLine(MS_LINES.last, 'odin', ox, over, 22, span(MS_LAST), MS_LAST);
         ctx.restore();
     }
 
@@ -1022,10 +1027,10 @@
             const hand = at.hands[x < LW / 2 ? 1 : 0];
             memBolt(s, [a, a + MC_ZAP_SECS], hand[0], hand[1], x, y - 20, 'rgba(201,122,90,1)');
         });
-        memLine(MC_LINE, LW / 2, 34, 22, memClamp((s - MC_SAY[0]) / (MC_SAY[1] - MC_SAY[0])), MC_SAY);
+        memLine(MC_LINE, 'fallen', LW / 2, 34, 22, memClamp((s - MC_SAY[0]) / (MC_SAY[1] - MC_SAY[0])), MC_SAY);
         MC_RING.forEach(([x, y], i) => {
             const a = MC_SHOUT[0] + i * 0.15;
-            memLine([['BRANDON!', 'fallen']], x, y - 96, 18, memClamp((s - a) / (MC_SHOUT[1] - a)), [a, MC_SHOUT[1]]);
+            memLine([['BRANDON!', 'fallen']], 'you', x, y - 96, 18, memClamp((s - a) / (MC_SHOUT[1] - a)), [a, MC_SHOUT[1]]);
         });
         ctx.restore();
     }
@@ -1148,8 +1153,9 @@
     }
 
     // an army's "BRANDON!", `count` of them going up over `where` (a list of
-    // [x, y]) across [c0, c1], in `voice`
-    function memShouts(s, where, count, [c0, c1], voice, seed) {
+    // [x, y]) across [c0, c1]: in the face of the Brandon they name, and the
+    // colour of `who` shouts it
+    function memShouts(s, where, count, [c0, c1], face, who, seed) {
         if (s < c0 || s >= c1) return;
         for (let i = 0; i < count; i++) {
             const [x, y] = where[Math.floor(memHash(i + seed) * where.length)];
@@ -1158,9 +1164,9 @@
             if (k <= 0 || k >= 1) continue;
             ctx.save();
             ctx.globalAlpha *= Math.sin(k * Math.PI);
-            ctx.font = MEM_VOICE[voice].font.replace('{px}', 17);
+            ctx.font = MEM_VOICE[face].font.replace('{px}', 17);
             ctx.textAlign = 'center';
-            ctx.fillStyle = MEM_VOICE[voice].ink;
+            ctx.fillStyle = MEM_VOICE[who].ink;
             ctx.fillText('BRANDON!', x, y - 26 - k * 22);
             ctx.restore();
         }
@@ -1217,11 +1223,11 @@
         }
         memAngel(s, MY_ANGEL[0], MY_GROUND, MY_ANGEL[1]);
         const where = army.map(m => [m.x, m.y]);
-        memShouts(s, where, 16, MY_JEER, 'surtr', 700);
-        memShouts(s, where, 16, MY_CHEER, 'odin', 800);
+        memShouts(s, where, 16, MY_JEER, 'surtr', 'you', 700);
+        memShouts(s, where, 16, MY_CHEER, 'odin', 'you', 800);
         const over = MY_GROUND - MY_SURTR[1] - 20;
-        memLine([['...', 'surtr']], MY_SURTR[0], over, 30, span(MY_NOTHING), MY_NOTHING);
-        memLine([['BRANDON', 'surtr']], MY_SURTR[0], over, 30, span(MY_NAME), MY_NAME);
+        memLine([['...', 'surtr']], 'surtr', MY_SURTR[0], over, 30, span(MY_NOTHING), MY_NOTHING);
+        memLine([['BRANDON', 'surtr']], 'surtr', MY_SURTR[0], over, 30, span(MY_NAME), MY_NAME);
         ctx.restore();
     }
 
@@ -1263,7 +1269,7 @@
         memOdin(MQ_ODIN[0], MQ_GROUND, MQ_ODIN[1], true, s, 1, 0, true);
         const ax = memLerp(MQ_ANGEL_X[0], MQ_ANGEL_X[1], memEase(span(MQ_ENTER)));
         memAngel(s, ax, MQ_GROUND, MQ_ANGEL_H);
-        memLine(MQ_ASK_LINE, ax, 200, 22, span(MQ_ASK), MQ_ASK);
-        memLine(MQ_ANSWER_LINE, MQ_ODIN[0], 200, 22, span(MQ_ANSWER), MQ_ANSWER);
+        memLine(MQ_ASK_LINE, 'angel', ax, 200, 22, span(MQ_ASK), MQ_ASK);
+        memLine(MQ_ANSWER_LINE, 'odin', MQ_ODIN[0], 200, 22, span(MQ_ANSWER), MQ_ANSWER);
         ctx.restore();
     }
