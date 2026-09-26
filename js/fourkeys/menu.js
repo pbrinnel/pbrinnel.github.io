@@ -1112,14 +1112,12 @@
         // the room: the timeline, oldest on the left, across the whole of
         // where he can stand. Its stops are evenly spaced, not to scale --
         // there are no years on it but the memories' own -- and a memory you
-        // have not earned is a stop with no name. Under each is its title,
-        // every other one a row lower so neighbours never share a line.
+        // have not earned is a stop with no name. Under each is its title.
         // There is no way out but forward: year 0 is the town, so it is also
         // the way back to it, and says so under its title.
         const tl = menuTimeline();
         const hs = halfSpan(), step = (LW - hs * 2) / (tl.length - 1);
         return tl.map((m, i) => ({ id: 'mem' + m.id, stop: true, cx: hs + step * i, ink: m.ink,
-                                   drop: i % 2 ? M_UNDER_DROP : 0,
                                    label: m.got ? menuYear(m.year) : '?',
                                    under: !m.got ? [] : m.id === 'now' ? [m.title, 'BACK'] : [m.title],
                                    act: !m.got ? null : m.id === 'now' ? menuReturn
@@ -1140,8 +1138,8 @@
     const M_TL_Y = 350;              // the line
     const M_STOP_R = 7;              // a stop's dot
     const M_UNDER = 32;              // baseline of what a stop says under itself, off the line
-    const M_UNDER_STEP = 17;         // ...and each line after the first, further down
-    const M_UNDER_DROP = 22;         // how much lower every other stop's lines start
+    const M_UNDER_STEP = 14;         // ...and each line after the first, further down
+    const M_UNDER_PX = 11;           // the size of what a stop says under itself
 
     function menuDrawTimeline(stops) {
         const x0 = stops[0].cx - 30, x1 = stops[stops.length - 1].cx + 30;
@@ -1186,7 +1184,7 @@
         const ink = on ? (c.act ? '#f2efe9' : '#6d685f') : (c.act ? c.ink : '#4a453d');
         if (c.act) text('YEAR', c.cx, M_TL_Y - 44, 11, ink, 'center');
         text(c.label, c.cx, M_TL_Y - 24, on ? 19 : 16, ink, 'center');
-        c.under.forEach((line, i) => text(line, c.cx, M_TL_Y + M_UNDER + c.drop + i * M_UNDER_STEP, 13, ink,
+        c.under.forEach((line, i) => text(line, c.cx, M_TL_Y + M_UNDER + i * M_UNDER_STEP, M_UNDER_PX, ink,
                                           'center'));
     }
 
@@ -1226,7 +1224,7 @@
         ctx.beginPath();
         ctx.moveTo(paddle.x, PADDLE_Y - padH() / 2 - 8);
         ctx.lineTo(lit.cx, !lit.stop ? M_CHOICE_Y + M_CHOICE_H / 2 + 8
-                         : lit.under.length ? M_TL_Y + M_UNDER + lit.drop + (lit.under.length - 1) * M_UNDER_STEP + 8
+                         : lit.under.length ? M_TL_Y + M_UNDER + (lit.under.length - 1) * M_UNDER_STEP + 8
                          : M_TL_Y + M_STOP_R * 1.6 + 8);
         ctx.stroke();
         ctx.setLineDash([]);
