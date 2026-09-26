@@ -148,6 +148,7 @@
         g.fill();
         g.globalCompositeOperation = 'source-over';
     }
+    const memWhole = () => memSprite('whole', (g, w, h) => placeShape(g, w, h, false));
     const memHeadless = () => memSprite('headless', (g, w, h) => { placeShape(g, w, h, false); memCut(g, w, h); });
     const memFlesh = color => memSprite('flesh' + color, (g, w, h) => {
         placeShape(g, w, h, false);
@@ -325,9 +326,9 @@
 
     // Which scene is which level's. A level with none has no memory (see
     // `ago` in menu.js), and there is no card for it.
-    const MEM_SCENES = { 1: s => memRally(s), 2: s => memStand(s), 5: s => memFall(s) };
+    const MEM_SCENES = { 1: s => memRally(s), 2: s => memStand(s), 3: s => memCourt(s), 5: s => memFall(s) };
     // ...and when each is over, in seconds into it: all of them end on black
-    const MEM_ENDS = { 1: () => MR_CUT, 2: () => MS_CUT, 5: () => MF_BLACK[1] };
+    const MEM_ENDS = { 1: () => MR_CUT, 2: () => MS_CUT, 3: () => MC_CUT, 5: () => MF_BLACK[1] };
     const MEM_AFTER = 2;             // seconds on the black before it goes back by itself
 
     // Whether a memory up t seconds is finished, black and all, and should go
@@ -368,8 +369,8 @@
     }
 
     // The end of the first game, as the opening shows it (intro.js draws it).
-    // Year 0 is not drawn here: it is the town, and MEMORIES just takes you
-    // back to it.
+    // Year 0 is not drawn here: it is the town, and MEMORIES takes you back
+    // to it the way the game first did (menuReturn).
     function memOpening(n, t) {
         ctx.globalAlpha = Math.min(1, t / MEM_CARD_IN);
         introWins(uiScale);
@@ -818,7 +819,7 @@
         }
         if (s >= MR_GROW[0]) memRallyChosen(one, grow);
         if (s >= MR_GO[0]) odin();
-        if (s >= MR_ZAP[0] && s < MR_ZAP[1]) memRallyBolt(s, LW / 2, ground - up - MR_ODIN_H * 0.55, one);
+        memBolt(s, MR_ZAP, LW / 2, ground - up - MR_ODIN_H * 0.55, one.x, one.y, 'rgba(255,200,110,1)');
         for (const [when, parts] of MR_LINES) {
             memLine(parts, LW / 2, 34, 22, memClamp((s - when[0]) / (when[1] - when[0])), when);
         }
@@ -869,25 +870,25 @@
         if (into > 0) drawFigure(x, y, w, into * ctx.globalAlpha, into, 0);
     }
 
-    // HIS strike: a crooked line from him to the chosen one that changes
-    // shape as it holds, a wide soft gold under a thin white core, faded in
-    // and out rather than flashed.
-    function memRallyBolt(s, x0, y0, m) {
-        const [a, b] = MR_ZAP;
+    // A strike: a crooked line from (x0, y0) to (x1, y1) across [a, b] that
+    // changes shape as it holds, a wide soft `glow` under a thin pale core,
+    // faded in and out rather than flashed.
+    function memBolt(s, [a, b], x0, y0, x1, y1, glow) {
         const k = (s - a) / (b - a);
+        if (k <= 0 || k >= 1) return;
         const alpha = Math.min(1, k / 0.12, (1 - k) / 0.3);
         const seed = Math.floor(s / MR_BOLT_KINK);
         const pts = [[x0, y0]];
-        const dx = m.x - x0, dy = m.y - y0, len = Math.hypot(dx, dy);
+        const dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy);
         for (let i = 1; i < MR_BOLT_BENDS; i++) {
-            const f = i / MR_BOLT_BENDS, off = (memHash(seed * 17 + i) - 0.5) * 60 * Math.sin(f * Math.PI);
+            const f = i / MR_BOLT_BENDS, off = (memHash(seed * 17 + i + x1) - 0.5) * 60 * Math.sin(f * Math.PI);
             pts.push([x0 + dx * f - dy / len * off, y0 + dy * f + dx / len * off]);
         }
-        pts.push([m.x, m.y]);
+        pts.push([x1, y1]);
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
         ctx.lineJoin = 'round';
-        for (const [wd, col, al] of [[12, 'rgba(255,200,110,1)', 0.35], [3, 'rgba(255,248,230,1)', 0.95]]) {
+        for (const [wd, col, al] of [[12, glow, 0.35], [3, 'rgba(255,248,230,1)', 0.95]]) {
             ctx.globalAlpha = alpha * al;
             ctx.strokeStyle = col;
             ctx.lineWidth = wd;
@@ -963,4 +964,179 @@
         memLine(MS_LINES.halt, ox, over, 22, span(MS_HALT), MS_HALT);
         memLine(MS_LINES.last, ox, over, 22, span(MS_LAST), MS_LAST);
         ctx.restore();
+    }
+
+    // ---- 92 years back: the court -----------------------------------------------------
+    // All of it in silhouette, black against the ember of a hall: the Fallen
+    // over it all, and five Brandons coming up to him and standing in a
+    // half circle under him. He gives each a kingdom, and strikes them, and
+    // each comes apart and goes back together as one of the five this game is
+    // fought against -- in outline, so you know the shapes before you meet
+    // them. They shout his name, and it cuts.
+    const MC_FADE_IN = 1.2;
+    const MC_ARRIVE = 1.0;           // the first of them starts up out of the bottom...
+    const MC_WALK = 2.0;             // ...takes this long to get to his place...
+    const MC_GAP = 0.45;             // ...and the next starts this much later
+    const MC_SAY = [5.5, 10.8];
+    const MC_ZAP = 11.2;             // the first strike; each after it MC_GAP later
+    const MC_ZAP_SECS = 0.7;
+    const MC_TURN = 1.6;             // seconds each takes to come apart and back as his boss
+    const MC_SHOUT = [15.2, 17.6];
+    const MC_CUT = 18.1;
+    const MC_INK = '#080504';
+    const MC_LU = [400, 150, 0.5];   // where the Fallen is, his middle, and his scale
+    const MC_SMALL_H = 90;           // how tall each of the five is when he comes
+    const MC_CELL = 6;               // px, the grain they come apart in
+    // where the five stand, left to right, and which level's boss each becomes
+    const MC_RING = [[156, 318, 1], [262, 412, 2], [400, 450, 3], [538, 412, 4], [644, 318, 5]];
+    const MC_LINE = [['...and to my loyal followers I grant you your own kingdom in this new world.', 'fallen']];
+
+    function memCourt(s) {
+        if (s >= MC_CUT || !memWhole() || !memHeadless() || !ready(ballImg)) return;
+        ctx.save();
+        ctx.globalAlpha = memEase(s / MC_FADE_IN);
+        // the hall's light, behind them all
+        const gr = ctx.createRadialGradient(LW / 2, 220, 20, LW / 2, 260, 560);
+        gr.addColorStop(0, 'rgba(150,72,40,0.75)');
+        gr.addColorStop(0.5, 'rgba(70,28,18,0.45)');
+        gr.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = gr;
+        ctx.fillRect(0, 0, LW, LH);
+
+        const g = memOffscreen();
+        const [lx, ly, lsc] = MC_LU;
+        const at = memLucifer(g, s, lx, ly, lsc, 1, 0);
+        MC_RING.forEach(([x, y, n], i) => {
+            const walk = memEase((s - MC_ARRIVE - i * MC_GAP) / MC_WALK);
+            const turn = memClamp((s - MC_ZAP - i * MC_GAP - MC_ZAP_SECS * 0.5) / MC_TURN);
+            memCourtOne(g, s, x, memLerp(LH + MC_SMALL_H, y, walk), n, turn, i);
+        });
+        g.globalCompositeOperation = 'source-atop';
+        g.fillStyle = MC_INK;
+        g.fillRect(0, 0, LW, LH);
+        g.globalCompositeOperation = 'source-over';
+        ctx.drawImage(memCanvas, 0, 0, LW, LH);
+
+        MC_RING.forEach(([x, y], i) => {
+            const a = MC_ZAP + i * MC_GAP;
+            const hand = at.hands[x < LW / 2 ? 1 : 0];
+            memBolt(s, [a, a + MC_ZAP_SECS], hand[0], hand[1], x, y - 20, 'rgba(201,122,90,1)');
+        });
+        memLine(MC_LINE, LW / 2, 34, 22, memClamp((s - MC_SAY[0]) / (MC_SAY[1] - MC_SAY[0])), MC_SAY);
+        MC_RING.forEach(([x, y], i) => {
+            const a = MC_SHOUT[0] + i * 0.15;
+            memLine([['BRANDON!', 'fallen']], x, y - 96, 18, memClamp((s - a) / (MC_SHOUT[1] - a)), [a, MC_SHOUT[1]]);
+        });
+        ctx.restore();
+    }
+
+    // one of the five at (x, y), `turn` of the way from a Brandon to his boss:
+    // the cells of him that have gone, and the cells of it that have come
+    function memCourtOne(g, s, x, y, n, turn, i) {
+        const wig = (dg, hz) => Math.sin(s * hz + i * 1.9) * dg * Math.PI / 180;
+        const small = () => {
+            const L = MC_SMALL_H, T = L / SHAPE_ASPECT;
+            g.save();
+            g.translate(x, y);
+            g.rotate(-Math.PI / 2 + wig(2, 1.6));
+            g.drawImage(memWhole(), -L / 2, -T / 2, L, T);
+            g.restore();
+        };
+        const boss = () => {
+            g.save();
+            g.translate(x, y);
+            g.rotate(wig(3, 1.3));
+            const sc = 1 + 0.03 * Math.sin(s * 2.1 + i);
+            g.scale(sc, sc);
+            MC_BOSSES[n](g, s);
+            g.restore();
+        };
+        if (turn <= 0) { small(); return; }
+        if (turn >= 1) { boss(); return; }
+        const cells = (keep) => {
+            g.beginPath();
+            for (let cy = -130, r = 0; cy < 120; cy += MC_CELL, r++) {
+                for (let cx = -100, c = 0; cx < 100; cx += MC_CELL, c++) {
+                    if ((memHash(r * 131 + c * 7 + i * 1000) < turn) === keep) g.rect(x + cx, y + cy, MC_CELL, MC_CELL);
+                }
+            }
+            g.clip();
+        };
+        g.save(); cells(false); small(); g.restore();
+        g.save(); cells(true); boss(); g.restore();
+    }
+
+    // Each boss in outline, built from what he is built from, centred on
+    // (0, 0) and fitting in about 180 across: WINDMILL a head on a stem with
+    // brandons for petals, IDOL one enormous head, TWINS a big one and a
+    // small one facing each other, LAMPS one hung over three stood on end,
+    // and GLEEOK the headless body upended with three heads on its necks.
+    const memMcBody = (g, x, y, L, a, flip) => {
+        const T = L / SHAPE_ASPECT;
+        g.save();
+        g.translate(x, y);
+        g.rotate(a);
+        if (flip) g.scale(-1, 1);
+        g.drawImage(memWhole(), -L / 2, -T / 2, L, T);
+        g.restore();
+    };
+    const memMcHead = (g, x, y, w) => {
+        const h = w * BALL_RY / BALL_RX;
+        g.drawImage(ballImg, x - w / 2, y - h / 2, w, h);
+    };
+    const MC_BOSSES = {
+        1: (g, s) => {                               // WINDMILL
+            g.fillStyle = '#000';
+            g.fillRect(-2, -400, 4, 380);
+            for (let p = 0; p < 6; p++) {
+                const a = s * 0.6 + p * Math.PI / 3;
+                memMcBody(g, Math.cos(a) * 42, -20 + Math.sin(a) * 42, 62, a, false);
+            }
+            memMcHead(g, 0, -20, 38);
+        },
+        2: (g) => memMcHead(g, 0, -20, 118),         // IDOL
+        3: (g) => {                                  // TWINS
+            memMcBody(g, -38, -30, 120, 0, false);
+            memMcBody(g, 52, -10, 78, 0, true);
+        },
+        4: (g, s) => {                               // LAMPS
+            memMcBody(g, 0, -70 + Math.sin(s * 1.4) * 3, 120, 0, false);
+            for (const lx of [-48, 0, 48]) memMcBody(g, lx, 10 + Math.sin(s + lx) * 3, 70, -Math.PI / 2, false);
+        },
+        5: (g, s) => {                               // GLEEOK
+            const L = 130, T = L / SHAPE_ASPECT;
+            g.save();
+            g.translate(0, -70);
+            g.rotate(Math.PI / 2);
+            g.drawImage(memHeadless(), -L / 2, -T / 2, L, T);
+            g.restore();
+            g.strokeStyle = '#000';
+            g.lineWidth = 7;
+            for (const [hx, hy, ph] of [[-46, 40, 0], [0, 58, 2], [46, 40, 4]]) {
+                const sway = Math.sin(s * 1.5 + ph) * 5;
+                g.beginPath();
+                g.moveTo(0, -8);
+                g.quadraticCurveTo(hx * 0.3, 20, hx + sway, hy);
+                g.stroke();
+                memMcHead(g, hx + sway, hy + 12, 30);
+            }
+        },
+    };
+
+    // A silhouette is drawn whole off to one side, then filled flat over only
+    // what was drawn, and laid on the screen: the field under it is already
+    // lit, so it cannot be filled there.
+    let memCanvas = null;
+    function memOffscreen() {
+        if (!memCanvas) memCanvas = document.createElement('canvas');
+        const c = memCanvas;
+        if (c.width !== canvas.width || c.height !== canvas.height) {
+            c.width = canvas.width; c.height = canvas.height;
+        }
+        const g = c.getContext('2d');
+        g.setTransform(c.width / LW, 0, 0, c.height / LH, 0, 0);
+        g.globalCompositeOperation = 'source-over';
+        g.globalAlpha = 1;
+        g.clearRect(0, 0, LW, LH);
+        return g;
     }

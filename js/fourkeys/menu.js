@@ -21,19 +21,20 @@
     // that can be told apart at a glance, and a town where every building reads
     // as its own place.
     const MENU_LEVELS = [
-        { n: 1, name: 'FARM', ink: '#7fa85a', cap: 'gable', pad: 'gilt', ago: 2784 },
-        { n: 2, name: 'RUINS', ink: '#b0a894', cap: 'broken', pad: 'statue', ago: 1701 },
-        { n: 3, name: 'CITY', ink: '#6f9bc4', cap: 'skyline', pad: 'frost' },
+        { n: 1, name: 'FARM', ink: '#7fa85a', cap: 'gable', pad: 'gilt', ago: 2784, title: 'Exhortation' },
+        { n: 2, name: 'RUINS', ink: '#b0a894', cap: 'broken', pad: 'statue', ago: 1701, title: 'Salvation' },
+        { n: 3, name: 'CITY', ink: '#6f9bc4', cap: 'skyline', pad: 'frost', ago: 92, title: 'Consolidation' },
         { n: 4, name: 'VOLCANO', ink: '#d2622f', cap: 'cone', pad: 'ember' }
     ];
-    const MENU_LAST = { n: 5, name: 'CASTLE', ink: '#9a7fc9', cap: 'crown', pad: 'pair', ago: 99 };
-    // `ago` is how many years before the game starts a level's memory is set;
-    // a level without one has no memory (yet). The game starts in year 0, and
+    const MENU_LAST = { n: 5, name: 'CASTLE', ink: '#9a7fc9', cap: 'crown', pad: 'pair', ago: 99, title: 'Fall' };
+    // `ago` is how many years before the game starts a level's memory is set,
+    // and `title` what the timeline calls it; a level without them has no
+    // memory (yet). The game starts in year 0, and
     // the opening is two more memories, always yours: the end of the first
     // game, 2000 years back (as its card says), and year 0 itself -- the
-    // town, which is where it takes you back to.
-    const MENU_OPENING = [{ id: 'past', year: -2000, ink: '#b8b2a8' },
-                          { id: 'now', year: 0, ink: '#f2efe9' }];
+    // town, which is where it takes you back to (menuReturn).
+    const MENU_OPENING = [{ id: 'past', year: -2000, ink: '#b8b2a8', title: 'Brandon Wins' },
+                          { id: 'now', year: 0, ink: '#f2efe9', title: 'Reprisal' }];
     // The first win anywhere, clean or not, also hands over CLASSIC. He plays
     // exactly as the paddle you started with, so there is nothing in him to
     // earn -- he is a souvenir, and the first one a player picks up.
@@ -520,6 +521,19 @@
     const ARRIVE_SETTLE = 0.4;       // the last of it, where his pace slows to a stop
 
     function menuArrive() { menuLoad(); menu.arriveT = 0; }
+    // Year 0, from MEMORIES: back to the town the way the game first brings
+    // you to it -- the buildings growing in from the horizon while he stands
+    // at home in the middle of the bottom, not up the town where the walk to
+    // MEMORIES left him. The town is as you left it, dust and all.
+    function menuReturn() {
+        menu.screen = null;
+        setHint(M_HINT);
+        paddle.x = paddle.tx = LW / 2;
+        menu.lift = 0;
+        menu.march = false;
+        menu.into = null;
+        menu.arriveT = 0;
+    }
     function menuArriving() { return menu.arriveT >= 0; }
 
     // his pace on the spot, on top of whatever walking you have him doing
@@ -1022,8 +1036,8 @@
     // still plays its level's the first time and records it.
     const MENU_MEMS_OPEN = true;
     function menuTimeline() {
-        return MENU_OPENING.map(o => ({ id: o.id, year: o.year, ink: o.ink, got: true }))
-            .concat(MENU_ALL.filter(l => l.ago).map(l => ({ id: l.n, year: -l.ago, ink: l.ink,
+        return MENU_OPENING.map(o => ({ id: o.id, year: o.year, ink: o.ink, title: o.title, got: true }))
+            .concat(MENU_ALL.filter(l => l.ago).map(l => ({ id: l.n, year: -l.ago, ink: l.ink, title: l.title,
                                                             got: MENU_MEMS_OPEN || !!menu.mems[l.n] })))
             .sort((a, b) => a.year - b.year);
     }
@@ -1091,15 +1105,15 @@
         // the room: the timeline, oldest on the left, across the whole of
         // where he can stand. Its stops are evenly spaced, not to scale --
         // there are no years on it but the memories' own -- and a memory you
-        // have not earned is a stop with no name. There is no way out but
-        // forward: year 0 is the town, so it is also the way back to it, and
-        // says so under its year.
+        // have not earned is a stop with no name. Under each is its title.
+        // There is no way out but forward: year 0 is the town, so it is also
+        // the way back to it, and says so under its title.
         const tl = menuTimeline();
         const hs = halfSpan(), step = (LW - hs * 2) / (tl.length - 1);
         return tl.map((m, i) => ({ id: 'mem' + m.id, stop: true, cx: hs + step * i, ink: m.ink,
                                    label: m.got ? menuYear(m.year) : '?',
-                                   under: m.id === 'now' ? 'BACK' : null,
-                                   act: !m.got ? null : m.id === 'now' ? menuLeave
+                                   under: !m.got ? [] : m.id === 'now' ? [m.title, 'BACK'] : [m.title],
+                                   act: !m.got ? null : m.id === 'now' ? menuReturn
                                                       : () => menuShow('memory', m.id) }));
     }
 
@@ -1117,6 +1131,7 @@
     const M_TL_Y = 350;              // the line
     const M_STOP_R = 7;              // a stop's dot
     const M_UNDER = 32;              // baseline of what a stop says under itself, off the line
+    const M_UNDER_STEP = 17;         // ...and each line after the first, further down
 
     function menuDrawTimeline(stops) {
         const x0 = stops[0].cx - 30, x1 = stops[stops.length - 1].cx + 30;
@@ -1161,7 +1176,7 @@
         const ink = on ? (c.act ? '#f2efe9' : '#6d685f') : (c.act ? c.ink : '#4a453d');
         if (c.act) text('YEAR', c.cx, M_TL_Y - 44, 11, ink, 'center');
         text(c.label, c.cx, M_TL_Y - 24, on ? 19 : 16, ink, 'center');
-        if (c.under) text(c.under, c.cx, M_TL_Y + M_UNDER, 13, ink, 'center');
+        c.under.forEach((line, i) => text(line, c.cx, M_TL_Y + M_UNDER + i * M_UNDER_STEP, 13, ink, 'center'));
     }
 
     function menuScreenDraw() {
@@ -1200,7 +1215,8 @@
         ctx.beginPath();
         ctx.moveTo(paddle.x, PADDLE_Y - padH() / 2 - 8);
         ctx.lineTo(lit.cx, !lit.stop ? M_CHOICE_Y + M_CHOICE_H / 2 + 8
-                         : lit.under ? M_TL_Y + M_UNDER + 8 : M_TL_Y + M_STOP_R * 1.6 + 8);
+                         : lit.under.length ? M_TL_Y + M_UNDER + (lit.under.length - 1) * M_UNDER_STEP + 8
+                         : M_TL_Y + M_STOP_R * 1.6 + 8);
         ctx.stroke();
         ctx.setLineDash([]);
         ctx.globalAlpha = 1;
