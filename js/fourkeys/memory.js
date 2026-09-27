@@ -574,8 +574,8 @@
         ctx.restore();
     }
 
-    // HIM -- the one who stood by the Angel: clay all over, his own head
-    // included, and lit from inside. His light is a glow that breathes, two
+    // HIM -- the one who stood by the Angel: made of the bricks' colours, his
+    // own head included, and lit from inside. His light is a glow that breathes, two
     // fans of rays turning against each other, and motes rising through it;
     // `aura` is how much of it there is, 1 his own and more for a swell. Over
     // it, his look (HIS LOOK, below): the wheel, the army he is made of, the
@@ -743,8 +743,9 @@
     // ---- HIS LOOK ---------------------------------------------------------------------
     // Tuned in the character lab (.claude/brandon-characters.html, ALLFATHER).
     // Over his own light, a wheel of Brandons pointing out from behind him like
-    // rays, faint; his body is his army, little Brandons in ranks hopping, a
-    // cheer running up him, rimmed in his light; out of his head a tree that
+    // rays, faint; his body is his army, little Brandons in the bricks' four
+    // colours in ranks hopping, a cheer running up him, rimmed in his light;
+    // out of his head a tree of the same colours that
     // never stops growing and never stops breaking; and two birds of three
     // Brandons going round the tree. Wheel, tree and birds are a backdrop,
     // washed and faded so he stands clear of them. Every branch is a Brandon; it grows out, then puts out two
@@ -760,13 +761,12 @@
     const MO_SUN_FADE = 0.55;        // how much of the wheel shows
     const MO_GLOW = '#ffd98a';
     const MO_TREE_DEPTH = 3, MO_TREE_SPREAD = 23, MO_TREE_SHRINK = 0.74, MO_TREE_FIRST = 0.27;
-    const MO_TREE_INKS = ['#b87c5e', '#c48a6c', '#cf9a78', '#d9aa84', '#e2ba8e'];   // clay, lighter toward the tips
+    const MO_INKS = ['#9e4b3c', '#bd7f3f', '#6f7f4e', '#c9a94e'];   // the four colours of the bricks (the engine's TIERS)
     const MO_TREE_BREAK = 0.1;       // chance a second that a branch snaps
     const MO_TREE_GROW = 2.5;        // seconds a branch takes to grow out
     const MO_TREE_FALL = 900;        // px/s² a broken piece falls at, for him 450 tall
     const MO_TREE_READY = 8;         // seconds of growing done before he is first seen
-    const MO_LEAF = '#c9a94e';
-    const MO_ARMY_SIZE = 0.1;        // one of his army's height, as a share of his
+    const MO_ARMY_SIZE = 0.12;       // one of his army's height, as a share of his
     const MO_ARMY_WAVE = 4;          // seconds between cheers
     const MO_BIRD = '#4f8f80', MO_BIRD_EDGE = '#c9a94e';   // old bronze gone green, edged in his gold
     const MO_BIRD_ROUND = 8;         // seconds for a bird to go round his tree
@@ -817,8 +817,11 @@
         if (!moArmyAt) {
             moArmyAt = [];
             const du = MO_ARMY_SIZE * 0.5, dv = MO_ARMY_SIZE * 1.15;
-            for (let r = 0, u = 0.02; u < 1; u += du, r++)
-                for (let v = (r % 2) * dv / 2; v < 1 + dv / 2; v += dv) moArmyAt.push({ u, v, seed: memLabHash(moArmyAt.length + 900) });
+            // the first rank half a rank under his boots, so his feet are filled too
+            for (let r = 0, u = 0.02 - du; u < 1; u += du, r++)
+                for (let v = (r % 2) * dv / 2; v < 1 + dv / 2; v += dv)
+                    moArmyAt.push({ u, v, seed: memLabHash(moArmyAt.length + 900),
+                                    ink: MO_INKS[Math.floor(memLabHash(moArmyAt.length + 1300) * MO_INKS.length)] });
             // the ranks highest up him are the furthest back
             moArmyAt.sort((p, q) => q.u - p.u);
         }
@@ -832,14 +835,14 @@
         g.globalAlpha = 1;
         g.clearRect(0, 0, moArmyCanvas.width, moArmyCanvas.height);
         g.setTransform(MO_ARMY_RES, 0, 0, MO_ARMY_RES, 0, 0);
-        const hL = MO_ARMY_SIZE * o.L, img = memFlesh(MEM_CLAY), lit = memFlesh('#f3cf86');
+        const hL = MO_ARMY_SIZE * o.L, lit = memFlesh('#f3cf86');
         const wave = (o.s / MO_ARMY_WAVE) % 1.6 - 0.3;
         for (const p of moArmyAt) {
             const [fx, fy] = memOnBody(o.x, o.cy, o.L, 0, p.u, p.v);
             const cheer = Math.exp(-((p.u - wave) ** 2) / 0.004);
             const hop = hL * (0.08 * Math.max(0, Math.sin(2 * Math.PI * (o.s / (0.7 + 0.5 * p.seed) + p.seed))) + 0.4 * cheer);
             const y = fy - hop - hL / 2;
-            memBone(g, img, fx, y, hL, -Math.PI / 2, p.seed > 0.5);
+            memBone(g, memBrick(p.ink), fx, y, hL, -Math.PI / 2, p.seed > 0.5);
             if (cheer > 0.02) {
                 g.globalAlpha = cheer;
                 memBone(g, lit, fx, y, hL, -Math.PI / 2, p.seed > 0.5);
@@ -850,7 +853,7 @@
         memBody(g, memFlesh(MEM_CLAY), o.x, o.cy, o.L);
         ctx.save();
         ctx.globalAlpha *= 0.28;
-        memBody(ctx, memFlesh(MEM_CLAY), o.x, o.cy, o.L);
+        memBody(ctx, memBrick(MO_INKS[3]), o.x, o.cy, o.L);
         ctx.restore();
         ctx.drawImage(moArmyCanvas, 0, 0, LW, LH);
     }
@@ -870,15 +873,16 @@
     // one step of `dt`: grow, maybe snap, and draw if `draw`; `all` snaps every branch he has
     function moGroveStep(g, o, dt, draw, all) {
         const snap = all ? 1 : 1 - Math.exp(-MO_TREE_BREAK * dt), deepest = MO_TREE_DEPTH - 1;
-        const leaf = memBrick(MO_LEAF), ll = o.L * 0.05;
+        const ll = o.L * 0.05;
         // a branch where it is now, and its leaves: [img, x, y, len, a, flip] each
         const pieces = (n, x, y, a, out) => {
             const len = n.len * o.L, ex = x + Math.cos(a) * len, ey = y + Math.sin(a) * len;
-            out.push([memFlesh(MO_TREE_INKS[n.depth]), (x + ex) / 2, (y + ey) / 2, len * 1.1, a, n.seed > 0.5]);
+            out.push([memBrick(MO_INKS[Math.floor(n.seed * MO_INKS.length)]), (x + ex) / 2, (y + ey) / 2, len * 1.1, a, n.seed > 0.5]);
             if (n.depth === deepest && n.len >= n.target)
                 for (let j = 0; j < 3; j++) {
                     const la = a + (j - 1) * 0.9 + Math.sin(o.s * 2.2 + n.seed * 9 + j) * 0.25;
-                    out.push([leaf, ex + Math.cos(la) * ll * 0.5, ey + Math.sin(la) * ll * 0.5, ll, la, j % 2]);
+                    out.push([memBrick(MO_INKS[Math.floor(memLabHash(n.seed * 97 + j) * MO_INKS.length)]),
+                              ex + Math.cos(la) * ll * 0.5, ey + Math.sin(la) * ll * 0.5, ll, la, j % 2]);
                 }
             return [ex, ey];
         };
