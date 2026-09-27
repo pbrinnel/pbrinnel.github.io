@@ -111,10 +111,12 @@
 
     // An ordinary stage has its bricks in. An open field has them taken away
     // again, and then the mini-boss comes on -- or does not, if it cannot ride
-    // what is left (a mole needs a wall to hide in).
+    // what is left (a mole needs a wall to hide in). A level's own screen can
+    // name its rider (levels.js); otherwise it is whoever the lab picked.
     function labMiniStart() {
         if (LAB.open) bricks = [];
-        labM = (LAB.mini && LAB_MINI[LAB.mini]) || null;
+        const who = (LEVELS[stage] && LEVELS[stage].mini) || LAB.mini;
+        labM = (who && LAB_MINI[who]) || null;
         if (labM && !labM.start()) labM = null;
     }
 

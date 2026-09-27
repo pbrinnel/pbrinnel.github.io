@@ -144,8 +144,9 @@
 
     // ---- what the debug menu reaches in through ---------------------------------------
     // Everything the town knows about you is in `menu`, and `menu` is this
-    // file's. These five are the whole of the way in, so nothing else has to
-    // know how progress is stored or that it is saved at all.
+    // file's. These five, and menuSkip/menuSkipName for the level you are in,
+    // are the whole of the way in, so nothing else has to know how progress
+    // is stored or that it is saved at all.
     function menuLevels() { menuLoad(); return MENU_ALL; }
     function menuMemories() { menuLoad(); return MENU_MEMS; }
     function menuPads() { menuLoad(); return MENU_PADS; }
@@ -423,9 +424,9 @@
         ctx.restore();
     }
 
-    // Into a level. There are no levels yet, so the prototype hands you that
-    // level's boss and remembers which one, and menuWatch keeps an eye on
-    // whether you had to buy it back.
+    // Into a level: its screens, the boss last (levels.js), or where there
+    // are none -- the VOID, or the boss lab, which has no levels.js -- just
+    // the boss. menuWatch keeps an eye on whether you had to buy it back.
     function menuEnter(level) {
         menuLoad();
         if (level.key === 'board') {
@@ -447,7 +448,10 @@
         menu.march = false;
         LAB.mini = null;
         setHint(HINT_PLAY);
-        LAB.fight(boss);
+        if (typeof levelsUse === 'function' && levelsUse(level.n)) {
+            LAB.boss = boss;
+            LAB.stageAt(0, false);
+        } else LAB.fight(boss);
     }
 
     // A head went off the bottom. True means it cost nothing: there is nothing
@@ -482,6 +486,8 @@
             else { menuQuit(); return; }
         }
         if (phase !== 'ascend' && phase !== 'cleared') return;
+        // any screen but a level's last is cleared on the way to the next
+        if (stage < LEVELS.length - 1) return;
         if ((run.out += dt) < M_OUT) return;
         menu.run = null;
         menuBeat(!run.cont, run.n);
@@ -504,6 +510,28 @@
         const run = menu && menu.run;
         if (run) menuBeat(!run.cont, run.n);
         menuOpen();
+    }
+
+    // The debug menu's win button. The screen you are on counts as beaten: a
+    // level's last is won outright, as though the takeover had played out,
+    // and any other goes straight on to the next with no STAGE CLEAR.
+    // Coming off the CONTINUE screen this way is not a continue.
+    function menuSkip() {
+        if (!menu || !menu.run) return false;
+        menu.run.over = false;
+        showCursor(false);
+        if (stage >= LEVELS.length - 1) { menuWon(); return true; }
+        stage++;
+        buildStage(stage);
+        banner = '';
+        return true;
+    }
+
+    // what that button would beat, or null outside a level
+    function menuSkipName() {
+        if (!menu || !menu.run) return null;
+        const l = LEVELS[stage];
+        return l.boss ? menuName(menu.run.n) + ' BOSS' : l.dbg;
     }
 
     // a level finished: the key always, the paddle only if you never continued
@@ -545,6 +573,7 @@
     function menuOpen() {
         menuLoad();
         menu.run = null;
+        if (typeof levelsUse === 'function') levelsUse();    // the town stands on the engine's own
         LAB.boss = null;
         LAB.mini = 'menu';
         LAB.stageAt(0, true);

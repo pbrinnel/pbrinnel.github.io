@@ -1365,17 +1365,21 @@
             return;
         }
 
-        const cols = lvl.rows[0].length;
+        // a row starting '>' is set half a brick over (see levels.js), so
+        // the widest row without one is what the bricks are sized to
+        const cols = Math.max(...lvl.rows.filter(row => row[0] !== '>').map(row => row.length));
         bw = (LW - MARGIN * 2 - GAP * (cols - 1)) / cols;
         bh = bw / SHAPE_ASPECT;
 
         bricks = [];
         lvl.rows.forEach((row, r) => {
+            const half = row[0] === '>';
+            if (half) row = row.slice(1);
             for (let c = 0; c < cols; c++) {
                 const ch = row[c];
                 if (!ch || ch === '.') continue;
                 const hp = ch === 'S' ? lvl.silverHp : ch === 'A' ? GOLD_HP : 1;
-                bricks.push(newBrick(MARGIN + c * (bw + GAP), TOP + r * (bh + GAP), ch, hp));
+                bricks.push(newBrick(MARGIN + (c + (half ? 0.5 : 0)) * (bw + GAP), TOP + r * (bh + GAP), ch, hp));
             }
         });
         labMiniStart();
@@ -1664,8 +1668,10 @@
 
     function resetBall() {
         // the one thing that made every stage feel identical: this used to be
-        // a flat BASE_SPEED, so stage five opened exactly as slow as stage one
-        speed = BASE_SPEED * (1 + 0.08 * stage);
+        // a flat BASE_SPEED, so stage five opened exactly as slow as stage one.
+        // A level's screens say their own place on that ladder (see levels.js).
+        const pace = LEVELS[stage] && LEVELS[stage].pace !== undefined ? LEVELS[stage].pace : stage;
+        speed = BASE_SPEED * (1 + 0.08 * pace);
         clearEffects();
         combo = 0;
         const b = newBall(paddle.x, padY() - padH() / 2 - bRY() - 2);

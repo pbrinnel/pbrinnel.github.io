@@ -38,12 +38,13 @@ touches it.
   and its `BEST_KEY` is its own — nothing it does can reach brandon's live leaderboard.
 - Its code is in `js/fourkeys/`: `engine.js` (brandon.html's game, forked 22 Sep 2026 and
   edited here from now on), `runtime.js` (the seam the bosses plug into), a file per boss,
-  mini-boss and paddle, `menu.js` (the town), `debug.js` (what the konami code and
+  mini-boss and paddle, `levels.js` (each level's three screens: a wall, a bigger
+  wall with a mini-boss on it, then the boss), `menu.js` (the town), `debug.js` (what the konami code and
   `?debug` open: the keys, the paddles, and a hold to forget it all), `intro.js` (the
   BRANDON WINS and 2000 YEARS LATER cards before the town), `memory.js` (the cutscene a
   level's first win plays and MEMORIES replays), and `start.js`, which is where the game
   begins.
-- The boss lab builds from these files but not from `intro.js` or `debug.js`, and it runs
+- The boss lab builds from these files but not from `intro.js`, `debug.js` or `levels.js`, and it runs
   brandon.html's engine. It does build `memory.js`, for the VOID's end (Odin, and his
   voice). So a module that calls something only fourkeys has must check it with `typeof`
   first, and a new top-level name must not already be used in

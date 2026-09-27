@@ -3,11 +3,12 @@
     // ---- FOUR KEYS: the debug menu ---------------------------------------------------
     // What the konami code opens, and fourkeys.html?debug on a phone. The town
     // is the whole of the game's progress, so this is the whole of the cheat
-    // menu: hand yourself a key, a paddle or a memory, or put it all back.
+    // menu: hand yourself a key, a paddle or a memory, or put it all back --
+    // and, inside a level, skip the screen you are on.
     //
     // It reaches the town through menuLevels/menuPads/menuMemories/menuHas/
-    // menuSet and nothing else, so it never has to know where any of it is
-    // kept.
+    // menuSet/menuSkip/menuSkipName and nothing else, so it never has to know
+    // where any of it is kept.
     //
     // engine.js owns the panel itself -- the konami code, the escape key, the
     // ?debug in the address -- and calls debugBuild() once at setup and
@@ -26,6 +27,20 @@
         const el = document.getElementById('debug');
         if (!el) return;
         el.querySelector('h2').textContent = 'FOUR KEYS';
+
+        // Inside a level, a way past the screen you are on, to get at the
+        // next without playing this one. It says which screen it would beat,
+        // and is not there in the town.
+        const win = document.createElement('button');
+        win.addEventListener('click', () => {
+            if (menuSkip()) debugEl.hidden = true;
+        });
+        el.appendChild(win);
+        dbgSync.push(() => {
+            const name = menuSkipName();
+            win.hidden = !name;
+            win.textContent = 'win ' + (name || '');
+        });
 
         // a column each, side by side: stacked they stood taller than a screen
         const cols = document.createElement('div');
