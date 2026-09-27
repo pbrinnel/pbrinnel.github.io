@@ -61,7 +61,7 @@
     // fall out of step with the first.
     const MENU_BOSSES = { windmill: 'WM_LVL', idol: 'IDOL_LVL', twins: 'TW_LVL',
                           lamps: 'LAMP_LVL', gleeok: 'GL_LVL', headless: 'HL_LVL',
-                          agahnim: 'AG_LVL', dodongo: 'DOD_LVL' };
+                          agahnim: 'AG_LVL', dodongo: 'DOD_LVL', lucifer: 'LU_LVL' };
     const MENU_ALL = MENU_LEVELS.concat([MENU_LAST, MENU_VOID]);
     const MENU_KEY = 'brandon-metalab.progress';
     // the line under the field: in the town there is nothing to serve
