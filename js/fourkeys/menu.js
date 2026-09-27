@@ -488,6 +488,14 @@
         menuOpen();
     }
 
+    // A boss that ends his level himself, rather than through the takeover (the
+    // VOID's): what you earned, and back to the town.
+    function menuWon() {
+        const run = menu && menu.run;
+        if (run) menuBeat(!run.cont, run.n);
+        menuOpen();
+    }
+
     // a level finished: the key always, the paddle only if you never continued
     function menuBeat(clean, n) {
         menuLoad();
@@ -784,6 +792,7 @@
     // itself -- no title, no rules, no instructions; the buildings and the
     // gates are the whole of it.
     function labDrawTop() {
+        if (labB && labB.drawTop) labB.drawTop();     // a boss's own end, over everything
         if (!menuUp()) return;
         if (menuUnlockDraw()) return;
         if (menuScreenDraw()) return;

@@ -185,6 +185,9 @@
     // the hub has no ball in it: he carries his head, and nothing is served
     function labSkipBall(b) { return menuUp() || !!(labB && labB.skipBall && labB.skipBall(b)); }
     function labBallR(b) { return labB && labB.ballR ? labB.ballR(b) : bRX(); }
+    // how far he is lifted and turned: walking up the town, or stood up by a boss
+    function labLift() { return menuLift() + (labB && labB.lift ? labB.lift() : 0); }
+    function labRock(i) { return menuRock(i) + (labB && labB.rock ? labB.rock(i) : 0); }
     // how long this boss takes to arrive: his own, or the original's
     function labEnterSecs() { return labB && labB.enterSecs ? labB.enterSecs() : ENTER_SECS; }
 

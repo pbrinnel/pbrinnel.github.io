@@ -43,9 +43,10 @@ touches it.
   BRANDON WINS and 2000 YEARS LATER cards before the town), `memory.js` (the cutscene a
   level's first win plays and MEMORIES replays), and `start.js`, which is where the game
   begins.
-- The boss lab builds from these files but not from `intro.js`, `debug.js` or `memory.js`,
-  and it runs brandon.html's engine. So a module that calls something only fourkeys has
-  must check it with `typeof` first, and a new top-level name must not already be used in
+- The boss lab builds from these files but not from `intro.js` or `debug.js`, and it runs
+  brandon.html's engine. It does build `memory.js`, for the VOID's end (Odin, and his
+  voice). So a module that calls something only fourkeys has must check it with `typeof`
+  first, and a new top-level name must not already be used in
   brandon.html (the lab refuses a name declared twice). Where the lab needs an engine
   change of fourkeys', the build lifts it out of `engine.js` rather than copying it (the
   paddle split, `spread()`..`halfSpan()`, is the first).

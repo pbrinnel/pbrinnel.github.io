@@ -60,7 +60,8 @@
         deckAtW = -1;                 // his flat may be a different width now
         padBits = [];
     }
-    const labPadW     = () => labP && labP.len ? labP.len() : 1;
+    // a boss may grow you too: the VOID's end stands you up to Odin's height
+    const labPadW     = () => (labP && labP.len ? labP.len() : 1) * (labB && labB.padGrow ? labB.padGrow() : 1);
     const labPadAngle = () => labP && labP.angle ? labP.angle() : 1;
     const labPadEdge  = () => labP && labP.edge ? labP.edge() : 1;
     const labPadSwipe = () => labP && labP.swipe ? labP.swipe() : 1;
@@ -100,8 +101,16 @@
         padBits = padBits.filter(b => b.t < b.life);
     }
 
-    function labPadUnder() { if (labP && labP.under) labP.under(); }
-    function labPadSkin(sg, o) { if (labP && labP.skin) labP.skin(sg, o); }
+    // A boss may fade all of you (padAlpha, set here and put back at the end of
+    // labPadOver) and lay a skin over whatever you are holding (padSkin).
+    function labPadUnder() {
+        if (labB && labB.padAlpha) ctx.globalAlpha = labB.padAlpha();
+        if (labP && labP.under) labP.under();
+    }
+    function labPadSkin(sg, o) {
+        if (labP && labP.skin) labP.skin(sg, o);
+        if (labB && labB.padSkin) labB.padSkin(sg, o);
+    }
     function labPadOver() {
         if (labP && labP.over) labP.over();
         for (const b of padBits) {

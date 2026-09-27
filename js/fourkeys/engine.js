@@ -79,7 +79,7 @@
     const CLIMB_RISE = 150;
     const CLIMB_GROW = 0.5;
     const CLIMB_EASE = 0.8;     // seconds to catch up, near enough
-    const padY = () => PADDLE_Y - CLIMB_RISE * climb - menuLift();
+    const padY = () => PADDLE_Y - CLIMB_RISE * climb - labLift();
 
     // A head that has got below his top near one end, still coming down, makes
     // that end dip toward it -- DIP_MAX straight away, most of the way there in
@@ -1181,7 +1181,7 @@
     }
     function segWig(i) {
         const a = wigAmp();
-        return (a ? Math.sin(clock * WIG_FREQ * (1 + i * 0.13) + i * 2.3) * a : 0) + menuRock(i);
+        return (a ? Math.sin(clock * WIG_FREQ * (1 + i * 0.13) + i * 2.3) * a : 0) + labRock(i);
     }
 
     function effSpeed() { return speed * (fx.S > 0 ? SLOW_MUL : 1); }
