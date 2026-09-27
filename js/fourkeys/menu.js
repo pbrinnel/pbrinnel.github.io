@@ -10,7 +10,7 @@
     //   four keys open the CASTLE
     //   finish a level without using a continue and you keep the paddle it guarded
     //   win any level at all and CLASSIC, the first game's paddle, is yours
-    //   the first win on each level plays its memory, kept in MEMORIES to watch again
+    //   each level you win for the first time plays the next memory, kept in MEMORIES
     //   win the CASTLE and the VOID stands in the way to it
     //
     // The five are laid out as a town: the FARM and the RUINS out on the left,
@@ -22,12 +22,12 @@
     // that can be told apart at a glance, and a town where every building reads
     // as its own place.
     const MENU_LEVELS = [
-        { n: 1, name: 'FARM', ink: '#7fa85a', cap: 'gable', pad: 'gilt', mem: 'exhortation' },
-        { n: 2, name: 'RUINS', ink: '#b0a894', cap: 'broken', pad: 'statue', mem: 'salvation' },
-        { n: 3, name: 'CITY', ink: '#6f9bc4', cap: 'skyline', pad: 'frost', mem: 'consolidation' },
+        { n: 1, name: 'FARM', ink: '#7fa85a', cap: 'gable', pad: 'gilt' },
+        { n: 2, name: 'RUINS', ink: '#b0a894', cap: 'broken', pad: 'statue' },
+        { n: 3, name: 'CITY', ink: '#6f9bc4', cap: 'skyline', pad: 'frost' },
         { n: 4, name: 'VOLCANO', ink: '#d2622f', cap: 'cone', pad: 'ember' }
     ];
-    const MENU_LAST = { n: 5, name: 'CASTLE', ink: '#9a7fc9', cap: 'crown', pad: 'pair', mem: 'fall' };
+    const MENU_LAST = { n: 5, name: 'CASTLE', ink: '#9a7fc9', cap: 'crown', pad: 'pair' };
     // The finale, which is not there at all until the CASTLE has been won
     // (`after`). It stands in the middle of the CASTLE's own lane, so once it
     // is up the CASTLE is only reached by walking round it. It guards no
@@ -35,14 +35,10 @@
     // there, and then it is behind you. Being new it is never dusty, and it
     // is no building at all but a hole turning in the town (menuDrawVoid).
     const MENU_VOID = { n: 6, name: 'VOID', ink: '#dcd6ee', after: 5 };
-    // `mem` is the memory a level's first win plays (MENU_MEMS); a level
-    // without one plays none.
-    //
     // Every memory, by the year it is set in: the game starts in year 0. Each
     // is named on the timeline by its year and its title, in its own colour.
     // Year 0 itself -- the town, which is where it takes you back to
-    // (menuReturn) -- is always there; the rest belong to a level, or to
-    // nothing yet.
+    // (menuReturn) -- is always there; the rest are earned in MENU_MEM_ORDER.
     const MENU_MEMS = [
         { id: 'exhortation', year: -2784, title: 'Exhortation', ink: '#7fa85a' },
         { id: 'salvation', year: -1701, title: 'Salvation', ink: '#b0a894' },
@@ -52,6 +48,10 @@
         { id: 'consolidation', year: -92, title: 'Consolidation', ink: '#6f9bc4' },
         { id: 'now', year: 0, title: 'Reprisal', ink: '#f2efe9', always: true },
     ];
+    // The order memories are earned in, one for each level won the first
+    // time, whichever level it is. Not the timeline's order: the story is
+    // told out of sequence, and the gaps it leaves are where the rest go.
+    const MENU_MEM_ORDER = ['exhortation', 'consolidation', 'cycle', 'salvation', 'counsel', 'fall'];
     // The first win anywhere, clean or not, also hands over CLASSIC. He plays
     // exactly as the paddle you started with, so there is nothing in him to
     // earn -- he is a souvenir, and the first one a player picks up.
@@ -488,6 +488,16 @@
         menuOpen();
     }
 
+    // The first memory in MENU_MEM_ORDER not yet earned, earned and queued
+    // to play. The debug menu can hand them over out of order, so it is the
+    // first missing one, not the next after a count.
+    function menuNextMemory() {
+        const id = MENU_MEM_ORDER.find(k => !menu.mems[k]);
+        if (!id) return;
+        menu.mems[id] = true;
+        menu.shows.push({ mem: id });
+    }
+
     // A boss that ends his level himself, rather than through the takeover (the
     // VOID's): what you earned, and back to the town.
     function menuWon() {
@@ -502,19 +512,18 @@
         const which = n || menu.sel || 1;
         const level = MENU_ALL.find(l => l.n === which);
         if (!level) return false;
-        if (level === MENU_VOID) return true;       // nothing of it is kept
+        // nothing of it is kept but a memory, and it can only be the sixth
+        // level won, so a win there earns whichever is still left
+        if (level === MENU_VOID) { menuNextMemory(); menuSave(); return true; }
         const first = !menu.keys[level.n];
         menu.keys[level.n] = true;
         // still kept, though the hub no longer shows it: the boards live
         // somewhere else
         menu.best[level.n] = Math.max(menu.best[level.n] || 0, score || 0);
         let got = level.name + (first ? ' · A KEY' : ' · DONE AGAIN');
-        // its memory plays the first time only, before any paddle is shown:
-        // after that it is in MEMORIES
-        if (level.mem && !menu.mems[level.mem]) {
-            menu.mems[level.mem] = true;
-            menu.shows.push({ mem: level.mem });
-        }
+        // a new level's memory plays before any paddle is shown: after that
+        // it is in MEMORIES
+        if (first) menuNextMemory();
         if (clean && !menu.pads[level.pad]) {
             menu.pads[level.pad] = true;
             menu.shows.push({ pad: level.pad });
@@ -1157,12 +1166,9 @@
         ctx.globalAlpha = 1;
     }
 
-    // Every memory, oldest first. Until how they are earned is decided,
-    // every one is open (MENU_MEMS_OPEN); a win still plays its level's the
-    // first time and records it.
-    const MENU_MEMS_OPEN = true;
+    // Every memory, oldest first, and whether it has been earned
     function menuTimeline() {
-        return MENU_MEMS.map(m => Object.assign({}, m, { got: m.always || MENU_MEMS_OPEN || !!menu.mems[m.id] }))
+        return MENU_MEMS.map(m => Object.assign({}, m, { got: m.always || !!menu.mems[m.id] }))
             .sort((a, b) => a.year - b.year);
     }
     const menuYear = y => (y < 0 ? '\u2212' + -y : '' + y);
@@ -1228,17 +1234,18 @@
         }
         // the room: the timeline, oldest on the left, across the whole of
         // where he can stand. Its stops are evenly spaced, not to scale --
-        // there are no years on it but the memories' own -- and a memory you
-        // have not earned is a stop with no name. Under each is its title.
+        // there are no years on it but the memories' own. A memory you have
+        // not earned is not on it at all, but its place is kept empty, so
+        // the gaps hint at what is still to come. Under each is its title.
         // There is no way out but forward: year 0 is the town, so it is also
         // the way back to it, and says so under its title.
         const tl = menuTimeline();
         const hs = halfSpan(), step = (LW - hs * 2) / (tl.length - 1);
-        return tl.map((m, i) => ({ id: 'mem' + m.id, stop: true, cx: hs + step * i, ink: m.ink,
-                                   label: m.got ? menuYear(m.year) : '?',
-                                   under: !m.got ? [] : m.id === 'now' ? [m.title, 'BACK'] : [m.title],
-                                   act: !m.got ? null : m.id === 'now' ? menuReturn
-                                                      : () => menuShow('memory', m.id) }));
+        return tl.map((m, i) => ({ id: 'mem' + m.id, stop: true, cx: hs + step * i, ink: m.ink, got: m.got,
+                                   label: menuYear(m.year),
+                                   under: m.id === 'now' ? [m.title, 'BACK'] : [m.title],
+                                   act: m.id === 'now' ? menuReturn : () => menuShow('memory', m.id) }))
+            .filter(c => c.got);
     }
 
     // the one nearest him
@@ -1249,7 +1256,8 @@
     }
 
     // The timeline: one line, oldest at the left, running on past the last
-    // stop to an arrowhead so it reads as time going somewhere. Each stop is
+    // stop to an arrowhead so it reads as time going somewhere. It spans
+    // every stop's place, earned or not, so it never grows. Each stop is
     // a dot with its year over it, and anything more it has to say under it;
     // the lit one is bigger and ringed.
     const M_TL_Y = 350;              // the line
@@ -1258,8 +1266,8 @@
     const M_UNDER_STEP = 14;         // ...and each line after the first, further down
     const M_UNDER_PX = 11;           // the size of what a stop says under itself
 
-    function menuDrawTimeline(stops) {
-        const x0 = stops[0].cx - 30, x1 = stops[stops.length - 1].cx + 30;
+    function menuDrawTimeline() {
+        const x0 = halfSpan() - 30, x1 = LW - halfSpan() + 30;
         ctx.strokeStyle = '#4a453d';
         ctx.fillStyle = '#4a453d';
         ctx.lineWidth = 2;
@@ -1279,27 +1287,19 @@
         const r = on ? M_STOP_R * 1.6 : M_STOP_R;
         ctx.beginPath();
         ctx.arc(c.cx, M_TL_Y, r, 0, 2 * Math.PI);
-        if (c.act) {
-            ctx.fillStyle = c.ink;
-            ctx.globalAlpha = on && menu.press === c.id ? 0.6 : 1;
-            ctx.fill();
-            ctx.globalAlpha = 1;
-        } else {
-            ctx.fillStyle = '#000';
-            ctx.fill();
-            ctx.strokeStyle = on ? '#6d685f' : '#4a453d';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-        }
+        ctx.fillStyle = c.ink;
+        ctx.globalAlpha = on && menu.press === c.id ? 0.6 : 1;
+        ctx.fill();
+        ctx.globalAlpha = 1;
         if (on) {
             ctx.beginPath();
             ctx.arc(c.cx, M_TL_Y, r + 5, 0, 2 * Math.PI);
-            ctx.strokeStyle = c.act ? c.ink : '#6d685f';
+            ctx.strokeStyle = c.ink;
             ctx.lineWidth = 1.5;
             ctx.stroke();
         }
-        const ink = on ? (c.act ? '#f2efe9' : '#6d685f') : (c.act ? c.ink : '#4a453d');
-        if (c.act) text('YEAR', c.cx, M_TL_Y - 44, 11, ink, 'center');
+        const ink = on ? '#f2efe9' : c.ink;
+        text('YEAR', c.cx, M_TL_Y - 44, 11, ink, 'center');
         text(c.label, c.cx, M_TL_Y - 24, on ? 19 : 16, ink, 'center');
         c.under.forEach((line, i) => text(line, c.cx, M_TL_Y + M_UNDER + i * M_UNDER_STEP, M_UNDER_PX, ink,
                                           'center'));
@@ -1318,7 +1318,7 @@
         const lit = menuChoiceAt(paddle.x);
         const choices = menuChoices();
         const stops = choices.filter(c => c.stop);
-        if (stops.length) menuDrawTimeline(stops);
+        if (stops.length) menuDrawTimeline();
         for (const c of choices) {
             const on = c === lit || c.id === lit.id;
             if (c.stop) { menuDrawStop(c, on); continue; }
