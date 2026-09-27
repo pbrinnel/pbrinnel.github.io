@@ -1016,7 +1016,17 @@
     // shows, 0 to 1 -- nearly always none.
     const MS_INK = '#5b4f96';
     const MS_BEAT = 1.7;             // seconds, one heartbeat (two thumps)
-    const MS_STRINGS = [[0.95, 0.2], [0.72, 0.1], [0.72, 0.9], [0.45, 0.5], [0.05, 0.4]];
+
+    // What he hangs from, tuned in the character lab (WISPS): not strings but
+    // pale fume coming down out of the dark and sinking into him where a
+    // puppet's strings would tie, so it could be his stench, or a spirit
+    // feeding him, or whoever works him from above. It never shows a source:
+    // each wisp gathers out of nothing and comes down in beads.
+    const MS_STRINGS = [[0.95, 0.2], [0.72, 0.1], [0.72, 0.9], [0.45, 0.5], [0.05, 0.4]];   // (u, v) on him: head, hands, middle, feet
+    const MS_WISP_BITS = 70;         // puffs per wisp
+    const MS_WISP_TAUT = 0.35;       // 0 = smoke curling into him, 1 = drawn tight as a line
+    const MS_WISP_SINK = 5;          // seconds for a wisp to come down out of the dark into him
+    const MS_WISP_ROOT = 0.1;        // how far up a wisp its root reaches, 0..1
     const memMenace = () => memSprite('menace', (g, w, h) => {
         g.drawImage(memFlesh(MS_INK), 0, 0);
         g.globalCompositeOperation = 'source-atop';
@@ -1180,6 +1190,38 @@
         });
     }
 
+    // Each wisp is puffs coming down a path into him from a point above his
+    // head that the path never visibly leaves. The whole wisp goes behind him,
+    // and `front` draws just its root again over him, so it sinks into his
+    // body without a column of smoke running down across his front.
+    function memSurtrWisps(x, cy, L, s, topY, seen, front) {
+        const taut = MS_WISP_TAUT, loose = 1 - taut;
+        const puff = memBlob('rgba(196,188,214,1)');
+        ctx.save();
+        const base = ctx.globalAlpha * seen;
+        MS_STRINGS.forEach(([u, v], k) => {
+            const [px, py] = memOnBody(x, cy, L, 0, u, v);
+            const tx = px + (u - 0.5) * 30;
+            for (let j = 0; j < MS_WISP_BITS; j++) {
+                // how far up the path, 1 at the top: it falls, so each puff comes down to him
+                const w = 1 - (s / (MS_WISP_SINK * (0.8 + 0.4 * memHash(k * 97 + j + 500))) + memHash(k * 97 + j)) % 1;
+                if (front && w > MS_WISP_ROOT) continue;
+                const wander = (Math.sin(w * 6 + s * 0.8 + k * 2.1) * L * 0.06
+                              + Math.sin(w * 14 - s * 1.7 + k) * L * 0.02) * loose * w;
+                const jitter = (memHash(k * 97 + j + 300) - 0.5) * L * 0.02 * (0.4 + loose);
+                const wx = px + (tx - px) * w + wander + jitter * (1 - w * 0.5);
+                const wy = py + (topY - py) * w;
+                const size = L * (0.014 + 0.08 * w * loose + 0.006 * taut) * (0.7 + 0.6 * memHash(k * 97 + j + 700));
+                // beads travel down the wisp, so it reads as flowing into him, never as a solid line
+                const bead = 0.5 + 0.5 * Math.sin(w * 11 + s * 2.3 + k * 3);
+                const fade = memClamp(w * 5) * Math.pow(1 - w, 1.2) * (front ? 1 - w / MS_WISP_ROOT : 1);
+                ctx.globalAlpha = base * fade * (0.25 + 0.75 * bead * bead) * (0.3 + 0.2 * taut);
+                ctx.drawImage(puff, wx - size / 2, wy - size / 2, size, size);
+            }
+        });
+        ctx.restore();
+    }
+
     // `away` true turns him to face right, the way he leaves
     function memSurtr(x, ground, L, s, strings, away) {
         const f = (s / MS_BEAT) % 1;
@@ -1223,22 +1265,10 @@
         ctx.rotate(sway);
         ctx.translate(-x, -pivotY);
         if (away) { ctx.translate(x, 0); ctx.scale(-1, 1); ctx.translate(-x, 0); }
-        if (strings > 0) {
-            ctx.save();
-            ctx.globalAlpha *= strings;
-            ctx.strokeStyle = 'rgba(230,220,210,0.7)';
-            ctx.lineWidth = 1.5;
-            for (const [u, v] of MS_STRINGS) {
-                const [px, py] = memOnBody(x, cy, L, 0, u, v);
-                ctx.beginPath();
-                ctx.moveTo(px + (u - 0.5) * 30, pivotY - L);
-                ctx.lineTo(px, py);
-                ctx.stroke();
-            }
-            ctx.restore();
-        }
+        if (strings > 0) memSurtrWisps(x, cy, L, s, pivotY, strings, false);
         memSurtrSword(x, cy, L, s, b, false);
         memBody(ctx, memMenace(), x, cy, L);
+        if (strings > 0) memSurtrWisps(x, cy, L, s, pivotY, strings, true);
         // the cracks, and his eyes, lit with his heartbeat
         ctx.save();
         const lit = ctx.globalAlpha;
