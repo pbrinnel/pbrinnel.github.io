@@ -17,7 +17,7 @@
     // the game's own reset asked for.
     const DBG_WIPE_HOLD = 1.2;
 
-    const DBG_HEADS = { keys: 'keys — four of them open the CASTLE', pads: 'paddles',
+    const DBG_HEADS = { keys: 'keys — four open the CASTLE, the CASTLE raises the VOID', pads: 'paddles',
                         mems: 'memories — year 0 is always yours' };
 
     let dbgSync = [];                 // one per row: bring its look up to date
@@ -31,7 +31,7 @@
         const cols = document.createElement('div');
         cols.className = 'cols';
         el.appendChild(cols);
-        debugRow(cols, 'keys', menuLevels().filter(l => l.n <= 4));
+        debugRow(cols, 'keys', menuLevels().filter(l => l.n <= 5));
         debugRow(cols, 'pads', menuPads().map(k => ({ k, name: (LAB_PAD[k] || {}).name || k.toUpperCase() })));
         debugRow(cols, 'mems', menuMemories().filter(m => !m.always)
             .map(m => ({ n: m.id, name: 'YEAR \u2212' + -m.year + ' ' + m.title.toUpperCase(), ink: m.ink })));

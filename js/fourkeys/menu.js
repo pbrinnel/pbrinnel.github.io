@@ -11,6 +11,7 @@
     //   finish a level without using a continue and you keep the paddle it guarded
     //   win any level at all and CLASSIC, the first game's paddle, is yours
     //   the first win on each level plays its memory, kept in MEMORIES to watch again
+    //   win the CASTLE and the VOID stands in the way to it
     //
     // The five are laid out as a town: the FARM and the RUINS out on the left,
     // the CITY and the VOLCANO on the right, and the CASTLE far off in the
@@ -27,6 +28,13 @@
         { n: 4, name: 'VOLCANO', ink: '#d2622f', cap: 'cone', pad: 'ember' }
     ];
     const MENU_LAST = { n: 5, name: 'CASTLE', ink: '#9a7fc9', cap: 'crown', pad: 'pair', mem: 'fall' };
+    // The finale, which is not there at all until the CASTLE has been won
+    // (`after`). It stands in the middle of the CASTLE's own lane, so once it
+    // is up the CASTLE is only reached by walking round it. It guards no
+    // paddle and gives no key, and nothing of a win in it is kept: it is
+    // there, and then it is behind you. Being new it is never dusty, and it
+    // is no building at all but a hole turning in the town (menuDrawVoid).
+    const MENU_VOID = { n: 6, name: 'VOID', ink: '#dcd6ee', after: 5 };
     // `mem` is the memory a level's first win plays (MENU_MEMS); a level
     // without one plays none.
     //
@@ -54,7 +62,7 @@
     const MENU_BOSSES = { windmill: 'WM_LVL', idol: 'IDOL_LVL', twins: 'TW_LVL',
                           lamps: 'LAMP_LVL', gleeok: 'GL_LVL', headless: 'HL_LVL',
                           agahnim: 'AG_LVL', dodongo: 'DOD_LVL' };
-    const MENU_ALL = MENU_LEVELS.concat([MENU_LAST]);
+    const MENU_ALL = MENU_LEVELS.concat([MENU_LAST, MENU_VOID]);
     const MENU_KEY = 'brandon-metalab.progress';
     // the line under the field: in the town there is nothing to serve
     const M_HINT = 'move to slide brandon · hold to walk him';
@@ -82,7 +90,7 @@
             dirty() { return menuBeat(false); },
             all() {
                 menuLoad();
-                for (const l of MENU_ALL) menu.keys[l.n] = true;
+                for (const l of MENU_ALL) if (l !== MENU_VOID) menu.keys[l.n] = true;
                 for (const k of MENU_PADS) menu.pads[k] = true;
                 for (const l of MENU_ALL) menu.seen[l.n] = true;
                 for (const m of MENU_MEMS) menu.mems[m.id] = true;
@@ -109,7 +117,7 @@
                  mems: (saved && saved.mems) || {},
                  dusting: null, sel: 1, say: null, sayT: 0,
                  cards: [], run: null, side: 0, hold: 0, sw: null,
-                 march: false, lift: 0, into: null, walk: 0, gait: 0, arriveT: -1,
+                 march: false, lift: 0, lastX: 0, into: null, walk: 0, gait: 0, arriveT: -1,
                  going: null, screen: null, press: null,
                  shows: [], showT: 0 };
         return menu;
@@ -128,7 +136,11 @@
                  pads: Object.keys(menu.pads).filter(k => menu.pads[k]) };
     }
 
-    function menuOpened() { return menuProgress().keys.length >= MENU_LEVELS.length; }
+    // the four levels' own keys: the CASTLE's and the VOID's open nothing more
+    function menuOpened() { menuLoad(); return MENU_LEVELS.every(l => menu.keys[l.n]); }
+
+    // whether a building is standing yet: most always are, one waits on a win
+    function menuStands(c) { return !c.level.after || !!menu.keys[c.level.after]; }
 
     // ---- what the debug menu reaches in through ---------------------------------------
     // Everything the town knows about you is in `menu`, and `menu` is this
@@ -157,7 +169,7 @@
     // ---- the town -------------------------------------------------------------------
     // He walks up from y 542, so the near pair is a short walk and the far one
     // is a long one. Their x spans never overlap and each is a lane straight up
-    // to one building: 25-161 is the FARM's, 187-305 the RUINS', 331-469 goes
+    // to one building: 25-161 is the FARM's, 187-305 the RUINS', 306-494 goes
     // all the way up the middle to the CASTLE, and the right is the mirror --
     // except hard against either wall, which is the lane of a corner (M_SIDES).
     //
@@ -173,16 +185,29 @@
     // down, the near pair just above the gates. The near pair are the same
     // 0.6 s walk they always were; the far pair and the CASTLE are a little
     // further off than they were under the old title band, 2.0 s and 3.2 s.
-    // the one line of patter goes in the gap between the far row and the near
-    // one -- the floor is the gates' now, and the near pair reach down to 452
-    const M_SAY_Y = 306;
+    //
+    // The VOID, once it stands, is small and in the middle of the way up to
+    // the CASTLE, halfway between the near row and the far one, so walking
+    // straight up from home arrives at it. The CASTLE's lane takes in the
+    // empty gaps either side of it, which leaves a strip each side of the
+    // VOID to walk up past it.
+    //
+    // The one line of patter goes under the VOID, between the near pair --
+    // the floor is the gates', and the near pair reach down to 452.
+    const M_SAY_Y = 372;
     const M_TOWN = {
         1: { x: 93, y: 392, w: 136, h: 120 },
         2: { x: 246, y: 228, w: 118, h: 112 },
         3: { x: 554, y: 228, w: 118, h: 112 },
         4: { x: 707, y: 392, w: 136, h: 120 },
-        5: { x: 400, y: 92, w: 138, h: 110 }
+        5: { x: 400, y: 92, w: 138, h: 110, lane: [306, 494] },
+        6: { x: 400, y: 310, w: 84, h: 64 }
     };
+    // Coming at a building's side rather than its door -- up the strip beside
+    // it and then across -- is a wall, not a door: he is stopped at the edge
+    // of its lane. More overlap than a frame of walking up can make is how a
+    // side is told from the door.
+    const M_SIDE_IN = 10;
 
     // More that are not levels. MEMORIES and the boards take the top corners,
     // and a corner's lane is the wall itself: walk up hard against the left or
@@ -229,8 +254,15 @@
     function menuLane(c) {
         const wall = menuWall();
         if (c.level.side) return wall === c.level.side;
-        const [l, r] = c.lane || [c.x - c.w / 2, c.x + c.w / 2];
+        const [l, r] = menuLaneOf(c);
         return !wall && paddle.x >= l && paddle.x <= r;
+    }
+    function menuLaneOf(c) { return c.lane || [c.x - c.w / 2, c.x + c.w / 2]; }
+
+    // lined up with it and nothing nearer in the way, which is what lights it:
+    // straight up from under the VOID, the CASTLE is not where he would get to
+    function menuAimed(c) {
+        return menuLane(c) && !menu.cards.some(o => o !== c && o.y > c.y && menuStands(o) && menuLane(o));
     }
 
     function menuSay(t) { menu.say = t; menu.sayT = 2.6; }
@@ -266,13 +298,23 @@
                                : Math.max(0, menu.lift - MARCH_BACK * dt);
         // He is wider than the gaps between the buildings, so what counts as
         // reaching one is his middle arriving, not his shoulder brushing it.
-        const c = menu.lift > 0 ? menuAt() : null;
-        if (c && c.level.n && !menu.seen[c.level.n]) menuDust(c.level.n);
+        // Only a walk up arrives anywhere. Coming home he passes back through
+        // whatever he walked round on the way up.
+        let c = menu.lift > 0 && menu.march ? menuAt() : null;
+        const over = c ? (c.y + c.h / 2) - (padY() - padH() / 2) : 0;
+        // back out the side he came in by, which is where he was last frame: a
+        // hand can carry him most of the way across in one
+        if (c && !c.level.side && over > M_SIDE_IN) {
+            const [l, r] = menuLaneOf(c);
+            paddle.x = menu.lastX < (l + r) / 2 ? l - 0.5 : r + 0.5;
+            c = null;
+        }
+        menu.lastX = paddle.x;
+        if (c && c.level.n && !c.level.after && !menu.seen[c.level.n]) menuDust(c.level.n);
         if (c) {
             // stopped on the step, however fast he was walking at it: padY()
             // reads menu.lift, so backing the overshoot out of it puts his
             // leading edge exactly on the door
-            const over = (c.y + c.h / 2) - (padY() - padH() / 2);
             if (over > 0) menu.lift -= over;
             if (menu.into && menu.into.card !== c) menu.into = null;
             if (!menu.into) menu.into = { card: c, t: 0 };
@@ -293,7 +335,7 @@
     function menuAt() {
         const y = padY() - padH() / 2;
         for (const c of menu.cards) {
-            if (!menuLane(c)) continue;
+            if (!menuStands(c) || !menuLane(c)) continue;
             if (y > c.y + c.h / 2 || y < c.y - c.h / 2) continue;
             return c;
         }
@@ -452,6 +494,7 @@
         const which = n || menu.sel || 1;
         const level = MENU_ALL.find(l => l.n === which);
         if (!level) return false;
+        if (level === MENU_VOID) return true;       // nothing of it is kept
         const first = !menu.keys[level.n];
         menu.keys[level.n] = true;
         // still kept, though the hub no longer shows it: the boards live
@@ -747,7 +790,7 @@
 
         const k = menuArriveK();
         // the far ones first, so a near one growing past them is drawn over them
-        for (const c of menu.cards.slice().sort((a, b) => a.y - b.y)) {
+        for (const c of menu.cards.filter(menuStands).sort((a, b) => a.y - b.y)) {
             menuArriveCard(c, k, () => menuDrawLevel(c));
         }
         menuDrawGoing();
@@ -811,6 +854,7 @@
     function menuDrawLevel(c) {
         const l = c.level;
         if (l.key) { menuDrawSide(c); return; }
+        if (l === MENU_VOID) { menuDrawVoid(c); return; }
         const w = menu.dusting && menu.dusting.n === l.n ? menu.dusting : null;
         if (menu.seen[l.n] && !w) { menuDrawClean(c, false); return; }
         if (!w) { menuDrawDusty(c); return; }
@@ -876,7 +920,7 @@
         const x = c.x - c.w / 2, y = c.y - c.h / 2;
         // lit while he is standing in its lane, walking or not, so a walk is
         // aimed before it is started
-        const aimed = menuLane(c);
+        const aimed = menuAimed(c);
         const ink = dusty ? DUST_INK : shut ? '#4a453d' : l.ink;
         menuCap(c, aimed ? ink : shut ? '#241f1b' : '#2e2a24');
         menuPanel(x, y, c.w, c.h, aimed, ink);
@@ -901,6 +945,70 @@
         const keyInk = o => dusty ? DUST_INK : o.ink;
         if (big) MENU_LEVELS.forEach((o, i) => menuKey(c.x - 42 + i * 28, y + c.h * 0.72, 8, !!menu.keys[o.n], keyInk(o)));
         else menuKey(c.x, y + c.h * 0.72, 12, !!menu.keys[l.n], keyInk(l));
+    }
+
+    // The VOID is not a building but a hole in the town: an oval of black with
+    // arms of light wound into it and turning, slowly, inward to a still black
+    // eye with its name in it, and a rim that will not hold its shape. Slow on purpose -- it is the one thing in the
+    // town that moves on its own, and it only has to look wrong, not busy.
+    // Nothing in it flashes. Stood in its doorway, the hole fills from the
+    // floor up like any other door.
+    const VOID_ARMS = 5;
+    const VOID_TWIST = 7.5;          // radians an arm winds through, rim to middle
+    const VOID_SPIN = 0.9;           // radians a second the arms turn
+    const VOID_WOBBLE = 0.07;        // how far the rim strays, as a share of it
+    const VOID_WOBBLE_HZ = 0.35;
+    const VOID_EYE = 0.45;           // the still black middle its name is in, as a share of it
+
+    function menuDrawVoid(c) {
+        const l = c.level, aimed = menuAimed(c);
+        const t = performance.now() / 1000;
+        const rx = c.w / 2, ry = c.h / 2;
+        // the rim, three lobes drifting round it
+        const rim = () => {
+            ctx.beginPath();
+            for (let i = 0; i <= 48; i++) {
+                const a = i / 48 * Math.PI * 2;
+                const k = 1 + VOID_WOBBLE * Math.sin(a * 3 + t * VOID_WOBBLE_HZ * Math.PI * 2);
+                const x = c.x + Math.cos(a) * rx * k, y = c.y + Math.sin(a) * ry * k;
+                if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+            }
+            ctx.closePath();
+        };
+        const a0 = ctx.globalAlpha;
+        ctx.save();
+        rim();
+        ctx.fillStyle = '#000';
+        ctx.fill();
+        ctx.clip();
+        ctx.strokeStyle = l.ink;
+        ctx.lineCap = 'round';
+        for (let i = 0; i < VOID_ARMS; i++) {
+            ctx.beginPath();
+            for (let s = 0; s <= 1.001; s += 0.04) {
+                const a = -t * VOID_SPIN + i * Math.PI * 2 / VOID_ARMS + s * VOID_TWIST;
+                const r = 1.1 - s * (1.1 - VOID_EYE);
+                const x = c.x + Math.cos(a) * rx * r, y = c.y + Math.sin(a) * ry * r;
+                if (s) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+            }
+            ctx.globalAlpha = a0 * (aimed ? 0.55 : 0.25);
+            ctx.lineWidth = 2.2;
+            ctx.stroke();
+        }
+        if (menu.into && menu.into.card === c) {
+            const k = Math.min(1, menu.into.t / DOOR_HOLD);
+            ctx.globalAlpha = a0 * 0.5;
+            ctx.fillStyle = l.ink;
+            ctx.fillRect(c.x - rx * 1.2, c.y + ry * 1.2 - c.h * 1.2 * k, rx * 2.4, c.h * 1.2 * k);
+        }
+        ctx.restore();
+        ctx.globalAlpha = a0 * (aimed ? 1 : 0.45);
+        rim();
+        ctx.strokeStyle = l.ink;
+        ctx.lineWidth = aimed ? 2 : 1.5;
+        ctx.stroke();
+        ctx.globalAlpha = a0;
+        text(l.name, c.x, c.y + 6, 17, aimed ? '#f2efe9' : '#8d877d', 'center');
     }
 
     // A gate on each wall, standing where he stands, naming the paddle it leads

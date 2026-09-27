@@ -16,9 +16,7 @@
     // the whole line stays the speaker's colour, so who is talking is never
     // in doubt. The ones with no name of their own (a crowd, the five before
     // they are anyone) speak in `you`'s plain cream.
-    // Who is who is never written down anywhere a player sees it. The Angel
-    // and the Fallen have a voice each, so they read as two Brandons until
-    // the memory 99 years back shows you they are one.
+    // Who is who is never written down anywhere a player sees it.
     //
     // The menu draws this through memoryDraw and asks memoryCardSecs how long
     // the card is up, both behind a typeof: the boss lab builds menu.js
@@ -38,10 +36,14 @@
     // looks: the Angel cool as his halo's light, the Fallen the clay of his
     // arms, HIM his radiance rather than his clay, so the two warm ones stay
     // apart, and the one they fear a lighter cut of his own indigo.
+    // The Angel, the Fallen and the Corrupted are one Brandon, so one face;
+    // only the colour says which of him is speaking.
+    const MEM_LUCIFER = '700 {px}px "Cinzel Decorative", serif';
     const MEM_VOICE = {
         you:    { font: '{px}px "Fira Sans", "Trebuchet MS", sans-serif', ink: '#f2efe9' },
-        angel:  { font: '700 {px}px "Cinzel Decorative", serif', ink: '#9fd3f0' },
-        fallen: { font: '{px}px "IM Fell English SC", serif', ink: '#c97a5a' },
+        angel:  { font: MEM_LUCIFER, ink: '#9fd3f0' },
+        fallen: { font: MEM_LUCIFER, ink: '#c97a5a' },
+        corrupted: { font: MEM_LUCIFER, ink: '#e0283c' },
         odin:   { font: '{px}px "Uncial Antiqua", serif', ink: '#e8b64c' },
         surtr:  { font: '{px}px "UnifrakturMaguntia", serif', ink: '#9a86e0' },
     };
