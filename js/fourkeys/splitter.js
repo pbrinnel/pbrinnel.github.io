@@ -22,11 +22,19 @@
                    'SPLIT_FLOOR', 'SPLIT_GRACE', 'SPLIT_PTS');
 
     let splitter = null;
+    // Making an entrance he comes down out of the top of the screen into
+    // his place, fading in as he comes, and nothing touches him until he is there.
+    const SPLIT_ENTER = 1.8;
 
     LAB_MINI.splitter = {
-        start() {
-            splitter = { pieces: [splitPiece(LW / 2, 130, 0, 1)], splits: 0, pops: 0 };
+        start(entering) {
+            splitter = { pieces: [splitPiece(LW / 2, 130, 0, 1)], splits: 0, pops: 0, enter: entering ? 0 : 1 };
             return true;
+        },
+        enter() {
+            const p = splitter.pieces[0];
+            const at = () => ({ x: p.x, y: Math.max(40, p.y + p.h / 2 + 10) });
+            return Object.assign(at(), { at });
         },
         reset() { splitter = null; },
         busy() { return !!splitter && splitter.pieces.length > 0; },
@@ -59,6 +67,12 @@
 
     function splitUpdate(dt) {
         if (!splitter) return;
+        if (splitter.enter < 1) {
+            splitter.enter = Math.min(1, splitter.enter + dt / SPLIT_ENTER);
+            const p = splitter.pieces[0], k = splitter.enter, e = k * k * (3 - 2 * k);
+            if (p) p.y = -p.h + (130 + p.h) * e;
+            return;
+        }
         for (const p of splitter.pieces) {
             if (p.flash > 0) p.flash = Math.max(0, p.flash - dt * 6);
             if (p.grace > 0) p.grace = Math.max(0, p.grace - dt);
@@ -76,7 +90,7 @@
     }
 
     function splitBallStep(b) {
-        if (!splitter) return;
+        if (!splitter || splitter.enter < 1) return;
         for (const p of splitter.pieces) {
             if (p.grace > 0) continue;
             const hit = maskContact(b, p.x, p.y, 0, p.w, p.h, MASK, p.mir);
@@ -105,7 +119,7 @@
         splitter.pops++;
         award(SPLIT_PTS * 3, hit.cx, hit.cy);
         maybeDropCapsule(p.x, p.y);
-        if (!all.length) labClearIfDone();
+        if (!all.length) { labMiniDown(); labClearIfDone(); }
     }
 
     function splitDraw() {
@@ -115,7 +129,7 @@
             const sp = shapeSprite('sp' + kind, brickColor(kind), p.w, p.h, false);
             if (!sp) continue;
             ctx.save();
-            ctx.globalAlpha = p.grace > 0 ? 0.5 : 1;
+            ctx.globalAlpha = (p.grace > 0 ? 0.5 : 1) * splitter.enter;
             ctx.translate(p.x, p.y);
             if (p.mir) ctx.scale(-1, 1);
             ctx.drawImage(sp, -p.w / 2, -p.h / 2, p.w, p.h);

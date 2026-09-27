@@ -11,7 +11,9 @@
     //   finish a level without using a continue and you keep the paddle it guarded
     //   win any level at all and CLASSIC, the first game's paddle, is yours
     //   each level you win for the first time plays the next memory, kept in MEMORIES
-    //   win the CASTLE and the VOID stands in the way to it
+    //   win the CASTLE and the VOID stands in the way to it: its memory comes
+    //   halfway through the fight, and its end is the credits
+    //   win the VOID and BOSS RUSH opens: every boss back to back, for a best of its own
     //
     // The five are laid out as a town: the FARM and the RUINS out on the left,
     // the CITY and the VOLCANO on the right, and the CASTLE far off in the
@@ -31,8 +33,7 @@
     // The finale, which is not there at all until the CASTLE has been won
     // (`after`). It stands in the middle of the CASTLE's own lane, so once it
     // is up the CASTLE is only reached by walking round it. It guards no
-    // paddle and gives no key, and nothing of a win in it is kept: it is
-    // there, and then it is behind you. Being new it is never dusty, and it
+    // paddle and has no slot on the CASTLE; its key opens BOSS RUSH. Being new it is never dusty, and it
     // is no building at all but a hole turning in the town (menuDrawVoid).
     const MENU_VOID = { n: 6, name: 'VOID', ink: '#dcd6ee', after: 5 };
     // Every memory, by the year it is set in: the game starts in year 0. Each
@@ -90,7 +91,7 @@
             dirty() { return menuBeat(false); },
             all() {
                 menuLoad();
-                for (const l of MENU_ALL) if (l !== MENU_VOID) menu.keys[l.n] = true;
+                for (const l of MENU_ALL) menu.keys[l.n] = true;
                 for (const k of MENU_PADS) menu.pads[k] = true;
                 for (const l of MENU_ALL) menu.seen[l.n] = true;
                 for (const m of MENU_MEMS) menu.mems[m.id] = true;
@@ -139,8 +140,13 @@
     // the four levels' own keys: the CASTLE's and the VOID's open nothing more
     function menuOpened() { menuLoad(); return MENU_LEVELS.every(l => menu.keys[l.n]); }
 
-    // whether a building is standing yet: most always are, one waits on a win
-    function menuStands(c) { return !c.level.after || !!menu.keys[c.level.after]; }
+    // whether a building is standing yet: most always are, the VOID waits on a
+    // win, MEMORIES on its first memory and BOSS RUSH on the VOID
+    function menuStands(c) {
+        if (c.level.key === 'memories') return MENU_MEMS.some(m => !m.always && menu.mems[m.id]);
+        if (c.level.key === 'rush') return !!menu.keys[MENU_VOID.n];
+        return !c.level.after || !!menu.keys[c.level.after];
+    }
 
     // ---- what the debug menu reaches in through ---------------------------------------
     // Everything the town knows about you is in `menu`, and `menu` is this
@@ -159,7 +165,28 @@
         menuSave();
     }
 
-    function menuName(n) { const l = MENU_ALL.find(o => o.n === n); return l ? l.name : 'LEVEL ' + n; }
+    // ---- the high scores --------------------------------------------------------------
+    // Each of the six levels has a best of its own, kept with the rest of
+    // your progress and wiped with it; TOTAL HIGH SCORE is all six added up.
+    // The engine's `best` is the level you are in, set as you go in, and it
+    // hands every new best back here as it happens -- so a run that is lost,
+    // or that bought a continue, still keeps what it reached.
+    function menuBestIs(v) {
+        if (!menu || !menu.run) return;
+        const n = menu.run.n;
+        if (v <= (menu.best[n] || 0)) return;
+        menu.best[n] = v;
+        menuSave();
+    }
+    function menuBestTotal() {
+        menuLoad();
+        return MENU_ALL.reduce((s, l) => s + (menu.best[l.n] || 0), 0);
+    }
+    // what the HUD calls the best it is showing: BOSS RUSH keeps its own,
+    // and it is not one of the six
+    function menuBestLabel() { return menu && menu.run && menu.run.n === M_RUSH ? 'RUSH BEST' : 'LEVEL BEST'; }
+
+    function menuName(n) { if (n === M_RUSH) return 'BOSS RUSH'; const l = MENU_ALL.find(o => o.n === n); return l ? l.name : 'LEVEL ' + n; }
 
     // the first boss whose level slider points at this one, if any
     function menuBossFor(n) {
@@ -213,19 +240,25 @@
     // More that are not levels. MEMORIES and the boards take the top corners,
     // and a corner's lane is the wall itself: walk up hard against the left or
     // right edge and that is where you arrive, past the FARM or the VOLCANO
-    // rather than into it. MEMORIES is always there: the opening is in it from
-    // the start. RESET is the least of them, a small sign up and to the
+    // rather than into it. MEMORIES is not built until there is a memory to
+    // keep in it (menuStands). RESET is the least of them, a small sign up and to the
     // right of MEMORIES, and its lane is the gap between the FARM and the
     // RUINS -- narrower than the sign, so nobody wanders into it. Going in
     // only asks the question (menuShow); erasing is a button in there.
+    // BOSS RUSH is its mirror, up and to the left of the boards over the
+    // gap between the CITY and the VOLCANO, and it is not there until the
+    // VOID has been won.
     const M_SIDES = [
         { key: 'memories', side: -1, lines: ['MEMORIES'], ink: '#d9a5b3',
           at: { x: 70, y: 80, w: 116, h: 90 } },
         { key: 'reset', lines: ['RESET'], ink: '#c0594a', small: true,
           at: { x: 174, y: 44, w: 60, h: 28, lane: [162, 186] } },
         { key: 'board', side: 1, lines: ['LEADER', 'BOARD'], ink: '#c9a94e',
-          at: { x: 730, y: 80, w: 116, h: 90 } }
+          at: { x: 730, y: 80, w: 116, h: 90 } },
+        { key: 'rush', lines: ['BOSS RUSH'], ink: '#e0a040', small: true,
+          at: { x: 626, y: 44, w: 80, h: 28, lane: [614, 638] } }
     ];
+    const M_RUSH = 'rush';           // BOSS RUSH's name in menu.run and menu.best
     const M_WALL = 3;                // px off his clamp that still counts as against the wall
 
     function menuBuild() {
@@ -440,10 +473,12 @@
             menu.march = false;             // the door is shut: he stops there
             return;
         }
+        if (level.key === 'rush') { menuRush(); return; }
         const boss = menuBossFor(level.n);
         if (!boss) { menuSay(level.name + ' · no boss is set to this level'); return; }
         menu.arriveT = -1;          // walked in before the town finished arriving
         menu.run = { n: level.n, over: false, cont: false, out: 0 };
+        best = menu.best[level.n] || 0;
         menu.sel = level.n;
         menu.march = false;
         LAB.mini = null;
@@ -452,6 +487,24 @@
             LAB.boss = boss;
             LAB.stageAt(0, false);
         } else LAB.fight(boss);
+    }
+
+    // BOSS RUSH: every level's boss in order, one screen each, the takeover
+    // between them and the next arriving straight after (menuWatch). No
+    // memories, no keys, no paddles -- just a score, kept as a best of its
+    // own. The boss lab has no levels.js, so no rush.
+    function menuRush() {
+        const whos = MENU_ALL.map(l => menuBossFor(l.n)).filter(Boolean);
+        if (typeof levelsRush !== 'function' || !whos.length) { menuSay('BOSS RUSH · not in here'); return; }
+        menu.arriveT = -1;
+        menu.run = { n: M_RUSH, over: false, cont: false, out: 0 };
+        best = menu.best[M_RUSH] || 0;
+        menu.march = false;
+        LAB.mini = null;
+        setHint(HINT_PLAY);
+        levelsRush(whos);
+        LAB.boss = whos[0];
+        LAB.stageAt(0, false);
     }
 
     // A head went off the bottom. True means it cost nothing: there is nothing
@@ -486,8 +539,19 @@
             else { menuQuit(); return; }
         }
         if (phase !== 'ascend' && phase !== 'cleared') return;
-        // any screen but a level's last is cleared on the way to the next
-        if (stage < LEVELS.length - 1) return;
+        // any screen but a level's last is cleared on the way to the next --
+        // except a boss in BOSS RUSH, whose takeover leads straight into the
+        // next one's entrance
+        if (stage < LEVELS.length - 1) {
+            if (phase !== 'ascend' || (run.out += dt) < M_OUT) return;
+            run.out = 0;
+            impact = null;
+            bossFall = null;
+            stage++;
+            buildStage(stage);
+            banner = '';
+            return;
+        }
         if ((run.out += dt) < M_OUT) return;
         menu.run = null;
         menuBeat(!run.cont, run.n);
@@ -495,21 +559,59 @@
     }
 
     // The first memory in MENU_MEM_ORDER not yet earned, earned and queued
-    // to play. The debug menu can hand them over out of order, so it is the
-    // first missing one, not the next after a count.
+    // to play behind its MEMORY UNLOCKED card. The debug menu can hand them
+    // over out of order, so it is the first missing one, not the next after
+    // a count.
     function menuNextMemory() {
         const id = MENU_MEM_ORDER.find(k => !menu.mems[k]);
         if (!id) return;
         menu.mems[id] = true;
-        menu.shows.push({ mem: id });
+        menu.shows.push({ memCard: id }, { mem: id });
     }
 
     // A boss that ends his level himself, rather than through the takeover (the
-    // VOID's): what you earned, and back to the town.
+    // VOID's): what you earned, and back to the town. The VOID's end is the
+    // end of the game, so the credits roll on the way.
     function menuWon() {
         const run = menu && menu.run;
+        const rush = !!(menu && menu.keys[MENU_VOID.n]);
         if (run) menuBeat(!run.cont, run.n);
+        if (run && run.n === MENU_VOID.n) {
+            menu.shows.push({ credits: true });
+            if (!rush) menu.shows.push({ rushCard: true });
+        }
         menuOpen();
+    }
+
+    // The VOID's memory, earned between its second part and its third and
+    // played over the fight (lucifer.js steps it and draws it). True if
+    // there was one still to earn.
+    function menuVoidMemory() {
+        menuLoad();
+        if (!menu.run || menu.run.n !== MENU_VOID.n) return false;
+        const had = menu.shows.length;
+        menuNextMemory();
+        if (menu.shows.length === had) return false;
+        menuSave();
+        menu.fightShow = true;
+        menu.showT = 0;
+        return true;
+    }
+    // ...one frame of it: true while it is still up
+    function menuFightShowStep(dt) {
+        if (!menu.fightShow) return false;
+        menuShowStep(dt);
+        if (!menu.shows.length) menu.fightShow = false;
+        return menu.fightShow;
+    }
+
+    // the unlock screens' clock, which a memory and the credits end by themselves
+    function menuShowStep(dt) {
+        menu.showT += dt;
+        const s = menu.shows[0];
+        const done = s.mem ? typeof memoryDone === 'function' && memoryDone(s.mem, menu.showT)
+                   : s.credits ? menu.showT >= menuCreditsSecs() : false;
+        if (done) { menu.shows.shift(); menu.showT = 0; }
     }
 
     // The debug menu's win button. The screen you are on counts as beaten: a
@@ -531,39 +633,46 @@
     function menuSkipName() {
         if (!menu || !menu.run) return null;
         const l = LEVELS[stage];
-        return l.boss ? menuName(menu.run.n) + ' BOSS' : l.dbg;
+        return l.who && menu.run.n === M_RUSH ? l.dbg : l.boss ? menuName(menu.run.n) + ' BOSS' : l.dbg;
     }
 
     // a level finished: the key always, the paddle only if you never continued
     function menuBeat(clean, n) {
         menuLoad();
+        if (n === M_RUSH) { menuSay('BOSS RUSH · ' + score); return true; }
         const which = n || menu.sel || 1;
         const level = MENU_ALL.find(l => l.n === which);
         if (!level) return false;
-        // nothing of it is kept but a memory, and it can only be the sixth
-        // level won, so a win there earns whichever is still left
-        if (level === MENU_VOID) { menuNextMemory(); menuSave(); return true; }
+        // its memory is earned halfway through the fight (menuVoidMemory)
+        // and its end is the credits; all a win keeps is its key, which
+        // opens BOSS RUSH
+        if (level === MENU_VOID) { menu.keys[level.n] = true; menuSave(); return true; }
         const first = !menu.keys[level.n];
         menu.keys[level.n] = true;
-        // still kept, though the hub no longer shows it: the boards live
-        // somewhere else
+        // the run keeps its best as it goes (menuBestIs); this is for the
+        // lab's buttons, which win a level without one
         menu.best[level.n] = Math.max(menu.best[level.n] || 0, score || 0);
         let got = level.name + (first ? ' · A KEY' : ' · DONE AGAIN');
         // a new level's memory plays before any paddle is shown: after that
         // it is in MEMORIES
         if (first) menuNextMemory();
+        // A paddle just won is in your hands when the town comes back: the
+        // level's own if there is one, since it is the one you played for,
+        // or else the souvenir. A paddle kept back says nothing.
+        let take = null;
         if (clean && !menu.pads[level.pad]) {
             menu.pads[level.pad] = true;
             menu.shows.push({ pad: level.pad });
             got += ' AND ' + (LAB_PAD[level.pad] ? LAB_PAD[level.pad].name : level.pad.toUpperCase());
-        } else if (!clean && !menu.pads[level.pad]) {
-            got += ' · the paddle stays locked';
+            take = level.pad;
         }
         if (!menu.pads[MENU_SOUVENIR]) {
             menu.pads[MENU_SOUVENIR] = true;
             menu.shows.push({ pad: MENU_SOUVENIR });
             got += ' · AND ' + LAB_PAD[MENU_SOUVENIR].name;
+            take = take || MENU_SOUVENIR;
         }
+        if (take && LAB_PAD[take]) LAB.usePad(take);
         menuSave();
         menuSay(got);
         return true;
@@ -585,10 +694,8 @@
         // a memory that has finished goes on by itself (see memoryDone)
         const over = (n, t) => typeof memoryDone === 'function' && memoryDone(n, t);
         if (menuUnlockUp()) {
-            menu.showT += dt;
             menu.march = false;
-            const m = menu.shows[0].mem;
-            if (m && over(m, menu.showT)) { menu.shows.shift(); menu.showT = 0; }
+            menuShowStep(dt);
             return;
         }
         if (menuScreenUp()) {
@@ -828,7 +935,8 @@
 
     // Drawn last of all, over the READY band. The town says nothing about
     // itself -- no title, no rules, no instructions; the buildings and the
-    // gates are the whole of it.
+    // gates are the whole of it, with your bests on them and their total
+    // along the floor.
     function labDrawTop() {
         if (labB && labB.drawTop) labB.drawTop();     // a boss's own end, over everything
         if (!menuUp()) return;
@@ -851,7 +959,11 @@
         menuDrawGateNote(-1);
         menuDrawGateNote(1);
         menuDrawLine();
+        // every level's best added up, along the floor under him, once there is one
+        const total = menuBestTotal();
+        if (total > 0) text('TOTAL HIGH SCORE ' + total, LW / 2, M_TOTAL_Y, 12, '#8d877d', 'center');
     }
+    const M_TOTAL_Y = 592;
 
     // Not a level: no roof and no key, just a sign.
     function menuDrawSide(c) {
@@ -867,6 +979,10 @@
             ctx.globalAlpha = 1;
         }
         const ink = aimed ? s.ink : '#8d877d';
+        // BOSS RUSH's best hangs under its sign, once it has one
+        if (s.key === 'rush' && menu.best[M_RUSH] > 0) {
+            text('BEST ' + menu.best[M_RUSH], c.x, y + c.h + 13, 10, ink, 'center');
+        }
         if (s.small) { text(s.lines[0], c.x, c.y + 4, 11, ink, 'center'); return; }
         if (s.lines.length === 1) { text(s.lines[0], c.x, c.y + 6, 17, ink, 'center'); return; }
         text(s.lines[0], c.x, y + c.h * 0.44, 17, ink, 'center');
@@ -989,9 +1105,14 @@
         text(l.name, c.x, y + c.h * 0.4, big ? 19 : 20, lit, 'center');
         // the last one keeps the four slots on it: what it is waiting for is the
         // only thing about it worth saying
+        // ...and under it your best there, once there is one, which lifts
+        // the key a little to make room
         const keyInk = o => dusty ? DUST_INK : o.ink;
-        if (big) MENU_LEVELS.forEach((o, i) => menuKey(c.x - 42 + i * 28, y + c.h * 0.72, 8, !!menu.keys[o.n], keyInk(o)));
-        else menuKey(c.x, y + c.h * 0.72, 12, !!menu.keys[l.n], keyInk(l));
+        const got = !dusty && menu.best[l.n] > 0;
+        const ky = y + c.h * (got ? (big ? 0.66 : 0.63) : 0.72);
+        if (big) MENU_LEVELS.forEach((o, i) => menuKey(c.x - 42 + i * 28, ky, 8, !!menu.keys[o.n], keyInk(o)));
+        else menuKey(c.x, ky, 12, !!menu.keys[l.n], keyInk(l));
+        if (got) text('BEST ' + menu.best[l.n], c.x, y + c.h * 0.9, 11, aimed ? '#f2efe9' : '#8d877d', 'center');
     }
 
     // The VOID is not a building but a hole in the town: an oval of black with
@@ -1056,17 +1177,20 @@
         ctx.stroke();
         ctx.globalAlpha = a0;
         text(l.name, c.x, c.y + 6, 17, aimed ? '#f2efe9' : '#8d877d', 'center');
+        if (menu.best[l.n] > 0) text('BEST ' + menu.best[l.n], c.x, c.y + 21, 10, aimed ? '#f2efe9' : '#8d877d', 'center');
     }
 
     // A gate on each wall, standing where he stands, naming the paddle it leads
     // to. The name is stacked a letter at a time: a 24px post is too narrow to
     // write across and turning the canvas to write up it is more machinery than
-    // six letters are worth.
+    // six letters are worth. With only the one paddle there is nowhere for a
+    // gate to lead, so there are no gates until a second is won.
     const M_GATE = { w: 24, y: 470, h: 118 };
     function menuDrawGate(side) {
         const x = side < 0 ? 0 : LW - M_GATE.w;
         const to = menuNextPad(side);
         const p = to && LAB_PAD[to];
+        if (!p) return;
         const on = menu.side === side && !menu.sw && menu.lift <= 1 && !!p;
         const ink = (p && (p.ink || p.rim)) || '#4a453d';
         ctx.fillStyle = 'rgba(0,0,0,0.86)';
@@ -1084,7 +1208,6 @@
         ctx.strokeRect(x + 0.5, M_GATE.y + 0.5, M_GATE.w - 1, M_GATE.h - 1);
         text(side < 0 ? '◀' : '▶', x + M_GATE.w / 2, M_GATE.y + 16, 12,
              on ? '#f2efe9' : '#6d685f', 'center');
-        if (!p) return;
         // a space is a gap down the post, the height of half a letter, so a
         // name of two words still reads as two
         let y = M_GATE.y + 34;
@@ -1124,10 +1247,9 @@
     // gate you are leaning on, or what just happened
     function menuDrawLine() {
         if (menu.sw || menu.going) return;
-        if (menu.side && menu.lift <= 1) {
-            const to = menuNextPad(menu.side);
-            text(to && LAB_PAD[to] ? 'lean to take ' + LAB_PAD[to].name : 'nothing else to lean for',
-                 LW / 2, M_SAY_Y, 12, '#6d685f', 'center');
+        const to = menu.side && menu.lift <= 1 && menuNextPad(menu.side);
+        if (to && LAB_PAD[to]) {
+            text('lean to take ' + LAB_PAD[to].name, LW / 2, M_SAY_Y, 12, '#6d685f', 'center');
             return;
         }
         if (menu.sayT > 0) {
@@ -1141,8 +1263,9 @@
     // ---- PADDLE UNLOCKED, and a memory ------------------------------------------------
     // What a win hands you gets the whole screen on the way back into the
     // town, one at a time, each held until you tap: the level's memory first,
-    // the first time it is beaten, then every paddle earned -- his name, and
-    // him, big, on a field of his own colour. Only a win shows them (menuBeat,
+    // the first time it is beaten, named on a MEMORY UNLOCKED card before it
+    // plays, then every paddle earned -- his name, and him, big, on a field
+    // of his own colour, with what he does and a few lines of where he is from. Only a win shows them (menuBeat,
     // which the lab's "count it beaten" buttons also call); the debug menu's
     // toggles and "unlock everything" do not.
     const UNLOCK_WAIT = 0.6;         // seconds up before a tap takes it away
@@ -1150,14 +1273,18 @@
     const UNLOCK_W = 500;            // how long he is drawn
     const UNLOCK_BACK = 0.22;        // his colour, this much of it over black, behind him
 
-    function menuUnlockUp() { return !!(menu && menu.shows.length && menuUp()); }
+    // up in the town, or over the VOID's fight while its memory plays
+    function menuUnlockUp() { return !!(menu && menu.shows.length && (menuUp() || menu.fightShow)); }
 
     // a tap: true if it was the unlock screen's to take
     function menuUnlockNext() {
         if (!menuUnlockUp()) return false;
-        const t = menu.shows[0].mem ? menuMemoryTap(menu.shows[0].mem, menu.showT)
-                                    : menu.showT >= UNLOCK_WAIT ? -1 : menu.showT;
+        const s = menu.shows[0];
+        const t = s.mem ? menuMemoryTap(s.mem, menu.showT)
+                : s.credits ? menuCreditsTap(menu.showT)
+                : menu.showT >= UNLOCK_WAIT ? -1 : menu.showT;
         if (t < 0) { menu.shows.shift(); menu.showT = 0; } else menu.showT = t;
+        if (!menu.shows.length) menu.fightShow = false;
         return true;
     }
 
@@ -1165,6 +1292,9 @@
         if (!menuUnlockUp()) return false;
         const show = menu.shows[0];
         if (show.mem) { menuMemoryCard(show.mem, menu.showT); return true; }
+        if (show.memCard) { menuMemoryUnlocked(show.memCard, menu.showT); return true; }
+        if (show.credits) { menuCreditsDraw(menu.showT); return true; }
+        if (show.rushCard) { menuRushUnlocked(menu.showT); return true; }
         const key = show.pad, p = LAB_PAD[key];
         const ink = (p && (p.ink || p.rim)) || '#8d877d';
         ctx.fillStyle = '#000';
@@ -1178,9 +1308,133 @@
         labPadIcon(key, LW / 2, LH / 2 + 10 + (1 - e) * 40, UNLOCK_W, false, e);
         ctx.globalAlpha = e;
         text(p ? p.name : key.toUpperCase(), LW / 2, 440, 40, ink, 'center');
-        if (p && p.blurb) text(p.blurb, LW / 2, 475, 15, '#c9c4ba', 'center');
+        if (p && p.blurb) text(p.blurb, LW / 2, 470, 15, '#c9c4ba', 'center');
+        if (p && p.lore) menuLore(p.lore, LW / 2, 500, UNLOCK_LORE_PX, UNLOCK_LORE_W);
         ctx.globalAlpha = 1;
         return true;
+    }
+
+    // A paddle's lore, wrapped to w and centred on x: {odin}, {surtr} and
+    // {angel} print as "Brandon" in that Brandon's face, the rest in the
+    // plain voice, all of it in the plain voice's colour (see LAB_PAD). The
+    // faces are memory.js's; the boss lab has them too, but asks first.
+    const UNLOCK_LORE_W = 560;
+    const UNLOCK_LORE_PX = 13;
+    function menuLore(str, x, y, px, w) {
+        const voices = typeof MEM_VOICE === 'object' ? MEM_VOICE : null;
+        if (voices && typeof memFontsLoad === 'function') memFontsLoad();
+        const face = v => voices && voices[v] ? voices[v].font.replace('{px}', px)
+                                              : px + 'px "Fira Sans", "Trebuchet MS", sans-serif';
+        // words, each keeping the space after it, and whose face it is in
+        const words = [];
+        str.split(/(\{\w+\})/).forEach(bit => {
+            const named = bit.match(/^\{(\w+)\}$/);
+            if (named) { words.push({ w: 'Brandon', v: named[1] }); return; }
+            for (const piece of bit.split(/(?<=\s)/)) if (piece) words.push({ w: piece, v: 'you' });
+        });
+        for (const wd of words) {
+            ctx.font = face(wd.v);
+            wd.width = ctx.measureText(wd.w).width;
+            wd.bare = ctx.measureText(wd.w.trimEnd()).width;
+        }
+        const rows = [[]];
+        let run = 0;
+        for (const wd of words) {
+            const glued = wd.w[0] === "'";      // a name and the 's after it stay together
+            if (!glued && run + wd.bare > w && rows[rows.length - 1].length) {
+                rows.push([]);
+                run = 0;
+            }
+            rows[rows.length - 1].push(wd);
+            run += wd.width;
+        }
+        const ink = voices ? voices.you.ink : '#f2efe9';
+        const a0 = ctx.globalAlpha;
+        ctx.globalAlpha = a0 * 0.72;
+        ctx.textAlign = 'left';
+        ctx.fillStyle = ink;
+        rows.forEach((row, r) => {
+            const total = row.reduce((s, wd) => s + wd.width, 0);
+            let cx = x - total / 2;
+            for (const wd of row) {
+                ctx.font = face(wd.v);
+                ctx.fillText(wd.w, cx, y + r * px * 1.35);
+                cx += wd.width;
+            }
+        });
+        ctx.globalAlpha = a0;
+    }
+
+    // MEMORY UNLOCKED, the paddle card's twin: the memory's title big in its
+    // own colour, then a tap and it plays. The title comes the way something
+    // half-remembered does -- out of a haze, soft copies of it drifting in
+    // round where it will be and settling into one over MEM_HAZE, wavering a
+    // little as it does. Copies laid round it rather than a blur filter,
+    // which Safari ignores.
+    const MEM_HAZE = 2.2;            // seconds the title takes to come clear
+    const MEM_HAZE_PX = 16;          // how far out the soft copies start
+    const MEM_HAZE_COPIES = 10;
+    function menuMemoryUnlocked(id, t) {
+        const m = MENU_MEMS.find(o => o.id === id);
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, LW, LH);
+        ctx.globalAlpha = UNLOCK_BACK;
+        ctx.fillStyle = m.ink;
+        ctx.fillRect(0, 0, LW, LH);
+        ctx.globalAlpha = 1;
+        text('MEMORY UNLOCKED', LW / 2, 200, 34, '#f2efe9', 'center');
+        const k = Math.min(1, t / MEM_HAZE), e = k * k * (3 - 2 * k);
+        const spread = MEM_HAZE_PX * Math.pow(1 - e, 1.5);
+        const sway = (1 - e) * 6 * Math.sin(t * 2.3);
+        for (let i = 0; i < MEM_HAZE_COPIES; i++) {
+            const a = i / MEM_HAZE_COPIES * Math.PI * 2 + t * 0.7;
+            ctx.globalAlpha = 0.16 * Math.min(1, k * 3) * (1 - e * 0.85);
+            text(m.title, LW / 2 + sway + Math.cos(a) * spread, 330 + Math.sin(a) * spread * 0.6, 54, m.ink, 'center');
+        }
+        ctx.globalAlpha = e * e;
+        text(m.title, LW / 2 + sway, 330, 54, m.ink, 'center');
+        ctx.globalAlpha = 1;
+    }
+
+    // BOSS RUSH UNLOCKED, after the credits, the paddle card's twin again
+    function menuRushUnlocked(t) {
+        const ink = M_SIDES.find(s => s.key === 'rush').ink;
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, LW, LH);
+        ctx.globalAlpha = UNLOCK_BACK;
+        ctx.fillStyle = ink;
+        ctx.fillRect(0, 0, LW, LH);
+        const e = 1 - Math.pow(1 - Math.min(1, t / UNLOCK_IN), 3);
+        ctx.globalAlpha = 1;
+        text('UNLOCKED', LW / 2, 200, 34, '#f2efe9', 'center');
+        ctx.globalAlpha = e;
+        text('BOSS RUSH', LW / 2, 320 + (1 - e) * 30, 54, ink, 'center');
+        text('every boss, back to back, for a best of its own', LW / 2, 368 + (1 - e) * 30, 15, '#c9c4ba', 'center');
+        ctx.globalAlpha = 1;
+    }
+
+    // The credits, after the VOID: one card at a time out of the black and
+    // back into it. Placeholders, all three.
+    const CREDITS = [['STARRING', 'BRANDON'], ['BY', 'PAUL'], ['STORY HELP BY', 'DAVE']];
+    const CREDITS_LEAD = 1;          // black before the first
+    const CREDITS_IN = 0.8, CREDITS_HOLD = 2.2, CREDITS_OUT = 0.8;
+    const creditsCard = () => CREDITS_IN + CREDITS_HOLD + CREDITS_OUT;
+    function menuCreditsSecs() { return CREDITS_LEAD + CREDITS.length * creditsCard() + 0.6; }
+    // a tap moves on to the next card, and past the last one closes them
+    function menuCreditsTap(t) {
+        const i = Math.floor((t - CREDITS_LEAD) / creditsCard()) + 1;
+        return i >= CREDITS.length ? -1 : CREDITS_LEAD + i * creditsCard();
+    }
+    function menuCreditsDraw(t) {
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, LW, LH);
+        const u = t - CREDITS_LEAD, i = Math.floor(u / creditsCard());
+        if (u < 0 || i >= CREDITS.length) return;
+        const k = u - i * creditsCard();
+        ctx.globalAlpha = Math.max(0, Math.min(1, k / CREDITS_IN, (creditsCard() - k) / CREDITS_OUT));
+        text(CREDITS[i][0], LW / 2, LH / 2 - 30, 17, '#8d877d', 'center');
+        text(CREDITS[i][1], LW / 2, LH / 2 + 24, 46, '#f2efe9', 'center');
+        ctx.globalAlpha = 1;
     }
 
     // A memory, which memory.js draws. The boss lab builds this file without
@@ -1432,7 +1686,7 @@
     addEventListener('pointercancel', () => { if (menu) menu.press = null; menuHeld(false); }, true);
     addEventListener('blur', () => { if (menu) menu.press = null; menuHeld(false); });
     addEventListener('keydown', e => {
-        if (e.code !== 'Space' || !menuUp()) return;
+        if (e.code !== 'Space' || !(menuUp() || menuUnlockUp())) return;
         e.preventDefault();
         if (e.repeat) return;               // a key held on from the door is not a press
         menuHeld(true);

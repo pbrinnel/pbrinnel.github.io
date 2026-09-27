@@ -7,7 +7,13 @@
     // out. Hit any of the others and the whole line turns round, its back
     // becoming its front -- so a shot that misses the leader is how you steer,
     // turning the line until its front comes round to where you can reach it.
-    // On an open field, a line of them walks on instead.
+    // On an open field, or making a level's entrance, a line of them walks on
+    // from off one side instead, under whatever is left of the wall.
+    //
+    // Stone is Centipede's mushrooms: the front of the line meeting it turns
+    // and comes down a notch, the same as at a wall. The line keeps below
+    // the lowest brick still breakable (congaCeil), so it never walks over
+    // the wall, and it has more room to rise into as the wall is cleared.
     let CONGA_AT    = 7;       // bricks left when they get up
     let CONGA_N     = 7;       // how many walk on to an open field
     let CONGA_SPEED = 80;      // px/s the front one walks at
@@ -26,11 +32,16 @@
     let conga = null;
 
     LAB_MINI.conga = {
-        start() {
+        start(entering) {
             conga = { line: [], formed: false, forming: 0, dir: 1, vdir: 1, drop: 0,
                       lost: 0, turns: 0, turnT: 0 };
-            if (LAB.open) congaWalkOn();
+            if (LAB.open || entering) congaWalkOn(Math.random() < 0.5 ? 1 : -1);
             return true;
+        },
+        enter() {
+            const lead = conga.line[0];
+            const at = () => ({ x: Math.max(60, Math.min(LW - 60, lead.cx)), y: lead.cy + bh / 2 + 8 });
+            return Object.assign(at(), { at });
         },
         reset() { conga = null; },
         update: congaUpdate,
@@ -97,18 +108,45 @@
         talk = [];
     }
 
-    // an open field: a line of them walking on from the left, already linked
-    function congaWalkOn() {
+    // a line of them walking on from off one side (`from`: -1 the left, 1
+    // the right), already linked, along the top of the room under the wall
+    function congaWalkOn(from) {
         const kinds = ['R', 'O', 'G', 'Y'];
-        const gap = bw * CONGA_LINK, y = TOP + bh / 2;
+        const gap = bw * CONGA_LINK, y = congaCeil();
         for (let i = 0; i < Math.max(1, Math.round(CONGA_N)); i++) {
             const b = newBrick(0, 0, kinds[i % kinds.length], 1);
-            congaJoin(b, -bw / 2 - i * gap, y);
+            congaJoin(b, from < 0 ? -bw / 2 - i * gap : LW + bw / 2 + i * gap, y);
+            b.head = from < 0 ? 0 : Math.PI;
             bricks.push(b);
             conga.line.push(b);
         }
+        conga.dir = from < 0 ? 1 : -1;
         conga.formed = true;
         congaSync();
+    }
+
+    // the highest the front of the line may walk: under the lowest brick of
+    // the wall that can still be broken, or the top row once there is none
+    function congaCeil() {
+        let low = TOP;
+        for (const b of bricks) {
+            if (b.alive && !b.conga && b.kind !== 'X') low = Math.max(low, b.y + bh + GAP);
+        }
+        return low + bh / 2;
+    }
+
+    // the stone the front one would walk into by going to cx, if any: one he
+    // is already standing in does not count, or a notch down into stone
+    // would leave him turning on the spot for ever
+    function congaStone(lead, cx) {
+        for (const b of bricks) {
+            if (!b.alive || b.kind !== 'X') continue;
+            const mx = b.x + bw / 2, my = b.y + bh / 2;
+            if (Math.abs(lead.cy - my) >= bh * 0.9) continue;
+            if (Math.abs(lead.cx - mx) < bw * 0.95) continue;
+            if (Math.abs(cx - mx) < bw * 0.95) return b;
+        }
+        return null;
     }
 
     function congaUpdate(dt) {
@@ -144,15 +182,20 @@
                 lead.cy += conga.vdir * d;
                 if ((conga.drop -= d) <= 0) conga.dir = -conga.dir;
             } else {
-                lead.cx += conga.dir * v * dt;
+                const to = lead.cx + conga.dir * v * dt;
                 const lo = bw / 2, hi = LW - bw / 2;
-                if ((conga.dir > 0 && lead.cx >= hi) || (conga.dir < 0 && lead.cx <= lo)) {
-                    lead.cx = Math.max(lo, Math.min(hi, lead.cx));
-                    // a notch down -- or, once the floor is reached, back up
+                const wall = (conga.dir > 0 && to >= hi) || (conga.dir < 0 && to <= lo);
+                const stone = !wall && congaStone(lead, to);
+                if (wall || stone) {
+                    if (wall) lead.cx = Math.max(lo, Math.min(hi, to));
+                    // a notch down -- or, once the floor is reached, back up,
+                    // but never up into the wall
+                    const ceil = congaCeil(), floor = Math.max(CONGA_FLOOR, ceil + CONGA_DROP);
+                    if (lead.cy < ceil) conga.vdir = 1;
                     const next = lead.cy + conga.vdir * CONGA_DROP;
-                    if (next > CONGA_FLOOR || next < TOP + bh / 2) conga.vdir = -conga.vdir;
+                    if (next > floor || next < ceil) conga.vdir = -conga.vdir;
                     conga.drop = CONGA_DROP;
-                }
+                } else lead.cx = to;
             }
             // everybody else keeps his distance from the one in front of him
             const gap = bw * CONGA_LINK;
@@ -200,6 +243,7 @@
             award((TIERS[b.kind] ? TIERS[b.kind].pts : 50) * 2, b.cx, b.cy - bh / 2);
             conga.lost++;
             conga.line = line.filter(x => x !== b);
+            if (conga.formed && !conga.line.length) labMiniDown();
             maybeDropCapsule(b.cx, b.cy);
             if (++hits === 4 || hits === 12) bumpSpeed(1.12);
             if (!bricks.some(x => x.alive && x.kind !== 'X')) clearStage();

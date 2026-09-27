@@ -16,6 +16,11 @@
     // Nothing here touches how fast he answers the pointer: on a phone the
     // finger IS the paddle, and a paddle that lagged would read as the game
     // ignoring you.
+    // `lore` is a few lines of where each one is from, for his PADDLE UNLOCKED
+    // card. A famous Brandon in it is written {odin}, {surtr} or {angel}: it
+    // prints as "Brandon" in that Brandon's own face, and the rest of the
+    // line in the plain voice of nobody in particular -- the memories' rule
+    // (MEM_VOICE), so you can tell which one is meant without being told.
     const LAB_PAD = {};
     let labP = null;
     let padBits = [];               // specks of whatever he sheds
@@ -307,6 +312,8 @@
         name: 'MODERN',
         rim: V2_RIM,
         blurb: 'the paddle you start with, polished',
+        lore: 'Two thousand years after the last Brandon won, someone had to pick up where he left off. ' +
+              'Freshly polished, a little too clean, and very much yours.',
         under() { padRim('padRimV', V2_RIM, 2, 0.45); },
         skin(sg, o) {
             const sp = padFlat('padGloss', '#ffffff');
@@ -356,7 +363,9 @@
     // CLASSIC: the first game's paddle, bare. Nothing but the photograph and
     // nothing changed about how he plays -- he is MODERN without the polish,
     // there to be carried for old times' sake. The first level you win gives him.
-    LAB_PAD.classic = { name: 'CLASSIC', blurb: 'the original · plays the same as MODERN' };
+    LAB_PAD.classic = { name: 'CLASSIC', blurb: 'the original · plays the same as MODERN',
+                        lore: 'The one who won, the first time. Worn smooth by the old game, ' +
+                              'and still the only Brandon who remembers what the world was like before.' };
 
     // GILT: gold leaf over the photograph, with a sweep of light crossing him
     // every few seconds. Shorter than standard, and everything he catches
@@ -365,6 +374,8 @@
         name: 'GILT',
         ink: GILT_INK, rim: GILT_RIM,
         blurb: 'shorter · power-ups last longer',
+        lore: 'Leafed in the gold of the harvest {odin} blessed when he walked these fields. ' +
+              'The farmers kept him polished for two thousand years, waiting for hands worth the shine.',
         len: () => GILT_LEN,
         caps: () => GILT_CAPS,
         under() { padRim('padRimG', GILT_RIM, 3, 0.5); },
@@ -394,6 +405,8 @@
         name: 'STATUE',
         stone: true,
         blurb: 'longest, leans furthest · flat returns, next to no spin',
+        lore: 'Carved from the ruins\' own stone in the likeness of {angel}, back when he shone. ' +
+              'He will not bend and he will not spin, but he will lean a long way to catch you.',
         len: () => STAT_LEN,
         angle: () => STAT_ANGLE,
         edge: () => STAT_SPIN,
@@ -420,6 +433,8 @@
         name: 'FROST',
         ink: FROST_INK, rim: FROST_RIM,
         blurb: 'easier to add spin · smaller sweet spot',
+        lore: 'Cut from the ice that sealed the city the winter {odin}\'s light went out. ' +
+              'Still cold to hold, and a head slides off him any way you like.',
         len: () => FROST_LEN,
         edge: () => FROST_EDGE,
         swipe: () => FROST_SWIPE,
@@ -463,6 +478,8 @@
         name: 'EMBER',
         ink: EMB_INK, rim: EMB_RIM,
         blurb: 'sharper angles off his ends · shorter',
+        lore: 'Forged in the fire of {surtr}\'s footsteps, where the mountain still remembers the ' +
+              'weight of him. He has never quite stopped burning.',
         len: () => EMB_LEN,
         angle: () => EMB_ANGLE,
         under() {
@@ -518,6 +535,8 @@
         name: 'THE PAIR',
         ink: PAIR_INK, twin: true,
         blurb: 'two of him · a hole down the middle',
+        lore: 'Two Brandons who swore to hold the castle gate together, and in all the years since ' +
+              'have never once agreed on which of them is on the left.',
         len: () => PAIR_LEN,
         split: () => true,
         quad: () => PAIR_QUAD,

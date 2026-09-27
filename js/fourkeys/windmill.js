@@ -300,6 +300,7 @@
     // petals it still had drop off it without landing on you -- you earned
     // the head, not a faceful of him. The last one is the garden's end.
     function wmWilt(b, f) {
+        const grey = f.still * (1 - f.hp / WM_HP);   // as grey as the wilting has left it
         f.alive = false;
         f.hp = 0;
         for (let i = 0; i < f.sails.length; i++) {
@@ -322,6 +323,7 @@
         b.alive = false;
         clearStage();
         labHeadDied(f.cx, f.cy, WM_HUB);
+        bossFall.grey = grey;
     }
 
     function wmDrawSail(x, y, psi, kind, flash, alpha, len) {

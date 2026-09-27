@@ -31,25 +31,36 @@
                    'PONG_AIM', 'PONG_HOME', 'PONG_Y', 'PONG_W', 'PONG_PTS');
 
     let pong = null;
+    // Making an entrance he slides in along the ceiling from off one side to
+    // the middle over PONG_ENTER, and no head gets past him or off him until
+    // he is there.
+    const PONG_ENTER = 1.8;
 
     LAB_MINI.pong = {
-        start() {
-            pong = { x: LW / 2, vx: 0, home: LW / 2, hp: PONG_HP, maxHp: PONG_HP, flash: 0, jt: 0,
-                     goals: 0, returns: 0, fall: null };
+        start(entering) {
+            const from = Math.random() < 0.5 ? -1 : 1;
+            pong = { x: entering ? LW / 2 + from * (LW / 2 + PONG_W) : LW / 2, vx: 0, home: LW / 2,
+                     hp: PONG_HP, maxHp: PONG_HP, flash: 0, jt: 0,
+                     goals: 0, returns: 0, fall: null, enter: entering ? 0 : 1, from };
             return true;
+        },
+        enter() {
+            const at = () => ({ x: Math.max(70, Math.min(LW - 70, pong.x)), y: PONG_Y + pongH() + 16 });
+            return Object.assign(at(), { at });
         },
         reset() { pong = null; },
         busy() { return !!pong && pong.hp > 0; },
         update: pongUpdate,
         ballStep: pongBallStep,
         ceiling(ball) {
-            if (!pong || pong.hp <= 0 || phase !== 'play') return;
+            if (!pong || pong.hp <= 0 || phase !== 'play' || pong.enter < 1) return;
             pong.hp--;
             pong.goals++;
             pong.flash = 1;
             award(PONG_PTS, ball.x, 60);
             if (pong.hp > 0) return;
             pong.fall = shatter(pong.x, PONG_Y, PONG_W, 1.2);
+            labMiniDown();
             labClearIfDone();
         },
         draw: pongDraw,
@@ -68,6 +79,12 @@
         if (pong.hp <= 0) return;
         if (pong.flash > 0) pong.flash = Math.max(0, pong.flash - dt * 4);
         if (pong.jt > 0) pong.jt = Math.max(0, pong.jt - dt * JIG_DECAY);
+        if (pong.enter < 1) {
+            pong.enter = Math.min(1, pong.enter + dt / PONG_ENTER);
+            const k = pong.enter, e = 1 - Math.pow(1 - k, 3);
+            pong.x = LW / 2 + pong.from * (LW / 2 + PONG_W) * (1 - e);
+            return;
+        }
         if (phase !== 'play') return;
         // the head that will reach him first, of the ones close enough to go for
         const line = PONG_Y + pongH() / 2;
@@ -105,7 +122,7 @@
     // down off it, angled by where on him it landed, and spun by his travel
     // the way yours spins it -- turned the other way, since he is upside down
     function pongBallStep(b) {
-        if (!pong || pong.hp <= 0 || b.vy >= 0) return;
+        if (!pong || pong.hp <= 0 || b.vy >= 0 || pong.enter < 1) return;
         const line = PONG_Y + pongH() / 2, ry = extY(b);
         if (b.y - ry > line || b.y < PONG_Y) return;              // not up to him yet, or already past
         if (Math.abs(b.x - pong.x) > PONG_W / 2 + extX(b) * 0.6) return;   // beside him

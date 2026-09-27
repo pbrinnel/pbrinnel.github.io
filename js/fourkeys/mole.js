@@ -5,9 +5,12 @@
     // dyed -- the gauntlet's bounty, so anyone who has sat on the throne knows
     // to look at him. When a head comes at him he trades places with a brick
     // beside him, and the brick takes the hit meant for him. He cannot hide in
-    // stone or in a gap, so everything broken round him is one less place to
-    // go. The stage cannot end while he is up, and once he is the last one
-    // standing he runs for the edge, the way the hat's last few do.
+    // stone or in a gap. Boxed in, he hops further -- to any brick within
+    // MOLE_REACH spaces, and failing that to the nearest few anywhere -- so
+    // breaking the wall round him never leaves him a sitting duck; a longer
+    // hop only takes him longer, which is your moment. The stage cannot end
+    // while he is up, and once he is the last one standing he runs for the
+    // edge, the way the hat's last few do.
     let MOLE_HP     = 4;       // hits to finish him
     let MOLE_NOTICE = 110;     // px from his edge a head coming at him gets a move
     let MOLE_SWAP   = 0.16;    // seconds a trade takes
@@ -17,30 +20,56 @@
     let MOLE_DIAG   = 1;       // 1: corner to corner counts as beside him
     let MOLE_PTS    = 100;     // a hit; the one that finishes him pays five of these
     let MOLE_RUN    = 6;       // seconds his run takes, once he is the last one
+    let MOLE_REACH  = 2.5;     // spaces he will hop, with nothing next to him
+    let MOLE_FAR    = 3;       // ...and with nothing that close either, the nearest this many anywhere
     // The act a run draws him from, 1 easy to 3 hard. He cannot touch you: all
     // he does is refuse to be hit, so the only thing he costs is time.
     let MOLE_LVL    = 1;
     LAB_KNOBS.push('MOLE_LVL', 'MOLE_HP', 'MOLE_NOTICE', 'MOLE_SWAP', 'MOLE_COOL', 'MOLE_DAZE',
-                   'MOLE_ODDS', 'MOLE_DIAG', 'MOLE_PTS', 'MOLE_RUN');
+                   'MOLE_ODDS', 'MOLE_DIAG', 'MOLE_PTS', 'MOLE_RUN', 'MOLE_REACH', 'MOLE_FAR');
 
     let mole = null;
 
+    // Making an entrance, he surfaces in a hole the wall has lost, fading up
+    // out of it over MOLE_FADE, and cannot be hit or move until he is there.
+    const MOLE_FADE = 1.4;
+
     LAB_MINI.mole = {
         // one of the stage's own, picked where he has the most places to go --
-        // and no wall, no mole
-        start() {
-            const pool = bricks.filter(b => b.kind !== 'X');
+        // and no wall, no mole. Making an entrance, he is one more instead,
+        // in whichever empty slot of the wall has the most round it.
+        start(entering) {
+            const pool = bricks.filter(b => b.alive && b.kind !== 'X');
             if (!pool.length) return false;
             const room = b => moleMoves(b).length;
-            const most = Math.max(...pool.map(room));
-            const picks = pool.filter(b => room(b) >= Math.min(3, most));
-            const b = picks[(Math.random() * picks.length) | 0];
+            let b = null;
+            if (entering) {
+                const holes = moleHoles();
+                const most = holes.length ? Math.max(...holes.map(room)) : 0;
+                if (most > 0) {
+                    const picks = holes.filter(h => room(h) >= Math.min(3, most));
+                    const h = picks[(Math.random() * picks.length) | 0];
+                    b = newBrick(h.x, h.y, 'R', 1);
+                    bricks.push(b);
+                }
+            }
+            if (!b) {
+                const most = Math.max(...pool.map(room));
+                const picks = pool.filter(o => room(o) >= Math.min(3, most));
+                b = picks[(Math.random() * picks.length) | 0];
+            }
             b.mole = true;
             b.lab = true;
             b.hp = b.maxHp = MOLE_HP;
-            mole = { brick: b, cool: 0, daze: 0, swaps: 0, ran: false, gone: false };
+            mole = { brick: b, cool: 0, daze: 0, swaps: 0, ran: false, gone: false, fade: entering ? 0 : 1 };
             return true;
         },
+        enter() {
+            const b = mole.brick;
+            return { x: b.x + bw / 2, y: b.y + bh + 8, at: () => ({ x: b.x + bw / 2, y: b.y + bh + 8 }) };
+        },
+        // still surfacing: a head goes straight through where he is coming up
+        contact(br) { return br.mole && mole && mole.fade < 1 ? null : undefined; },
         reset() { mole = null; },
         update: moleUpdate,
         hit: moleHit,
@@ -65,6 +94,23 @@
         }
     };
 
+    // every slot of this screen's wall with nothing alive in it
+    function moleHoles() {
+        const rows = LEVELS[stage].rows || [];
+        const cols = Math.max(...rows.filter(r => r[0] !== '>').map(r => r.length));
+        const out = [];
+        rows.forEach((row, r) => {
+            const half = row[0] === '>';
+            for (let c = 0; c < cols - (half ? 1 : 0); c++) {
+                const x = MARGIN + (c + (half ? 0.5 : 0)) * (bw + GAP), y = TOP + r * (bh + GAP);
+                if (!bricks.some(o => o.alive && Math.abs(o.x - x) < bw / 2 && Math.abs(o.y - y) < bh / 2)) {
+                    out.push({ x, y });
+                }
+            }
+        });
+        return out;
+    }
+
     // where a brick belongs: the slot it is sliding to, or the one it is in
     function moleSlot(b) { return b.slide ? { x: b.slide.x1, y: b.slide.y1 } : { x: b.x, y: b.y }; }
 
@@ -78,6 +124,18 @@
             if (dx > px || dy > py) return false;
             return MOLE_DIAG >= 0.5 || dx < 1 || dy < 1;
         });
+    }
+
+    // Where he can get to from here: next door if anywhere, else within
+    // MOLE_REACH spaces, else the nearest MOLE_FAR of whatever is left.
+    function moleEscapes(m) {
+        const near = moleMoves(m);
+        if (near.length) return near;
+        const a = moleSlot(m), step = bw + GAP;
+        const rest = bricks.filter(o => o !== m && o.alive && o.kind !== 'X' && !o.flee && !o.slide)
+            .map(o => ({ o, d: Math.hypot(o.x - a.x, o.y - a.y) })).sort((p, q) => p.d - q.d);
+        const reach = rest.filter(r => r.d <= step * MOLE_REACH);
+        return (reach.length ? reach : rest.slice(0, Math.max(1, Math.round(MOLE_FAR)))).map(r => r.o);
     }
 
     // the first head in play coming at him and inside MOLE_NOTICE of his edge
@@ -94,13 +152,14 @@
     }
 
     // the two of them trade slots, one passing over and one under, the way
-    // cups do in a shell game
+    // cups do in a shell game. A long hop arcs higher and takes longer.
     function moleSwap(a, b) {
         const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 1;
         const nx = -dy / d, ny = dx / d;
-        const lift = bh * 0.6;
-        a.slide = { x0: a.x, y0: a.y, x1: b.x, y1: b.y, t: 0, nx, ny, lift };
-        b.slide = { x0: b.x, y0: b.y, x1: a.x, y1: a.y, t: 0, nx: -nx, ny: -ny, lift };
+        const far = Math.max(1, d / (bw + GAP));
+        const lift = bh * 0.6 * Math.sqrt(far), secs = MOLE_SWAP * Math.sqrt(far);
+        a.slide = { x0: a.x, y0: a.y, x1: b.x, y1: b.y, t: 0, nx, ny, lift, secs };
+        b.slide = { x0: b.x, y0: b.y, x1: a.x, y1: a.y, t: 0, nx: -nx, ny: -ny, lift, secs };
     }
 
     // every frame, after the hat's runners have moved and before the physics,
@@ -110,7 +169,7 @@
             const s = b.slide;
             if (!s) continue;
             if (b.flee || !b.alive) { b.slide = null; continue; }
-            s.t = Math.min(1, s.t + dt / MOLE_SWAP);
+            s.t = Math.min(1, s.t + dt / (s.secs || MOLE_SWAP));
             const k = s.t * s.t * (3 - 2 * s.t), lift = Math.sin(Math.PI * s.t) * s.lift;
             b.x = s.x0 + (s.x1 - s.x0) * k + s.nx * lift;
             b.y = s.y0 + (s.y1 - s.y0) * k + s.ny * lift;
@@ -118,6 +177,7 @@
         }
         if (!mole) return;
         const m = mole.brick;
+        if (mole.fade < 1) { mole.fade = Math.min(1, mole.fade + dt / MOLE_FADE); return; }
         if (!m.alive) {
             // off the edge with health left: he got away
             if (m.hp > 0 && !mole.gone) {
@@ -127,6 +187,11 @@
             return;
         }
         if (phase !== 'play') return;
+        // the rest of the wall gone from round him another way (run off): he runs too
+        if (!mole.ran && !m.flee && !bricks.some(o => o !== m && o.alive && o.kind !== 'X')) {
+            moleLeft([m]);
+            return;
+        }
         mole.cool = Math.max(0, mole.cool - dt);
         mole.daze = Math.max(0, mole.daze - dt);
         if (m.flee || m.slide || mole.cool > 0 || mole.daze > 0) return;
@@ -134,7 +199,7 @@
         if (!threat) return;
         mole.cool = MOLE_COOL;                 // one decision per head, whichever way it goes
         if (Math.random() >= MOLE_ODDS) return;
-        const moves = moleMoves(m);
+        const moves = moleEscapes(m);
         if (!moves.length) return;             // nowhere to go: he takes it
         // the one furthest from where the head will be a moment from now
         const hx = threat.x + threat.vx * 0.15, hy = threat.y + threat.vy * 0.15;
@@ -156,6 +221,7 @@
         b.slide = null;
         shockwave(b);
         award(MOLE_PTS * 5, b.x + bw / 2, b.y);
+        labMiniDown();
         if (b.flee) round.hunter++;
         if (!capsule) {
             const pool = capsulePool();
@@ -186,10 +252,14 @@
         const sp = shapeSprite('mole', null, bw, bh, false);    // the photograph, undyed
         if (!sp) return;
         const o = b.jt > 0 ? wobble(b.jt) * JIG_BRICK : 0;
+        const k = mole && mole.brick === b ? mole.fade : 1;
         ctx.save();
-        ctx.translate(b.x + b.jnx * o + bw / 2, b.y + b.jny * o + bh / 2);
+        // surfacing: up out of the hole as he fades in
+        ctx.translate(b.x + b.jnx * o + bw / 2, b.y + b.jny * o + bh / 2 + (1 - k) * (1 - k) * bh * 0.8);
         if (b.wigA) ctx.rotate(b.wigA);
+        ctx.globalAlpha = k * k;
         ctx.drawImage(sp, -bw / 2, -bh / 2, bw, bh);
+        ctx.globalAlpha = 1;
         if (b.flash > 0) {
             ctx.globalAlpha = Math.min(1, b.flash) * 0.75;
             ctx.drawImage(shapeSprite('flash', '#f2efe9', bw, bh, true), -bw / 2, -bh / 2, bw, bh);

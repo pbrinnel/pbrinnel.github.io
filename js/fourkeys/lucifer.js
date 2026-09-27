@@ -329,7 +329,10 @@
         },
         padAlpha() { return lu && lu.stage === 'end' ? 1 - luEndPose().morph : 1; },
         fence() { if (lu && lu.stage === 'end') paddle.x = paddle.tx = luLerp(lu.end.x, LW / 2, luEndPose().stand); },
-        drawTop() { if (lu && lu.stage === 'end') luDrawEndTop(); },
+        drawTop() {
+            if (lu && lu.stage === 'end') luDrawEndTop();
+            if (lu && lu.mem) menuUnlockDraw();
+        },
         // the lab's jumps
         acts: {
             one(b) { luJump(b, 1); return true; },
@@ -812,8 +815,20 @@
             return;
         }
         if (lu.stage === 'turn') {
-            lu.sec += dt;
-            if (lu.sec >= luCorruptTimes().end) {
+            const end = luCorruptTimes().end;
+            lu.sec = Math.min(end, lu.sec + dt);
+            // Changed, and the second part is over: the game's last memory is
+            // earned here, not at the end, and plays over the fight while it
+            // holds on him as he now is. Only the first time -- once it has
+            // been earned, or with nothing left to earn, part 3 just starts.
+            if (lu.sec >= end && lu.mem === undefined) {
+                lu.mem = typeof menuVoidMemory === 'function' && menuVoidMemory();
+            }
+            if (lu.mem) {
+                if (menuFightShowStep(dt)) return;
+                lu.mem = false;
+            }
+            if (lu.sec >= end) {
                 lu.stage = 3; lu.stT = 0; lu.mi = 0; lu.restT = LU_REST3 / LU_PACE3;
                 b.hp = b.maxHp = luCrownLeft() + LU_HEAD_HP;
                 // the head you had is gone; a fresh one waits on you to serve it

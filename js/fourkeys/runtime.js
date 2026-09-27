@@ -96,6 +96,7 @@
     // A stage is being stood up, and nobody from the last one survives it.
     function labStageReset() {
         labShouts = [];
+        labMiniWait = null;
         if (labB && labB.reset) labB.reset();
         if (labM && labM.reset) labM.reset();
         labB = null;
@@ -103,9 +104,10 @@
     }
 
     // the boss stage has just been built as the original: make it whoever the
-    // lab picked
+    // screen names (BOSS RUSH's, one after another), or else whoever the lab picked
     function labBossStart() {
-        labB = (LAB.boss && LAB_BOSS[LAB.boss]) || null;
+        const who = (LEVELS[stage] && LEVELS[stage].who) || LAB.boss;
+        labB = (who && LAB_BOSS[who]) || null;
         if (labB) labB.start(bricks[0]);
     }
 
@@ -113,12 +115,46 @@
     // again, and then the mini-boss comes on -- or does not, if it cannot ride
     // what is left (a mole needs a wall to hide in). A level's own screen can
     // name its rider (levels.js); otherwise it is whoever the lab picked.
+    //
+    // A level's rider makes an entrance. The screen starts without him, and
+    // only once the rally has been going MINI_WAIT0..MINI_WAIT1 seconds --
+    // rolled fresh every time -- does he come on, shouting as he does. How he
+    // comes on (walking, lowering, fading) is his own `enter`; the shout is
+    // here, so every one of them has it. The screen cannot end while he is
+    // still to come, and if the wall is gone before he is, he comes at once.
+    const MINI_WAIT0 = 5, MINI_WAIT1 = 10;
+    let labMiniWait = null;          // { who, t }: a rider still to come
     function labMiniStart() {
         if (LAB.open) bricks = [];
-        const who = (LEVELS[stage] && LEVELS[stage].mini) || LAB.mini;
+        labMiniWait = null;
+        const own = LEVELS[stage] && LEVELS[stage].mini;
+        if (own && LAB_MINI[own]) {
+            labMiniWait = { who: own, t: MINI_WAIT0 + Math.random() * (MINI_WAIT1 - MINI_WAIT0) };
+            return;
+        }
+        const who = LAB.mini;
         labM = (who && LAB_MINI[who]) || null;
         if (labM && !labM.start()) labM = null;
     }
+
+    // his clock runs only in a rally, like everything else that is waiting on you
+    function labMiniArrive(dt) {
+        const w = labMiniWait;
+        if (!w || phase !== 'play') return;
+        const wall = bricks.some(b => b.alive && b.kind !== 'X');
+        if ((w.t -= dt) > 0 && wall) return;
+        labMiniWait = null;
+        labM = LAB_MINI[w.who];
+        if (!labM.start(true)) { labM = null; labClearIfDone(); return; }
+        // enter() says where he is shouting from: { x, y }, and `at` if the
+        // shout should ride on him as he comes
+        const from = labM.enter ? labM.enter() : null;
+        if (from) labShout(from.x, from.y, 'BRANDON!', SHOUT_SECS * 1.6, from.at || null);
+    }
+
+    // A rider has been beaten, not merely outlasted: the round pays MINI BOSS
+    // CLEAR for it. The MOLE getting off the edge does not count.
+    function labMiniDown() { if (round) round.mini = true; }
 
     function labHolds(ball) { return !!(labB && labB.holds && labB.holds(ball)); }
 
@@ -131,8 +167,8 @@
         return false;
     }
 
-    // whether a mini-boss still has to be beaten before the stage can end
-    function labBusy() { return !!(labM && labM.busy && labM.busy()); }
+    // whether a mini-boss still has to come, or be beaten, before the stage can end
+    function labBusy() { return !!labMiniWait || !!(labM && labM.busy && labM.busy()); }
 
     // a brick has died and some are left; true if the mini-boss takes it from there
     function labLeft(left) { return !!(labM && labM.left && labM.left(left)); }
@@ -178,6 +214,7 @@
         for (const s of labShouts) s.life -= dt;
         labShouts = labShouts.filter(s => s.life > 0);
         menuWatch(dt);           // outside labM: it is what notices a level ending
+        labMiniArrive(dt);
         if (labM) labM.update(dt);
         // after the paddle has gone where the hand sent it, and before the
         // physics: a boss standing on the floor can hold him back from it
@@ -487,21 +524,33 @@
     // him over A_DIE, then coming apart. `extra` draws whatever else of him is
     // still falling. The takeover's white cut-out is his body's shape, which is
     // wrong for a head, so his own flash stands in for it while the blow holds.
+    // A head that had already gone grey before it died (the WINDMILL's last
+    // flower) sets c.grey, and starts there rather than flushing back to colour.
     function labHeadFall(extra) {
         const c = bossFall;
         if (!c || !c.head) return;
         const wilt = Math.max(0, Math.min(1, ascendT / A_DIE));
         const e = wilt * wilt * (3 - 2 * wilt);
+        const grey = Math.max(e, c.grey || 0);
         const w = c.w, h = w * (BALL_RY / BALL_RX);
         if (extra) extra();
         if (ascendT < A_DIE) {
             if (ready(ballImg)) {
-                if (e > 0.001) ctx.filter = 'grayscale(' + e.toFixed(3) + ')';
                 ctx.drawImage(ballImg, c.x - w / 2, c.y - h / 2 + e * F_SAG, w, h);
-                ctx.filter = 'none';
+                // the grey laid over him rather than ctx.filter, which Safari ignores
+                const g = headSprite2('grey');
+                if (g && grey > 0.001) {
+                    ctx.globalAlpha = grey;
+                    ctx.drawImage(g, c.x - w / 2, c.y - h / 2 + e * F_SAG, w, h);
+                    ctx.globalAlpha = 1;
+                }
             }
         } else {
+            // from where the sag left him, or he jumps back up as he comes apart
+            ctx.save();
+            ctx.translate(0, F_SAG);
             drawHeadCrumble(c, headSprite2('grey'));
+            ctx.restore();
         }
         const a = impact ? (impact.t < HIT_HOLD ? 1 : 1 - (impact.t - HIT_HOLD) / HIT_FADE) : 0;
         if (a > 0.002) {

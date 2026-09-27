@@ -1572,32 +1572,46 @@
     // ---- 92 years back: the court -----------------------------------------------------
     // All of it in silhouette, black against the ember of a hall: the Fallen
     // over it all, and five Brandons coming up to him and standing in a
-    // half circle under him. He gives each a kingdom, and strikes them, and
-    // each comes apart and goes back together as one of the five this game is
-    // fought against -- in outline, so you know the shapes before you meet
-    // them. They shout his name, and it cuts.
+    // half circle under him. He gives each a kingdom, and strikes them one
+    // after another, and each is wrapped in his lightning and swells, cell by
+    // cell, into one of the five this game is fought against -- at the size
+    // it will be when you meet it, so the hall fills with them and you can
+    // see how far each has grown past the Brandon he was. Each is edged in
+    // the hall's ember so the five still read where they stand over one
+    // another. They shout his name, and it cuts.
     const MC_FADE_IN = 1.2;
     const MC_ARRIVE = 1.0;           // the first of them starts up out of the bottom...
     const MC_WALK = 2.0;             // ...takes this long to get to his place...
     const MC_GAP = 0.45;             // ...and the next starts this much later
     const MC_SAY = [5.5, 10.8];
-    const MC_ZAP = 11.2;             // the first strike; each after it MC_GAP later
+    const MC_ZAP = 11.2;             // the first strike...
+    const MC_ZAP_GAP = 0.85;         // ...and each after it this much later, so each change is its own beat
     const MC_ZAP_SECS = 0.7;
-    const MC_TURN = 1.6;             // seconds each takes to come apart and back as his boss
-    const MC_SHOUT = [15.2, 17.6];
-    const MC_CUT = 18.1;
+    const MC_TURN = 1.8;             // seconds each takes to come apart and swell into his boss
+    const MC_TURN_FROM = 0.3;        // the size the boss starts swelling from, of his own
+    const MC_ARCS = 6;               // bolts crawling over one while he changes
+    const MC_ARC_TAIL = 0.6;         // ...and seconds they keep crawling once he has
+    const MC_SHOUT = [16.9, 19.3];
+    const MC_CUT = 19.8;
     const MC_INK = '#080504';
+    const MC_RIM = '#8a3f22';        // the hall's ember, round each of the five once he has changed
+    const MC_RIM_PX = 2;
+    const MC_GLOW = 'rgba(201,122,90,1)';
     const MC_LU = [400, 150, 0.5];   // where the Fallen is, his middle, and his scale
     const MC_SMALL_H = 90;           // how tall each of the five is when he comes
-    const MC_CELL = 6;               // px, the grain they come apart in
+    const MC_CELL = 7;               // px, the grain they come apart in
     // where the five stand, left to right, and which level's boss each becomes
     const MC_RING = [[156, 318, 1], [262, 412, 2], [400, 450, 3], [538, 412, 4], [644, 318, 5]];
     const MC_LINE = [['...and to my loyal followers I grant you your own kingdom in this new world.', 'fallen']];
 
+    const mcZap = i => MC_ZAP + i * MC_ZAP_GAP;
+    const mcTurn = (s, i) => memClamp((s - mcZap(i) - MC_ZAP_SECS * 0.5) / MC_TURN);
+
     function memCourt(s) {
         if (s >= MC_CUT || !memWhole() || !memHeadless() || !ready(ballImg)) return;
         ctx.save();
-        ctx.globalAlpha = memEase(s / MC_FADE_IN);
+        const fade = memEase(s / MC_FADE_IN);
+        ctx.globalAlpha = fade;
         // the hall's light, behind them all
         const gr = ctx.createRadialGradient(LW / 2, 220, 20, LW / 2, 260, 560);
         gr.addColorStop(0, 'rgba(150,72,40,0.75)');
@@ -1606,36 +1620,114 @@
         ctx.fillStyle = gr;
         ctx.fillRect(0, 0, LW, LH);
 
-        const g = memOffscreen();
-        const [lx, ly, lsc] = MC_LU;
-        const at = memLucifer(g, s, lx, ly, lsc, 1, 0);
-        MC_RING.forEach(([x, y, n], i) => {
-            const walk = memEase((s - MC_ARRIVE - i * MC_GAP) / MC_WALK);
-            const turn = memClamp((s - MC_ZAP - i * MC_GAP - MC_ZAP_SECS * 0.5) / MC_TURN);
-            memCourtOne(g, s, x, memLerp(LH + MC_SMALL_H, y, walk), n, turn, i);
-        });
-        g.globalCompositeOperation = 'source-atop';
-        g.fillStyle = MC_INK;
-        g.fillRect(0, 0, LW, LH);
-        g.globalCompositeOperation = 'source-over';
-        ctx.drawImage(memCanvas, 0, 0, LW, LH);
+        const where = i => {
+            const [x, y] = MC_RING[i];
+            return [x, memLerp(LH + MC_SMALL_H, y, memEase((s - MC_ARRIVE - i * MC_GAP) / MC_WALK))];
+        };
+        // the bosses first, the bulkiest at the back so the smaller ones
+        // still show in front of them, each edged
+        MC_RING.map((r, i) => i).sort((a, b) => MC_DEPTH.indexOf(MC_RING[a][2]) - MC_DEPTH.indexOf(MC_RING[b][2]))
+            .forEach(i => {
+                const turn = mcTurn(s, i);
+                if (turn <= 0) return;
+                const [x, y] = where(i);
+                memCourtLayer(g => memCourtOne(g, s, x, y, MC_RING[i][2], turn, i, true), true);
+            });
+        // then the Brandons still to change, and the Fallen over everything
+        let at = null;
+        memCourtLayer(g => {
+            at = memLucifer(g, s, MC_LU[0], MC_LU[1], MC_LU[2], 1, 0);
+            MC_RING.forEach(([, , n], i) => {
+                const turn = mcTurn(s, i);
+                if (turn >= 1) return;
+                const [x, y] = where(i);
+                memCourtOne(g, s, x, y, n, turn, i, false);
+            });
+        }, false);
 
-        MC_RING.forEach(([x, y], i) => {
-            const a = MC_ZAP + i * MC_GAP;
+        MC_RING.forEach(([x, y, n], i) => {
+            const a = mcZap(i);
             const hand = at.hands[x < LW / 2 ? 1 : 0];
-            memBolt(s, [a, a + MC_ZAP_SECS], hand[0], hand[1], x, y - 20, 'rgba(201,122,90,1)');
+            memBolt(s, [a, a + MC_ZAP_SECS], hand[0], hand[1], x, y - 20, MC_GLOW);
+            memCourtArcs(s, i, x, y, n);
         });
         memLine(MC_LINE, 'fallen', LW / 2, 34, 22, memClamp((s - MC_SAY[0]) / (MC_SAY[1] - MC_SAY[0])), MC_SAY);
-        MC_RING.forEach(([x, y], i) => {
+        MC_RING.forEach(([x, y, n], i) => {
             const a = MC_SHOUT[0] + i * 0.15;
-            memLine([['BRANDON!', 'fallen']], 'you', x, y - 96, 18, memClamp((s - a) / (MC_SHOUT[1] - a)), [a, MC_SHOUT[1]]);
+            const top = y + MC_TOP[n];
+            memLine([['BRANDON!', 'fallen']], 'you', x, Math.max(70, top - 14), 18,
+                    memClamp((s - a) / (MC_SHOUT[1] - a)), [a, MC_SHOUT[1]]);
         });
         ctx.restore();
     }
 
-    // one of the five at (x, y), `turn` of the way from a Brandon to his boss:
-    // the cells of him that have gone, and the cells of it that have come
-    function memCourtOne(g, s, x, y, n, turn, i) {
+    // Some of the scene drawn off to one side, flattened to a silhouette and
+    // laid on the screen -- edged in ember first, when `rim`.
+    function memCourtLayer(draw, rim) {
+        const g = memOffscreen();
+        draw(g);
+        g.globalCompositeOperation = 'source-atop';
+        if (rim) {
+            g.fillStyle = MC_RIM;
+            g.fillRect(0, 0, LW, LH);
+            for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+                ctx.drawImage(memCanvas, dx * MC_RIM_PX, dy * MC_RIM_PX, LW, LH);
+            }
+        }
+        g.fillStyle = MC_INK;
+        g.fillRect(0, 0, LW, LH);
+        g.globalCompositeOperation = 'source-over';
+        ctx.drawImage(memCanvas, 0, 0, LW, LH);
+    }
+
+    // Lightning crawling over one of the five from the moment he is struck
+    // until a little after he has changed: short crooked bolts between points
+    // round him, re-cut every MR_BOLT_KINK, over the size he has grown to so
+    // far, with a glow under them. They move; nothing brightens the screen.
+    function memCourtArcs(s, i, x, y, n) {
+        const a = mcZap(i), b = a + MC_ZAP_SECS * 0.5 + MC_TURN + MC_ARC_TAIL;
+        if (s < a || s > b) return;
+        const on = Math.min(1, (s - a) / 0.2, (b - s) / MC_ARC_TAIL);
+        const k = memCourtGrow(mcTurn(s, i));
+        const r = memLerp(MC_SMALL_H * 0.6, MC_REACH[n], k), cy = y + memLerp(0, MC_MID[n], k);
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha *= on * 0.5;
+        ctx.drawImage(memBlob(MC_GLOW), x - r * 1.3, cy - r * 1.3, r * 2.6, r * 2.6);
+        ctx.lineJoin = 'round';
+        const seed = Math.floor(s / MR_BOLT_KINK);
+        for (let j = 0; j < MC_ARCS; j++) {
+            const h = q => memHash(seed * 53 + j * 11 + i * 997 + q);
+            const a0 = h(1) * Math.PI * 2, a1 = a0 + (0.6 + h(2) * 1.4) * (h(3) < 0.5 ? -1 : 1);
+            const r0 = r * (0.55 + h(4) * 0.5), r1 = r * (0.55 + h(5) * 0.5);
+            const pts = [];
+            for (let q = 0; q <= 6; q++) {
+                const f = q / 6, ang = memLerp(a0, a1, f), rr = memLerp(r0, r1, f) + (q && q < 6 ? (h(10 + q) - 0.5) * r * 0.25 : 0);
+                pts.push([x + Math.cos(ang) * rr, cy + Math.sin(ang) * rr * 0.9]);
+            }
+            for (const [wd, col, al] of [[7, MC_GLOW, 0.5], [2, 'rgba(255,240,220,1)', 1]]) {
+                ctx.globalAlpha = on * al * 0.85;
+                ctx.strokeStyle = col;
+                ctx.lineWidth = wd;
+                ctx.beginPath();
+                pts.forEach(([px, py], q) => q ? ctx.lineTo(px, py) : ctx.moveTo(px, py));
+                ctx.stroke();
+            }
+        }
+        ctx.restore();
+    }
+
+    // how big his boss is, `turn` of the way through the change: swelling
+    // from MC_TURN_FROM of its size, a little past it, and back
+    function memCourtGrow(turn) {
+        const t = memClamp(turn), c = 1.6;
+        return t <= 0 ? 0 : 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2);
+    }
+
+    // One of the five at (x, y), `turn` of the way from a Brandon to his boss:
+    // the cells of him that have gone (`boss` false), or the cells of it that
+    // have come, swelling as they do (`boss` true).
+    function memCourtOne(g, s, x, y, n, turn, i, boss) {
         const wig = (dg, hz) => Math.sin(s * hz + i * 1.9) * dg * Math.PI / 180;
         const small = () => {
             const L = MC_SMALL_H, T = L / SHAPE_ASPECT;
@@ -1645,35 +1737,52 @@
             g.drawImage(memWhole(), -L / 2, -T / 2, L, T);
             g.restore();
         };
-        const boss = () => {
+        const big = () => {
             g.save();
             g.translate(x, y);
-            g.rotate(wig(3, 1.3));
-            const sc = 1 + 0.03 * Math.sin(s * 2.1 + i);
+            g.rotate(wig(2, 1.3));
+            const sc = memLerp(MC_TURN_FROM, 1, memCourtGrow(turn)) * (1 + 0.02 * Math.sin(s * 2.1 + i));
             g.scale(sc, sc);
             MC_BOSSES[n](g, s);
             g.restore();
         };
-        if (turn <= 0) { small(); return; }
-        if (turn >= 1) { boss(); return; }
-        const cells = (keep) => {
-            g.beginPath();
-            for (let cy = -130, r = 0; cy < 120; cy += MC_CELL, r++) {
-                for (let cx = -100, c = 0; cx < 100; cx += MC_CELL, c++) {
-                    if ((memHash(r * 131 + c * 7 + i * 1000) < turn) === keep) g.rect(x + cx, y + cy, MC_CELL, MC_CELL);
-                }
+        const h = MC_SMALL_H * 0.6;
+        if (!boss) {
+            if (turn <= 0) { small(); return; }
+            g.save(); memCourtCells(g, turn, i, false, x - h, y - h, x + h, y + h, MC_CELL); small(); g.restore();
+            return;
+        }
+        if (turn >= 1) { big(); return; }
+        // the boss's cells are coarser, since there is so much more of him;
+        // they run up off the top, where the stems and the long bodies go
+        const r = MC_REACH[n] * 1.4;
+        g.save(); memCourtCells(g, turn, i, true, x - r, 0, x + r, y + r, MC_CELL * 2); big(); g.restore();
+    }
+
+    // clip to the cells of a box that have turned (keep true) or not yet
+    function memCourtCells(g, turn, i, keep, x0, y0, x1, y1, cell) {
+        g.beginPath();
+        for (let cy = y0, r = 0; cy < y1; cy += cell, r++) {
+            for (let cx = x0, c = 0; cx < x1; cx += cell, c++) {
+                if ((memHash(r * 131 + c * 7 + i * 1000) < turn) === keep) g.rect(cx, cy, cell, cell);
             }
-            g.clip();
-        };
-        g.save(); cells(false); small(); g.restore();
-        g.save(); cells(true); boss(); g.restore();
+        }
+        g.clip();
     }
 
     // Each boss in outline, built from what he is built from, centred on
-    // (0, 0) and fitting in about 180 across: WINDMILL a head on a stem with
-    // brandons for petals, IDOL one enormous head, TWINS a big one and a
-    // small one facing each other, LAMPS one hung over three stood on end,
-    // and GLEEOK the headless body upended with three heads on its necks.
+    // (0, 0) at the size his fight has him, read off his own knobs: WINDMILL
+    // a head on a stem with brandons for petals, IDOL one enormous head,
+    // TWINS a big one and a small one facing each other, LAMPS one hung over
+    // three stood on end, and GLEEOK the headless body upended with three
+    // heads on its necks. MC_REACH is roughly how far each reaches from its
+    // middle, MC_MID where that middle is, and MC_TOP its top, for the
+    // lightning and the shout.
+    // MC_DEPTH is the order they are laid down in, back to front.
+    const MC_REACH = { 1: 150, 2: 200, 3: 230, 4: 220, 5: 240 };
+    const MC_MID = { 1: -150, 2: -90, 3: -40, 4: -90, 5: -90 };
+    const MC_TOP = { 1: -300, 2: -300, 3: -140, 4: -220, 5: -330 };
+    const MC_DEPTH = [5, 2, 4, 3, 1];
     const memMcBody = (g, x, y, L, a, flip) => {
         const T = L / SHAPE_ASPECT;
         g.save();
@@ -1690,39 +1799,41 @@
     const MC_BOSSES = {
         1: (g, s) => {                               // WINDMILL
             g.fillStyle = '#000';
-            g.fillRect(-2, -400, 4, 380);
-            for (let p = 0; p < 6; p++) {
-                const a = s * 0.6 + p * Math.PI / 3;
-                memMcBody(g, Math.cos(a) * 42, -20 + Math.sin(a) * 42, 62, a, false);
+            g.fillRect(-2, -900, 4, 900 + MC_MID[1]);
+            const n = Math.max(1, Math.round(WM_SAILS));
+            for (let p = 0; p < n; p++) {
+                const a = s * 0.6 + p * Math.PI * 2 / n, r = WM_R0 + WM_SAIL / 2;
+                memMcBody(g, Math.cos(a) * r, MC_MID[1] + Math.sin(a) * r, WM_SAIL, a, false);
             }
-            memMcHead(g, 0, -20, 38);
+            memMcHead(g, 0, MC_MID[1], WM_HUB);
         },
-        2: (g) => memMcHead(g, 0, -20, 118),         // IDOL
+        2: (g) => memMcHead(g, 0, -90, IDOL_W),      // IDOL
         3: (g) => {                                  // TWINS
-            memMcBody(g, -38, -30, 120, 0, false);
-            memMcBody(g, 52, -10, 78, 0, true);
+            memMcBody(g, -95, -70, TW_W_BIG, 0, false);
+            memMcBody(g, 150, 10, TW_W_SMALL, 0, true);
         },
         4: (g, s) => {                               // LAMPS
-            memMcBody(g, 0, -70 + Math.sin(s * 1.4) * 3, 120, 0, false);
-            for (const lx of [-48, 0, 48]) memMcBody(g, lx, 10 + Math.sin(s + lx) * 3, 70, -Math.PI / 2, false);
+            memMcBody(g, 0, -170 + Math.sin(s * 1.4) * 4, LAMP_BOSS_W, 0, false);
+            for (const lx of [-LAMP_W, 0, LAMP_W]) memMcBody(g, lx, 0 + Math.sin(s + lx) * 4, LAMP_W, -Math.PI / 2, false);
         },
         5: (g, s) => {                               // GLEEOK
-            const L = 130, T = L / SHAPE_ASPECT;
+            const L = GL_W, T = L / SHAPE_ASPECT, collar = -60;
             g.save();
-            g.translate(0, -70);
+            g.translate(0, collar - L / 2);
             g.rotate(Math.PI / 2);
             g.drawImage(memHeadless(), -L / 2, -T / 2, L, T);
             g.restore();
             g.strokeStyle = '#000';
-            g.lineWidth = 7;
-            for (const [hx, hy, ph] of [[-46, 40, 0], [0, 58, 2], [46, 40, 4]]) {
-                const sway = Math.sin(s * 1.5 + ph) * 5;
+            g.lineWidth = 12;
+            [-1, 0, 1].forEach((k, ph) => {
+                const a = k * GL_FAN + Math.sin(s * 1.5 + ph * 2) * 0.08;
+                const hx = Math.sin(a) * GL_NECK, hy = collar + Math.cos(a) * GL_NECK;
                 g.beginPath();
-                g.moveTo(0, -8);
-                g.quadraticCurveTo(hx * 0.3, 20, hx + sway, hy);
+                g.moveTo(0, collar);
+                g.quadraticCurveTo(hx * 0.3, collar + GL_NECK * 0.55, hx, hy);
                 g.stroke();
-                memMcHead(g, hx + sway, hy + 12, 30);
-            }
+                memMcHead(g, hx, hy + GL_HEAD_W * 0.35, GL_HEAD_W);
+            });
         },
     };
 

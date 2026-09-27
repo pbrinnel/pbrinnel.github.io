@@ -6,7 +6,12 @@
     // on the sole knocks it back up and hurts it; anything else just bounces.
     // If it gets all the way down it stamps -- on you, if you are under it,
     // which costs a life -- then lifts back up and comes again.
-    let BOOT_HP    = 6;       // hits on the sole to see it off
+    //
+    // It does not stay. After BOOT_STAY0..BOOT_STAY1 seconds of a rally it
+    // lifts off the top of the screen and is gone for BOOT_AWAY0..BOOT_AWAY1,
+    // then comes down again shouting, somewhere over you -- the wall is
+    // yours to work on while it is away, and it is never away for long.
+    let BOOT_HP    = 9;       // hits on the sole to see it off
     let BOOT_W     = 180;     // px along the sole
     let BOOT_SINK  = 26;      // px/s it comes down
     let BOOT_KNOCK = 70;      // px a hit on the sole puts it back up
@@ -14,12 +19,17 @@
     let BOOT_TOP   = 150;     // where its sole starts, down from the top, and goes back to
     let BOOT_LIFT  = 1.2;     // seconds it takes to lift again after a stamp
     let BOOT_PTS   = 120;     // a hit on the sole
+    let BOOT_STAY0 = 8,  BOOT_STAY1 = 14;     // seconds it stays before it goes...
+    let BOOT_AWAY0 = 5,  BOOT_AWAY1 = 10;     // ...and is gone
+    let BOOT_ARRIVE = 1.1;    // seconds it takes to come down into view, near enough
     // The act a run draws it from, 1 easy to 3 hard. It is the only one of
     // them that takes a life off you outright, and it asks for a hit on the
     // sole every few seconds while you are keeping a head alive.
     let BOOT_LVL   = 4;
     LAB_KNOBS.push('BOOT_LVL', 'BOOT_HP', 'BOOT_W', 'BOOT_SINK', 'BOOT_KNOCK', 'BOOT_TRACK',
-                   'BOOT_TOP', 'BOOT_LIFT', 'BOOT_PTS');
+                   'BOOT_TOP', 'BOOT_LIFT', 'BOOT_PTS', 'BOOT_STAY0', 'BOOT_STAY1', 'BOOT_AWAY0',
+                   'BOOT_AWAY1', 'BOOT_ARRIVE');
+    const bootRoll = (a, b) => a + Math.random() * (b - a);
 
     // Read off the levelled art: the toe and heel of his sole in his own box
     // (u along him from the boot, v down), and what is kept of him -- the boot
@@ -36,9 +46,15 @@
 
     LAB_MINI.boot = {
         start() {
-            boot = { x: LW / 2, sole: -BOOT_W * 2, hp: BOOT_HP, maxHp: BOOT_HP, flash: 0, iframes: 0,
-                     lift: 0, stamps: 0, caught: 0, arriving: true };
+            boot = { x: Math.max(BOOT_W / 2, Math.min(LW - BOOT_W / 2, paddle.x)), sole: -BOOT_W * 2,
+                     hp: BOOT_HP, maxHp: BOOT_HP, flash: 0, iframes: 0,
+                     lift: 0, stamps: 0, caught: 0, arriving: true,
+                     stay: bootRoll(BOOT_STAY0, BOOT_STAY1), away: 0, leaving: false };
             return true;
+        },
+        enter() {
+            const at = () => ({ x: boot.x, y: Math.max(40, boot.sole + 30) });
+            return Object.assign(at(), { at });
         },
         reset() { boot = null; },
         busy() { return !!boot && boot.hp > 0; },
@@ -118,13 +134,34 @@
         if (boot.flash > 0) boot.flash = Math.max(0, boot.flash - dt * 5);
         if (boot.iframes > 0) boot.iframes = Math.max(0, boot.iframes - dt);
         if (boot.hp <= 0) { boot.sole -= 700 * dt; return; }     // off it goes, back where it came from
-        // down into view at the start, whatever the phase
+        // down into view, slowly, at the start and every time it comes back
         if (boot.arriving) {
-            boot.sole += (BOOT_TOP - boot.sole) * (1 - Math.exp(-dt / 0.35));
+            boot.sole += (BOOT_TOP - boot.sole) * (1 - Math.exp(-dt / (BOOT_ARRIVE / 3)));
             if (Math.abs(boot.sole - BOOT_TOP) < 1) boot.arriving = false;
             return;
         }
         if (phase !== 'play') return;
+        // gone: waiting off the top, then back down over wherever you are
+        if (boot.away > 0) {
+            if (!bricks.some(b => b.alive && b.kind !== 'X')) boot.away = Math.min(boot.away, 1.2);
+            if ((boot.away -= dt) > 0) return;
+            boot.away = 0;
+            boot.x = Math.max(BOOT_W / 2, Math.min(LW - BOOT_W / 2, paddle.x));
+            boot.arriving = true;
+            boot.stay = bootRoll(BOOT_STAY0, BOOT_STAY1);
+            labShout(boot.x, 40, 'BRANDON!', SHOUT_SECS * 1.6, () => ({ x: boot.x, y: Math.max(40, boot.sole + 30) }));
+            return;
+        }
+        // going: straight up and out, and away once it is out of sight
+        if (boot.leaving) {
+            boot.sole -= 520 * dt;
+            if (boot.sole < -BOOT_W * 2) {
+                boot.leaving = false;
+                boot.away = bootRoll(BOOT_AWAY0, BOOT_AWAY1);
+            }
+            return;
+        }
+        if (boot.lift <= 0 && (boot.stay -= dt) <= 0) { boot.leaving = true; return; }
         if (boot.lift > 0) {
             boot.lift = Math.max(0, boot.lift - dt);
             boot.sole += (BOOT_TOP - boot.sole) * (1 - Math.exp(-dt / 0.3));
@@ -149,7 +186,7 @@
     }
 
     function bootBallStep(b) {
-        if (!boot || boot.hp <= 0 || boot.arriving) return;
+        if (!boot || boot.hp <= 0 || boot.arriving || boot.leaving || boot.away > 0) return;
         const W = BOOT_W, up = b.vy < 0;
         let hit = boxContact(b, boot.x - W / 2, boot.sole - W * BOOT_TALL, boot.x + W / 2, boot.sole);
         const sole = !!hit && hit.cy >= boot.sole - 0.5 && b.y > boot.sole;
@@ -166,7 +203,7 @@
         boot.iframes = 0.2;
         boot.sole = Math.max(BOOT_TOP, boot.sole - BOOT_KNOCK);
         award(BOOT_PTS, hit.cx, hit.cy);
-        if (boot.hp <= 0) labClearIfDone();
+        if (boot.hp <= 0) { labMiniDown(); labClearIfDone(); }
     }
 
     function bootDraw() {

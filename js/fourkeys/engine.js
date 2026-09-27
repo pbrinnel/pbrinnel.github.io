@@ -185,6 +185,7 @@
     const CAP_SCORE  = 250;
     const MAX_BALLS  = 6;
     const SLOW_MUL   = 0.68;
+    const SLOW_EASE  = 2;      // seconds, at the end of SLOW, the heads take to get back up to speed
 
     const WIG_AMP    = 8 * Math.PI / 180;  // how far things lean
     const WIG_FREQ   = 3.2;                // rad/s -- a slow sway, not a buzz
@@ -225,7 +226,9 @@
         { key: 'fast',     label: 'GOTTA GO FAST',   pts: 300 },
         { key: 'heads',    label: HEADS_AT + ' HEADS', pts: 600 },
         { key: 'grit',     label: 'NEVER GIVE UP',   pts: 400 },
-        { key: 'hunter',   label: 'HUNTER',          pts: 300, many: true }
+        { key: 'hunter',   label: 'HUNTER',          pts: 300, many: true },
+        // a level's mini-boss beaten, not outlasted (see labMiniDown)
+        { key: 'mini',     label: 'MINI BOSS CLEAR', pts: 250 }
     ];
 
     // The reveal. The score does not move until the last line has landed --
@@ -486,6 +489,12 @@
     const FLEE_WAIT   = 1.0;     // seconds one spends saying it before he goes
     const FLEE_SECS   = 8;       // ...then getting all the way off the screen, at a dawdle
     const FLEE_RAMP   = 0.8;     // seconds of that spent getting up to pace
+    // Any wall, not only the hat's, will not hold you at its last few for
+    // ever: once STALL_AT or fewer are left and STALL_SECS go by without a
+    // single one of them being hit, every one of them runs for it at once.
+    // A mini-boss is not a brick and never runs this way.
+    const STALL_AT    = 3;
+    const STALL_SECS  = 15;
     const TODDLE_HZ   = 2.2;     // rocks a second, left and back
     const TODDLE_LEAN = 7 * Math.PI / 180;
     const TODDLE_HOP  = 3;       // px he lifts at the end of each step
@@ -1019,6 +1028,7 @@
     let ascendFrom = { y: PADDLE_Y, w: PADDLE_W };
     let phantoms = [], phGap = 0, shout = null, enterT = 0, rings = [], overT = 0;
     let talk = [], fleeRoll = -1; // the hat stage's voices, and seconds to its next coin toss
+    let stallT = 0;               // seconds the last few have gone without a hit -- see STALL_AT
     let round = null;             // what this round has done so far -- see EOR_ROWS
     let eor = null;               // ...and the screen it becomes once the round is over
     let dragT = 0;                // seconds of sluggish left on him
@@ -1045,18 +1055,11 @@
     let board = [], boardLive = false;
     let entry = '', entryRank = -1, sending = false;
 
-    const BEST_KEY = 'fourkeys.best';
-    function loadBest() {
-        try { return parseInt(localStorage.getItem(BEST_KEY), 10) || 0; }
-        catch (e) { return 0; }
-    }
-    function saveBest() {
-        try { localStorage.setItem(BEST_KEY, String(best)); } catch (e) { /* private mode */ }
-    }
-    function clearBest() {
-        best = 0;
-        try { localStorage.removeItem(BEST_KEY); } catch (e) { /* private mode */ }
-    }
+    // Every level keeps a best of its own, saved with the rest of your
+    // progress (menuBestIs); `best` is the one for the level you are in, and
+    // the town sets it as you go in. Nothing here touches brandon.html's.
+    function saveBest() { menuBestIs(best); }
+    function clearBest() { best = 0; }
 
     // ---- the leaderboard -----------------------------------------------------
     // One shared table for everyone, held by a small Cloudflare Worker (its
@@ -1184,7 +1187,11 @@
         return (a ? Math.sin(clock * WIG_FREQ * (1 + i * 0.13) + i * 2.3) * a : 0) + labRock(i);
     }
 
-    function effSpeed() { return speed * (fx.S > 0 ? SLOW_MUL : 1); }
+    // SLOW takes hold at once but lets go over its last SLOW_EASE seconds, so
+    // the heads wind back up to speed rather than lurching there
+    function effSpeed() {
+        return speed * (1 - (1 - SLOW_MUL) * Math.min(1, Math.max(0, fx.S) / SLOW_EASE));
+    }
 
     // ---- the drag ------------------------------------------------------------
     // The time constant he chases the pointer on, stepped and returned. Zero is
@@ -1341,11 +1348,12 @@
         hits = 0;
         tierSeen = {};
         talk = []; fleeRoll = -1;          // -1: nobody has started deciding yet
+        stallT = 0;
         climb = 0;              // a fresh stage puts him back on his own line
         shoutT = -1;            // ...and leaves no yell of the boss's still waiting
         // a round's tally starts here and nowhere else -- a lost life and a
         // continue both happen inside one, and neither may wipe it
-        round = { lost: false, fast: false, heads: false, grit: false, hunter: 0, peak: 1 };
+        round = { lost: false, fast: false, heads: false, grit: false, hunter: 0, peak: 1, mini: false };
         eor = null;
 
         if (lvl.boss) {
@@ -1701,7 +1709,7 @@
     paddle = { x: LW / 2, tx: LW / 2, prevX: LW / 2, vx: 0, w: PADDLE_W,
                jt: [0, 0, 0, 0], tilt: [0, 0, 0, 0], dip: [0, 0, 0, 0] };
     fx = { B: 0, D: 0, S: 0, R: 0, P: 0, W: 0, E: 0 };
-    best = loadBest();
+    best = 0;                     // the town sets it, level by level
     fetchBoard();                 // async; the game never waits on it
     newGame();
 
@@ -2152,7 +2160,7 @@
     }
 
     function action() {
-        if (menuUp()) return;
+        if (menuUp() || menuUnlockUp()) return;     // the VOID's memory takes the tap too
         if (!debugEl.hidden) return;              // ignore taps behind the menu
         // the gauntlet: a tap is a thrown head, and nothing else. the ceremony
         // at the end of it is not skippable by the click that was already on
@@ -2294,6 +2302,7 @@
     // see the award below. An ordinary brick is small enough that its own
     // middle IS the contact point, near enough, so it goes on using that.
     function hitBrick(b, cx, cy) {
+        if (b.kind !== 'X' && b.kind !== 'Z') stallT = 0;
         // the white flash is the "I hurt it" signal. a solid brick must not
         // give it, or the game is telling you to keep swinging at something
         // that will never break.
@@ -2372,7 +2381,7 @@
     // Everything the round earned, as the rows the screen prints. Nothing is
     // paid here -- see payBonus.
     function endOfRound() {
-        const boss = stage === LEVELS.length - 1;
+        const boss = !!LEVELS[stage].boss;
         const rows = [{ label: 'END OF ROUND BONUS', pts: EOR_BASE * (stage + 1) }];
         const met = {
             // the hit that ends a round moves BONUS in the same step that ends
@@ -2388,7 +2397,8 @@
             fast:     round.fast ? 1 : 0,
             heads:    round.heads ? 1 : 0,
             grit:     round.grit ? 1 : 0,
-            hunter:   round.hunter
+            hunter:   round.hunter,
+            mini:     round.mini ? 1 : 0
         };
         for (const r of EOR_ROWS) {
             const n = met[r.key];
@@ -2479,7 +2489,7 @@
         eor = endOfRound();
         capsule = null;
         dragT = 0;                  // nothing of his hangs on you past the kill
-        if (stage === LEVELS.length - 1) {
+        if (LEVELS[stage].boss) {
             // you do not get to just win. he comes apart where he stands --
             // the same way you will when your turn comes -- and your brandon
             // rises into the space he leaves and swells to fill it. Every
@@ -2547,6 +2557,14 @@
         if (playing && fleeRoll >= 0 && (fleeRoll -= dt) <= 0) {
             fleeRoll += FLEE_REROLL;
             tossForFlight();
+        }
+        if (playing && !LEVELS[stage].boss) {
+            const last = bricks.filter(b => b.alive && b.kind !== 'X' && !b.lab && !b.flee);
+            if (!last.length || last.length > STALL_AT) stallT = 0;
+            else if ((stallT += dt) >= STALL_SECS) {
+                stallT = 0;
+                for (const b of last) startFlee(b);
+            }
         }
         let gone = false;
         for (const b of bricks) {
@@ -5361,14 +5379,15 @@
             ctx.globalAlpha = 1;
         }
 
-        // SCORE is the one number that survives the handover -- the gauntlet
-        // prints it in this same spot, so it is the thread through the cut and
-        // it stays. BEST does not carry over, and a reading that only ever
-        // disappears is better not put up over the ending in the first place.
-        // None of it in the town, which has no score and nothing to lose.
+        // This level's score, this level's best, and every level's best added
+        // up, all the way through the level, its end included. None of it in
+        // the town, which has no score and nothing to lose.
         const hud = !menuUp();
-        if (hud) text('SCORE ' + score, 15 * u, 27 * u, 15 * u, '#f2efe9');
-        if (hud && phase !== 'ascend') text('BEST ' + best, 15 * u, 46 * u, 13 * u, '#6d685f');
+        if (hud) {
+            text('SCORE ' + score, 15 * u, 27 * u, 15 * u, '#f2efe9');
+            text(menuBestLabel() + ' ' + best, 15 * u, 46 * u, 13 * u, '#8d877d');
+            text('TOTAL HIGH SCORE ' + menuBestTotal(), 15 * u, 63 * u, 13 * u, '#6d685f');
+        }
 
         // no lives counter over the ending -- it is meaningless by then, and it
         // was landing squarely on the new king's face

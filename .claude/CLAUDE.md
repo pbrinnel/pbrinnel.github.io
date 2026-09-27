@@ -35,11 +35,12 @@ touches it.
 
 - **Unlisted, like brandon.html**: `noindex, nofollow`, not linked from anywhere, and no
   `og:`/`twitter:` tags at all, so a pasted link shows nothing. Its `BOARD_URL` is empty
-  and its `BEST_KEY` is its own — nothing it does can reach brandon's live leaderboard.
+  and its bests are its own, one per level, kept with the town's progress (`menuBestIs`
+  in `menu.js`) — nothing it does can reach brandon's live leaderboard or best.
 - Its code is in `js/fourkeys/`: `engine.js` (brandon.html's game, forked 22 Sep 2026 and
   edited here from now on), `runtime.js` (the seam the bosses plug into), a file per boss,
-  mini-boss and paddle, `levels.js` (each level's three screens: a wall, a bigger
-  wall with a mini-boss on it, then the boss), `menu.js` (the town), `debug.js` (what the konami code and
+  mini-boss and paddle, `levels.js` (each level's three screens: a wall, a second
+  wall a mini-boss makes an entrance on, then the boss), `menu.js` (the town), `debug.js` (what the konami code and
   `?debug` open: the keys, the paddles, and a hold to forget it all), `intro.js` (the
   BRANDON WINS and 2000 YEARS LATER cards before the town), `memory.js` (the cutscene a
   level's first win plays and MEMORIES replays), and `start.js`, which is where the game
@@ -59,6 +60,8 @@ touches it.
   service: text must look the same on every machine. Fira Sans is the player's and the
   UI's; each other Brandon speaks in his own font and colour (see `MEM_VOICE` in
   `memory.js`).
+- Brick screens use brandon.html's brick size: seven across, every screen. An exception needs
+  a specific reason (Paul, 27 Sep 2026). The layout rules are in `levels.js`'s header.
 - Every `<script src>` carries `?v=N`. Pages are cached for ten minutes, so **bump all of
   them together on every deploy** or someone gets one new file and one old one.
 - The boss lab builds from these same files; only the panel is the lab's own. Tuning a boss
