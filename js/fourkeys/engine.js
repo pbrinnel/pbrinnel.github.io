@@ -2507,7 +2507,7 @@
             banner = 'BRANDON WINS';
         } else {
             phase = 'cleared';
-            banner = 'STAGE CLEAR';
+            banner = 'WALL CLEAR';          // a stage is a whole building in the town (menuBestLabel)
             // the hat's statues go too, now there is nothing left to stand
             // over -- see STATUE_WAIT
             if (LEVELS[stage].talks) {
@@ -5379,7 +5379,7 @@
             ctx.globalAlpha = 1;
         }
 
-        // This level's score, this level's best, and every level's best added
+        // This stage's score, this stage's best, and every stage's best added
         // up, all the way through the level, its end included. None of it in
         // the town, which has no score and nothing to lose.
         const hud = !menuUp();

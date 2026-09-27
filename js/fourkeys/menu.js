@@ -182,11 +182,12 @@
         menuLoad();
         return MENU_ALL.reduce((s, l) => s + (menu.best[l.n] || 0), 0);
     }
-    // what the HUD calls the best it is showing: BOSS RUSH keeps its own,
-    // and it is not one of the six
-    function menuBestLabel() { return menu && menu.run && menu.run.n === M_RUSH ? 'RUSH BEST' : 'LEVEL BEST'; }
+    // what the HUD calls the best it is showing. A player calls each of the
+    // six a STAGE -- never a level, so the walls inside one are not mistaken
+    // for more of them. BOSS RUSH keeps its own, and it is not one of the six.
+    function menuBestLabel() { return menu && menu.run && menu.run.n === M_RUSH ? 'RUSH BEST' : 'STAGE BEST'; }
 
-    function menuName(n) { if (n === M_RUSH) return 'BOSS RUSH'; const l = MENU_ALL.find(o => o.n === n); return l ? l.name : 'LEVEL ' + n; }
+    function menuName(n) { if (n === M_RUSH) return 'BOSS RUSH'; const l = MENU_ALL.find(o => o.n === n); return l ? l.name : 'STAGE ' + n; }
 
     // the first boss whose level slider points at this one, if any
     function menuBossFor(n) {
@@ -475,7 +476,7 @@
         }
         if (level.key === 'rush') { menuRush(); return; }
         const boss = menuBossFor(level.n);
-        if (!boss) { menuSay(level.name + ' · no boss is set to this level'); return; }
+        if (!boss) { menuSay(level.name + ' · no boss is set to this stage'); return; }
         menu.arriveT = -1;          // walked in before the town finished arriving
         menu.run = { n: level.n, over: false, cont: false, out: 0 };
         best = menu.best[level.n] || 0;
@@ -616,7 +617,7 @@
 
     // The debug menu's win button. The screen you are on counts as beaten: a
     // level's last is won outright, as though the takeover had played out,
-    // and any other goes straight on to the next with no STAGE CLEAR.
+    // and any other goes straight on to the next with no WALL CLEAR.
     // Coming off the CONTINUE screen this way is not a continue.
     function menuSkip() {
         if (!menu || !menu.run) return false;
