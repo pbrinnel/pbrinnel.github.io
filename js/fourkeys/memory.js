@@ -969,25 +969,30 @@
     // over him with violet light behind them beating with his heart; violet
     // points in his own eyes; and two swords of Brandons, burning, flying round
     // him opposite each other on a tilted ring, rising and falling out of step.
-    // The second is the first with its colours inverted. Each turns like a
-    // baton weighted at one end, thrown: about a point toward its hilt, fast
-    // through half of every turn and slow through the other.
+    // The second is the first with its colours reversed. Each turns slowest
+    // upright and fastest lying flat.
     const MSF_ECLIPSE = 0.35;        // how much of the black sun shows
     const MSF_EYES = [[0.0225, -0.062], [0.0005, -0.0255]];   // his eyes in the photo, from his head's middle, shares of him
     const MSF_SWORD = 0.75;          // a sword's length, blade to pommel near enough, as a share of him
-    const MSF_SWORD_ROUND = 8;       // seconds for them to go round him
-    const MSF_SWORD_TURN = 19.2;     // ...and for one to turn over once, on average
-    const MSF_SWORD_LURCH = 0.7;     // how uneven the turn is: 0 even, toward 1 nearly stopping
-    const MSF_SWORD_HEAVY = 0.2;     // how far from its middle toward the hilt it turns about, as a share of it
+    const MSF_SWORD_ROUND = 10.5;    // seconds for them to go round him
+    const MSF_SWORD_TURN = 19.2;     // ...and for one to turn over once
+    // How much slower a sword turns upright than flat: its speed is
+    // 1 - MSF_SWORD_UPRIGHT × how upright it is, scaled so a turn still takes
+    // MSF_SWORD_TURN. Its angle is then atan2(√(1 - k)·sin φ, cos φ) for a φ
+    // going round evenly.
+    const MSF_SWORD_UPRIGHT = 0.85;
     const MSF_SWORD_BOB = 0.23;      // how far each rises and falls, as a share of him
-    const MSF_SWORD_BOB_SECS = 12;   // ...taking this long
-    // Each sword's iron, fire (hot to cool), glow and pommel. The second is the
-    // first inverted: the iron flipped dark for light, the rest turned to the
-    // opposite hue at the same lightness, since fire flipped outright goes dark
-    // and, drawn as light, vanishes.
+    const MSF_SWORD_BOB_SECS = 8.5;  // ...taking this long
+    // Each sword's iron, the edge round it, its fire (hot to cool), glow and
+    // pommel. The second is the first reversed: the blade takes the fire's
+    // purple and the fire the iron's black. Dark fire is drawn over what is
+    // behind it rather than added to it, each tongue rimmed in `rim` so it
+    // reads on the dark.
     const MSF_SWORDS = [
-        { iron: '#1c1628', flames: ['#efe6ff', '#a58bff', '#5a36b8'], glow: '#7850ff', pommel: MS_INK },
-        { iron: '#e3e9d7', flames: ['#f6ffe6', '#e5ff8b', '#94b836'], glow: '#d7ff50', pommel: '#8a964f' },
+        { iron: '#1c1628', edge: () => memBrick('#a58bff'), flames: ['#efe6ff', '#a58bff', '#5a36b8'],
+          glow: '#7850ff', pommel: MS_INK },
+        { iron: '#a58bff', edge: () => memFlesh('#1c1628'), flames: ['#2a2138', '#1c1628', '#0a070f'], rim: '#a58bff',
+          glow: '#7850ff', pommel: '#1c1628' },
     ];
 
     function memSurtrEclipse(x, cy, L, s, b) {
@@ -1059,17 +1064,16 @@
             // each burns on its own clock
             const t = s + k * 3.7;
             const Ls = L * MSF_SWORD * (0.9 + 0.15 * depth), T = Ls / SHAPE_ASPECT;
-            const iron = memFlesh(ink.iron), edge = memBrick(ink.flames[1]), fire = ink.flames.map(memFlesh);
+            const iron = memFlesh(ink.iron), edge = ink.edge(), fire = ink.flames.map(memFlesh);
+            const rim = ink.rim ? memBrick(ink.rim) : null;
             ctx.save();
             const base = ctx.globalAlpha;
             ctx.translate(x + Math.sin(ph) * L * 0.45,
                           cy - L * 0.1 + depth * L * 0.08 + Math.sin(s * 2 * Math.PI / MSF_SWORD_BOB_SECS + k * 2.1) * MSF_SWORD_BOB * L);
-            const turn = s * 2 * Math.PI / MSF_SWORD_TURN + k * 1.3;
-            ctx.rotate(turn + MSF_SWORD_LURCH * Math.sin(turn));
-            // In its own frame: the point down, the hilt up, and the point it
-            // turns about, MSF_SWORD_HEAVY toward the hilt from its middle, on
-            // the origin.
-            const point = Ls * (0.36 + MSF_SWORD_HEAVY), top = point - Ls * 0.6, seg = (point - top) / 6;
+            const phi = s * 2 * Math.PI / MSF_SWORD_TURN + k * Math.PI / 2;
+            ctx.rotate(Math.atan2(Math.sqrt(1 - MSF_SWORD_UPRIGHT) * Math.sin(phi), Math.cos(phi)));
+            // in its own frame: the point down at +0.36 of it, the hilt up past -0.24
+            const point = Ls * 0.36, top = point - Ls * 0.6, seg = (point - top) / 6;
             ctx.globalCompositeOperation = 'lighter';
             ctx.globalAlpha = base * (0.3 + 0.25 * b);
             const gw = Ls * 0.45;
@@ -1086,15 +1090,20 @@
             forged(0, top - Ls * 0.05, Ls * 0.1, -Math.PI / 2, 0);
             const pommel = memBallIn(ink.pommel), pr = Ls * 0.03;
             if (pommel) ctx.drawImage(pommel, -pr, top - Ls * 0.1 - pr * 1.9, pr * 2, pr * 2 * BALL_RY / BALL_RX);
-            ctx.globalCompositeOperation = 'lighter';
+            ctx.globalCompositeOperation = rim ? 'source-over' : 'lighter';
             for (let i = 0; i < 160; i++) {
                 const h1 = memLabHash(i + 1000), life = (t / (0.9 + 0.9 * h1) + memLabHash(i + 1100)) % 1;
                 const y0 = point - (point - top) * memLabHash(i + 1200) * 1.05;
                 const fx = (memLabHash(i + 1300) - 0.5) * T * 0.12 + Math.sin(t * 3 + i) * Ls * 0.012 * life;
                 const len = Ls * 0.075 * (1 - 0.75 * life) * (0.6 + 0.8 * memLabHash(i + 1400));
-                ctx.globalAlpha = base * Math.sin(Math.min(1, life * 1.2) * Math.PI) * 0.7;
-                memBone(ctx, fire[life < 0.25 ? 0 : life < 0.6 ? 1 : 2], fx, y0 - life * Ls * (0.08 + 0.1 * h1),
-                        len, -Math.PI / 2 + Math.sin(t * 6 + i * 1.7) * 0.2, i % 2);
+                const fy = y0 - life * Ls * (0.08 + 0.1 * h1), fa = -Math.PI / 2 + Math.sin(t * 6 + i * 1.7) * 0.2;
+                const alpha = base * Math.sin(Math.min(1, life * 1.2) * Math.PI) * 0.7;
+                if (rim) {
+                    ctx.globalAlpha = alpha * 0.6;
+                    memBone(ctx, rim, fx, fy, len * 1.12, fa, i % 2);
+                }
+                ctx.globalAlpha = alpha;
+                memBone(ctx, fire[life < 0.25 ? 0 : life < 0.6 ? 1 : 2], fx, fy, len, fa, i % 2);
             }
             ctx.restore();
         });
