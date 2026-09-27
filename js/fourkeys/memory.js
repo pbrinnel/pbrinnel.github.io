@@ -57,7 +57,7 @@
     // shoulders sits off where his own head was by headDx/headDy px, turned
     // headTurn degrees and rocking headSway either side of that, headSize
     // times his own head's width.
-    const MEM_FALLEN = { lean: 14, headDx: 10, headDy: -12, headTurn: -15.5, headSway: 9.5, headSize: 1.3 };
+    const MEM_FALLEN = { lean: 14, headDx: 10, headDy: -12, headTurn: -15.5, headSway: 9.5, headSize: 1.69 };
     const MEM_ANGEL  = { lean: 3,  headDx: 3,  headDy: -22, headTurn: 0,     headSway: 2.5, headSize: 1.3 };
     const MEM_HEAD_PERIOD = 1.8, MEM_ANGEL_HEAD_PERIOD = 5;
     const MEM_ANGEL_BOB = 5;         // px the Angel floats up and down
@@ -93,6 +93,41 @@
     const MEM_HALO_SIZE = 0.44, MEM_HALO_NEAR = 0.14;
     const MEM_HALO_GLOW = 0.22;      // the pale light behind the halo, at full
     const MEM_HALO_SPIN = 3.5;       // how much faster it turns as he falls
+    // The Fallen's arms go dark toward his body, into the black of his shirt:
+    // the hands clay, the forearms between, the upper arms nearly black.
+    const MEM_SHIRT = '#141418';
+    const memArmDark = order => memEase((0.5 - order) / 0.5);
+    // In the cup of each of the Fallen's hands, three small bones going round
+    // a ball of energy the way a sorcerer holds one -- except there is no
+    // ball: nothing is drawn but them, their rings tipped against each other.
+    // They keep three of the Angel's brick colours, the only pieces of him that
+    // never drained. Each rides its own ring, tipped its own way, turning its
+    // own way; the middle is MEM_ORB_ALONG out from his wrist and
+    // MEM_ORB_ACROSS across his hand (+ toward the inside of the curl),
+    // mirrored for the other hand. Rig px.
+    const MEM_ORB_BONE = 86;         // a bone's length at its nearest
+    const MEM_ORB_R = 25;            // how far out they go round the middle
+    const MEM_ORB_ALONG = 58, MEM_ORB_ACROSS = -65;
+    const MEM_ORBS = [{ tilt: -25, speed: 1, tint: '#c9a94e' }, { tilt: 55, speed: -0.8, tint: '#6f7f4e' },
+                      { tilt: 15, speed: 0.65, tint: '#9e4b3c' }];
+    function memOrbs(t, slots) {
+        const out = [];
+        [1, -1].forEach((side, hi) => {
+            const pm = slots.get(side + 'palm0'), ca = Math.cos(pm.a), sa = Math.sin(pm.a);
+            const wx = pm.x - ca * pm.len / 2, wy = pm.y - sa * pm.len / 2;
+            const cx = wx + ca * MEM_ORB_ALONG - sa * MEM_ORB_ACROSS * side;
+            const cy = wy + sa * MEM_ORB_ALONG + ca * MEM_ORB_ACROSS * side;
+            MEM_ORBS.forEach((ring, ri) => {
+                const tilt = ring.tilt * side * Math.PI / 180, rx = MEM_ORB_R, ry = MEM_ORB_R * 0.35;
+                const th = t * 2 * Math.PI / (MEM_HALO_PERIOD * 0.9) * ring.speed + hi * 1.3 + ri * 2.1;
+                const ox = Math.cos(th) * rx, oy = Math.sin(th) * ry, depth = Math.sin(th);
+                out.push({ x: cx + ox * Math.cos(tilt) - oy * Math.sin(tilt), y: cy + ox * Math.sin(tilt) + oy * Math.cos(tilt),
+                           z: depth, a: Math.atan2(ry * Math.cos(th), -rx * Math.sin(th)) + tilt,
+                           len: MEM_ORB_BONE * (MEM_HALO_SIZE + MEM_HALO_NEAR * depth), flip: ri, tint: ring.tint });
+            });
+        });
+        return out;
+    }
 
     // The pieces, in the order the arms are built: which bone each is, the
     // ring it rides as the Angel, the brick colour it wears there, and when in
@@ -272,7 +307,7 @@
                 a: memLerpAng(Math.atan2(ry * Math.cos(th), -rx * Math.sin(th)) + tilt, slot.a, fly),
                 s: memLerp(MEM_HALO_SIZE + MEM_HALO_NEAR * depth, 1, fly),
                 len: slot.len, thick: slot.thick, flip: slot.flip,
-                drain: memEase((fall - 0.12 - 0.25 * pc.order) / 0.25),
+                drain: memEase((fall - 0.12 - 0.25 * pc.order) / 0.25), dark: memArmDark(pc.order),
                 depth: fly > 0.5 ? 2 : depth, tint: pc.tint,
                 // on the near side of the halo, or out on his arms, he is in
                 // front of them -- except for the upper arms, which come out
@@ -289,9 +324,28 @@
             const brick = d.drain < 1 && memBrick(d.tint);
             if (brick) g.drawImage(brick, -w / 2, -h / 2, w, h);
             if (d.drain > 0) {
-                g.globalAlpha *= d.drain;
+                const base = g.globalAlpha;
+                g.globalAlpha = base * d.drain;
                 g.drawImage(memFlesh(MEM_CLAY), -w / 2, -h / 2, w, h);
+                // darker the nearer his body, into his shirt
+                if (d.dark > 0) {
+                    g.globalAlpha = base * d.drain * d.dark;
+                    g.drawImage(memFlesh(MEM_SHIRT), -w / 2, -h / 2, w, h);
+                }
             }
+            g.restore();
+        };
+        // the little ones round the balls in his hands, coming in as he falls
+        const orbs = memOrbs(t, slots), orbK = memEase((fall - 0.6) / 0.4);
+        const orb = h => {
+            const len = h.len * orbK, img = memBrick(h.tint);
+            if (orbK <= 0.01 || !img) return;
+            g.save();
+            g.globalAlpha *= orbK;
+            g.translate(h.x, h.y);
+            g.rotate(h.a);
+            g.scale(h.flip ? -1 : 1, 1);
+            g.drawImage(img, -len / 2, -len / SHAPE_ASPECT / 2, len, len / SHAPE_ASPECT);
             g.restore();
         };
 
@@ -318,7 +372,10 @@
         g.rotate(lean + (pose.headTurn + pose.headSway * Math.sin(t * 2 * Math.PI / period)) * Math.PI / 180);
         g.drawImage(ballImg, -bw / 2, -bh / 2, bw, bh);
         g.restore();
+        // round each ball: the far side of its rings behind the hand, the near in front
+        orbs.filter(h => h.z < 0).forEach(orb);
         drawn.filter(d => d.front).sort((a, b) => a.depth - b.depth).forEach(piece);
+        orbs.filter(h => h.z >= 0).forEach(orb);
         g.restore();
 
         const out = p => [x + p[0] * scale, y + bob * scale + p[1] * scale];
@@ -1024,8 +1081,8 @@
     // each wisp gathers out of nothing and comes down in beads.
     const MS_STRINGS = [[0.95, 0.2], [0.72, 0.1], [0.72, 0.9], [0.45, 0.5], [0.05, 0.4]];   // (u, v) on him: head, hands, middle, feet
     const MS_WISP_BITS = 70;         // puffs per wisp
-    const MS_WISP_TAUT = 0.35;       // 0 = smoke curling into him, 1 = drawn tight as a line
-    const MS_WISP_SINK = 5;          // seconds for a wisp to come down out of the dark into him
+    const MS_WISP_TAUT = 0.3;        // 0 = smoke curling into him, 1 = drawn tight as a line
+    const MS_WISP_SINK = 31;         // seconds for a wisp to come down out of the dark into him
     const MS_WISP_ROOT = 0.1;        // how far up a wisp its root reaches, 0..1
     const memMenace = () => memSprite('menace', (g, w, h) => {
         g.drawImage(memFlesh(MS_INK), 0, 0);
