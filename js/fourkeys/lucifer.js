@@ -48,27 +48,30 @@
     // and six wings grow out of the head. That is the last part, and every
     // piece of him is a brick: a hit on a wheel takes LU_WHEEL_CHUNK of its
     // bones, a hit on a wing takes its outermost layer (the long feathers,
-    // then the rest, then the bone), and once nothing is left round his head
-    // the head itself takes LU_HEAD_HP. His bar is all of it. Every piece of
+    // then the rest, then the bone). The crown is what shields his head:
+    // any head that gets through it to him hurts him. His bar is every piece
+    // of the crown and LU_HEAD_HP more, a hit on either taking one off it. Every piece of
     // health you take runs down into you as HIS light, until you have all of
     // it, and your colour comes back with it; his wings tire from LU_LIMP_AT
     // of it left, and from LU_GREY_AT he goes grey and flashes red when hit.
     // He fires his eyes at you, and grows the tree down out of his head. What
     // you knock off his crown grows back after LU_CROWN_REGROW, as armour to
-    // break again: a piece costs him health only the first time.
+    // break again, drawn as a dim husk: a piece costs him health only the
+    // first time.
     //
     // He never heals: his bar goes up once, in the change, and never otherwise.
     //
-    // He dies saying so, and his head comes apart. Then you stand up where
-    // you lay, everything you carry with you, grow to his height and become
-    // the new Odin, and say his name: BRANDON WINS, and back to the town.
+    // He dies saying so, and burns away to ash just as the last hit left
+    // him, glitching and all. Then you stand up where
+    // you lay, plain -- no paddle of yours, no capsule -- grow to his height and
+    // become the new Odin, and say his name: BRANDON WINS, and back to the town.
     let LU_LVL        = 6;
     let LU_HP1        = 8;      // hits to end the first part
     let LU_HP2        = 10;     // ...the second
     let LU_DRAIN_LEFT = 1;      // ...and the hits' worth left on his bar when he drains you
     let LU_SHAKE      = 6;      // px he shakes when a hit hurts him
     let LU_SHAKE_SECS = 0.35;   // ...dying away over this long
-    let LU_HEAD_HP    = 8;      // hits on his head, once nothing is left round it
+    let LU_HEAD_HP    = 8;      // his head's share of his last bar, on top of his crown's
     let LU_WHEEL_CHUNK = 2;     // bones of a wheel one hit takes
     let LU_L          = 230;    // how tall he stands
     let LU_Y          = 210;    // where his middle hangs
@@ -152,24 +155,29 @@
     let LU_LIMP_AT    = 0.5;    // share of the last part's health left when his wings start to tire
     let LU_LIMP_DROOP = 0.5;    // ...how far toward hanging straight down they have sunk at the end
     let LU_GREY_AT    = 0.25;   // share left when the grey starts coming into him
-    let LU_GLITCH     = 1;      // how hard his head glitches, crown all taken (see luGlitch)
-    let LU_CROWN_REGROW = 10;   // seconds before a knocked-off piece of the crown starts growing back
-    let LU_CROWN_GROW_IN = 2.5; // ...and how long it takes; it can be hit from halfway
+    let LU_GLITCH     = 1;      // how hard his head glitches at the end (see luGlitch)
+    let LU_GLITCH_AT  = 0.5;    // ...starting from nothing at this share of his health left
+    let LU_CROWN_REGROW = 30;   // seconds before a knocked-off piece of the crown starts growing back
+    let LU_CROWN_GROW_IN = 7.5; // ...and how long it takes; a head goes through it until it has
     let LU_DIE_TYPE   = 16;     // letters a second, his last words
     let LU_DIE_HOLD   = 1.8;    // seconds on them before he goes
     let LU_ODIN_GLOW  = 0.55;   // how bright HIS light is under you, all of it taken
     // the end: seconds for each beat, and how tall you stand at the last
-    let LU_END_CRUMBLE = 1.8;   // his head coming apart
+    let LU_END_CRUMBLE = 3;     // him burning away
     let LU_END_STAND  = 1.4;    // you standing up, from partway into that
     let LU_END_GROW   = 2.2;    // you growing, from partway into that
     let LU_END_ODIN_L = 330;    // ...to this tall
-    let LU_END_MORPH  = 1.6;    // you becoming him, from halfway through the growing
+    let LU_END_MORPH  = 4.5;    // you becoming him, from as you start to grow
+    let LU_END_SURGE  = 1.5;    // ...his light swelling this much more than his own as you do
+    let LU_END_SETTLE = 2;      // ...and back to his own over this, from BRANDON!
+    let LU_END_SWAP   = 1.4;    // your paddle becoming the standard one, as he starts to burn
     let LU_END_HOLD   = 2.6;    // BRANDON!, held
-    let LU_END_FADE   = 1.6;    // the black coming down over BRANDON WINS
-    let LU_END_BLACK  = 1.2;    // ...held there before the town
-    LAB_KNOBS.push('LU_GLITCH', 'LU_DRAIN_LEFT', 'LU_SHAKE', 'LU_SHAKE_SECS', 'LU_WING2_SPAN', 'LU_WING2_DEG',
+    let LU_END_WINS   = 4;      // BRANDON WINS, over you as Odin
+    let LU_END_OUT    = 0.8;    // ...then the black, and the town
+    LAB_KNOBS.push('LU_GLITCH', 'LU_GLITCH_AT', 'LU_DRAIN_LEFT', 'LU_SHAKE', 'LU_SHAKE_SECS', 'LU_WING2_SPAN', 'LU_WING2_DEG',
                    'LU_CROWN_REGROW', 'LU_CROWN_GROW_IN', 'LU_END_CRUMBLE', 'LU_END_STAND', 'LU_END_GROW',
-                   'LU_END_ODIN_L', 'LU_END_MORPH', 'LU_END_HOLD', 'LU_END_FADE', 'LU_END_BLACK');
+                   'LU_END_ODIN_L', 'LU_END_MORPH', 'LU_END_SURGE', 'LU_END_SETTLE', 'LU_END_SWAP',
+                   'LU_END_HOLD', 'LU_END_WINS', 'LU_END_OUT');
     LAB_KNOBS.push('LU_LVL', 'LU_HP1', 'LU_HP2', 'LU_HEAD_HP', 'LU_WHEEL_CHUNK', 'LU_L', 'LU_Y', 'LU_Y3',
                    'LU_DRIFT', 'LU_DRIFT_RATE', 'LU_HOME', 'LU_FORM_HP', 'LU_FORM_SECS', 'LU_REST', 'LU_REST3',
                    'LU_REFORM', 'LU_STAGGER', 'LU_PACE2', 'LU_PACE3', 'LU_CLAW_Y', 'LU_CLAW_SPEED', 'LU_CLAW_HOLD',
@@ -270,6 +278,7 @@
     ];
     // The Fallen's two wings are the same, but their long feathers are his arm's
     // nine pieces, one to each; the rows over them and the bone only look.
+    const LU_HUSK = 0.4;             // how solid a piece of the crown that has grown back is drawn
     const LU_WING2_ROWS = [Object.assign({}, LU_WING_ROWS[0], { n: LU_PIECES.length }), LU_WING_ROWS[1], LU_WING_ROWS[2]];
     const LU_WING_BONES = 4;         // joints in each wing's bone, a piece to each
     const LU_WING_SHADOW = 5;        // rig px a feather's shadow falls off it
@@ -294,7 +303,8 @@
 
     LAB_BOSS.lucifer = {
         start: luStart,
-        reset() { lu = null; },
+        // cleared partway through the end, you get your own paddle back
+        reset() { if (lu && lu.stage === 'end') labPadUse(LAB.pad); lu = null; },
         update: luUpdate,
         contact: luContact,
         touch: luTouch,
@@ -304,13 +314,19 @@
         drawFall() {},                  // he never falls: the end is his own (luDrawEnd)
         holds(ball) { return !!lu && (lu.frozen.has(ball) || lu.hands.some(h => h.held === ball)); },
         climb() { return 0; },
-        // your head is put away while he drains you and changes, and at the end
-        skipBall() { return !!lu && ['drain', 'turn', 'end'].includes(lu.stage); },
+        // your head is put away while he drains you and changes, and from his death on
+        skipBall() { return !!lu && ['drain', 'turn', 'dying', 'end'].includes(lu.stage); },
         // you, drained grey; and at the end standing up, growing, and giving way to Odin
         padSkin(sg, o) { if (lu && lu.grey > 0.001) padLay(sg, o, greySprite(), lu.grey); },
         lift() { return lu && lu.stage === 'end' ? luEndPose().stand * (padW() / 2 - padH() / 2) : 0; },
         rock() { return lu && lu.stage === 'end' ? luEndPose().stand * LU_STAND_TURN : 0; },
-        padGrow() { return lu && lu.stage === 'end' ? luLerp(1, LU_END_ODIN_L / lu.end.w, luEndPose().grow) : 1; },
+        // to LU_END_ODIN_L from however long you are without it, which BIG and
+        // your paddle's own length are still easing out of
+        padGrow() {
+            if (!lu || lu.stage !== 'end') return 1;
+            const base = Math.max(paddle.w, PADDLE_W * (1 + CLIMB_GROW * climb)) * lifeScale() * labPadLen();
+            return luLerp(1, LU_END_ODIN_L / base, luEndPose().grow);
+        },
         padAlpha() { return lu && lu.stage === 'end' ? 1 - luEndPose().morph : 1; },
         fence() { if (lu && lu.stage === 'end') paddle.x = paddle.tx = luLerp(lu.end.x, LW / 2, luEndPose().stand); },
         drawTop() { if (lu && lu.stage === 'end') luDrawEndTop(); },
@@ -357,7 +373,7 @@
                frozen: new Map(), motes: [], moteAcc: 0, slams: [], clap: null, pend: null, bd: null, cf: null,
                pieces: [], orbs: [], trees: [], birds: [], beams: [], debris: [], crown: null, now: null,
                attack: null, wingPh: 0, limp: 0, odin: 0, odinShow: 0, flash3: 0, shake: 0, grey: 0,
-               refill: 0, end: null, fall: null,
+               refill: 0, end: null, perish: null, ash: [],
                hands: [-1, 1].map(side => ({ side, form: 'arm', t: 0, hits: 0,
                    done: false, st: '', stT: 0, x: LW / 2 + side * LU_HOME, y: LU_Y, vy: 0, open: 0,
                    held: null, holdT: 0, slams: 0, tree: null, beam: null, charge: 0, wingK: 0, deco: [] })) };
@@ -394,7 +410,7 @@
     function luPace() { return lu.stage === 3 || lu.stage === 'dying' ? LU_PACE3 : lu.stage === 1 ? 1 : LU_PACE2; }
     function luActive(h) { return h.form !== 'arm'; }
     // the Corrupted is up: changing, or changed
-    function luCorrupted() { return lu.stage === 'turn' || lu.stage === 3 || lu.stage === 'dying'; }
+    function luCorrupted() { return ['turn', 3, 'dying', 'end'].includes(lu.stage); }
 
     // Nothing reaches him in the breath between parts, or while he drains
     // you and changes, or while he speaks.
@@ -737,9 +753,9 @@
         if (luCorrupted()) {
             lu.cf = luCorruptFrame();
             lu.wither = lu.cf.w;
-            lu.limp = lu.stage === 'dying' ? 1 : lu.stage === 3 ? luClamp((LU_LIMP_AT - b.hp / b.maxHp) / LU_LIMP_AT) : 0;
+            lu.limp = lu.stage === 'dying' || lu.stage === 'end' ? 1 : lu.stage === 3 ? luClamp((LU_LIMP_AT - b.hp / b.maxHp) / LU_LIMP_AT) : 0;
         }
-        lu.wingPh += dt / (LU_WING_FLAP.period * (1 + lu.limp));
+        lu.wingPh += dt / (LU_WING_FLAP.period * (1 + lu.limp)) * (lu.stage === 'end' ? 1 - luEndPose().crumble : 1);
         if (lu.stage === 3) luCrownStep(dt);
         luPose();
         // a wing's rows and bone come in with its feathers and go with them
@@ -752,7 +768,7 @@
         for (const h of lu.hands) if (h.held && !balls.includes(h.held)) h.held = null;
         for (const [ball] of lu.frozen) if (!balls.includes(ball)) lu.frozen.delete(ball);
         for (const ball of balls) if (ball.luPass && ball.vy < 0) ball.luPass = false;
-        if (lu.stage !== 3 && lu.stage !== 'dying') {
+        if (!luCorrupted()) {
             for (const p of lu.pieces) luPieceStep(p, dt);
             luOrbStep(dt);
         }
@@ -770,6 +786,10 @@
         }
         lu.debris = lu.debris.filter(d => d.age < 1.4);
         lu.slams = lu.slams.filter(s => (s.t += dt) < 0.6);
+        // BIG running out gently at the end, not all at once
+        if (lu.stage === 'end') paddle.w = luToward(paddle.w, PADDLE_W, dt * PADDLE_W / LU_END_SWAP);
+        for (const a of lu.ash) { a.t += dt; a.x += a.vx * dt; a.y += a.vy * dt; a.vy -= 20 * dt; a.vx *= 1 - 0.6 * dt; }
+        lu.ash = lu.ash.filter(a => a.t < a.life);
         lu.flash3 = Math.max(0, lu.flash3 - dt * 3);
         // HIS light in you: as much of it as you have taken off him
         lu.odin = lu.stage === 3 ? 1 - b.hp / b.maxHp : lu.stage === 'dying' || lu.stage === 'end' ? 1 : 0;
@@ -1383,13 +1403,14 @@
                 // turns away from you: smaller as a whole, never squashed. One
                 // growing back comes in small.
                 const along = Math.hypot(tan[0], tan[1]), grow = lu.crown.wheelIn[wi][k];
+                const husk = lu.crown.wheelTaken[wi][k];    // grown back: it no longer counts
                 out.wheel.push({ kind: 'wheel', wheel: wi, k, chunk: Math.floor(k / lu.crown.chunk),
                                  x: cf.hx + p[0] * r, y: cf.hy + p[1] * r, z: p[2], a: Math.atan2(tan[1], tan[0]),
                                  len: 2 * Math.PI * r / n * 1.12 * (0.55 + 0.45 * along) * luLerp(0.2, 1, luEase(grow)),
-                                 tint: LU_REDS[(k + wi) % 3], flip: k % 2, solid: grow >= 0.5 });
+                                 tint: LU_REDS[(k + wi) % 3], flip: k % 2, solid: grow >= 1, husk });
                 if (k % 2 === 0) out.wheel.push({ kind: 'eye', x: cf.hx + p[0] * r, y: cf.hy + p[1] * r, z: p[2] + 0.01,
                                                   face: luClamp(0.35 + p[2] * 0.65) * grow, seed: wi * 40 + k,
-                                                  size: LU_EYE_SIZE * cf.ringGrow });
+                                                  size: LU_EYE_SIZE * cf.ringGrow, husk });
             }
         });
     }
@@ -1412,8 +1433,8 @@
             const th = side > 0 ? d : Math.PI - d, span = LU_WING_SPAN * wing.len * k;
             luWing(out, { x: cf.hx + Math.cos(th) * cf.root, y: cf.hy + Math.sin(th) * cf.root, th,
                           tr: wing.trail * side, span, k, ph: wi * 0.2, beat: LU_WING_BEAT * (1 - 0.8 * limp),
-                          wid, stage, grow: c.wingIn[wid], cx: cf.hx, cy: cf.hy, reach: cf.root + span * 1.25,
-                          rows: LU_WING_ROWS, eyes: true });
+                          wid, stage, grow: c.wingIn[wid], taken: c.wingTaken[wid], cx: cf.hx, cy: cf.hy,
+                          reach: cf.root + span * 1.25, rows: LU_WING_ROWS, eyes: true });
         }));
     }
 
@@ -1421,6 +1442,7 @@
     // tr says: the bone's joints bent by a beat that reaches each later, the
     // rows hung off it, the bone over them, the eyes along it. Layers below
     // `stage` are gone; the one at `stage` is growing back, `grow` of the way.
+    // Layers below `taken` have been broken before, and are husks now.
     // Shading darkens toward (cx, cy). Feathers go into out.feathers in the
     // order to draw them, each with its row's `group` and its place `i` in it.
     function luWing(out, w) {
@@ -1452,7 +1474,8 @@
                                          LU_WING_FLAP.feather * f * wave(f * LU_WING_BONES * LU_WING_FLAP.lag + LU_WING_FLAP.featherLag));
                 const fx = ax + Math.cos(fa) * len / 2, fy = ay + Math.sin(fa) * len / 2;
                 out.feathers.push({ kind: 'feather', wing: w.wid, group, i, x: fx, y: fy, a: fa, len,
-                                    flip: (i + ri) % 2, k: w.k * g, tone: tone(fx, fy, row.lift), tr, solid: g >= 0.5 });
+                                    flip: (i + ri) % 2, k: w.k * g, tone: tone(fx, fy, row.lift), tr, solid: g >= 1,
+                                    husk: group < (w.taken || 0) });
             }
         });
         const bl = seg * 1.12, gb = grown(2);
@@ -1461,7 +1484,8 @@
             const off = -tr * bl / SHAPE_ASPECT * 0.3;
             const bx = mx - Math.sin(jt.a) * off, by = my + Math.cos(jt.a) * off;
             out.feathers.push({ kind: 'feather', wing: w.wid, group: 2, i: j, x: bx, y: by, a: jt.a, len: bl * luLerp(0.3, 1, gb),
-                                flip: j % 2, k: w.k * gb, tone: tone(bx, by, 0.2), tr, solid: gb >= 0.5 });
+                                flip: j % 2, k: w.k * gb, tone: tone(bx, by, 0.2), tr, solid: gb >= 1,
+                                husk: 2 < (w.taken || 0) });
         });
         if (!w.eyes) return;
         for (const [f, inward, size] of LU_WING_EYES) {
@@ -1507,13 +1531,14 @@
     // a run of every wheel in turn, and then off his head. For the lab.
     function luStrip(b, hp) {
         const c = lu.crown;
+        // by what has been taken, not what is gone, so each step is a piece of his health
         while (b.hp > hp && luCrownLeft() > 0) {
-            const w = c.wing.findIndex((s, i) => s < 3 && s === Math.min(...c.wing));
-            const wi = c.wheel.findIndex(g => g.some(x => !x));
-            if (w >= 0 && (wi < 0 || c.wing[w] <= 1)) c.wingTaken[w] = ++c.wing[w];
+            const w = c.wingTaken.findIndex(t => t < 3 && t === Math.min(...c.wingTaken));
+            const wi = c.wheelTaken.findIndex(g => g.some(x => !x));
+            if (w >= 0 && (wi < 0 || c.wingTaken[w] <= 1)) { c.wingTaken[w]++; c.wing[w] = Math.max(c.wing[w], c.wingTaken[w]); }
             else if (wi >= 0) {
-                const wheel = c.wheel[wi], k = wheel.indexOf(false), ch = Math.floor(k / c.chunk);
-                wheel.forEach((_, j) => { if (Math.floor(j / c.chunk) === ch) wheel[j] = c.wheelTaken[wi][j] = true; });
+                const taken = c.wheelTaken[wi], k = taken.indexOf(false), ch = Math.floor(k / c.chunk);
+                taken.forEach((_, j) => { if (Math.floor(j / c.chunk) === ch) taken[j] = c.wheel[wi][j] = true; });
             }
             b.hp--;
         }
@@ -1615,13 +1640,13 @@
     }
 
     // A ring where it struck, for the hits that do nothing: everything drawn
-    // in stone, and his head while the crown still stands round it.
+    // in stone, and his head in the moment after a hit.
     function luGlances() {
         const pd = lu.pend;
         if (!pd) return false;
         if (pd.piece) return luInert(pd.piece);
         if (pd.orb || pd.branch || pd.bird || pd.crown) return false;
-        return luArmoured() || bossIF > 0 || (lu.stage === 3 && luCrownLeft() > 0);
+        return luArmoured() || bossIF > 0;
     }
 
     function luHit(b, cx, cy) {
@@ -1659,7 +1684,6 @@
             return;
         }
         if (luArmoured() || bossIF > 0) return;
-        if (lu.stage === 3 && luCrownLeft() > 0) return;
         b.flash = 1;
         bossIF = BOSS_IF;
         luHurt(b, cx, cy);
@@ -1698,7 +1722,7 @@
         lu.y = stage === 3 ? LU_Y3 : LU_Y;
         b.hp = b.maxHp = stage === 3 ? luCrownLeft() + LU_HEAD_HP : luHp12();
         if (stage === 2) b.hp = LU_HP2 + LU_DRAIN_LEFT;
-        lu.shake = 0; lu.grey = 0; lu.end = null; lu.fall = null;
+        lu.shake = 0; lu.grey = 0; lu.end = null; lu.perish = null; lu.ash = [];
         for (const h of lu.hands) h.wingK = 0;
         for (const h of lu.hands) luForm(h, 'arm');
         for (const o of lu.orbs) o.gone = 0;
@@ -1716,6 +1740,7 @@
         } else if (lu.stage === 2) {
             luDrainStart();
         } else if (lu.stage === 3) {
+            labBurst();                 // every head in play goes off; skipBall hides what is held
             lu.stage = 'dying';
             luCallOff();
             luFreeze();
@@ -1723,33 +1748,46 @@
     }
 
     // ---- the end ------------------------------------------------------------------
-    // His words are said and his head comes apart. You stand up where you
-    // lay -- boot on the floor, whatever you are holding and wearing still
-    // yours -- walk to the middle, grow to LU_END_ODIN_L, and give way to
-    // Odin, HIS light now yours; you say his name, and the black comes down
-    // over BRANDON WINS. The takeover never runs: the town has you back.
+    // His words are said and he burns away. You stand up where you lay, boot
+    // on the floor, walk to the middle, and as you grow to LU_END_ODIN_L you
+    // slowly become Odin, HIS light swelling past his own as you do and
+    // settling as you say his name. BRANDON WINS stands over you as him; only
+    // then the black, and the town. The takeover never runs.
+    //
+    // You do it as the standard paddle with no capsule running: every paddle
+    // and capsule has looks of its own that fight Odin's, and THE PAIR and
+    // DOUBLE are more than one of you to stand up. Your paddle fades into the
+    // standard one over LU_END_SWAP, halves sliding together and capsules
+    // running out rather than stopping. The paddle you chose (LAB.pad) is
+    // left alone, and is back in your hands after.
     const LU_STAND_TURN = -Math.PI / 2;  // which way up you stand: your head at the top
     function luEndStart() {
-        const cf = lu.cf;
-        lu.end = { x: paddle.x, w: padW() };  // measured before 'end' starts growing you
-        lu.stage = 'end'; lu.stT = 0;
-        lu.fall = { x: cf.fx, y: cf.fy, w: cf.fw, h: cf.fh, a: cf.ha };
+        labPadFade('standard', LU_END_SWAP);
+        // every capsule off, the wiggle easing out as it always does
+        for (const k of Object.keys(fx)) fx[k] = k === 'W' ? Math.min(fx.W, WIG_EASE) : 0;
+        dragT = 0;
         capsule = null;
+        lu.end = { x: paddle.x };
+        lu.stage = 'end'; lu.stT = 0;
+        lu.perish = null; lu.ash = [];
     }
     function luEndTimes() {
-        const stand = LU_END_CRUMBLE * 0.6, grow = stand + LU_END_STAND * 0.7, morph = grow + LU_END_GROW * 0.5;
-        const yell = morph + LU_END_MORPH, fade = yell + LU_END_HOLD, done = fade + LU_END_FADE + LU_END_BLACK;
-        return { stand, grow, morph, yell, fade, done };
+        const stand = LU_END_CRUMBLE * 0.6, grow = stand + LU_END_STAND * 0.7, morph = grow;
+        const yell = morph + LU_END_MORPH, wins = yell + LU_END_HOLD, out = wins + LU_END_WINS, done = out + LU_END_OUT;
+        return { stand, grow, morph, yell, wins, out, done };
     }
-    // how far into each beat the end is, eased
+    // how far into each beat the end is, eased; `surge` is how far his light
+    // is swollen past his own, up through the change and down after it
     function luEndPose() {
         const T = luEndTimes(), t = lu.stT;
         return { t, T, crumble: luClamp(t / LU_END_CRUMBLE), stand: luEase((t - T.stand) / LU_END_STAND),
                  grow: luEase((t - T.grow) / LU_END_GROW),
                  morph: typeof memOdin === 'function' ? luEase((t - T.morph) / LU_END_MORPH) : 0,
-                 black: luEase((t - T.fade) / LU_END_FADE) };
+                 surge: t < T.yell ? luEase((t - T.morph) / LU_END_MORPH) : 1 - luEase((t - T.yell) / LU_END_SETTLE),
+                 wins: luEase((t - T.wins) / 0.6), black: luEase((t - T.out) / LU_END_OUT) };
     }
     function luEndDone() {
+        labPadUse(LAB.pad);
         if (typeof menuWon === 'function') menuWon();
     }
 
@@ -2013,7 +2051,7 @@
         const reach = (cf.root + LU_WING_SPAN * 1.1 * 1.25) * cf.S;
         const ar = reach * 0.9 * (1 + 0.04 * swell) * (0.4 + 0.6 * cf.auraK);
         ctx.save();
-        ctx.globalAlpha = cf.auraK;
+        ctx.globalAlpha *= cf.auraK;
         const gr = ctx.createRadialGradient(cf.fx, cf.fy, ar * 0.1, cf.fx, cf.fy, ar);
         gr.addColorStop(0, 'rgba(0,0,0,0.95)');
         gr.addColorStop(0.62, 'rgba(0,0,0,0.8)');
@@ -2044,18 +2082,22 @@
     function luDrawCorrupt(b) {
         const cf = lu.cf, now = lu.now;
         if (!cf || !now || !ready(ballImg)) return;
+        const going = lu.stage === 'end' ? luEase(luEndPose().crumble) : 0;
+        ctx.save();
+        ctx.globalAlpha = 1 - going;
         luDrawAura(cf);
+        ctx.restore();
         const layer = luLayer(0), g = layer.getContext('2d');
         g.setTransform(ctx.getTransform());
         const S = cf.S;
         // the wings, and their eyes as they open
-        for (const f of now.feathers) luDrawFeather(g, f, 1);
+        for (const f of now.feathers) luDrawFeather(g, f, f.husk ? LU_HUSK : 1);
         const wingEyes = lu.stage === 'turn' ? cf.wingOpen : 1;
         now.eyes.forEach((e, i) => luDrawEye(g, e.x, e.y, e.r, luClamp(wingEyes * now.eyes.length - i), i + 100));
         // while he changes: his arm bones and his little ones flying up into
         // the wheels, each to a bone of it, which it becomes; the rest of the
         // wheels fading in behind them
-        let pieces = now.wheel.map(d => ({ d, alpha: 1 }));
+        let pieces = now.wheel.map(d => ({ d, alpha: d.husk ? LU_HUSK : 1 }));
         if (lu.stage === 'turn') {
             const bones = now.wheel.filter(d => d.kind === 'wheel');
             const flyers = lu.pieces.map(p => ({ p, order: p.order }))
@@ -2098,11 +2140,11 @@
             }
         }
         // his head, reddening, and his eyes as they open all over it -- and,
-        // as his crown is stripped, glitching out of the world
+        // in his last LU_GLITCH_AT, glitching out of the world
         g.save();
         g.translate(cf.fx, cf.fy);
         g.rotate(cf.ha);
-        const glitch = luGlitch();
+        const glitch = luGlitch(b);
         if (glitch > 0.001) luDrawGlitchHead(g, cf, b, glitch);
         else luDrawHead(g, cf, b);
         g.restore();
@@ -2119,7 +2161,7 @@
             g.fillStyle = LU_SILHOUETTE;
             g.fillRect(0, 0, layer.width, layer.height);
         }
-        const grey = lu.stage === 'dying' ? 1 : lu.stage === 3 ? luClamp(1 - b.hp / b.maxHp / LU_GREY_AT) : 0;
+        const grey = lu.stage === 'dying' || lu.stage === 'end' ? 1 : lu.stage === 3 ? luClamp(1 - b.hp / b.maxHp / LU_GREY_AT) : 0;
         if (grey > 0.001) {
             // the colour out of him and nowhere else: a copy keeps his shape
             const keep = luLayer(1), kg = keep.getContext('2d');
@@ -2138,6 +2180,7 @@
             g.fillStyle = '#e0283c';
             g.fillRect(0, 0, layer.width, layer.height);
         }
+        if (lu.stage === 'end') luPerish(g, layer, cf, going * 1.08);
         g.globalCompositeOperation = 'source-over';
         g.globalAlpha = 1;
         ctx.save();
@@ -2146,14 +2189,135 @@
         ctx.restore();
     }
 
-    // His head on `g`, which is already at it and turned with it.
+    // His perishing, over his layer, just as the last hit left him: he goes
+    // the colour of ash, then burns away from the outside in -- what is left
+    // of his crown and wings first, his head last -- in clumps, along a red
+    // edge, and every grain that goes rises off him as ash, some still lit.
+    // `k` is how far through it he is, 0 to just past 1.
+    //
+    // The grains are laid out once, as he begins to go, over everything round
+    // him (so a wing still beating out of where it was cannot outlast him),
+    // and marked as him from where his pieces are -- never read back off the
+    // canvas, which a page opened from disk refuses and a big screen pays
+    // for. What has gone collects on a mask of its own, so a frame only adds
+    // the grains that go in it.
+    const LU_ASH_CELL = 3;           // field px a grain is
+    const LU_ASH_ODDS = 0.45;        // share of grains that leave a speck of ash
+    const LU_ASH_EDGE = 0.05;        // how deep the burning edge is, in `k`
+    const LU_ASH_ORDER = 0.75;       // how much outside-in the order is, against clumps at random
+    const LU_ASH_ROOM = 24;          // field px round him that burns too
+    function luPerishGrains(cf) {
+        const c = LU_ASH_CELL, parts = [];
+        // every piece of him as a capsule along it: [x, y, angle, half its length, half its width]
+        for (const d of lu.now.wheel) if (d.kind === 'wheel') parts.push([d.x, d.y, d.a, d.len / 2, d.len / SHAPE_ASPECT / 2]);
+        for (const f of lu.now.feathers) parts.push([f.x, f.y, f.a, f.len / 2, f.len / SHAPE_ASPECT / 2]);
+        const hr = Math.max(cf.fw, cf.fh) / 2;
+        let x0 = cf.fx - hr, x1 = cf.fx + hr, y0 = cf.fy - hr, y1 = cf.fy + hr;
+        for (const [x, y, , h] of parts) { x0 = Math.min(x0, x - h); x1 = Math.max(x1, x + h); y0 = Math.min(y0, y - h); y1 = Math.max(y1, y + h); }
+        x0 -= LU_ASH_ROOM; y0 -= LU_ASH_ROOM; x1 += LU_ASH_ROOM; y1 += LU_ASH_ROOM;
+        const nx = Math.ceil((x1 - x0) / c), ny = Math.ceil((y1 - y0) / c), him = new Uint8Array(nx * ny);
+        const mark = (cx, cy, r, inside) => {
+            const i0 = Math.max(0, Math.floor((cx - r - x0) / c)), i1 = Math.min(nx - 1, Math.floor((cx + r - x0) / c));
+            const j0 = Math.max(0, Math.floor((cy - r - y0) / c)), j1 = Math.min(ny - 1, Math.floor((cy + r - y0) / c));
+            for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+                if (inside(x0 + (i + 0.5) * c, y0 + (j + 0.5) * c)) him[j * nx + i] = 1;
+            }
+        };
+        for (const [x, y, a, h, w] of parts) {
+            const ca = Math.cos(a), sa = Math.sin(a);
+            mark(x, y, h + w, (px, py) => {
+                const u = Math.max(-h, Math.min(h, (px - x) * ca + (py - y) * sa));
+                return Math.hypot(px - x - u * ca, py - y - u * sa) <= w + c / 2;
+            });
+        }
+        mark(cf.fx, cf.fy, hr, (px, py) => ((px - cf.fx) / (cf.fw / 2)) ** 2 + ((py - cf.fy) / (cf.fh / 2)) ** 2 <= 1.1);
+        const R = Math.max(...[[x0, y0], [x1, y0], [x0, y1], [x1, y1]].map(([x, y]) => Math.hypot(x - cf.fx, y - cf.fy)));
+        const cells = [];
+        for (let j = 0; j < ny; j++) {
+            for (let i = 0; i < nx; i++) {
+                const x = x0 + i * c, y = y0 + j * c;
+                const d = Math.hypot(x + c / 2 - cf.fx, y + c / 2 - cf.fy) / R;
+                const v = LU_ASH_ORDER * (1 - d) + (1 - LU_ASH_ORDER) * (0.6 * luHash(Math.floor(i / 5) * 31.7 + Math.floor(j / 5) * 57.3)
+                                                               + 0.4 * luHash(i * 12.9898 + j * 78.233));
+                cells.push({ x, y, v, him: !!him[j * nx + i] });
+            }
+        }
+        cells.sort((a, b2) => a.v - b2.v);
+        return { cells, n: 0, mask: document.createElement('canvas') };
+    }
+    function luPerish(g, layer, cf, k) {
+        const T = ctx.getTransform(), c = LU_ASH_CELL;
+        const p = lu.perish || (lu.perish = luPerishGrains(cf));
+        const mask = p.mask, mg = mask.getContext('2d');
+        // a new size of screen starts the mask again from every grain gone so far
+        let from = p.n;
+        if (mask.width !== layer.width || mask.height !== layer.height) { mask.width = layer.width; mask.height = layer.height; from = 0; }
+        mg.setTransform(T);
+        mg.fillStyle = '#000';
+        mg.beginPath();
+        let n = from;
+        for (; n < p.cells.length && p.cells[n].v < k; n++) {
+            const q = p.cells[n];
+            mg.rect(q.x, q.y, c + 0.5, c + 0.5);
+            if (n < p.n || !q.him || luHash(q.x * 0.37 + q.y * 0.71) >= LU_ASH_ODDS) continue;
+            lu.ash.push({ x: q.x + c / 2, y: q.y + c / 2, vx: (Math.random() - 0.5) * 50 + 15, vy: -30 - 70 * Math.random(),
+                          t: 0, life: 1 + Math.random() * 1.2, s: 1.5 + 2 * Math.random(), ember: Math.random() < 0.2 });
+        }
+        mg.fill();
+        p.n = n;
+        g.save();
+        g.globalCompositeOperation = 'source-atop';
+        g.globalAlpha = 0.4 * luClamp(k * 3);
+        g.fillStyle = '#6b6661';
+        g.fillRect(0, 0, layer.width, layer.height);
+        g.setTransform(T);
+        g.globalAlpha = 0.85;
+        g.fillStyle = '#e0503c';
+        g.beginPath();
+        for (let e = n; e < p.cells.length && p.cells[e].v < k + LU_ASH_EDGE; e++) {
+            const q = p.cells[e];
+            if (q.him) g.rect(q.x, q.y, c, c);
+        }
+        g.fill();
+        g.setTransform(1, 0, 0, 1, 0, 0);
+        g.globalCompositeOperation = 'destination-out';
+        g.globalAlpha = 1;
+        g.drawImage(mask, 0, 0);
+        g.restore();
+    }
+
+    // the ash off him: grey specks rising and fading, then the few still
+    // burning, added on
+    function luDrawAsh() {
+        if (!lu.ash.length) return;
+        ctx.save();
+        ctx.fillStyle = '#8a8580';
+        for (const a of lu.ash) {
+            if (a.ember) continue;
+            ctx.globalAlpha = (1 - a.t / a.life) * 0.75;
+            ctx.fillRect(a.x - a.s / 2, a.y - a.s / 2, a.s, a.s);
+        }
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = '#ff6a3c';
+        for (const a of lu.ash) {
+            if (!a.ember) continue;
+            ctx.globalAlpha = (1 - a.t / a.life) * 0.9;
+            ctx.fillRect(a.x - a.s / 2, a.y - a.s / 2, a.s, a.s);
+        }
+        ctx.restore();
+    }
+
+    // His head on `g`, which is already at it and turned with it: in his last
+    // part, white for exactly the BOSS_IF after a hit that a second one
+    // cannot land in.
     function luDrawHead(g, cf, b) {
         g.drawImage(ballImg, -cf.fw / 2, -cf.fh / 2, cf.fw, cf.fh);
         g.globalAlpha = cf.redK;
         const red = luTinted('head55', ballImg, LU_RED_BODY, 0.55);
         if (red) g.drawImage(red, -cf.fw / 2, -cf.fh / 2, cf.fw, cf.fh);
-        if (b.flash > 0 && lu.flash3 <= 0) {
-            g.globalAlpha = Math.min(1, b.flash) * 0.7;
+        const white = lu.stage === 3 ? bossIF / BOSS_IF : b.flash;
+        if (white > 0 && lu.flash3 <= 0) {
+            g.globalAlpha = Math.min(1, white) * 0.7;
             g.drawImage(headSprite2('flat', '#f2efe9'), -cf.fw / 2, -cf.fh / 2, cf.fw, cf.fh);
         }
         g.globalAlpha = 1;
@@ -2162,14 +2326,14 @@
                                              luClamp(cf.headOpen * all.length - i), i));
     }
 
-    // How far his head has glitched out of the world: LU_GLITCH times the share
-    // of his crown ever taken, so it grows as he is stripped and is whole once
-    // only his head is left. Picked in the character lab (GLITCHING OUT).
-    function luGlitch() {
-        if (lu.stage !== 3 && lu.stage !== 'dying') return 0;
-        const chunks = Math.ceil(Math.max(1, Math.round(LU_RING_BONES)) / Math.max(1, Math.round(LU_WHEEL_CHUNK)));
-        const total = LU_WHEELS.length * chunks + 6 * 3;
-        return LU_GLITCH * (1 - luCrownLeft() / total);
+    // How far his head has glitched out of the world: none until LU_GLITCH_AT
+    // of his last part's health is left, then more with every hit, LU_GLITCH
+    // with none left and through his last words. Picked in the character lab
+    // (GLITCHING OUT).
+    function luGlitch(b) {
+        if (lu.stage === 'dying' || lu.stage === 'end') return LU_GLITCH;
+        if (lu.stage !== 3) return 0;
+        return LU_GLITCH * luClamp((LU_GLITCH_AT - b.hp / b.maxHp) / Math.max(0.01, LU_GLITCH_AT));
     }
     const LU_GLITCH_PAD = 1.5;       // his head's own canvas, this many times his head, so the effects have room
     const LU_GLITCH_RES = 3;         // ...at this many px to a field px
@@ -2517,7 +2681,7 @@
 
     function luDraw(b) {
         if (!lu.bd) return;
-        if (lu.stage === 'end') { luDrawEnd(); return; }
+        if (lu.stage === 'end') { luDrawEnd(b); return; }
         luDrawOdin(lu.odinShow, 0);
         luDrawShadows();
         if (luCorrupted()) luDrawCorrupt(b);
@@ -2557,55 +2721,51 @@
     }
 
     // The end, under you: HIS light standing up with you and growing with
-    // you, until his own takes over; his grey head coming apart from the chin
-    // up, a grain at a time; and Odin where you stand, coming in as you go.
+    // you, swelling as you change, until his own takes over; him perishing as
+    // the last hit left him (luPerish), and his ash; and Odin where you
+    // stand, coming in as you go, his light swollen past his own and settling.
     const LU_ODIN_MIRROR = false;    // Odin's head on the side yours is, stood up
-    function luDrawEnd() {
-        const e = luEndPose(), f = lu.fall;
-        luDrawOdin(1 - e.morph, e.stand);
-        const sp = headSprite2('grey');
-        if (f && sp && e.crumble < 1) {
-            ctx.save();
-            if (e.crumble > 0) {
-                const top = f.y - f.h * 0.6, bot = f.y + f.h * 0.6, cell = 6;
-                ctx.beginPath();
-                for (let gy = top, j = 0; gy < bot; gy += cell, j++) {
-                    const up = (gy - top) / (bot - top);        // 0 at his crown
-                    for (let gx = f.x - f.w * 0.6, i = 0; gx < f.x + f.w * 0.6; gx += cell, i++) {
-                        const hsh = luHash(i * 12.9898 + j * 78.233);
-                        if ((1 - up) * 0.75 + hsh * 0.25 > e.crumble) ctx.rect(gx, gy, cell, cell);
-                    }
-                }
-                ctx.clip();
-            }
-            ctx.translate(f.x, f.y);
-            ctx.rotate(f.a);
-            ctx.drawImage(sp, -f.w / 2, -f.h / 2, f.w, f.h);
-            ctx.restore();
-        }
+    function luDrawEnd(b) {
+        const e = luEndPose(), swell = 1 + LU_END_SURGE * e.surge;
+        luDrawOdin((1 - e.morph) * swell, e.stand);
+        if (e.crumble < 1) luDrawCorrupt(b);
+        luDrawAsh();
         if (e.morph > 0.001) {
             const L = padW();
             ctx.save();
             ctx.globalAlpha = e.morph;
-            // memOdin stands him with his middle L/2 + 6 over `ground`
-            memOdin(paddle.x, padY() + L / 2 + 6, L, LU_ODIN_MIRROR, clock, e.morph, 0, true);
+            // memOdin stands him with his middle L/2 + 6 over `ground`; his
+            // `aura` past 1 is a swell of his light
+            memOdin(paddle.x, padY() + L / 2 + 6, L, LU_ODIN_MIRROR, clock, e.morph * swell, 0, true);
             ctx.restore();
         }
     }
 
-    // ...and over everything: BRANDON!, said as Odin over your head, then the
-    // black coming down over BRANDON WINS
+    // ...and over everything: BRANDON!, said as Odin over your head; then
+    // BRANDON WINS over the top of the field, with you as him in full view
+    // under it; and only at the last, the black
     function luDrawEndTop() {
-        const e = luEndPose(), T = e.T, until = T.fade + LU_END_FADE;
-        if (typeof memLine === 'function' && e.t > T.yell && e.t < until) {
+        const e = luEndPose(), T = e.T;
+        if (typeof memLine === 'function' && e.t > T.yell && e.t < T.wins + 0.4) {
             memLine([['BRANDON!', 'odin']], 'odin', paddle.x, Math.max(60, padY() - padW() / 2 - 30), 44,
-                    (e.t - T.yell) / (until - T.yell), [T.yell, until], 2);
+                    (e.t - T.yell) / (T.wins + 0.4 - T.yell), [T.yell, T.wins + 0.4], 2);
         }
-        if (e.black <= 0) return;
         ctx.save();
-        ctx.globalAlpha = e.black;
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, LW, LH);
-        text('BRANDON WINS', LW / 2, LH / 2, 40, '#f2efe9', 'center');
+        if (e.wins > 0) {
+            ctx.globalAlpha = e.wins;
+            ctx.font = '700 46px "Fira Sans", "Trebuchet MS", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.lineJoin = 'round';
+            ctx.lineWidth = 6;
+            ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+            ctx.strokeText('BRANDON WINS', LW / 2, 74);
+            ctx.fillStyle = '#f2efe9';
+            ctx.fillText('BRANDON WINS', LW / 2, 74);
+        }
+        if (e.black > 0) {
+            ctx.globalAlpha = e.black;
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, LW, LH);
+        }
         ctx.restore();
     }

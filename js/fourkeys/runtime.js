@@ -172,6 +172,7 @@
 
     function labUpdate(dt) {
         labPadUpdate(dt);
+        labBurstStep(dt);
         for (const s of labShouts) s.life -= dt;
         labShouts = labShouts.filter(s => s.life > 0);
         menuWatch(dt);           // outside labM: it is what notices a level ending
@@ -209,6 +210,82 @@
             drawShout();
         }
         shout = keep;
+    }
+
+    // ---- the heads going off at the killing blow -------------------------------------
+    // Every head in play bursts where it is: its pieces flying apart and
+    // turning as they fall, a ring spreading, sparks. A boss's last hit calls
+    // it -- the original's in clearStage, one of the lab's from his own -- and
+    // the heads are not drawn after: the takeover draws none, and a boss who
+    // holds the world still hides the ones he holds. One flash a head, never
+    // repeated.
+    let labBursts = [];
+    const LAB_BURST_SECS = 1.1;      // how long the pieces take to go
+    const LAB_BURST_PIECES = 8;
+    const LAB_BURST_FALL = 700;      // px/s² the pieces fall at
+    function labBurst() {
+        for (const b of balls) {
+            if (labSkipBall(b)) continue;
+            const pieces = [], sparks = [];
+            for (let i = 0; i < LAB_BURST_PIECES; i++) {
+                const a0 = i / LAB_BURST_PIECES * 2 * Math.PI + Math.random() * 0.3, a1 = a0 + 2 * Math.PI / LAB_BURST_PIECES;
+                const mid = (a0 + a1) / 2, sp = 180 + Math.random() * 220;
+                pieces.push({ a0, a1, vx: Math.cos(mid) * sp, vy: Math.sin(mid) * sp - 80, va: (Math.random() - 0.5) * 14 });
+            }
+            for (let i = 0; i < 18; i++) {
+                const a = Math.random() * 2 * Math.PI, sp = 150 + Math.random() * 350;
+                sparks.push({ vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0.3 + Math.random() * 0.4 });
+            }
+            labBursts.push({ x: b.x, y: b.y, r: labBallR(b), angle: b.angle, t: 0, pieces, sparks });
+        }
+    }
+    function labBurstStep(dt) { labBursts = labBursts.filter(bu => (bu.t += dt) < LAB_BURST_SECS); }
+    function labDrawBursts() {
+        for (const bu of labBursts) {
+            const t = bu.t, k = t / LAB_BURST_SECS;
+            ctx.save();
+            // the flash, gone in a moment, and the ring after it
+            if (t < 0.15) {
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.globalAlpha = 0.8 * (1 - t / 0.15);
+                const g = ctx.createRadialGradient(bu.x, bu.y, 0, bu.x, bu.y, bu.r * 3);
+                g.addColorStop(0, 'rgba(255,240,210,1)');
+                g.addColorStop(1, 'rgba(255,150,60,0)');
+                ctx.fillStyle = g;
+                ctx.beginPath(); ctx.arc(bu.x, bu.y, bu.r * 3, 0, 2 * Math.PI); ctx.fill();
+            }
+            if (t < 0.4) {
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.globalAlpha = 0.7 * (1 - t / 0.4);
+                ctx.strokeStyle = '#ffd9a0';
+                ctx.lineWidth = 3 * (1 - t / 0.4) + 1;
+                ctx.beginPath(); ctx.arc(bu.x, bu.y, bu.r * (1.2 + 9 * t), 0, 2 * Math.PI); ctx.stroke();
+            }
+            // the head, in pieces: each its own wedge of him, flying and turning
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = Math.max(0, 1 - k * k);
+            for (const p of bu.pieces) {
+                ctx.save();
+                ctx.translate(bu.x + p.vx * t, bu.y + p.vy * t + 0.5 * LAB_BURST_FALL * t * t);
+                ctx.rotate(p.va * t);
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.arc(0, 0, bu.r * 1.6, p.a0, p.a1);
+                ctx.closePath();
+                ctx.clip();
+                drawBall(0, 0, bu.r, bu.angle);
+                ctx.restore();
+            }
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.fillStyle = '#ffb45a';
+            for (const s of bu.sparks) {
+                if (t >= s.life) continue;
+                ctx.globalAlpha = 1 - t / s.life;
+                const d = 1 - Math.exp(-3 * t), sx = bu.x + s.vx / 3 * d, sy = bu.y + s.vy / 3 * d + 120 * t * t;
+                ctx.fillRect(sx - 1.5, sy - 1.5, 3, 3);
+            }
+            ctx.restore();
+        }
     }
 
     // how much of the original's climb this fight has

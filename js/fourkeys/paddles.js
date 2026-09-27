@@ -57,11 +57,26 @@
     // ---- what the game asks -------------------------------------------------------
     function labPadUse(key) {
         labP = LAB_PAD[key] || LAB_PAD.standard;
+        labPFrom = null;
         deckAtW = -1;                 // his flat may be a different width now
         padBits = [];
     }
+    // The same, but over `secs`: the one in hand fades as the new one comes in,
+    // and his length goes from one to the other. What he does is the new one's
+    // at once. The VOID's end uses it to hand you the standard paddle.
+    let labPFrom = null, labPFade = 0, labPFadeSecs = 1;
+    function labPadFade(key, secs) {
+        const was = labP;
+        labPadUse(key);
+        if (was !== labP && secs > 0) { labPFrom = was; labPFade = 0; labPFadeSecs = secs; }
+    }
+    const labPadFadeK = () => labPFrom ? Math.min(1, labPFade / labPFadeSecs) : 1;
+    // how much every look is drawn at: set round each call below, 1 otherwise
+    let padK = 1;
+    const padLenOf = v => v && v.len ? v.len() : 1;
+    const labPadLen   = () => labPFrom ? padLenOf(labPFrom) + (padLenOf(labP) - padLenOf(labPFrom)) * labPadFadeK() : padLenOf(labP);
     // a boss may grow you too: the VOID's end stands you up to Odin's height
-    const labPadW     = () => (labP && labP.len ? labP.len() : 1) * (labB && labB.padGrow ? labB.padGrow() : 1);
+    const labPadW     = () => labPadLen() * (labB && labB.padGrow ? labB.padGrow() : 1);
     const labPadAngle = () => labP && labP.angle ? labP.angle() : 1;
     const labPadEdge  = () => labP && labP.edge ? labP.edge() : 1;
     const labPadSwipe = () => labP && labP.swipe ? labP.swipe() : 1;
@@ -69,7 +84,8 @@
     const labPadDeck  = () => labP && labP.deck ? labP.deck() : 1;
     const labPadCaps  = () => labP && labP.caps ? labP.caps() : 1;
     const labPadSplit = () => !!(labP && labP.split);
-    const labPadQuad  = () => labP && labP.quad ? labP.quad() : 1;
+    const padQuadOf = v => v && v.quad ? v.quad() : 1;
+    const labPadQuad  = () => labPFrom ? padQuadOf(labPFrom) + (padQuadOf(labP) - padQuadOf(labPFrom)) * labPadFadeK() : padQuadOf(labP);
 
     // what the panel prints about whatever is in hand
     function labPadState() {
@@ -89,6 +105,7 @@
     // Whatever he sheds, he sheds wherever he is on screen -- the town
     // included, which is where a paddle is chosen and has to show what it is.
     function labPadUpdate(dt) {
+        if (labPFrom && (labPFade += dt) >= labPFadeSecs) labPFrom = null;
         if (labP && labP.step && !(king && phase === 'fall')) labP.step(dt);
         padMarkStep(dt);
         for (const b of padBits) {
@@ -102,17 +119,26 @@
     }
 
     // A boss may fade all of you (padAlpha, set here and put back at the end of
-    // labPadOver) and lay a skin over whatever you are holding (padSkin).
+    // labPadOver) and lay a skin over whatever you are holding (padSkin). While
+    // one paddle fades into another both are drawn, each at its share (padK).
+    const padAlphaNow = () => labB && labB.padAlpha ? labB.padAlpha() : 1;
+    function padBoth(part, args) {
+        const a = padAlphaNow(), k = labPadFadeK();
+        if (labPFrom && labPFrom[part]) { padK = a * (1 - k); labPFrom[part](...args); }
+        if (labP && labP[part]) { padK = a * k; labP[part](...args); }
+        padK = 1;
+        ctx.globalAlpha = a;
+    }
     function labPadUnder() {
-        if (labB && labB.padAlpha) ctx.globalAlpha = labB.padAlpha();
-        if (labP && labP.under) labP.under();
+        ctx.globalAlpha = padAlphaNow();
+        padBoth('under', []);
     }
     function labPadSkin(sg, o) {
-        if (labP && labP.skin) labP.skin(sg, o);
+        padBoth('skin', [sg, o]);
         if (labB && labB.padSkin) labB.padSkin(sg, o);
     }
     function labPadOver() {
-        if (labP && labP.over) labP.over();
+        padBoth('over', []);
         for (const b of padBits) {
             const a = Math.max(0, 1 - b.t / b.life) * b.a;
             if (b.kind === 'flake') {
@@ -212,9 +238,9 @@
         ctx.save();
         ctx.translate(sg.cx, padY() + o * JIG_PADDLE);
         ctx.rotate(segWig(sg.i) + paddle.dip[sg.i]);
-        ctx.globalAlpha = alpha;
+        ctx.globalAlpha = padK * (alpha);
         ctx.drawImage(sprite, -tw / 2, -th / 2, tw, th);
-        ctx.globalAlpha = 1;
+        ctx.globalAlpha = padK;
         ctx.restore();
     }
 
@@ -231,9 +257,9 @@
             ctx.save();
             ctx.translate(sg.cx, padY() + o * JIG_PADDLE);
             ctx.rotate(segWig(sg.i) + paddle.dip[sg.i]);
-            ctx.globalAlpha = alpha;
+            ctx.globalAlpha = padK * (alpha);
             ctx.drawImage(sp, -tw / 2, -th / 2, tw, th);
-            ctx.globalAlpha = 1;
+            ctx.globalAlpha = padK;
             ctx.restore();
         }
     }
@@ -290,7 +316,7 @@
             ctx.save();
             ctx.translate(sg.cx, padY() + o * JIG_PADDLE);
             ctx.rotate(segWig(sg.i) + paddle.dip[sg.i]);
-            ctx.globalAlpha = V2_GLOSS;
+            ctx.globalAlpha = padK * (V2_GLOSS);
             ctx.drawImage(gl, -tw / 2, -th / 2, tw, th);
             // the glint: a narrow band crossing him, then nothing until the next
             const t = (clock % V2_GLINT) / V2_SWEEP;
@@ -298,10 +324,10 @@
                 ctx.beginPath();
                 ctx.rect(-tw / 2 + (t * 1.2 - 0.1) * tw, -th, tw * 0.08, th * 2);
                 ctx.clip();
-                ctx.globalAlpha = 0.3;
+                ctx.globalAlpha = padK * (0.3);
                 ctx.drawImage(sp, -tw / 2, -th / 2, tw, th);
             }
-            ctx.globalAlpha = 1;
+            ctx.globalAlpha = padK;
             ctx.restore();
         }
     };
@@ -354,9 +380,9 @@
             ctx.beginPath();
             ctx.rect(-tw / 2 + (t * 1.3 - 0.15) * tw, -th, tw * 0.15, th * 2);
             ctx.clip();
-            ctx.globalAlpha = 0.34;
+            ctx.globalAlpha = padK * (0.34);
             ctx.drawImage(sp, -tw / 2, -th / 2, tw, th);
-            ctx.globalAlpha = 1;
+            ctx.globalAlpha = padK;
             ctx.restore();
         }
     };
@@ -445,12 +471,12 @@
             g.addColorStop(0, EMB_INK);
             g.addColorStop(1, 'rgba(0,0,0,0)');
             // a steady light with a slow breath in it: nothing here flashes
-            ctx.globalAlpha = EMB_GLOW * (0.85 + 0.15 * Math.sin(clock * 1.7));
+            ctx.globalAlpha = padK * (EMB_GLOW * (0.85 + 0.15 * Math.sin(clock * 1.7)));
             ctx.fillStyle = g;
             ctx.beginPath();
             ctx.arc(paddle.x, padY(), r, 0, Math.PI * 2);
             ctx.fill();
-            ctx.globalAlpha = 1;
+            ctx.globalAlpha = padK;
             padRim('padRimE', EMB_RIM, 2.5, 0.5);
         },
         skin(sg, o) { padLay(sg, o, padTint('padEmber', EMB_INK), 0.72); },
@@ -509,9 +535,9 @@
                     ctx.save();
                     ctx.translate(sg.cx + dx, padY());
                     ctx.rotate(segWig(sg.i) + paddle.dip[sg.i]);
-                    ctx.globalAlpha = e.a;
+                    ctx.globalAlpha = padK * (e.a);
                     ctx.drawImage(sp, -tw / 2, -th / 2, tw, th);
-                    ctx.globalAlpha = 1;
+                    ctx.globalAlpha = padK;
                     ctx.restore();
                 }
             }

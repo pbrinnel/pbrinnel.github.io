@@ -2476,7 +2476,9 @@
         if (stage === LEVELS.length - 1) {
             // you do not get to just win. he comes apart where he stands --
             // the same way you will when your turn comes -- and your brandon
-            // rises into the space he leaves and swells to fill it.
+            // rises into the space he leaves and swells to fill it. Every
+            // head in play goes off where it is (labBurst).
+            labBurst();
             phase = 'ascend';
             ascendT = 0;
             const b = bricks[0];
@@ -5323,6 +5325,7 @@
         drawMotes();
         drawShout();
         labDrawShouts();
+        labDrawBursts();
         drawYell();
         drawTalk();
 
