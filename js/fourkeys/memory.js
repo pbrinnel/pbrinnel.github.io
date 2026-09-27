@@ -518,10 +518,11 @@
     // HIM -- the one who stood by the Angel: clay all over, his own head
     // included, and lit from inside. His light is a glow that breathes, two
     // fans of rays turning against each other, and motes rising through it;
-    // `aura` is how much of it there is, 1 his own and more for a swell.
-    // `drain` runs his clay to the grey every Brandon goes at the end, and
-    // `body` false draws only the light (his body is coming apart). Mirrored,
-    // his head is on the right.
+    // `aura` is how much of it there is, 1 his own and more for a swell. Over
+    // it, his look (HIS LOOK, below): the wheel, the army he is made of, the
+    // birds, the tree. `drain` runs him to the grey every Brandon goes at the
+    // end, and `body` false draws only the light (his body is coming apart,
+    // and the tree comes down with it). Mirrored, his head is on the right.
     let mfRays = null;
     function memOdin(x, ground, L, mirror, s, aura, drain, body) {
         const cy = ground - L / 2 - 6;
@@ -559,16 +560,295 @@
             }
             ctx.restore();
         }
-        if (!body) return;
-        const T = L / SHAPE_ASPECT;
+        // the rest is drawn with his head on the left, and turned over after
         ctx.save();
-        ctx.translate(x, cy);
-        if (mirror) ctx.scale(-1, 1);
-        ctx.rotate(-Math.PI / 2);
-        if (drain < 1) ctx.drawImage(memFlesh(MEM_CLAY), -L / 2, -T / 2, L, T);
-        if (drain > 0) {
-            ctx.globalAlpha *= drain;
-            ctx.drawImage(greySprite(), -L / 2, -T / 2, L, T);
+        if (mirror) { ctx.translate(x, 0); ctx.scale(-1, 1); ctx.translate(-x, 0); }
+        const o = { x, cy, L, ground, s, hx: x + hx0, hy, ax: (x + hx0 + x) / 2, ay };
+        const light = Math.min(1, aura);
+        memOdinSun(o, light);
+        memOdinBirds(o, light, false);
+        memOdinTree(o, body);
+        if (body) {
+            memOdinArmy(o);
+            if (drain > 0) {
+                ctx.save();
+                ctx.globalAlpha *= drain;
+                memBody(ctx, greySprite(), x, cy, L);
+                ctx.restore();
+            }
+        }
+        memOdinFalling(o);
+        memOdinBirds(o, light, true);
+        ctx.restore();
+    }
+
+    // a whole Brandon on `g`, centred on (x, y), `len` long, his head pointing `a`
+    function memBone(g, img, x, y, len, a, flip) {
+        if (!img) return;
+        const th = len / SHAPE_ASPECT;
+        g.save();
+        g.translate(x, y);
+        g.rotate(a);
+        if (flip) g.scale(1, -1);
+        g.drawImage(img, -len / 2, -th / 2, len, th);
+        g.restore();
+    }
+    // a body stood up on his boot, his middle at (x, cy), L tall
+    function memBody(g, img, x, cy, L) {
+        if (!img) return;
+        const T = L / SHAPE_ASPECT;
+        g.save();
+        g.translate(x, cy);
+        g.rotate(-Math.PI / 2);
+        g.drawImage(img, -L / 2, -T / 2, L, T);
+        g.restore();
+    }
+    // the ball in `color`, done the way memFlesh does a Brandon
+    const memBalls = new Map();
+    function memBallIn(color) {
+        if (memBalls.has(color)) return memBalls.get(color);
+        if (!ready(ballImg)) return null;
+        const w = ballImg.naturalWidth, h = ballImg.naturalHeight;
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        const g = c.getContext('2d');
+        g.drawImage(ballImg, 0, 0);
+        g.globalCompositeOperation = 'source-in';
+        g.fillStyle = color;
+        g.fillRect(0, 0, w, h);
+        g.globalCompositeOperation = 'multiply';
+        g.filter = 'grayscale(1) contrast(0.55) brightness(2.6) contrast(1.6)';
+        g.drawImage(ballImg, 0, 0);
+        g.filter = 'none';
+        g.globalCompositeOperation = 'destination-in';
+        g.drawImage(ballImg, 0, 0);
+        memBalls.set(color, c);
+        return c;
+    }
+    // the character lab's own steady pseudo-random, so what it tuned is what shows
+    const memLabHash = i => { const s = Math.sin(i * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+
+    // ---- HIS LOOK ---------------------------------------------------------------------
+    // Tuned in the character lab (.claude/brandon-characters.html, ALLFATHER).
+    // Over his own light, a wheel of Brandons pointing out from behind him like
+    // rays, faint; his body is his army, little Brandons in ranks hopping, a
+    // cheer running up him; two birds of three Brandons going round his head;
+    // and out of his head a tree that never stops growing and never stops
+    // breaking. Every branch is a Brandon; it grows out, then puts out two
+    // more; each second any branch may snap, and falls with everything above
+    // it as one piece, turning. When he comes apart the whole of it goes, and
+    // the birds fly off. Everything but his own light is `light` strong.
+    const MO_SUN_RINGS = [
+        { n: 20, r: 0.26, len: 0.2, turn: 1 },
+        { n: 34, r: 0.44, len: 0.28, turn: -0.55 },
+    ];
+    const MO_SUN_GOLDS = ['#c9a94e', '#bd7f3f'];
+    const MO_SUN_TURN = 80;          // seconds for the inner wheel to go round
+    const MO_SUN_FADE = 0.4;         // how much of the wheel shows
+    const MO_GLOW = '#ffd98a';
+    const MO_TREE_DEPTH = 5, MO_TREE_SPREAD = 23, MO_TREE_SHRINK = 0.74, MO_TREE_FIRST = 0.27;
+    const MO_TREE_INKS = ['#b87c5e', '#c48a6c', '#cf9a78', '#d9aa84', '#e2ba8e'];   // clay, lighter toward the tips
+    const MO_TREE_BREAK = 0.1;       // chance a second that a branch snaps
+    const MO_TREE_GROW = 1.5;        // seconds a branch takes to grow out
+    const MO_TREE_FALL = 900;        // px/s² a broken piece falls at, for him 450 tall
+    const MO_TREE_READY = 8;         // seconds of growing done before he is first seen
+    const MO_LEAF = '#c9a94e';
+    const MO_ARMY_SIZE = 0.1;        // one of his army's height, as a share of his
+    const MO_ARMY_WAVE = 4;          // seconds between cheers
+    const MO_BIRD = '#4f8f80', MO_BIRD_EDGE = '#c9a94e';   // old bronze gone green, edged in his gold
+    const MO_BIRD_ROUND = 8;         // seconds for a bird to go round him
+
+    function memOdinSun(o, light) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(-LW, -2 * LH, 3 * LW, o.ground + 2 * LH);
+        ctx.clip();
+        const base = ctx.globalAlpha * light * MO_SUN_FADE;
+        const breathe = 0.5 + 0.5 * Math.sin(o.s * 2 * Math.PI / 3.2);
+        MO_SUN_RINGS.forEach((ring, ri) => {
+            for (let i = 0; i < ring.n; i++) {
+                const th = i / ring.n * 2 * Math.PI + o.s * 2 * Math.PI / MO_SUN_TURN * ring.turn + ri * 0.1;
+                const len = ring.len * o.L * (i % 2 ? 0.7 : 1) * (1 + 0.04 * breathe);
+                const r = ring.r * o.L * (1 + 0.03 * breathe) + len / 2;
+                const x = o.ax + Math.cos(th) * r, y = o.ay + Math.sin(th) * r;
+                const lit = 0.5 + 0.5 * Math.sin(th * 2 - o.s * 1.4 + ri);
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.globalAlpha = base * (0.6 + 0.4 * lit);
+                memBone(ctx, memBrick(MO_SUN_GOLDS[(i + ri) % 2]), x, y, len, th, i % 2);
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.globalAlpha = base * 0.45 * lit;
+                memBone(ctx, memFlesh(MO_GLOW), x, y, len, th, i % 2);
+            }
+        });
+        ctx.restore();
+    }
+
+    // His army: ranks over the whole of his box, cut to his shape on a canvas
+    // of their own, over a faint copy of him so the gaps still read as him.
+    let moArmyAt = null, moArmyCanvas = null;
+    const MO_ARMY_RES = 2;           // the army's canvas, this many px to the frame's one
+    function memOdinArmy(o) {
+        if (!moArmyAt) {
+            moArmyAt = [];
+            const du = MO_ARMY_SIZE * 0.5, dv = MO_ARMY_SIZE * 1.15;
+            for (let r = 0, u = 0.02; u < 1; u += du, r++)
+                for (let v = (r % 2) * dv / 2; v < 1 + dv / 2; v += dv) moArmyAt.push({ u, v, seed: memLabHash(moArmyAt.length + 900) });
+            // the ranks highest up him are the furthest back
+            moArmyAt.sort((p, q) => q.u - p.u);
+        }
+        if (!moArmyCanvas) {
+            moArmyCanvas = document.createElement('canvas');
+            moArmyCanvas.width = LW * MO_ARMY_RES; moArmyCanvas.height = LH * MO_ARMY_RES;
+        }
+        const g = moArmyCanvas.getContext('2d');
+        g.setTransform(1, 0, 0, 1, 0, 0);
+        g.globalCompositeOperation = 'source-over';
+        g.globalAlpha = 1;
+        g.clearRect(0, 0, moArmyCanvas.width, moArmyCanvas.height);
+        g.setTransform(MO_ARMY_RES, 0, 0, MO_ARMY_RES, 0, 0);
+        const hL = MO_ARMY_SIZE * o.L, img = memFlesh(MEM_CLAY), lit = memFlesh('#f3cf86');
+        const wave = (o.s / MO_ARMY_WAVE) % 1.6 - 0.3;
+        for (const p of moArmyAt) {
+            const [fx, fy] = memOnBody(o.x, o.cy, o.L, 0, p.u, p.v);
+            const cheer = Math.exp(-((p.u - wave) ** 2) / 0.004);
+            const hop = hL * (0.08 * Math.max(0, Math.sin(2 * Math.PI * (o.s / (0.7 + 0.5 * p.seed) + p.seed))) + 0.4 * cheer);
+            const y = fy - hop - hL / 2;
+            memBone(g, img, fx, y, hL, -Math.PI / 2, p.seed > 0.5);
+            if (cheer > 0.02) {
+                g.globalAlpha = cheer;
+                memBone(g, lit, fx, y, hL, -Math.PI / 2, p.seed > 0.5);
+                g.globalAlpha = 1;
+            }
+        }
+        g.globalCompositeOperation = 'destination-in';
+        memBody(g, memFlesh(MEM_CLAY), o.x, o.cy, o.L);
+        ctx.save();
+        ctx.globalAlpha *= 0.28;
+        memBody(ctx, memFlesh(MEM_CLAY), o.x, o.cy, o.L);
+        ctx.restore();
+        ctx.drawImage(moArmyCanvas, 0, 0, LW, LH);
+    }
+
+    // The tree. moGrove.kids are the three branches out of his head, each
+    // { depth, len, target, rel, sway, seed, kids }, lengths as shares of him;
+    // chunks are the broken pieces falling, each Brandon of one kept where it
+    // was when it broke, turned about the break by `spin` as it goes.
+    let moGrove = null;
+    function moSprout(depth, i, target) {
+        const root = depth === 0;
+        return { depth, len: 0, sway: 0, seed: Math.random(), kids: [null, null],
+                 rel: root ? [-30, 0, 30][i] * Math.PI / 180 - Math.PI / 2
+                           : (i ? 1 : -1) * MO_TREE_SPREAD * (0.75 + 0.5 * Math.random()) * Math.PI / 180,
+                 target: root ? MO_TREE_FIRST * (i === 1 ? 1.05 : 0.95) : target * MO_TREE_SHRINK * (0.9 + 0.2 * Math.random()) };
+    }
+    // one step of `dt`: grow, maybe snap, and draw if `draw`; `all` snaps every branch he has
+    function moGroveStep(o, dt, draw, all) {
+        const snap = all ? 1 : 1 - Math.exp(-MO_TREE_BREAK * dt), deepest = MO_TREE_DEPTH - 1;
+        const leaf = memBrick(MO_LEAF), ll = o.L * 0.05;
+        // a branch where it is now, and its leaves: [img, x, y, len, a, flip] each
+        const pieces = (n, x, y, a, out) => {
+            const len = n.len * o.L, ex = x + Math.cos(a) * len, ey = y + Math.sin(a) * len;
+            out.push([memFlesh(MO_TREE_INKS[n.depth]), (x + ex) / 2, (y + ey) / 2, len * 1.1, a, n.seed > 0.5]);
+            if (n.depth === deepest && n.len >= n.target)
+                for (let j = 0; j < 3; j++) {
+                    const la = a + (j - 1) * 0.9 + Math.sin(o.s * 2.2 + n.seed * 9 + j) * 0.25;
+                    out.push([leaf, ex + Math.cos(la) * ll * 0.5, ey + Math.sin(la) * ll * 0.5, ll, la, j % 2]);
+                }
+            return [ex, ey];
+        };
+        const walk = (n, x, y, a0, slots, i) => {
+            if (Math.random() < snap) {
+                if (draw) {
+                    const out = [];
+                    const whole = (m, mx, my, ma) => {
+                        const [ex, ey] = pieces(m, mx, my, ma, out);
+                        m.kids.forEach(k => k && whole(k, ex, ey, ma + k.rel + k.sway));
+                    };
+                    whole(n, x, y, a0 + n.rel + n.sway);
+                    moGrove.chunks.push({ out, x0: x, y0: y, px: x, py: y, vx: (Math.random() - 0.5) * 60, vy: -20,
+                                          spin: (Math.random() - 0.5) * 3, age: 0 });
+                }
+                slots[i] = null;
+                return;
+            }
+            n.len = Math.min(n.target, n.len + dt * n.target / MO_TREE_GROW);
+            n.sway = Math.sin(o.s * 2 * Math.PI / 7 + n.depth * 0.8 + n.seed * 6) * (0.6 + n.depth * 0.9) * Math.PI / 180;
+            const a = a0 + n.rel + n.sway, out = [];
+            const [ex, ey] = pieces(n, x, y, a, out);
+            if (draw) out.forEach(p => memBone(ctx, ...p));
+            if (n.len < n.target) return;
+            n.kids.forEach((k, j) => {
+                if (!k && n.depth < deepest) k = n.kids[j] = moSprout(n.depth + 1, j, n.target);
+                if (k) walk(k, ex, ey, a, n.kids, j);
+            });
+        };
+        const [tx, ty] = memOnBody(o.x, o.cy, o.L, 0, 0.98, HL_HEAD_V);
+        moGrove.kids.forEach((k, i) => {
+            if (!k && !all) k = moGrove.kids[i] = moSprout(0, i, 0);
+            if (k) walk(k, tx, ty + o.L * 0.02, 0, moGrove.kids, i);
+        });
+    }
+    function memOdinTree(o, body) {
+        // a new tree for each showing, already grown, since it has always been growing
+        if (!moGrove || o.s < moGrove.last) {
+            moGrove = { kids: [null, null, null], chunks: [], last: o.s, goneAt: null };
+            for (let k = 0; k < MO_TREE_READY * 10; k++) moGroveStep(o, 0.1, false, false);
+        }
+        const dt = Math.min(0.1, o.s - moGrove.last);
+        moGrove.last = o.s;
+        if (body) moGroveStep(o, dt, true, false);
+        else if (moGrove.goneAt === null) { moGrove.goneAt = o.s; moGroveStep(o, 0, true, true); }
+        for (const c of moGrove.chunks) {
+            c.age += dt;
+            c.vy += MO_TREE_FALL * o.L / 450 * dt;
+            c.px += c.vx * dt; c.py += c.vy * dt;
+        }
+        moGrove.chunks = moGrove.chunks.filter(c => c.age < 6 && c.py < o.ground + 400);
+    }
+    function memOdinFalling(o) {
+        if (!moGrove) return;
+        const base = ctx.globalAlpha;
+        for (const c of moGrove.chunks) {
+            const r = c.spin * c.age, cr = Math.cos(r), sr = Math.sin(r);
+            ctx.globalAlpha = base * memClamp(1 - (c.py - o.ground) / 150);
+            for (const [img, x, y, len, a, flip] of c.out) {
+                const ox = x - c.x0, oy = y - c.y0;
+                memBone(ctx, img, c.px + ox * cr - oy * sr, c.py + ox * sr + oy * cr, len, a + r, flip);
+            }
+        }
+        ctx.globalAlpha = base;
+    }
+
+    // The two birds, the half of their round nearer you (`near`) or the far
+    // half. Each is three Brandons, a body and a wing each side of two joints,
+    // edged so they read on the dark. Once he is gone they climb away.
+    function memOdinBirds(o, light, near) {
+        const gone = moGrove && moGrove.goneAt !== null ? o.s - moGrove.goneAt : 0;
+        const img = memFlesh(MO_BIRD), edge = memBrick(MO_BIRD_EDGE);
+        ctx.save();
+        const base = ctx.globalAlpha * Math.max(light, gone > 0 ? 1 : 0) * memClamp(1 - (gone - 1.5) / 1);
+        const bone = (x, y, len, a, flip) => {
+            ctx.globalAlpha = base * 0.8;
+            memBone(ctx, edge, x, y, len * 1.08, a, flip);
+            ctx.globalAlpha = base;
+            memBone(ctx, img, x, y, len, a, flip);
+        };
+        for (const k of [0, 1]) {
+            const ph = o.s * 2 * Math.PI / MO_BIRD_ROUND + k * Math.PI, depth = Math.cos(ph);
+            if ((depth >= 0) !== near) continue;
+            const R = o.L * 0.5, cx = o.hx, cy = o.hy - o.L * 0.2;
+            const x = cx + Math.sin(ph) * R * (1 + gone), y = cy + depth * o.L * 0.08 + Math.sin(ph * 2 + k) * o.L * 0.04
+                      - gone * gone * o.L * 0.9;
+            const a = Math.atan2(-Math.sin(ph) * o.L * 0.08, Math.cos(ph) * R);
+            const s = o.L * 0.16 * (0.85 + 0.2 * depth), flap = Math.sin(o.s * 2 * Math.PI * 1.1 + k * 2);
+            for (const side of [-1, 1]) {
+                const w1 = a + side * (Math.PI / 2 + 0.3 - 0.45 * flap);
+                const ex = x + Math.cos(w1) * s * 0.7, ey = y + Math.sin(w1) * s * 0.7;
+                bone((x + ex) / 2, (y + ey) / 2, s * 0.75, w1, side > 0);
+                const w2 = w1 + side * (0.4 + 0.35 * flap);
+                bone(ex + Math.cos(w2) * s * 0.4, ey + Math.sin(w2) * s * 0.4, s * 0.85, w2, side < 0);
+            }
+            bone(x, y, s, a, k);
         }
         ctx.restore();
     }
@@ -684,6 +964,121 @@
         g.globalCompositeOperation = 'source-over';
     });
 
+    // His look, tuned in the character lab (FORGED): a black sun behind his
+    // head, faint, with a corona of Brandons writhing off its rim; cracks all
+    // over him with violet light behind them beating with his heart; violet
+    // points in his own eyes; and a small sword of Brandons, burning, that
+    // flies round him on a tilted ring, turning end over end.
+    const MSF_ECLIPSE = 0.35;        // how much of the black sun shows
+    const MSF_EYES = [[0.0225, -0.062], [0.0005, -0.0255]];   // his eyes in the photo, from his head's middle, shares of him
+    const MSF_SWORD = 0.3;           // the sword's length, blade to pommel near enough, as a share of him
+    const MSF_SWORD_ROUND = 10;      // seconds for it to go round him
+    const MSF_SWORD_TURN = 2.5;      // ...and to turn over once
+    const MSF_FLAMES = ['#efe6ff', '#a58bff', '#5a36b8'];   // its fire, hot to cool
+    const MSF_IRON = '#1c1628';
+
+    function memSurtrEclipse(x, cy, L, s, b) {
+        const [, hy] = memOnBody(x, cy, L, 0, HL_HEAD_U, HL_HEAD_V);
+        const R = L * 0.24, ray = memFlesh('#8a6ee0'), core = memFlesh('#e2d8ff');
+        ctx.save();
+        const base = ctx.globalAlpha * MSF_ECLIPSE;
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = base * (0.3 + 0.2 * b);
+        ctx.drawImage(memBlob('rgba(110,70,220,1)'), x - R * 1.8, hy - R * 1.8, R * 3.6, R * 3.6);
+        for (let i = 0; i < 48; i++) {
+            const th = i / 48 * 2 * Math.PI + s * 2 * Math.PI / 240 + (memLabHash(i + 1500) - 0.5) * 0.05;
+            const len = L * (0.1 + 0.2 * memLabHash(i + 1510)) * (0.85 + 0.2 * Math.sin(s * 0.8 + i * 1.9));
+            const r = R * 0.9 + len / 2;
+            ctx.globalAlpha = base * 0.75;
+            memBone(ctx, ray, x + Math.cos(th) * r, hy + Math.sin(th) * r, len, th, i % 2);
+            ctx.globalAlpha = base * 0.45;
+            memBone(ctx, core, x + Math.cos(th) * (R * 0.9 + len * 0.3), hy + Math.sin(th) * (R * 0.9 + len * 0.3), len * 0.6, th, i % 2);
+        }
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = base;
+        ctx.fillStyle = '#050308';
+        ctx.beginPath();
+        ctx.arc(x, hy, R, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = `rgba(200,180,255,${0.5 + 0.3 * b})`;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    // the cracks, drawn once on his levelled body and cut to him below the neck
+    const memCracks = () => memSprite('cracks', (g, w, h) => {
+        const paths = [];
+        const walk = (x, y, a, steps, seed) => {
+            const pts = [[x, y]];
+            for (let s = 0; s < steps; s++) {
+                a += (memLabHash(seed * 31 + s) - 0.5) * 1.1;
+                x += Math.cos(a) * 13; y += Math.sin(a) * 13;
+                pts.push([x, y]);
+                if (s === 5 && steps > 8 && memLabHash(seed + s + 50) > 0.4) walk(x, y, a + 1, 6, seed + 97);
+            }
+            paths.push(pts);
+        };
+        for (let k = 0; k < 16; k++)
+            walk(w * (0.08 + 0.72 * memLabHash(k + 1600)), h * (0.2 + 0.6 * memLabHash(k + 1610)),
+                 memLabHash(k + 1620) * 2 * Math.PI, 12, k + 1630);
+        g.lineCap = g.lineJoin = 'round';
+        for (const [lw, col] of [[9, 'rgba(150,110,255,0.35)'], [2.2, '#e6dcff']]) {
+            g.lineWidth = lw;
+            g.strokeStyle = col;
+            for (const pts of paths) {
+                g.beginPath();
+                pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y));
+                g.stroke();
+            }
+        }
+        g.globalCompositeOperation = 'destination-in';
+        g.drawImage(memHeadless(), 0, 0);
+        g.globalCompositeOperation = 'source-over';
+    });
+
+    // the sword, on the far half of its round or the near
+    function memSurtrSword(x, cy, L, s, b, near) {
+        const ph = s * 2 * Math.PI / MSF_SWORD_ROUND, depth = Math.cos(ph);
+        if ((depth >= 0) !== near) return;
+        const Ls = L * MSF_SWORD * (0.9 + 0.15 * depth), T = Ls / SHAPE_ASPECT;
+        const iron = memFlesh(MSF_IRON), edge = memBrick(MSF_FLAMES[1]), fire = MSF_FLAMES.map(memFlesh);
+        ctx.save();
+        const base = ctx.globalAlpha;
+        ctx.translate(x + Math.sin(ph) * L * 0.45, cy - L * 0.1 + depth * L * 0.08);
+        ctx.rotate(s * 2 * Math.PI / MSF_SWORD_TURN);
+        // in its own frame: point down at +0.36 of it, the hilt up past -0.24
+        const point = Ls * 0.36, top = point - Ls * 0.6, seg = (point - top) / 6;
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = base * (0.3 + 0.25 * b);
+        const gw = Ls * 0.45;
+        ctx.drawImage(memBlob('rgba(120,80,255,1)'), -gw / 2, top - gw * 0.1, gw, point - top + gw * 0.2);
+        ctx.globalCompositeOperation = 'source-over';
+        const forged = (px, py, len, a, flip) => {
+            ctx.globalAlpha = base * 0.7;
+            memBone(ctx, edge, px, py, len * 1.06, a, flip);
+            ctx.globalAlpha = base;
+            memBone(ctx, iron, px, py, len, a, flip);
+        };
+        for (let i = 0; i < 6; i++) forged(0, point - seg * (i + 0.5), seg * 1.12, -Math.PI / 2, i % 2);
+        for (const side of [-1, 1]) forged(side * Ls * 0.07, top, Ls * 0.14, side > 0 ? 0 : Math.PI, 0);
+        forged(0, top - Ls * 0.05, Ls * 0.1, -Math.PI / 2, 0);
+        const pommel = memBallIn(MS_INK), pr = Ls * 0.03;
+        if (pommel) ctx.drawImage(pommel, -pr, top - Ls * 0.1 - pr * 1.9, pr * 2, pr * 2 * BALL_RY / BALL_RX);
+        ctx.globalCompositeOperation = 'lighter';
+        for (let i = 0; i < 160; i++) {
+            const h1 = memLabHash(i + 1000), life = (s / (0.9 + 0.9 * h1) + memLabHash(i + 1100)) % 1;
+            const y0 = point - (point - top) * memLabHash(i + 1200) * 1.05;
+            const fx = (memLabHash(i + 1300) - 0.5) * T * 0.12 + Math.sin(s * 3 + i) * Ls * 0.012 * life;
+            const len = Ls * 0.075 * (1 - 0.75 * life) * (0.6 + 0.8 * memLabHash(i + 1400));
+            ctx.globalAlpha = base * Math.sin(Math.min(1, life * 1.2) * Math.PI) * 0.7;
+            memBone(ctx, fire[life < 0.25 ? 0 : life < 0.6 ? 1 : 2], fx, y0 - life * Ls * (0.08 + 0.1 * h1),
+                    len, -Math.PI / 2 + Math.sin(s * 6 + i * 1.7) * 0.2, i % 2);
+        }
+        ctx.restore();
+    }
+
     // `away` true turns him to face right, the way he leaves
     function memSurtr(x, ground, L, s, strings, away) {
         const f = (s / MS_BEAT) % 1;
@@ -718,6 +1113,7 @@
             ctx.drawImage(memBlob('rgba(255,90,40,1)'), ex - es * 2, ey - es * 2, es * 4, es * 4);
         }
         ctx.restore();
+        memSurtrEclipse(x, cy, L, s, b);
 
         const sway = Math.sin(s * 2 * Math.PI / 7) * 0.018 + Math.sin(s * 2 * Math.PI / 2.9) * 0.004;
         const pivotY = ground - L * 1.25;
@@ -740,10 +1136,20 @@
             }
             ctx.restore();
         }
-        const T = L / SHAPE_ASPECT;
-        ctx.translate(x, cy);
-        ctx.rotate(-Math.PI / 2);
-        ctx.drawImage(memMenace(), -L / 2, -T / 2, L, T);
+        memSurtrSword(x, cy, L, s, b, false);
+        memBody(ctx, memMenace(), x, cy, L);
+        // the cracks, and his eyes, lit with his heartbeat
+        ctx.save();
+        const lit = ctx.globalAlpha;
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = lit * (0.35 + 0.65 * b);
+        memBody(ctx, memCracks(), x, cy, L);
+        ctx.globalAlpha = lit * (0.4 + 0.4 * b);
+        const [hx, hy] = memOnBody(x, cy, L, 0, HL_HEAD_U, HL_HEAD_V), er = HL_HEAD_W * L * 1.3 * 0.14;
+        for (const [dx, dy] of MSF_EYES)
+            ctx.drawImage(memBlob('rgba(190,160,255,1)'), hx + dx * L - er, hy + dy * L - er, er * 2, er * 2);
+        ctx.restore();
+        memSurtrSword(x, cy, L, s, b, true);
         ctx.restore();
     }
 
