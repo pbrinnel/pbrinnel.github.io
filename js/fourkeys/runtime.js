@@ -71,6 +71,11 @@
         },
         // a mini-boss's own test buttons, by name
         act(name) { return !!(labM && labM.acts && labM.acts[name] && labM.acts[name]()); },
+        // ...and a boss's, handed his brick
+        bossAct(name) {
+            const b = bricks && bricks[0];
+            return !!(labB && labB.acts && labB.acts[name] && b && b.kind === 'Z' && b.alive && labB.acts[name](b));
+        },
         // the hub, and its saved progress -- reachable from anywhere, since the
         // point of the buttons is to get you back to it
         hub() { menuOpen(); },
