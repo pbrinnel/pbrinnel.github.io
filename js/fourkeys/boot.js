@@ -11,7 +11,7 @@
     // lifts off the top of the screen and is gone for BOOT_AWAY0..BOOT_AWAY1,
     // then comes down again shouting, somewhere over you -- the wall is
     // yours to work on while it is away, and it is never away for long.
-    let BOOT_HP    = 9;       // hits on the sole to see it off
+    let BOOT_HP    = 6;       // hits on the sole to see it off
     let BOOT_W     = 180;     // px along the sole
     let BOOT_SINK  = 26;      // px/s it comes down
     let BOOT_KNOCK = 70;      // px a hit on the sole puts it back up
@@ -20,7 +20,7 @@
     let BOOT_LIFT  = 1.2;     // seconds it takes to lift again after a stamp
     let BOOT_PTS   = 120;     // a hit on the sole
     let BOOT_STAY0 = 8,  BOOT_STAY1 = 14;     // seconds it stays before it goes...
-    let BOOT_AWAY0 = 5,  BOOT_AWAY1 = 10;     // ...and is gone
+    let BOOT_AWAY0 = 1,  BOOT_AWAY1 = 3;      // ...and is gone
     let BOOT_ARRIVE = 1.1;    // seconds it takes to come down into view, near enough
     // The act a run draws it from, 1 easy to 3 hard. It is the only one of
     // them that takes a life off you outright, and it asks for a hit on the

@@ -30,7 +30,10 @@
     // stand until he rises again, IDOL_DOWN later and slowly; land on your
     // end and he only shoves you aside. Down there he is a
     // wall: you cannot get past him, and nor can the ball, so whichever side
-    // of him you are on is the side you play from until he goes back up.
+    // of him you are on is the side you play from until he goes back up --
+    // except that a head going over the top of him to the other side sends
+    // him straight back up, quickly (IDOL_RISE_QUICK), so you are never left
+    // walled off from your own head.
     let IDOL_HP        = 10;     // hits on bare face to finish him
     let IDOL_W         = 290;    // how wide he is
     let IDOL_Y         = 105;    // where his middle hangs; his crown is off the top
@@ -51,6 +54,7 @@
     let IDOL_G         = 2600;   // px/s^2 he falls at
     let IDOL_DOWN      = 3;      // seconds he stays down
     let IDOL_RISE      = 150;    // px/s he goes back up at
+    let IDOL_RISE_QUICK = 700;   // ...and when a head has gone over him
     let IDOL_CLIMB     = 0.4;    // how much of the original's climb this fight has
     // The act a run draws him from, 1 easy to 3 hard. The drop is his only
     // attack and it is telegraphed, and at Paul's numbers a bite stays open
@@ -60,7 +64,7 @@
                    'IDOL_BRICK', 'IDOL_CRACK', 'IDOL_CRACK_MAX', 'IDOL_CRACK_W',
                    'IDOL_STREAK_GAP', 'IDOL_WALK', 'IDOL_WAIT_MIN',
                    'IDOL_WAIT_MAX', 'IDOL_DROP_MIN', 'IDOL_DROP_MAX', 'IDOL_SHAKE', 'IDOL_SHAKE_PX',
-                   'IDOL_G', 'IDOL_DOWN', 'IDOL_RISE', 'IDOL_CLIMB');
+                   'IDOL_G', 'IDOL_DOWN', 'IDOL_RISE', 'IDOL_RISE_QUICK', 'IDOL_CLIMB');
 
     // His two coats, each a heap of whole pieces (idolCoat). A piece is there
     // or it is gone, so he breaks in Brandon-shaped chunks, never in squares.
@@ -97,6 +101,7 @@
             if (phase === 'play') idol.t += dt;
             // a head lost, or too long between hits, and the streak is gone
             if (phase !== 'play' || idol.t - idol.lastHit > IDOL_STREAK_GAP) idol.streak = 0;
+            idolCrossed();
             idolMove(dt);
             b.x = idol.x + idol.jx - bw / 2;
             b.y = idol.cy - bh / 2;
@@ -174,6 +179,18 @@
 
     const idolRand = (a, b) => a + Math.random() * (b - a);
 
+    // While he is falling or down, which side of his middle each head in
+    // play is on; one that changes sides has gone over him, and he goes back
+    // up quickly (idolMove) so you can follow it
+    function idolCrossed() {
+        const low = idol.stage === 'fall' || idol.stage === 'down';
+        for (const ball of balls) {
+            const side = Math.sign(ball.x - idol.x);
+            if (low && !ball.stuck && ball.idolSide && side && side !== ball.idolSide) idol.quick = true;
+            ball.idolSide = low ? side : 0;
+        }
+    }
+
     // A head whose middle has got inside him -- he fell past it faster than
     // it was knocked ahead of him, or landed on it -- is shot back out of the
     // top of his head, or out under his chin while his top is off the screen.
@@ -243,16 +260,17 @@
                 break;
             }
             case 'down':
-                if ((idol.st += dt) >= IDOL_DOWN) {
+                if ((idol.st += dt) >= IDOL_DOWN || idol.quick) {
                     idol.stage = 'rise';
                     idol.pin = null;
                     idol.side = 0;          // he may be over you: no fence until you are clear
                 }
                 break;
             case 'rise':
-                idol.cy = Math.max(IDOL_Y, idol.cy - IDOL_RISE * dt);
+                idol.cy = Math.max(IDOL_Y, idol.cy - (idol.quick ? IDOL_RISE_QUICK : IDOL_RISE) * dt);
                 if (idol.cy <= IDOL_Y) {
                     idol.stage = 'idle';
+                    idol.quick = false;
                     idol.next = idolRand(IDOL_DROP_MIN, IDOL_DROP_MAX);
                 }
                 break;

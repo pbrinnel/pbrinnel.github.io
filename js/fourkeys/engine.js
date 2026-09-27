@@ -491,8 +491,8 @@
     const FLEE_RAMP   = 0.8;     // seconds of that spent getting up to pace
     // Any wall, not only the hat's, will not hold you at its last few for
     // ever: once STALL_AT or fewer are left and STALL_SECS go by without a
-    // single one of them being hit, every one of them runs for it at once.
-    // A mini-boss is not a brick and never runs this way.
+    // single one of them being hit, every one of them runs for it at once,
+    // saying nothing. A mini-boss is not a brick and never runs this way.
     const STALL_AT    = 3;
     const STALL_SECS  = 15;
     const TODDLE_HZ   = 2.2;     // rocks a second, left and back
@@ -2507,7 +2507,7 @@
             banner = 'BRANDON WINS';
         } else {
             phase = 'cleared';
-            banner = 'WALL CLEAR';          // a stage is a whole building in the town (menuBestLabel)
+            banner = 'STAGE CLEAR';         // brandon.html's words, kept on purpose
             // the hat's statues go too, now there is nothing left to stand
             // over -- see STATUE_WAIT
             if (LEVELS[stage].talks) {
@@ -2563,7 +2563,7 @@
             if (!last.length || last.length > STALL_AT) stallT = 0;
             else if ((stallT += dt) >= STALL_SECS) {
                 stallT = 0;
-                for (const b of last) startFlee(b);
+                for (const b of last) walkOff(b, FLEE_WAIT, FLEE_SECS);    // no bubbles: they just go
             }
         }
         let gone = false;

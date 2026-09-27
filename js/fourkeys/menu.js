@@ -10,7 +10,7 @@
     //   four keys open the CASTLE
     //   finish a level without using a continue and you keep the paddle it guarded
     //   win any level at all and CLASSIC, the first game's paddle, is yours
-    //   each level you win for the first time plays the next memory, kept in MEMORIES
+    //   each stage gives the next memory the first time you win it with one left to give
     //   win the CASTLE and the VOID stands in the way to it: its memory comes
     //   halfway through the fight, and its end is the credits
     //   win the VOID and BOSS RUSH opens: every boss back to back, for a best of its own
@@ -49,8 +49,8 @@
         { id: 'consolidation', year: -92, title: 'Consolidation', ink: '#6f9bc4' },
         { id: 'now', year: 0, title: 'Reprisal', ink: '#f2efe9', always: true },
     ];
-    // The order memories are earned in, one for each level won the first
-    // time, whichever level it is. Not the timeline's order: the story is
+    // The order memories are earned in, one from each stage won (see
+    // menuNextMemory), whichever stage it is. Not the timeline's order: the story is
     // told out of sequence, and the gaps it leaves are where the rest go.
     const MENU_MEM_ORDER = ['exhortation', 'consolidation', 'cycle', 'salvation', 'counsel', 'fall'];
     // The first win anywhere, clean or not, also hands over CLASSIC. He plays
@@ -102,6 +102,7 @@
             wipe() {
                 menuLoad();
                 menu.keys = {}; menu.pads = { standard: true }; menu.best = {}; menu.seen = {}; menu.mems = {};
+                menu.memFrom = {};
                 menuSave();
                 LAB.usePad('standard');
                 return true;
@@ -115,7 +116,7 @@
         try { saved = JSON.parse(localStorage.getItem(MENU_KEY) || 'null'); } catch (e) { saved = null; }
         menu = { keys: (saved && saved.keys) || {}, pads: (saved && saved.pads) || { standard: true },
                  best: (saved && saved.best) || {}, seen: (saved && saved.seen) || {},
-                 mems: (saved && saved.mems) || {},
+                 mems: (saved && saved.mems) || {}, memFrom: (saved && saved.memFrom) || {},
                  dusting: null, sel: 1, say: null, sayT: 0,
                  cards: [], run: null, side: 0, hold: 0, sw: null,
                  march: false, lift: 0, lastX: 0, into: null, walk: 0, gait: 0, arriveT: -1,
@@ -127,7 +128,8 @@
     function menuSave() {
         try {
             localStorage.setItem(MENU_KEY, JSON.stringify({ keys: menu.keys, pads: menu.pads, best: menu.best,
-                                                            seen: menu.seen, mems: menu.mems }));
+                                                            seen: menu.seen, mems: menu.mems,
+                                                            memFrom: menu.memFrom }));
         } catch (e) { /* a private window just will not remember */ }
     }
 
@@ -559,15 +561,22 @@
         menuOpen();
     }
 
-    // The first memory in MENU_MEM_ORDER not yet earned, earned and queued
-    // to play behind its MEMORY UNLOCKED card. The debug menu can hand them
-    // over out of order, so it is the first missing one, not the next after
-    // a count.
-    function menuNextMemory() {
+    // Stage n's memory, if it has not given one yet: the first in
+    // MENU_MEM_ORDER not yet earned, earned and queued to play behind its
+    // MEMORY UNLOCKED card. Each stage gives one (`memFrom`), on whichever
+    // win of it comes first while there is one left to give -- not only the
+    // first win, so a stage whose key came from the debug menu, or that was
+    // won with every memory already open, still gives its own later. The
+    // debug menu can hand memories over out of order, so it is the first
+    // missing one, not the next after a count. True if one was earned.
+    function menuNextMemory(n) {
+        if (menu.memFrom[n]) return false;
         const id = MENU_MEM_ORDER.find(k => !menu.mems[k]);
-        if (!id) return;
+        if (!id) return false;
         menu.mems[id] = true;
+        menu.memFrom[n] = true;
         menu.shows.push({ memCard: id }, { mem: id });
+        return true;
     }
 
     // A boss that ends his level himself, rather than through the takeover (the
@@ -590,9 +599,7 @@
     function menuVoidMemory() {
         menuLoad();
         if (!menu.run || menu.run.n !== MENU_VOID.n) return false;
-        const had = menu.shows.length;
-        menuNextMemory();
-        if (menu.shows.length === had) return false;
+        if (!menuNextMemory(MENU_VOID.n)) return false;
         menuSave();
         menu.fightShow = true;
         menu.showT = 0;
@@ -617,7 +624,7 @@
 
     // The debug menu's win button. The screen you are on counts as beaten: a
     // level's last is won outright, as though the takeover had played out,
-    // and any other goes straight on to the next with no WALL CLEAR.
+    // and any other goes straight on to the next with no STAGE CLEAR.
     // Coming off the CONTINUE screen this way is not a continue.
     function menuSkip() {
         if (!menu || !menu.run) return false;
@@ -654,9 +661,9 @@
         // lab's buttons, which win a level without one
         menu.best[level.n] = Math.max(menu.best[level.n] || 0, score || 0);
         let got = level.name + (first ? ' · A KEY' : ' · DONE AGAIN');
-        // a new level's memory plays before any paddle is shown: after that
+        // the stage's memory plays before any paddle is shown: after that
         // it is in MEMORIES
-        if (first) menuNextMemory();
+        menuNextMemory(level.n);
         // A paddle just won is in your hands when the town comes back: the
         // level's own if there is one, since it is the one you played for,
         // or else the souvenir. A paddle kept back says nothing.
@@ -1244,21 +1251,14 @@
         ctx.globalAlpha = 1;
     }
 
-    // one line under the town, and only when there is something to say: the
-    // gate you are leaning on, or what just happened
+    // one line under the town, and only when something has just happened.
+    // Leaning on a gate says nothing here: the gate and the note beside it
+    // already name the paddle.
     function menuDrawLine() {
-        if (menu.sw || menu.going) return;
-        const to = menu.side && menu.lift <= 1 && menuNextPad(menu.side);
-        if (to && LAB_PAD[to]) {
-            text('lean to take ' + LAB_PAD[to].name, LW / 2, M_SAY_Y, 12, '#6d685f', 'center');
-            return;
-        }
-        if (menu.sayT > 0) {
-            ctx.globalAlpha = Math.min(1, menu.sayT / 0.4);
-            text(menu.say, LW / 2, M_SAY_Y, 16, '#c9a94e', 'center');
-            ctx.globalAlpha = 1;
-            return;
-        }
+        if (menu.sw || menu.going || menu.sayT <= 0) return;
+        ctx.globalAlpha = Math.min(1, menu.sayT / 0.4);
+        text(menu.say, LW / 2, M_SAY_Y, 16, '#c9a94e', 'center');
+        ctx.globalAlpha = 1;
     }
 
     // ---- PADDLE UNLOCKED, and a memory ------------------------------------------------
@@ -1500,11 +1500,19 @@
         setHint(M_HINT);
     }
 
+    // Everything gone, and the game starts over the way it did the first
+    // time: the title, the two opening cards, then the town arriving, dusty.
+    // The boss lab has no opening, and just goes back to its town.
     function menuErase() {
         LAB_MINI.menu.acts.wipe();
         clearBest();                        // everything means the best as well
-        menuLeave();
-        menuSay('SAVE DATA ERASED');
+        if (typeof introRestart !== 'function') { menuLeave(); menuSay('SAVE DATA ERASED'); return; }
+        menu.screen = null;
+        menuOpen();
+        paddle.x = paddle.tx = LW / 2;
+        introRestart();
+        freeMouse();
+        splash.hidden = false;
     }
 
     // What there is to pick on this screen, left to right. Spread over the

@@ -25,6 +25,8 @@
 
     function introUp() { return introAt < INTRO_CARDS.length; }
     function introSkip() { introAt = INTRO_CARDS.length; }
+    // from the top again, under the splash: what erasing your save does
+    function introRestart() { introAt = 0; introSince = -1; }
 
     function introNext(e) {
         if (!introUp() || !splash.hidden) return;
