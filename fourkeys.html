@@ -153,14 +153,11 @@
            this has to be spelled out or hiding it would do nothing */
         #splash[hidden] { display: none; }
 
-        /* the sequel's mark: small enough that the title still reads as one
-           word with a number after it, rather than two things of equal weight */
-        #splash i {
-            font-style: normal;
-            font-size: 0.15em;
-            letter-spacing: 0;
-            margin-left: 0.25em;
-            vertical-align: baseline;
+        /* shrink-wrapped to the title, so the subtitle has its width to match */
+        #splash .title {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
         }
 
         #splash span {
@@ -169,6 +166,33 @@
             letter-spacing: -0.03em;
             line-height: 1;
             color: #f2efe9;
+        }
+
+        /* hollow, so the number is the one thing on the screen that isn't
+           solid; stroke under the fill keeps the stroke from eating the glyph */
+        #splash span b {
+            color: #000;
+            -webkit-text-stroke: 0.035em #f2efe9;
+            paint-order: stroke fill;
+        }
+
+        /* faded out at both ends rather than cut off; fitSubtitle sets its
+           width and the space above and below it */
+        #splash hr {
+            height: 1px;
+            margin: 0 auto;
+            border: 0;
+            background: linear-gradient(to right, transparent, #8a857c 30%, #8a857c 70%, transparent);
+        }
+
+        /* this is its size before fitSubtitle stretches it to the title */
+        #splash small {
+            display: block;
+            font-size: clamp(0.7rem, 1.6vw, 1rem);
+            line-height: 1;
+            white-space: nowrap;
+            transform-origin: left;
+            color: #8a857c;
         }
 
         /* stage select, unlocked with the konami code or ?debug */
@@ -329,7 +353,62 @@
     </style>
 </head>
 <body>
-    <div id="splash"><span>BRANDON<i>2</i></span></div>
+    <div id="splash"><div class="title"><span>BRANDON <b>2</b></span><hr><small>BRANDON TO BRANDON</small></div></div>
+    <script>
+    // Stretches the subtitle to SUB_WIDTH of the title's width, centred under
+    // it: taller first, up to SUB_MAX_GROW, then wider letters, up to
+    // SUB_MAX_WIDEN, and letter spacing for whatever is left. The rule between
+    // them sits RULE_GAP (of the title's size) from the letters on each side.
+    (function fitSubtitle() {
+        const SUB_WIDTH = 0.9;
+        const SUB_MAX_GROW = 2;
+        const SUB_MAX_WIDEN = 1.5;
+        const RULE_GAP = 0.12;
+        const title = document.querySelector('#splash span');
+        const sub = document.querySelector('#splash small');
+        const rule = document.querySelector('#splash hr');
+        // the rule splits the difference between the two widths
+        rule.style.width = (1 + SUB_WIDTH) / 2 * 100 + '%';
+        const measure = document.createElement('canvas').getContext('2d');
+        // where the capitals' ink starts and ends inside an element's line
+        // box, which with line-height 1 is not its edges: the title's box
+        // has room below for descenders it doesn't have
+        function ink(el) {
+            const cs = getComputedStyle(el);
+            measure.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+            const m = measure.measureText(el.textContent);
+            const size = parseFloat(cs.fontSize);
+            const baseline = (size - m.fontBoundingBoxAscent - m.fontBoundingBoxDescent) / 2
+                + m.fontBoundingBoxAscent;
+            return { top: baseline - m.actualBoundingBoxAscent,
+                     below: size - baseline - m.actualBoundingBoxDescent };
+        }
+        function fit() {
+            sub.style.cssText = '';
+            const base = parseFloat(getComputedStyle(sub).fontSize);
+            const full = title.getBoundingClientRect().width;
+            const target = full * SUB_WIDTH;
+            const natural = sub.getBoundingClientRect().width;
+            const grow = Math.min(SUB_MAX_GROW, target / natural);
+            const width = natural * grow;
+            const widen = Math.max(1, Math.min(SUB_MAX_WIDEN, target / width));
+            // the last letter's spacing is cancelled by the margin, so only
+            // the gaps between letters count
+            const gap = (target / widen - width) / (sub.textContent.length - 1);
+            sub.style.fontSize = base * grow + 'px';
+            sub.style.letterSpacing = gap + 'px';
+            sub.style.marginRight = -gap + 'px';
+            sub.style.marginLeft = (full - target) / 2 + 'px';
+            sub.style.transform = 'scaleX(' + widen + ')';
+            const space = parseFloat(getComputedStyle(title).fontSize) * RULE_GAP;
+            rule.style.marginTop = space - ink(title).below + 'px';
+            rule.style.marginBottom = space - ink(sub).top + 'px';
+        }
+        fit();
+        document.fonts.ready.then(fit);
+        addEventListener('resize', fit);
+    })();
+    </script>
 
     <div id="rotate"><b>BRANDON</b>turn your phone sideways</div>
 
