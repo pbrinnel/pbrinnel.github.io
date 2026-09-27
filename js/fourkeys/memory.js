@@ -530,10 +530,12 @@
         const hx = x + (mirror ? -hx0 : hx0);
         const ax = (hx + x) / 2, ay = (hy + cy) / 2 - L * 0.08;
         const breathe = 0.5 + 0.5 * Math.sin(s * 2 * Math.PI / 3.2);
-        if (aura > 0.001) {
+        // his own light, at MO_LIGHT; the rest of him goes by `aura` itself
+        const own = aura * MO_LIGHT;
+        if (own > 0.001) {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
-            ctx.globalAlpha *= Math.min(1, (0.35 + 0.2 * breathe) * aura);
+            ctx.globalAlpha *= Math.min(1, (0.35 + 0.2 * breathe) * own);
             const gs = L * (1.5 + 0.08 * breathe + 0.9 * Math.max(0, aura - 1));
             ctx.drawImage(memBlob(MF_ODIN_GLOW), ax - gs / 2, ay - gs / 2, gs, gs);
             ctx.restore();
@@ -541,7 +543,7 @@
             for (const [dir, al, sc] of [[1, 0.55, 1], [-1, 0.35, 0.8]]) {
                 ctx.save();
                 ctx.globalCompositeOperation = 'lighter';
-                ctx.globalAlpha *= Math.min(1, al * aura * (0.8 + 0.2 * breathe));
+                ctx.globalAlpha *= Math.min(1, al * own * (0.8 + 0.2 * breathe));
                 ctx.translate(ax, ay);
                 ctx.rotate(dir * s * 2 * Math.PI / 70);
                 ctx.drawImage(memOdinRays(), -rs * sc / 2, -rs * sc / 2, rs * sc, rs * sc);
@@ -555,7 +557,7 @@
                 const mx = ax + (memHash(i + 30) - 0.5) * L * 0.9 + Math.sin(s + i) * 8;
                 const my = ground - life * L * 1.2;
                 const ms = (3 + 4 * memHash(i + 40)) * L / 450;
-                ctx.globalAlpha = base * Math.min(1, Math.sin(life * Math.PI) * 0.8 * aura);
+                ctx.globalAlpha = base * Math.min(1, Math.sin(life * Math.PI) * 0.8 * own);
                 ctx.drawImage(memBlob('rgba(255,235,180,1)'), mx - ms * 2, my - ms * 2, ms * 4, ms * 4);
             }
             ctx.restore();
@@ -565,10 +567,15 @@
         if (mirror) { ctx.translate(x, 0); ctx.scale(-1, 1); ctx.translate(-x, 0); }
         const o = { x, cy, L, ground, s, hx: x + hx0, hy, ax: (x + hx0 + x) / 2, ay };
         const light = Math.min(1, aura);
-        memOdinSun(o, light);
-        memOdinBirds(o, light, false);
-        memOdinTree(o, body);
+        memOdinBackdrop(o, light, body);
         if (body) {
+            if (MO_RIM > 0) {
+                ctx.save();
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.globalAlpha *= MO_RIM * light * (1 - drain);
+                memBody(ctx, memRim(), x, cy, L);
+                ctx.restore();
+            }
             memOdinArmy(o);
             if (drain > 0) {
                 ctx.save();
@@ -577,10 +584,56 @@
                 ctx.restore();
             }
         }
-        memOdinFalling(o);
-        memOdinBirds(o, light, true);
         ctx.restore();
     }
+
+    let moBackCanvas = null;
+    function memOdinBackdrop(o, light, body) {
+        if (!moBackCanvas) {
+            moBackCanvas = document.createElement('canvas');
+            moBackCanvas.width = LW * MO_BACK_RES; moBackCanvas.height = LH * MO_BACK_RES;
+        }
+        const g = moBackCanvas.getContext('2d');
+        g.setTransform(1, 0, 0, 1, 0, 0);
+        g.globalCompositeOperation = 'source-over';
+        g.globalAlpha = 1;
+        g.clearRect(0, 0, moBackCanvas.width, moBackCanvas.height);
+        g.setTransform(MO_BACK_RES, 0, 0, MO_BACK_RES, 0, 0);
+        memOdinSun(g, o, light);
+        memOdinBirds(g, o, light, false);
+        memOdinTree(g, o, body);
+        memOdinFalling(g, o);
+        memOdinBirds(g, o, light, true);
+        g.globalCompositeOperation = 'source-atop';
+        g.globalAlpha = MO_BACK_WASH;
+        g.fillStyle = MO_BACK_INK;
+        g.fillRect(-LW, -LH, 3 * LW, 3 * LH);
+        const r0 = MO_FADE_FROM * o.L, r1 = MO_FADE_TO * o.L;
+        g.globalCompositeOperation = 'destination-in';
+        g.globalAlpha = 1;
+        g.translate(o.ax, o.ay);
+        g.scale(1, MO_FADE_TALL);
+        const gr = g.createRadialGradient(0, 0, r0, 0, 0, r1);
+        gr.addColorStop(0, 'rgba(0,0,0,1)');
+        gr.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = gr;
+        g.fillRect(-4 * LW, -4 * LH, 8 * LW, 8 * LH);
+        ctx.drawImage(moBackCanvas, 0, 0, LW, LH);
+    }
+    // his outline alone, in his light: his body spread a few px every way, less his body
+    const memRim = () => memSprite('rim', (g, w, h) => {
+        const src = memFlesh(MEM_CLAY);
+        for (let i = 0; i < 16; i++) {
+            const a = i / 16 * 2 * Math.PI, d = i % 2 ? 3 : 6;
+            g.drawImage(src, Math.cos(a) * d, Math.sin(a) * d);
+        }
+        g.globalCompositeOperation = 'source-in';
+        g.fillStyle = MO_GLOW;
+        g.fillRect(0, 0, w, h);
+        g.globalCompositeOperation = 'destination-out';
+        g.drawImage(src, 0, 0);
+        g.globalCompositeOperation = 'source-over';
+    });
 
     // a whole Brandon on `g`, centred on (x, y), `len` long, his head pointing `a`
     function memBone(g, img, x, y, len, a, flip) {
@@ -632,9 +685,10 @@
     // Tuned in the character lab (.claude/brandon-characters.html, ALLFATHER).
     // Over his own light, a wheel of Brandons pointing out from behind him like
     // rays, faint; his body is his army, little Brandons in ranks hopping, a
-    // cheer running up him; two birds of three Brandons going round his head;
-    // and out of his head a tree that never stops growing and never stops
-    // breaking. Every branch is a Brandon; it grows out, then puts out two
+    // cheer running up him, rimmed in his light; out of his head a tree that
+    // never stops growing and never stops breaking; and two birds of three
+    // Brandons going round the tree. Wheel, tree and birds are a backdrop,
+    // washed and faded so he stands clear of them. Every branch is a Brandon; it grows out, then puts out two
     // more; each second any branch may snap, and falls with everything above
     // it as one piece, turning. When he comes apart the whole of it goes, and
     // the birds fly off. Everything but his own light is `light` strong.
@@ -644,26 +698,39 @@
     ];
     const MO_SUN_GOLDS = ['#c9a94e', '#bd7f3f'];
     const MO_SUN_TURN = 80;          // seconds for the inner wheel to go round
-    const MO_SUN_FADE = 0.4;         // how much of the wheel shows
+    const MO_SUN_FADE = 0.55;        // how much of the wheel shows
     const MO_GLOW = '#ffd98a';
-    const MO_TREE_DEPTH = 5, MO_TREE_SPREAD = 23, MO_TREE_SHRINK = 0.74, MO_TREE_FIRST = 0.27;
+    const MO_TREE_DEPTH = 3, MO_TREE_SPREAD = 23, MO_TREE_SHRINK = 0.74, MO_TREE_FIRST = 0.27;
     const MO_TREE_INKS = ['#b87c5e', '#c48a6c', '#cf9a78', '#d9aa84', '#e2ba8e'];   // clay, lighter toward the tips
     const MO_TREE_BREAK = 0.1;       // chance a second that a branch snaps
-    const MO_TREE_GROW = 1.5;        // seconds a branch takes to grow out
+    const MO_TREE_GROW = 2.5;        // seconds a branch takes to grow out
     const MO_TREE_FALL = 900;        // px/s² a broken piece falls at, for him 450 tall
     const MO_TREE_READY = 8;         // seconds of growing done before he is first seen
     const MO_LEAF = '#c9a94e';
     const MO_ARMY_SIZE = 0.1;        // one of his army's height, as a share of his
     const MO_ARMY_WAVE = 4;          // seconds between cheers
     const MO_BIRD = '#4f8f80', MO_BIRD_EDGE = '#c9a94e';   // old bronze gone green, edged in his gold
-    const MO_BIRD_ROUND = 8;         // seconds for a bird to go round him
+    const MO_BIRD_ROUND = 8;         // seconds for a bird to go round his tree
+    const MO_BIRD_SIZE = 0.104;      // a bird's body, as a share of his height
+    const MO_BIRD_R = 0.38, MO_BIRD_UP = 0.35;   // how far out they go, and how far over his head the middle is, shares of him
+    const MO_LIGHT = 0.4;            // how strong his own light is: glow, rays and motes
+    // Where he begins and ends, next to the others. His wheel, his tree, what
+    // falls from it and his birds are drawn together on a canvas of their own,
+    // the backdrop: washed MO_BACK_WASH of the way to MO_BACK_INK so they sit
+    // back behind him, and faded out from his middle -- whole out to
+    // MO_FADE_FROM of his height, gone by MO_FADE_TO, the fade MO_FADE_TALL
+    // times as tall as it is wide. His body carries a rim of his light.
+    const MO_BACK_WASH = 0.4, MO_BACK_INK = '#4a3222';
+    const MO_FADE_FROM = 0.2, MO_FADE_TO = 0.75, MO_FADE_TALL = 1.3;
+    const MO_RIM = 0.2;
+    const MO_BACK_RES = 2;           // the backdrop's canvas, this many px to the frame's one
 
-    function memOdinSun(o, light) {
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(-LW, -2 * LH, 3 * LW, o.ground + 2 * LH);
-        ctx.clip();
-        const base = ctx.globalAlpha * light * MO_SUN_FADE;
+    function memOdinSun(g, o, light) {
+        g.save();
+        g.beginPath();
+        g.rect(-LW, -2 * LH, 3 * LW, o.ground + 2 * LH);
+        g.clip();
+        const base = g.globalAlpha * light * MO_SUN_FADE;
         const breathe = 0.5 + 0.5 * Math.sin(o.s * 2 * Math.PI / 3.2);
         MO_SUN_RINGS.forEach((ring, ri) => {
             for (let i = 0; i < ring.n; i++) {
@@ -672,15 +739,15 @@
                 const r = ring.r * o.L * (1 + 0.03 * breathe) + len / 2;
                 const x = o.ax + Math.cos(th) * r, y = o.ay + Math.sin(th) * r;
                 const lit = 0.5 + 0.5 * Math.sin(th * 2 - o.s * 1.4 + ri);
-                ctx.globalCompositeOperation = 'source-over';
-                ctx.globalAlpha = base * (0.6 + 0.4 * lit);
-                memBone(ctx, memBrick(MO_SUN_GOLDS[(i + ri) % 2]), x, y, len, th, i % 2);
-                ctx.globalCompositeOperation = 'lighter';
-                ctx.globalAlpha = base * 0.45 * lit;
-                memBone(ctx, memFlesh(MO_GLOW), x, y, len, th, i % 2);
+                g.globalCompositeOperation = 'source-over';
+                g.globalAlpha = base * (0.6 + 0.4 * lit);
+                memBone(g, memBrick(MO_SUN_GOLDS[(i + ri) % 2]), x, y, len, th, i % 2);
+                g.globalCompositeOperation = 'lighter';
+                g.globalAlpha = base * 0.45 * lit;
+                memBone(g, memFlesh(MO_GLOW), x, y, len, th, i % 2);
             }
         });
-        ctx.restore();
+        g.restore();
     }
 
     // His army: ranks over the whole of his box, cut to his shape on a canvas
@@ -742,7 +809,7 @@
                  target: root ? MO_TREE_FIRST * (i === 1 ? 1.05 : 0.95) : target * MO_TREE_SHRINK * (0.9 + 0.2 * Math.random()) };
     }
     // one step of `dt`: grow, maybe snap, and draw if `draw`; `all` snaps every branch he has
-    function moGroveStep(o, dt, draw, all) {
+    function moGroveStep(g, o, dt, draw, all) {
         const snap = all ? 1 : 1 - Math.exp(-MO_TREE_BREAK * dt), deepest = MO_TREE_DEPTH - 1;
         const leaf = memBrick(MO_LEAF), ll = o.L * 0.05;
         // a branch where it is now, and its leaves: [img, x, y, len, a, flip] each
@@ -775,7 +842,7 @@
             n.sway = Math.sin(o.s * 2 * Math.PI / 7 + n.depth * 0.8 + n.seed * 6) * (0.6 + n.depth * 0.9) * Math.PI / 180;
             const a = a0 + n.rel + n.sway, out = [];
             const [ex, ey] = pieces(n, x, y, a, out);
-            if (draw) out.forEach(p => memBone(ctx, ...p));
+            if (draw) out.forEach(p => memBone(g, ...p));
             if (n.len < n.target) return;
             n.kids.forEach((k, j) => {
                 if (!k && n.depth < deepest) k = n.kids[j] = moSprout(n.depth + 1, j, n.target);
@@ -788,16 +855,16 @@
             if (k) walk(k, tx, ty + o.L * 0.02, 0, moGrove.kids, i);
         });
     }
-    function memOdinTree(o, body) {
+    function memOdinTree(g, o, body) {
         // a new tree for each showing, already grown, since it has always been growing
         if (!moGrove || o.s < moGrove.last) {
             moGrove = { kids: [null, null, null], chunks: [], last: o.s, goneAt: null };
-            for (let k = 0; k < MO_TREE_READY * 10; k++) moGroveStep(o, 0.1, false, false);
+            for (let k = 0; k < MO_TREE_READY * 10; k++) moGroveStep(g, o, 0.1, false, false);
         }
         const dt = Math.min(0.1, o.s - moGrove.last);
         moGrove.last = o.s;
-        if (body) moGroveStep(o, dt, true, false);
-        else if (moGrove.goneAt === null) { moGrove.goneAt = o.s; moGroveStep(o, 0, true, true); }
+        if (body) moGroveStep(g, o, dt, true, false);
+        else if (moGrove.goneAt === null) { moGrove.goneAt = o.s; moGroveStep(g, o, 0, true, true); }
         for (const c of moGrove.chunks) {
             c.age += dt;
             c.vy += MO_TREE_FALL * o.L / 450 * dt;
@@ -805,42 +872,44 @@
         }
         moGrove.chunks = moGrove.chunks.filter(c => c.age < 6 && c.py < o.ground + 400);
     }
-    function memOdinFalling(o) {
+    function memOdinFalling(g, o) {
         if (!moGrove) return;
-        const base = ctx.globalAlpha;
+        const base = g.globalAlpha;
         for (const c of moGrove.chunks) {
             const r = c.spin * c.age, cr = Math.cos(r), sr = Math.sin(r);
-            ctx.globalAlpha = base * memClamp(1 - (c.py - o.ground) / 150);
+            g.globalAlpha = base * memClamp(1 - (c.py - o.ground) / 150);
             for (const [img, x, y, len, a, flip] of c.out) {
                 const ox = x - c.x0, oy = y - c.y0;
-                memBone(ctx, img, c.px + ox * cr - oy * sr, c.py + ox * sr + oy * cr, len, a + r, flip);
+                memBone(g, img, c.px + ox * cr - oy * sr, c.py + ox * sr + oy * cr, len, a + r, flip);
             }
         }
-        ctx.globalAlpha = base;
+        g.globalAlpha = base;
     }
 
     // The two birds, the half of their round nearer you (`near`) or the far
-    // half. Each is three Brandons, a body and a wing each side of two joints,
-    // edged so they read on the dark. Once he is gone they climb away.
-    function memOdinBirds(o, light, near) {
+    // half, going round the middle of his tree's crown. Each is three
+    // Brandons, a body and a wing each side of two joints, edged so they read
+    // on the dark. Once he is gone they climb away.
+    function memOdinBirds(g, o, light, near) {
         const gone = moGrove && moGrove.goneAt !== null ? o.s - moGrove.goneAt : 0;
         const img = memFlesh(MO_BIRD), edge = memBrick(MO_BIRD_EDGE);
-        ctx.save();
-        const base = ctx.globalAlpha * Math.max(light, gone > 0 ? 1 : 0) * memClamp(1 - (gone - 1.5) / 1);
+        g.save();
+        const base = g.globalAlpha * Math.max(light, gone > 0 ? 1 : 0) * memClamp(1 - (gone - 1.5) / 1);
         const bone = (x, y, len, a, flip) => {
-            ctx.globalAlpha = base * 0.8;
-            memBone(ctx, edge, x, y, len * 1.08, a, flip);
-            ctx.globalAlpha = base;
-            memBone(ctx, img, x, y, len, a, flip);
+            g.globalAlpha = base * 0.8;
+            memBone(g, edge, x, y, len * 1.08, a, flip);
+            g.globalAlpha = base;
+            memBone(g, img, x, y, len, a, flip);
         };
         for (const k of [0, 1]) {
             const ph = o.s * 2 * Math.PI / MO_BIRD_ROUND + k * Math.PI, depth = Math.cos(ph);
             if ((depth >= 0) !== near) continue;
-            const R = o.L * 0.5, cx = o.hx, cy = o.hy - o.L * 0.2;
+            const [tx, ty] = memOnBody(o.x, o.cy, o.L, 0, 0.98, HL_HEAD_V);
+            const R = o.L * MO_BIRD_R, cx = tx, cy = ty - o.L * MO_BIRD_UP;
             const x = cx + Math.sin(ph) * R * (1 + gone), y = cy + depth * o.L * 0.08 + Math.sin(ph * 2 + k) * o.L * 0.04
                       - gone * gone * o.L * 0.9;
             const a = Math.atan2(-Math.sin(ph) * o.L * 0.08, Math.cos(ph) * R);
-            const s = o.L * 0.16 * (0.85 + 0.2 * depth), flap = Math.sin(o.s * 2 * Math.PI * 1.1 + k * 2);
+            const s = o.L * MO_BIRD_SIZE * (0.85 + 0.2 * depth), flap = Math.sin(o.s * 2 * Math.PI * 1.1 + k * 2);
             for (const side of [-1, 1]) {
                 const w1 = a + side * (Math.PI / 2 + 0.3 - 0.45 * flap);
                 const ex = x + Math.cos(w1) * s * 0.7, ey = y + Math.sin(w1) * s * 0.7;
@@ -850,7 +919,7 @@
             }
             bone(x, y, s, a, k);
         }
-        ctx.restore();
+        g.restore();
     }
 
     // His grey body coming apart along the same grid, in the same order, as
