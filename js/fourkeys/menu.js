@@ -495,6 +495,14 @@
     const M_PUSH_PARALLAX = 1.2;     // how much faster near things rush past than the door, far things slower
     const M_PUSH_LEVEL_FROM = 0.55;  // the share of going in at which the level starts to show through
     const M_NEAR_GROUND = 1.3, M_NEAR_SKY = -0.3;   // the gates and the sky, on menuNear's scale
+    // A sign has no door, so PUSH TO BOARD: the same push, into its board's
+    // own face, which drifts to the middle and fills the screen with the
+    // screen it opens. He fades where he stands before the push gets going.
+    const M_SIGN_SECS = 1.2, M_SIGN_BACK = 1.1;
+    const M_SIGN_ZOOM_FROM = 0.1;    // the push starts almost at once: there is no walk first
+    const M_SIGN_PARALLAX = 0.6;     // half a building's: the signs are all at the back of the town
+    const M_SIGN_FADE = 0.2;         // the share of the way in he takes to fade
+    const M_SIGN_DARK_FROM = 0.6;    // ...and from which the board goes to the screen's dark
     const M_FIELD = '#000';          // the level's own background, what the doorway opens onto
 
     function menuCanEnter(l) {
@@ -509,9 +517,12 @@
         menu.going = { card: c, t: 0, x: paddle.x, y: padY() };
     }
 
+    const menuPushSecs = c => c.level.key ? M_SIGN_SECS : M_PUSH_SECS;
+    const menuPushBack = c => c.level.key ? M_SIGN_BACK : M_PUSH_BACK;
+
     function menuGoStep(dt) {
         const g = menu.going;
-        if ((g.t += dt) < M_PUSH_SECS) return;
+        if ((g.t += dt) < menuPushSecs(g.card)) return;
         menu.going = null;
         const l = g.card.level;
         if (l.key === 'settings' || l.key === 'memories' || l.key === 'board') {
@@ -526,7 +537,7 @@
     // the door, and him walking out of it to stand at home under it
     function menuLeaveStep(dt) {
         const lv = menu.leaving;
-        if ((lv.t += dt) < M_PUSH_BACK) return;
+        if ((lv.t += dt) < menuPushBack(lv.card)) return;
         paddle.x = paddle.tx = lv.x;
         menu.lift = 0;
         menu.leaving = null;
@@ -538,8 +549,8 @@
     // going in or coming back out, as one: the card, how far in (0 at the
     // door to 1 through it), and where he walks from or to
     function menuMotion() {
-        if (menu.going) return { card: menu.going.card, k: menuClamp(menu.going.t / M_PUSH_SECS), x: menu.going.x, y: menu.going.y, going: true };
-        if (menu.leaving) return { card: menu.leaving.card, k: 1 - menuClamp(menu.leaving.t / M_PUSH_BACK), x: menu.leaving.x, y: padY() };
+        if (menu.going) return { card: menu.going.card, k: menuClamp(menu.going.t / menuPushSecs(menu.going.card)), x: menu.going.x, y: menu.going.y, going: true };
+        if (menu.leaving) return { card: menu.leaving.card, k: 1 - menuClamp(menu.leaving.t / menuPushBack(menu.leaving.card)), x: menu.leaving.x, y: padY() };
         return null;
     }
     // how near a thing in the town is: 0 on the CASTLE's row, 1 on the FARM's
@@ -549,6 +560,17 @@
     function menuCamera(near) {
         const m = menuMotion();
         if (!m) return;
+        if (m.card.level.key) {
+            // into a sign's board, far enough for it, wide and short, to fill the screen both ways
+            const G = menuHang(m.card), fx = m.card.x, fy = G.top + G.bh / 2;
+            const S = 1 + Math.pow(menuBand(m.k, M_SIGN_ZOOM_FROM, 1), 3) * (Math.max(LW / G.bw, LH / G.bh) + 1);
+            const s = Math.pow(S, Math.max(0.15, 1 + M_SIGN_PARALLAX * (near - menuNear(m.card))));
+            const centre = menuEase(menuBand(m.k, M_SIGN_ZOOM_FROM - 0.05, 0.9));
+            ctx.translate(menuLerp(fx, LW / 2, centre), menuLerp(fy, LH / 2, centre));
+            ctx.scale(s, s);
+            ctx.translate(-fx, -fy);
+            return;
+        }
         const d = menuDoorOf(m.card), fx = d.cx, fy = d.bot - d.h * 0.45;
         const S = 1 + Math.pow(menuBand(m.k, M_PUSH_ZOOM_FROM, 1), 3) * M_PUSH_DEPTH;
         // nearer than the door rushes past faster, further slower -- but it still comes
@@ -693,6 +715,7 @@
     function menuDrawPush() {
         const m = menuMotion();
         if (!m) return;
+        if (m.card.level.key) { menuDrawPushSign(m); return; }
         const c = m.card, d = menuDoorOf(c), k = m.k, ink = c.level.ink;
         const open = menuEase(menuBand(k, 0, 0.2)), walk = menuEase(menuBand(k, 0.05, M_PUSH_WALK));
         const size = d.grows ? open : 1;
@@ -728,6 +751,19 @@
         labPadIcon(LAB.pad, menuLerp(m.x, d.cx, walk), menuLerp(m.y, d.bot - d.h * 0.3, walk),
                    menuLerp(w0, d.w * 0.8, walk), false, 1 - menuBand(walk, 0.85, 1));
         ctx.restore();
+        ctx.restore();
+    }
+
+    // into a sign: he fades where he stands, and the board he is pushed into
+    // goes to the dark of the screen it opens as it fills it
+    function menuDrawPushSign(m) {
+        const c = m.card, G = menuHang(c), k = m.k;
+        ctx.save();
+        menuCamera(menuNear(c));
+        const a = 1 - menuEase(menuBand(k, 0, M_SIGN_FADE));
+        if (a > 0) labPadIcon(LAB.pad, m.x, m.y, padW(), false, a);
+        const dark = menuBand(k, M_SIGN_DARK_FROM, 1);
+        if (dark > 0) { menuAlpha(dark); menuBoardPath(c, G.left, G.top, G.bw, G.bh); ctx.fillStyle = M_FIELD; ctx.fill(); menuAlpha(1); }
         ctx.restore();
     }
 
@@ -1570,26 +1606,11 @@
     }
     const M_KEY = 40, M_KEY_SMALL = 24;   // a sigil's size on its own level, and in the CASTLE's row
 
-    // Not a level: no key, just a sign. A one-line name is shrunk to fit it.
-    function menuSideWords(c, st) {
-        const s = c.level, y = c.y - c.h / 2;
-        const ink = st.aimed ? menuMix(s.ink, '#ffffff', 0.25) : '#a39d93';
-        const fit = (t, size) => {
-            ctx.font = size + 'px "Fira Sans", "Trebuchet MS", sans-serif';   // as text() sets it
-            return Math.min(size, Math.floor(size * (c.w - 16) / ctx.measureText(t).width));
-        };
-        if (s.key === 'rush' && menu.best[M_RUSH] > 0) text('BEST ' + menu.best[M_RUSH], c.x, y + c.h + 13, 10, ink, 'center');
-        if (s.small) { text(s.lines[0], c.x, c.y + 4, 11, ink, 'center'); return; }
-        if (s.lines.length === 1) { text(s.lines[0], c.x, c.y + 6, fit(s.lines[0], 17), ink, 'center'); return; }
-        text(s.lines[0], c.x, y + c.h * 0.44, 17, ink, 'center');
-        text(s.lines[1], c.x, y + c.h * 0.72, 13, ink, 'center');
-    }
-
     // ---- the heraldry: one thing of its own on every building -----------------------
     // Each is behind the building, in front of it, or both, and stirs as he
     // lines up (st.rise, c.stir): the sails turn faster, the fallen lintel teeters, the
-    // windows light floor by floor, the plume thickens, the crow circles
-    // faster, the board's wings stir.
+    // windows light floor by floor, the plume thickens. The signs' crow and
+    // wings are drawn with them (menuDrawSide), but live here with the rest.
     const M_CROW = '#4b4652';        // a crow's slate, never black
     const M_CROW_ROUND = 6;          // seconds round MEMORIES, on its own clock
     const M_SAIL_TURN = 0.2;         // radians a second the FARM's sails turn, on its own clock
@@ -1605,8 +1626,7 @@
     const M_WING_BEAT_LIT = 0.2;     // share of the Corrupted's beat, when lit
     const M_WING_SLOW = 2;           // times slower than his
     const M_WING_FEATHER = 0.72;     // feathers this much of his length, to fit the corner
-    const M_WING_RISE = 48 * Math.PI / 180;   // how far above level the spines point, out of the plate's middle
-    const M_WING_SPAN = 42;
+    const M_WING_RISE = 48 * Math.PI / 180;   // how far above level the spines point, out of the LEADERBOARD's crest
 
     const M_HERALDS = {
         // FARM: a windmill behind the barn, a dark tapering tower like the
@@ -1697,24 +1717,6 @@
                     menuLay(menuBody(ink, 'wash'), px + Math.cos(a) * 18, tip + 5 + Math.sin(a) * 18, 36, a, false, side < 0);
                 });
             }
-        },
-        // MEMORIES: a crow circling the sign itself, behind it on the far side
-        // of its round and in front on the near
-        memories: {
-            behind(c, st) { menuCrow(c, st, false); },
-            front(c, st) { menuCrow(c, st, true); }
-        },
-        // LEADERBOARD: a plate across the sign with the Corrupted's wings in gold
-        // spreading out of it as a V, facing out -- a champion's standard
-        board: {
-            plate: c => ({ level: c.level, x: c.x, y: c.y + 4, w: c.w, h: 30 }),
-            behind(c, st) {
-                const beat = M_WING_BEAT_LIT * st.rise, ph = menuNow() / (M_WING_FLAP.period * M_WING_SLOW);
-                for (const tr of [-1, 1]) {
-                    const th = tr > 0 ? -M_WING_RISE : Math.PI + M_WING_RISE;
-                    menuWing(c.x + tr * 8, c.y - 4, th, tr, M_WING_SPAN, beat, ph, st);
-                }
-            }
         }
     };
 
@@ -1790,13 +1792,99 @@
         menuAlpha(1);
     }
 
-    // a sign that is not a level: its heraldry, its shape (or its plate), its words
+    // ---- the signs: MEMORIES, SETTINGS, BOSS RUSH, the LEADERBOARD --------------------
+    // A tier under the levels: they matter, but they should not compete. So
+    // they are signs rather than buildings -- a board hung on two short chains
+    // of little heads, from a post and arm on the big two and a bracket on the
+    // small two -- drawn in thin lines that sit in slate while he is elsewhere
+    // and take their colour as he lines up, swaying a little more when lit.
+    // Each board is cut to what it is for: MEMORIES a scroll, the LEADERBOARD
+    // a plaque with a crest its wings rise out of, SETTINGS a tag, BOSS RUSH an
+    // arrow pointing into the town. The crow circles MEMORIES.
+    const M_SIGN_WING = 22;          // the board's wings, smaller than a level's things would be
+    const M_SIGN_SWAY = 0.01, M_SIGN_SWAY_LIT = 0.035;   // radians a board swings, and the more it swings lit
+    const menuSignLine = st => menuMix(st.ink, M_SLATE, 0.55 * (1 - st.rise));
+    const menuSignInk = st => st.aimed ? menuMix(st.ink, '#ffffff', 0.25) : '#a39d93';
+
+    // where a sign's board hangs
+    function menuHang(c) {
+        const small = c.level.small, x0 = c.x - c.w / 2, y0 = c.y - c.h / 2;
+        const armY = small ? y0 - 5 : y0 + 6, drop = small ? 5 : 12;
+        const bw = small ? c.w : c.w * 0.84, bh = small ? c.h : c.h * 0.46;
+        return { small, x0, y0, armY, bw, bh, top: armY + drop, left: c.x - bw / 2 };
+    }
+    function menuBoardPath(c, x, y, w, h) {
+        ctx.beginPath();
+        switch (c.level.key) {
+            case 'memories':        // a scroll: a sheet with a roll at each end
+                ctx.rect(x + 5, y + 2, w - 10, h - 4);
+                ctx.roundRect(x, y - 1, 7, h + 2, 3.5);
+                ctx.roundRect(x + w - 7, y - 1, 7, h + 2, 3.5);
+                break;
+            case 'board':           // a plaque with a crest
+                ctx.moveTo(x, y + 7); ctx.lineTo(x + w / 2 - 12, y + 7); ctx.lineTo(x + w / 2, y - 5); ctx.lineTo(x + w / 2 + 12, y + 7);
+                ctx.lineTo(x + w, y + 7); ctx.lineTo(x + w, y + h); ctx.lineTo(x, y + h); ctx.closePath();
+                break;
+            case 'settings':        // a tag, clipped at one end
+                ctx.moveTo(x + 9, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + h); ctx.lineTo(x + 9, y + h); ctx.lineTo(x, y + h / 2); ctx.closePath();
+                break;
+            default: {              // an arrow, pointing toward the middle of the town
+                const inward = c.x > LW / 2 ? -1 : 1;
+                if (inward < 0) { ctx.moveTo(x, y + h / 2); ctx.lineTo(x + 10, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + h); ctx.lineTo(x + 10, y + h); }
+                else { ctx.moveTo(x, y); ctx.lineTo(x + w - 10, y); ctx.lineTo(x + w, y + h / 2); ctx.lineTo(x + w - 10, y + h); ctx.lineTo(x, y + h); }
+                ctx.closePath();
+            }
+        }
+    }
+
     function menuDrawSide(c) {
-        const st = menuState(c), h = M_HERALDS[c.level.key] || {};
-        if (h.behind) h.behind(c, st);
-        menuSilhouette(c, st, h.plate ? h.plate(c) : c);
-        if (h.front) h.front(c, st);
-        menuSideWords(c, st);
+        const st = menuState(c), G = menuHang(c), line = menuSignLine(st), key = c.level.key;
+        ctx.strokeStyle = line; ctx.lineWidth = 1.5;
+        if (!G.small) {
+            // the post on the side toward the wall, its arm, and a brace
+            const postX = c.level.side < 0 ? G.x0 + 3 : G.x0 + c.w - 3, armTo = c.level.side < 0 ? G.x0 + c.w - 8 : G.x0 + 8;
+            ctx.beginPath();
+            ctx.moveTo(postX, G.y0 + c.h + 4); ctx.lineTo(postX, G.armY - 3);
+            ctx.moveTo(postX, G.armY); ctx.lineTo(armTo, G.armY);
+            ctx.moveTo(postX, G.armY + 14); ctx.lineTo(postX + (armTo - postX) * 0.18, G.armY);
+            ctx.stroke();
+        } else {
+            ctx.beginPath(); ctx.moveTo(c.x - G.bw * 0.35, G.armY); ctx.lineTo(c.x + G.bw * 0.35, G.armY); ctx.stroke();
+        }
+        if (key === 'memories') menuCrow(c, st, false);
+        if (key === 'board') {
+            const beat = M_WING_BEAT_LIT * st.rise, ph = menuNow() / (M_WING_FLAP.period * M_WING_SLOW);
+            for (const tr of [-1, 1]) menuWing(c.x + tr * 6, G.top - 3, tr > 0 ? -M_WING_RISE : Math.PI + M_WING_RISE, tr, M_SIGN_WING, beat, ph, st);
+        }
+        ctx.save();
+        ctx.translate(c.x, G.armY);
+        ctx.rotate(Math.sin(menuNow() * 1.3 + c.x) * (M_SIGN_SWAY + M_SIGN_SWAY_LIT * st.rise));
+        ctx.translate(-c.x, -G.armY);
+        // the chains: a few little heads each
+        const link = menuHead(line, 'flat');
+        for (const cx of [c.x - G.bw * 0.35, c.x + G.bw * 0.35]) for (let i = 0; i < (G.small ? 1 : 3); i++) menuPutHead(link, cx, G.armY + 2 + i * 4, 3);
+        const shape = () => menuBoardPath(c, G.left, G.top, G.bw, G.bh);
+        shape(); ctx.fillStyle = M_DARK; ctx.fill();
+        // stood in the doorway, the board fills from the floor up
+        const k = menuDoorK(c);
+        if (k) {
+            ctx.save(); shape(); ctx.clip();
+            menuAlpha(0.45); ctx.fillStyle = st.ink;
+            ctx.fillRect(G.left - 12, G.top + G.bh - (G.bh + 12) * k, G.bw + 24, (G.bh + 12) * k);
+            ctx.restore(); menuAlpha(1);
+        }
+        shape(); ctx.strokeStyle = line; ctx.lineWidth = 1 + 0.6 * st.rise; ctx.stroke();
+        if (key === 'settings') { ctx.beginPath(); ctx.arc(G.left + 7, G.top + G.bh / 2, 2, 0, Math.PI * 2); ctx.stroke(); }
+        // the name, shrunk to fit, a little off the middle where the shape asks for it
+        const name = c.level.lines.join(''), size = G.small ? 11 : 14, room = G.bw - 22;
+        ctx.font = size + 'px "Fira Sans", "Trebuchet MS", sans-serif';   // as text() sets it
+        const fit = Math.min(size, Math.floor(size * room / ctx.measureText(name).width));
+        const nudge = key === 'settings' ? 4 : key === 'rush' ? (c.x > LW / 2 ? 4 : -4) : 0;
+        text(name, c.x + nudge, G.top + G.bh / 2 + (G.small ? 4 : key === 'board' ? 8 : 5), fit, menuSignInk(st), 'center');
+        ctx.restore();
+        if (key === 'memories') menuCrow(c, st, true);
+        // BOSS RUSH's best hangs under its sign, once it has one
+        if (key === 'rush' && menu.best[M_RUSH] > 0) text('BEST ' + menu.best[M_RUSH], c.x, G.y0 + c.h + 13, 10, menuSignInk(st), 'center');
     }
 
     function menuDrawClean(c) {
@@ -2455,6 +2543,9 @@
     // home down some other lane would drag him through whatever is in it
     function menuLeave() {
         if (menu.screen.from !== undefined) paddle.x = paddle.tx = menu.screen.from;
+        // back out of the sign the screen was opened from, the way it was gone into
+        const c = menu.cards.find(o => o.level.key === menu.screen.kind && menuStands(o));
+        if (c) { menu.leaving = { card: c, t: 0, x: paddle.x }; menu.lift = 0; }
         menu.screen = null;
         setHint(M_HINT);
     }
