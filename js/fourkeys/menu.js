@@ -311,7 +311,8 @@
     // and a corner's lane is the wall itself: walk up hard against the left or
     // right edge and that is where you arrive, past the FARM or the VOLCANO
     // rather than into it. MEMORIES is not built until there is a memory to
-    // keep in it (menuStands). SETTINGS is the least of them, a small sign up and to the
+    // keep in it, nor the boards until you have a score to put on one
+    // (menuStands). SETTINGS is the least of them, a small sign up and to the
     // right of MEMORIES, and its lane is the gap between the FARM and the
     // RUINS -- narrower than the sign, so nobody wanders into it. Going in
     // is only a screen of choices (menuShow); erasing is two presses deeper.
@@ -798,6 +799,8 @@
         if (menuScreenUp()) {
             menu.screen.t += dt;
             menu.march = false;
+            menuDashStep(dt);
+            // the pick may have been BACK, and the screen gone with it
             if (menu.screen && menu.screen.kind === 'memory' && over(menu.screen.n, menu.screen.t)) menuShow('memories');
             return;
         }
@@ -1586,7 +1589,7 @@
                     choices: () => [
                         { id: 'back', label: 'BACK', ink: M_SAFE, act: menuLeave },
                         { id: 'export', label: 'EXPORT SAVE', ink: '#6f9bc4', act: menuExport },
-                        { id: 'import', label: 'IMPORT SAVE', ink: '#7fa85a', act: menuPickSave },
+                        { id: 'import', label: 'IMPORT SAVE', ink: '#7fa85a', act: menuPickSave, now: true },
                         { id: 'reset', label: 'RESET', ink: M_RISK, act: () => menuShow('reset') }] },
         reset: { title: 'ERASE SAVE DATA?', line: 'every key, paddle and memory, gone for good', home: 'keep',
                  choices: () => [
@@ -1907,7 +1910,8 @@
         ctx.fillRect(0, 0, LW, LH);
         const s = M_SCREENS[sc.kind];
         const tab = !!(s && s.table);
-        const lit = menuChoiceAt(paddle.x);
+        const dash = sc.dash;
+        const lit = dash ? dash.c : menuChoiceAt(paddle.x);
         // BACK has no table of its own, so the last one stays up under it
         if (tab && lit.view !== undefined) sc.view = lit.view;
         if (s) {
@@ -1918,6 +1922,7 @@
         } else text('MEMORIES', LW / 2, 150, 34, '#d9a5b3', 'center');
         if (tab) { boardPick(sc.view); drawBoard(118, M_TAB_Y - M_TAB_H / 2 - 30, 1); }
         const rowY = tab ? M_TAB_Y : M_CHOICE_Y, rowH = tab ? M_TAB_H : M_CHOICE_H;
+        const pose = dash && menuDashPose(dash, rowY, rowH);
         const choices = menuChoices();
         const stops = choices.filter(c => c.stop);
         if (stops.length) menuDrawTimeline();
@@ -1927,7 +1932,7 @@
             const x = c.cx - c.w / 2, y = rowY - rowH / 2;
             menuPanel(x, y, c.w, rowH, on, c.ink);
             if (on) {
-                ctx.globalAlpha = menu.press === c.id ? 0.4 : 0.18;
+                ctx.globalAlpha = pose && pose.bumped ? DASH_HIT : menu.press === c.id || pose ? 0.4 : 0.18;
                 ctx.fillStyle = c.ink;
                 ctx.fillRect(x + 1, y + 1, c.w - 2, rowH - 2);
                 ctx.globalAlpha = 1;
@@ -1935,21 +1940,29 @@
             text(c.label, c.cx, rowY + (tab ? 5 : 6), tab ? fitSize(c.label, 15, c.w - 8) : 17,
                  on ? (c.act ? '#f2efe9' : '#6d685f') : (c.act ? c.ink : '#4a453d'), 'center');
         }
-        // a line from him up to what he is under, so it is plain he is the pointer
-        ctx.strokeStyle = lit.ink;
-        ctx.globalAlpha = 0.5;
-        ctx.lineWidth = 2;
-        ctx.setLineDash([4, 6]);
-        ctx.beginPath();
-        ctx.moveTo(paddle.x, PADDLE_Y - padH() / 2 - 8);
-        ctx.lineTo(lit.cx, !lit.stop ? rowY + rowH / 2 + 8
-                         : lit.under.length ? M_TL_Y + M_UNDER + (lit.under.length - 1) * M_UNDER_STEP + 8
-                         : M_TL_Y + M_STOP_R * 1.6 + 8);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.globalAlpha = 1;
+        // a line from him up to what he is under, so it is plain he is the
+        // pointer -- not while he is running the length of it
+        if (!pose) {
+            ctx.strokeStyle = lit.ink;
+            ctx.globalAlpha = 0.5;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 6]);
+            ctx.beginPath();
+            ctx.moveTo(paddle.x, PADDLE_Y - padH() / 2 - 8);
+            ctx.lineTo(lit.cx, !lit.stop ? rowY + rowH / 2 + 8
+                             : lit.under.length ? M_TL_Y + M_UNDER + (lit.under.length - 1) * M_UNDER_STEP + 8
+                             : M_TL_Y + M_STOP_R * 1.6 + 8);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.globalAlpha = 1;
+        }
         if (!tab) text('move under one · click, tap or space to pick it', LW / 2, 245, 17, '#6d685f', 'center');
-        labPadIcon(LAB.pad, paddle.x, PADDLE_Y, padW(), false, 1);
+        if (!pose) { labPadIcon(LAB.pad, paddle.x, PADDLE_Y, padW(), false, 1); return true; }
+        ctx.save();
+        ctx.translate(pose.x, pose.y + pose.bob);
+        ctx.rotate(pose.rock);
+        labPadIcon(LAB.pad, 0, 0, padW(), false, 1);
+        ctx.restore();
         return true;
     }
 
@@ -1975,13 +1988,61 @@
             if (t < 0) menuShow('memories'); else menu.screen.t = t;
             return true;
         }
+        if (menu.screen.dash) return true;  // he is already on his way to one
         const c = menuChoiceAt(menuAimOf(e));
         if (down) menu.press = c.act ? c.id : null;
         else {
-            if (menu.press && c.id === menu.press) c.act();
+            if (menu.press && c.id === menu.press) { if (c.stop) c.act(); else menuDash(c); }
             menu.press = null;
         }
         return true;
+    }
+
+    // ---- picking: he dashes up into it ----------------------------------------------
+    // A pick is not taken where he stands. He sprints up the screen into the
+    // choice, and it is taken when he bumps it. A screen still up afterwards
+    // (a note, a tab) has him drop straight back to where the hand has him.
+    // The whole of it is well under half a second: it is a flourish on a
+    // choice already made, never a wait. The dash lives on the screen it
+    // began on, so a pick that brings up another screen ends it there.
+    // A choice marked `now` is taken as the press lets go and he dashes
+    // after it: a file picker only opens from inside a press.
+    const DASH_UP = 0.14;            // s from the floor to the choice, speeding up
+    const DASH_HOLD = 0.07;          // s up against it, which is when it is taken
+    const DASH_BACK = 0.12;          // s back down, slowing
+    const DASH_HZ = 11;              // paces a second: a sprint, not the town's walk
+    const DASH_BOB = 3;              // px he rises and falls a pace
+    const DASH_ROCK = 0.1;           // radians he rolls a pace
+    const DASH_HIT = 0.55;           // how bright the choice lights as he bumps it
+
+    function menuDash(c) {
+        menu.screen.dash = { c, t: 0, x: paddle.x, hit: false };
+        if (c.now) c.act();
+    }
+
+    function menuDashStep(dt) {
+        const sc = menu.screen, d = sc.dash;
+        if (!d) return;
+        d.t += dt;
+        if (!d.hit && d.t >= DASH_UP + DASH_HOLD) {
+            d.hit = true;
+            if (!d.c.now) d.c.act();
+        }
+        if (d.t >= DASH_UP + DASH_HOLD + DASH_BACK) sc.dash = null;
+    }
+
+    // Where he is on the way. `k` is how far up, 0 on the floor and 1 with
+    // his head against the choice's bottom edge; he paces only while moving.
+    function menuDashPose(d, rowY, rowH) {
+        const up = d.t < DASH_UP, back = d.t > DASH_UP + DASH_HOLD;
+        const u = up ? d.t / DASH_UP : Math.min(1, (d.t - DASH_UP - DASH_HOLD) / DASH_BACK);
+        const k = up ? u * u : back ? (1 - u) * (1 - u) : 1;
+        // his art, not his box: the box is shorter, and his head would go in
+        const top = rowY + rowH / 2 + padW() / SHAPE_ASPECT / 2;
+        const ph = d.t * DASH_HZ * Math.PI * 2, pace = up || back ? 1 : 0;
+        return { x: d.x + (d.c.cx - d.x) * k, y: PADDLE_Y + (top - PADDLE_Y) * k,
+                 bob: Math.sin(ph) * DASH_BOB * pace, rock: Math.cos(ph) * DASH_ROCK * pace,
+                 bumped: !up };
     }
 
     // ---- holding, which is the whole of the input ------------------------------------
