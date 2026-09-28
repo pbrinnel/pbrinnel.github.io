@@ -244,18 +244,18 @@
     // and a corner's lane is the wall itself: walk up hard against the left or
     // right edge and that is where you arrive, past the FARM or the VOLCANO
     // rather than into it. MEMORIES is not built until there is a memory to
-    // keep in it (menuStands). RESET is the least of them, a small sign up and to the
+    // keep in it (menuStands). SETTINGS is the least of them, a small sign up and to the
     // right of MEMORIES, and its lane is the gap between the FARM and the
     // RUINS -- narrower than the sign, so nobody wanders into it. Going in
-    // only asks the question (menuShow); erasing is a button in there.
+    // is only a screen of choices (menuShow); erasing is two presses deeper.
     // BOSS RUSH is its mirror, up and to the left of the boards over the
     // gap between the CITY and the VOLCANO, and it is not there until the
     // VOID has been won.
     const M_SIDES = [
         { key: 'memories', side: -1, lines: ['MEMORIES'], ink: '#d9a5b3',
           at: { x: 70, y: 80, w: 116, h: 90 } },
-        { key: 'reset', lines: ['RESET'], ink: '#c0594a', small: true,
-          at: { x: 174, y: 44, w: 60, h: 28, lane: [162, 186] } },
+        { key: 'settings', lines: ['SETTINGS'], ink: '#a9a39a', small: true,
+          at: { x: 174, y: 44, w: 80, h: 28, lane: [162, 186] } },
         { key: 'board', side: 1, lines: ['LEADER', 'BOARD'], ink: '#c9a94e',
           at: { x: 730, y: 80, w: 116, h: 90 } },
         { key: 'rush', lines: ['BOSS RUSH'], ink: '#e0a040', small: true,
@@ -322,7 +322,7 @@
     // second takes it all back.
     const MARCH_UP = 118;            // px/s forward
     const MARCH_BACK = 300;          // px/s back home
-    const MARCH_MAX = 470;           // past the last door, RESET's, for the empty lanes
+    const MARCH_MAX = 470;           // past the last door, SETTINGS', for the empty lanes
     const DOOR_HOLD = 0.8;           // stood in the doorway before it opens
     const WALK_HZ = 2.3;             // paces a second, which is what the bob is
     const WALK_BOB = 0.8;            // how much he rises and falls, in jig units
@@ -418,7 +418,7 @@
         if ((g.t += dt) < GO_SECS) return;
         menu.going = null;
         const l = g.card.level;
-        if (l.key === 'reset' || l.key === 'memories') { menuShow(l.key); menu.screen.from = g.x; }
+        if (l.key === 'settings' || l.key === 'memories') { menuShow(l.key); menu.screen.from = g.x; }
         else menuEnter(l);
     }
 
@@ -1469,26 +1469,61 @@
         return -1;
     }
 
-    // ---- inside: RESET's question and the MEMORIES room ------------------------------
+    // ---- inside: SETTINGS and the MEMORIES room --------------------------------------
     // The two buildings you go into without leaving the town. Their choices
     // are picked the way the game-over screen's are: he is down at the bottom
     // with them in a row over him, the one he is under is lit, and a press
     // takes it -- a click, a tap or Space. That is the one way that works
     // everywhere: a mouse is locked to him in the town, so there is no cursor
     // to aim with, and a finger that taps a choice puts him under it anyway.
-    // Erasing is its own deliberate press on a word that says so, never the
-    // end of a hold that ran on a moment too long, and it is on the right,
-    // away from the gap he walks up to get there, so he always arrives under
-    // KEEP.
+    //
+    // Every screen but the room is a title, a line under it and a row of
+    // choices (M_SCREENS), and each puts him under its `home` choice as it
+    // comes up -- the one that changes nothing. So whatever he pressed to
+    // get there, the next press cannot be the one that erases or overwrites:
+    // that is always its own deliberate move and press on a word that says so.
     const M_CHOICE_Y = 330;          // the row of choices
     const M_CHOICE_H = 84;
+    const M_CHOICE_W = 200;          // widest a choice gets...
+    const M_CHOICE_GAP = 24;         // ...and the least room between two
+    const M_SAFE = '#f2efe9';        // a choice that changes nothing
+    const M_RISK = '#c0594a';        // a choice that throws progress away
+
+    const M_SCREENS = {
+        settings: { title: 'SETTINGS', ink: '#a9a39a', line: 'your progress lives in this browser', home: 'back',
+                    choices: () => [
+                        { id: 'back', label: 'BACK', ink: M_SAFE, act: menuLeave },
+                        { id: 'export', label: 'EXPORT SAVE', ink: '#6f9bc4', act: menuExport },
+                        { id: 'import', label: 'IMPORT SAVE', ink: '#7fa85a', act: menuPickSave },
+                        { id: 'reset', label: 'RESET', ink: M_RISK, act: () => menuShow('reset') }] },
+        reset: { title: 'ERASE SAVE DATA?', line: 'every key, paddle and memory, gone for good', home: 'keep',
+                 choices: () => [
+                     { id: 'keep', label: 'KEEP', ink: M_SAFE, act: () => menuShow('settings') },
+                     { id: 'erase', label: 'ERASE', ink: M_RISK, act: menuErase }] },
+        // `n` is the save that was read, not yet loaded
+        import: { title: 'LOAD THIS SAVE?', line: sc => menuSaveSummary(sc.n) + ' · replaces what is here',
+                  home: 'keep',
+                  choices: sc => [
+                      { id: 'keep', label: 'KEEP MINE', ink: M_SAFE, act: () => menuShow('settings') },
+                      { id: 'load', label: 'LOAD IT', ink: M_RISK, act: () => menuLoadSave(sc.n) }] }
+    };
+
+    // Any number of choices, left to right, each the middle of an equal share
+    // of the width: he picks by whichever middle is nearest, so a choice he
+    // cannot quite stand under is still his from as near as he can get.
+    function menuRow(list) {
+        const share = LW / list.length, w = Math.min(M_CHOICE_W, share - M_CHOICE_GAP);
+        return list.map((c, i) => Object.assign({ cx: share * (i + 0.5), w }, c));
+    }
 
     function menuScreenUp() { return !!(menu && menu.screen && menuUp()); }
     function menuShow(kind, n) {
         // where he went in, kept from the room to a memory and back
         const from = menu.screen ? menu.screen.from : undefined;
-        menu.screen = { kind, n, t: 0, from };
+        menu.screen = { kind, n, t: 0, from, note: null };
         menu.press = null;
+        const s = M_SCREENS[kind];
+        if (s) paddle.x = paddle.tx = menuChoices().find(c => c.id === s.home).cx;
         setHint(kind === 'memory' ? 'click/tap or space to go back'
                                   : 'move to choose · click/tap or space to pick');
     }
@@ -1515,15 +1550,172 @@
         splash.hidden = false;
     }
 
+    // ---- the save file ------------------------------------------------------------------
+    // EXPORT SAVE hands over everything `menu` keeps as a .brandon file, and
+    // IMPORT SAVE reads one back over it. The format is specified in
+    // _ref/BRANDON-SAVE.md: change what this section writes or reads and
+    // change that doc in the same commit.
+    //
+    // It is plain text, one line for each thing you have -- nothing you have
+    // not got is named in it, so it is no list of what there is to switch on
+    // -- and its last line is a seal over the rest. A file edited by hand no
+    // longer matches its seal and will not load. That only keeps honest
+    // people honest (the seal is worked out in this file, for anyone to
+    // read), which is all it has to: the bests in it are this browser's own,
+    // and the boards will keep their own scores.
+    //
+    // Saves have to outlive the game that wrote them, both ways. Anything a
+    // file does not mention is not had, so an old file lacking something
+    // added since just starts it locked. Any line the reader does not know
+    // is skipped, so a file from a newer game still loads what it can.
+    // Every .brandon file opens with the game it is for, so one game's saves
+    // can never be loaded into another's.
+    const M_SAVE_GAME = 'BRANDON2';
+    const M_SAVE_VER = 1;            // only for a change an older reader would get wrong
+    const M_SAVE_NAME = 'save.brandon';
+    const M_SAVE_SALT = '2000 YEARS LATER';
+    const M_SAVE_MAX = 65536;        // bytes: a real save is a few hundred
+    // What each thing is called in the file. Pinned here, never taken from a
+    // display name or an id, so renaming either cannot orphan a save: a
+    // token, once shipped, is forever. Something new needs a new token here
+    // (menuSaveText warns about anything had that has none).
+    const M_SAVE_STAGES = { 1: 'FARM', 2: 'RUINS', 3: 'CITY', 4: 'VOLCANO', 5: 'CASTLE', 6: 'VOID',
+                            rush: 'BOSS RUSH' };
+    const M_SAVE_PADS = { gilt: 'GILT', statue: 'STATUE', frost: 'FROST', ember: 'EMBER', pair: 'PAIR',
+                          classic: 'CLASSIC' };
+    const M_SAVE_MEMS = { exhortation: 'EXHORTATION', salvation: 'SALVATION', cycle: 'CYCLE',
+                          counsel: 'COUNSEL', fall: 'FALL', consolidation: 'CONSOLIDATION' };
+    // each kind of line, and which of `menu`'s tables it fills from which tokens
+    const M_SAVE_SETS = [['KEY', 'keys', M_SAVE_STAGES], ['PADDLE', 'pads', M_SAVE_PADS],
+                         ['MEMORY', 'mems', M_SAVE_MEMS], ['GAVE', 'memFrom', M_SAVE_STAGES],
+                         ['VISITED', 'seen', M_SAVE_STAGES]];
+
+    // FNV-1a over the salt and the lines, as eight hex digits
+    function menuSeal(body) {
+        let h = 0x811c9dc5;
+        const s = M_SAVE_SALT + '\n' + body;
+        for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193);
+        return (h >>> 0).toString(16).padStart(8, '0');
+    }
+
+    const menuTokenOf = (table, tok) => Object.keys(table).find(k => table[k] === tok);
+
+    function menuSaveText() {
+        menuLoad();
+        const lines = [M_SAVE_GAME + ' SAVE ' + M_SAVE_VER];
+        const had = (what, k, table) => {
+            if (table[k]) return true;
+            // `standard` is everyone's, so it is never written
+            if (!(what === 'pads' && k === 'standard')) console.warn('no save token for', what, k);
+            return false;
+        };
+        for (const [word, what, table] of M_SAVE_SETS) {
+            for (const k of Object.keys(menu[what])) {
+                if (menu[what][k] && had(what, k, table)) lines.push(word + ' ' + table[k]);
+            }
+        }
+        for (const k of Object.keys(menu.best)) {
+            if (menu.best[k] > 0 && had('best', k, M_SAVE_STAGES)) lines.push('BEST ' + M_SAVE_STAGES[k] + ' ' + menu.best[k]);
+        }
+        const body = lines.join('\n');
+        return body + '\nSEAL ' + menuSeal(body) + '\n';
+    }
+
+    // what the file says, as `menu` keeps it, or a string saying why not
+    function menuParseSave(text) {
+        const lines = String(text).replace(/\r/g, '').split('\n').map(s => s.trim()).filter(Boolean);
+        const head = /^(\S+) SAVE (\d+)$/.exec(lines[0] || '');
+        if (!head) return 'THAT IS NOT A BRANDON SAVE';
+        if (head[1] !== M_SAVE_GAME) return 'THAT SAVE IS FOR ANOTHER GAME';
+        const last = lines.pop();
+        if (last !== 'SEAL ' + menuSeal(lines.join('\n'))) return 'THAT SAVE WILL NOT LOAD';
+        if (Number(head[2]) > M_SAVE_VER) return 'THAT SAVE IS FROM A NEWER GAME';
+        const got = { keys: {}, pads: { standard: true }, mems: {}, memFrom: {}, seen: {}, best: {} };
+        for (const line of lines.slice(1)) {
+            const sp = line.indexOf(' '), word = line.slice(0, sp), rest = line.slice(sp + 1);
+            const set = M_SAVE_SETS.find(s => s[0] === word);
+            if (set) {
+                const k = menuTokenOf(set[2], rest);
+                if (k !== undefined) got[set[1]][k] = true;
+            } else if (word === 'BEST') {
+                const at = rest.lastIndexOf(' '), k = menuTokenOf(M_SAVE_STAGES, rest.slice(0, at));
+                const v = Number(rest.slice(at + 1));
+                if (k !== undefined && Number.isInteger(v) && v > 0) got.best[k] = Math.max(got.best[k] || 0, v);
+            }
+        }
+        return got;
+    }
+
+    function menuSaveSummary(s) {
+        const count = (o, one, many) => {
+            const k = Object.keys(o).filter(x => o[x]).length;
+            return k + ' ' + (k === 1 ? one : many);
+        };
+        return count(s.keys, 'key', 'keys') + ', ' + count(s.pads, 'paddle', 'paddles') + ' and ' +
+               count(s.mems, 'memory', 'memories');
+    }
+
+    // Written straight to a download. octet-stream, so no browser decides it
+    // is text and puts .txt on the end of the name.
+    function menuExport() {
+        const url = URL.createObjectURL(new Blob([menuSaveText()], { type: 'application/octet-stream' }));
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = M_SAVE_NAME;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        // not the name: a browser that already has one calls it (1), (2)...
+        menu.screen.note = 'SAVE DOWNLOADED';
+    }
+
+    // The browser's own file picker, which only opens from inside a press --
+    // and a choice is taken as the press lets go, so it still is one. The
+    // mouse is let go first: the picker would take it anyway, and the town
+    // takes it back on the next click. There is no `accept` filter, since a
+    // phone that has never heard of .brandon greys every file out rather than
+    // showing it; what is in the file is what decides.
+    function menuPickSave() {
+        freeMouse();
+        const f = document.createElement('input');
+        f.type = 'file';
+        f.addEventListener('change', () => {
+            const file = f.files && f.files[0];
+            if (!file) return;
+            const said = t => { if (menuScreenUp() && menu.screen.kind === 'settings') menu.screen.note = t; };
+            if (file.size > M_SAVE_MAX) { said('THAT IS NOT A BRANDON SAVE'); return; }
+            const r = new FileReader();
+            r.onload = () => {
+                const got = menuParseSave(r.result);
+                if (typeof got === 'string') { said(got); return; }
+                // only over the screen it was asked from: anything else has moved on
+                if (menuScreenUp() && menu.screen.kind === 'settings') menuShow('import', got);
+            };
+            r.onerror = () => said('THAT FILE WOULD NOT OPEN');
+            r.readAsText(file);
+        });
+        f.click();
+    }
+
+    // everything replaced by the file's, and home to the town to see it
+    function menuLoadSave(s) {
+        menuLoad();
+        Object.assign(menu, s);
+        menu.dusting = null;
+        menuSave();
+        if (!menu.pads[LAB.pad]) LAB.usePad('standard');
+        clearBest();
+        menuLeave();
+        menuSay('SAVE LOADED');
+    }
+
     // What there is to pick on this screen, left to right. Spread over the
     // whole of where his middle can go, so every one of them is somewhere he
     // can stand.
     function menuChoices() {
         const sc = menu.screen;
-        if (sc.kind === 'reset') {
-            return [{ id: 'keep', label: 'KEEP', cx: 250, w: 200, ink: '#f2efe9', act: menuLeave },
-                    { id: 'erase', label: 'ERASE', cx: 550, w: 200, ink: '#c0594a', act: menuErase }];
-        }
+        if (M_SCREENS[sc.kind]) return menuRow(M_SCREENS[sc.kind].choices(sc));
         // the room: the timeline, oldest on the left, across the whole of
         // where he can stand. Its stops are evenly spaced, not to scale --
         // there are no years on it but the memories' own. A memory you have
@@ -1603,9 +1795,12 @@
         if (sc.kind === 'memory') { menuMemoryCard(sc.n, sc.t); return true; }
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, LW, LH);
-        if (sc.kind === 'reset') {
-            text('ERASE SAVE DATA?', LW / 2, 150, 34, '#f2efe9', 'center');
-            text('every key, paddle and memory, gone for good', LW / 2, 195, 15, '#9a958c', 'center');
+        const s = M_SCREENS[sc.kind];
+        if (s) {
+            text(s.title, LW / 2, 150, 34, s.ink || M_SAFE, 'center');
+            // a note is what the last choice did, and it stands in for the line
+            const line = sc.note || (typeof s.line === 'function' ? s.line(sc) : s.line);
+            text(line, LW / 2, 195, 15, sc.note ? M_SAFE : '#9a958c', 'center');
         } else text('MEMORIES', LW / 2, 150, 34, '#d9a5b3', 'center');
         const lit = menuChoiceAt(paddle.x);
         const choices = menuChoices();

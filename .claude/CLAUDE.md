@@ -62,6 +62,10 @@ touches it.
   `memory.js`).
 - Brick screens use brandon.html's brick size: seven across, every screen. An exception needs
   a specific reason (Paul, 27 Sep 2026). The layout rules are in `levels.js`'s header.
+- **Save files (`.brandon`) are specified in `_ref/BRANDON-SAVE.md`.** Read it before you
+  touch saved progress in any way: a new unlock, paddle, memory, stage or anything kept in
+  `menu`. Every new thing needs a pinned save token, and the doc changes in the same
+  commit. Old saves must always keep loading.
 - Every `<script src>` carries `?v=N`. Pages are cached for ten minutes, so **bump all of
   them together on every deploy** or someone gets one new file and one old one.
 - The boss lab builds from these same files; only the panel is the lab's own. Tuning a boss
