@@ -251,13 +251,15 @@
             return true;
         });
     }
-    // his head gone grey, with `ink` through it
+    // his head gone grey and soft as smoke, with `ink` through it. The blur
+    // needs room round him or it is cut off square at the canvas edge.
+    const PAD_ASH_BLUR = 3;           // px of blur at PAD_SPECK_BAKE: past about 6 he is no longer anyone
     function padHeadSprite(ink) {
-        const w = PAD_SPECK_BAKE, h = Math.round(w * BALL_RY / BALL_RX);
-        return padBakeSpeck('head' + ink, w, h, ink, 0.35, g => {
+        const w = PAD_SPECK_BAKE, h = Math.round(w * BALL_RY / BALL_RX), m = PAD_ASH_BLUR * 2;
+        return padBakeSpeck('head' + ink, w + 2 * m, h + 2 * m, ink, 0.35, g => {
             if (!ready(ballImg)) return false;
-            g.filter = 'grayscale(1) contrast(1.35) brightness(1.05)';
-            g.drawImage(ballImg, 0, 0, w, h);
+            g.filter = 'blur(' + PAD_ASH_BLUR + 'px) grayscale(1) contrast(1.35) brightness(1.05)';
+            g.drawImage(ballImg, m, m, w, h);
             return true;
         });
     }
@@ -605,7 +607,7 @@
             if (Math.random() < dt * 3) {
                 const p = padSomewhere(0.8);
                 padBit(p.x, padY() - padH() * 0.2, '#8a7f76', 1.8 + Math.random(),
-                       (Math.random() - 0.5) * 20, -18 - Math.random() * 20, -4, 6 + Math.random() * 2, 0.75, 'head');
+                       (Math.random() - 0.5) * 20, -18 - Math.random() * 20, -4, 7 + Math.random() * 2, 0.75, 'head');
             }
         }
     };
