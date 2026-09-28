@@ -543,8 +543,16 @@
         menu.leaving = null;
     }
 
-    // engine.js asks, and leaves him undrawn while menuDrawPush draws him
-    function menuPadHidden() { return !!(menu && (menu.going || menu.leaving) && menuUp()); }
+    // engine.js asks, and leaves him undrawn while the town draws him: going
+    // in or coming out (menuDrawPush), and in among the buildings the rest of
+    // the time (menuDrawHim). Being asked is how the town knows it may.
+    function menuPadHidden() {
+        if (!menu || !menuUp() || menu.drawingHim) return false;
+        if (menu.going || menu.leaving) return true;
+        if (menu.screen || menuUnlockUp()) return false;
+        menu.asked = true;
+        return true;
+    }
 
     // going in or coming back out, as one: the card, how far in (0 at the
     // door to 1 through it), and where he walks from or to
@@ -747,7 +755,7 @@
         ctx.roundRect(c.x - c.w / 2, c.y - c.h / 2, c.w, c.h, 6);
         menuDoorPath(d, 1, false);
         ctx.clip('evenodd');
-        const w0 = padW();
+        const w0 = padW() * menuShrinkAt(m.y);
         labPadIcon(LAB.pad, menuLerp(m.x, d.cx, walk), menuLerp(m.y, d.bot - d.h * 0.3, walk),
                    menuLerp(w0, d.w * 0.8, walk), false, 1 - menuBand(walk, 0.85, 1));
         ctx.restore();
@@ -761,7 +769,7 @@
         ctx.save();
         menuCamera(menuNear(c));
         const a = 1 - menuEase(menuBand(k, 0, M_SIGN_FADE));
-        if (a > 0) labPadIcon(LAB.pad, m.x, m.y, padW(), false, a);
+        if (a > 0) labPadIcon(LAB.pad, m.x, m.y, padW() * menuShrinkAt(m.y), false, a);
         const dark = menuBand(k, M_SIGN_DARK_FROM, 1);
         if (dark > 0) { menuAlpha(dark); menuBoardPath(c, G.left, G.top, G.bw, G.bh); ctx.fillStyle = M_FIELD; ctx.fill(); menuAlpha(1); }
         ctx.restore();
@@ -1548,25 +1556,13 @@
 
         const k = menuArriveK();
         menuRiseStep();
+        const asked = menu.asked;          // the engine left him to us this frame
+        menu.asked = false;
         // the field's own transform, for anything drawn in the screen's terms under the camera
         menu.baseT = ctx.getTransform();
-        // a warm light low over the far end of the town, the DAYBREAK the town was built from
-        ctx.save(); menuCamera(M_NEAR_SKY);
-        ctx.globalAlpha = k;
-        const g = ctx.createRadialGradient(LW / 2, 60, 10, LW / 2, 60, 420);
-        g.addColorStop(0, 'rgba(74,50,34,0.35)'); g.addColorStop(1, 'rgba(74,50,34,0)');
-        ctx.fillStyle = g; ctx.fillRect(0, 0, LW, LH);
-        ctx.restore();
+        menuDrawGround(k);
         ctx.globalAlpha = 1;
-        // the far ones first, so a near one growing past them is drawn over them
-        for (const c of menu.cards.filter(menuStands).sort((a, b) => a.y - b.y)) {
-            menuArriveCard(c, k, () => {
-                ctx.save(); menuCamera(menuNear(c));
-                menu.a0 = ctx.globalAlpha; menuDrawLevel(c); ctx.globalAlpha = menu.a0;
-                ctx.restore();
-            });
-        }
-        // the gates are at his feet, so they are simply there once the town is
+        // the gates are at the front of the town, under anything that passes them
         ctx.save(); menuCamera(M_NEAR_GROUND);
         ctx.globalAlpha = k;
         menu.a0 = k;
@@ -1575,6 +1571,20 @@
         ctx.restore();
         ctx.globalAlpha = 1;
         menu.a0 = 1;
+        // Back to front by where each stands on the ground, and him among them
+        // by where his feet are: a building whose foot is nearer than his is
+        // drawn over him, so walking up past the FARM puts him behind its windmill.
+        const feet = padY() + padH() * menuShrinkAt(padY()) / 2;
+        let him = !asked || !!menuMotion();
+        for (const c of menu.cards.filter(menuStands).sort((a, b) => (a.y + a.h / 2) - (b.y + b.h / 2))) {
+            if (!him && c.y + c.h / 2 > feet) { menuDrawHim(); him = true; }
+            menuArriveCard(c, k, () => {
+                ctx.save(); menuCamera(menuNear(c));
+                menu.a0 = ctx.globalAlpha; menuDrawLevel(c); ctx.globalAlpha = menu.a0;
+                ctx.restore();
+            });
+        }
+        if (!him) menuDrawHim();
         menuDrawPush();
         if (k < 1 || menuMotion()) return;
         menuPadPeek();
@@ -1586,6 +1596,99 @@
         if (total > 0) text('TOTAL HIGH SCORE ' + total, LW / 2, M_TOTAL_Y, 12, '#8d877d', 'center');
     }
     const M_TOTAL_Y = 592;
+
+    // ---- the ground and the sky --------------------------------------------------------
+    // What the town stands on, under the town's own rules: flat, thin, dark,
+    // sparse, slow, nothing that flashes. Each part sits at its own depth, so
+    // PUSH IN rushes it past like everything else.
+    //
+    // Depth is one idea throughout: he shrinks as he walks up the town, to
+    // M_FAR_SIZE of himself at the far row, drawn smaller only (his box is
+    // his box), and a building whose foot is nearer than his feet is drawn
+    // over him.
+    const M_HORIZON = 60;            // the far edge of the town, where it arrives from
+    const M_SKY_LINE = '#211d19';    // the horizon's line, the faintest there is
+    const M_GROUND = '#100e0c';      // the ground under it, a shade off the sky
+    const M_BAND_NEAR = 40;          // px, the ground's band at his feet...
+    const M_BAND_FAR = 6;            // ...and at the horizon, easing between
+    const M_BAND_TONE = 0.11;        // the lighter bands, this far from the dark toward slate
+    const M_FAR_SIZE = 0.62;         // his size at the far row
+    const M_ARMY = 40, M_ARMY_PACE = 9, M_ARMY_STEP = 5.5;   // the distant army: how many, px a second, steps a second
+    const M_ARMY_INK = '#29241f';
+
+    // how big he is drawn with his middle at y: 1 at home, M_FAR_SIZE at the far row's feet
+    function menuShrinkAt(y) {
+        const far = M_TOWN[5].y + M_TOWN[5].h / 2;
+        return Math.max(0.2, 1 - (1 - M_FAR_SIZE) * (PADDLE_Y - y) / (PADDLE_Y - far));
+    }
+
+    function menuDrawGround(k) {
+        const T = menuNow();
+        const layer = (near, fn) => { ctx.save(); menuCamera(near); ctx.globalAlpha = k; fn(); ctx.restore(); };
+        // a warm light low over the far end of the town, the DAYBREAK the town was built from
+        layer(M_NEAR_SKY, () => {
+            const g = ctx.createRadialGradient(LW / 2, 60, 10, LW / 2, 60, 420);
+            g.addColorStop(0, 'rgba(74,50,34,0.35)'); g.addColorStop(1, 'rgba(74,50,34,0)');
+            ctx.fillStyle = g; ctx.fillRect(0, 0, LW, LH);
+        });
+        // the ground, and the line where it meets the sky
+        layer(M_NEAR_SKY, () => {
+            ctx.fillStyle = M_GROUND; ctx.fillRect(-LW, M_HORIZON, LW * 3, LH * 2);
+            ctx.strokeStyle = M_SKY_LINE; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(-LW, M_HORIZON); ctx.lineTo(LW * 2, M_HORIZON); ctx.stroke();
+        });
+        // the ground in bands, every other one a shade lighter, thinner further back
+        layer(0.2, () => {
+            ctx.fillStyle = menuMix('#0b0a09', '#4a433a', M_BAND_TONE);
+            let y = LH + 40, i = 0;
+            while (y > M_HORIZON && i < 400) {
+                const th = Math.max(1, menuLerp(M_BAND_NEAR, M_BAND_FAR, menuClamp((LH - y) / (LH - M_HORIZON))));
+                const top = Math.max(M_HORIZON, y - th);
+                if (i % 2 === 0) ctx.fillRect(-LW, top, LW * 3, y - top);
+                y -= th; i++;
+            }
+        });
+        // the army that ends the first game, marching past on the horizon, in
+        // step, showing in the gaps between the far buildings
+        layer(M_NEAR_SKY - 0.2, () => {
+            const gap = (LW + 60) / M_ARMY, img = menuBody(M_ARMY_INK, 'flat');
+            for (let i = 0; i < M_ARMY; i++) {
+                const x = ((i * gap + T * M_ARMY_PACE) % (LW + 60)) - 30, step = Math.sin(T * M_ARMY_STEP + i * 0.4);
+                const len = 13 + menuHash(i + 99) * 2;
+                menuLay(img, x, M_HORIZON - len / 2 - Math.abs(step) * 1.2, len, step * 0.06, true, i % 2);
+            }
+        });
+        // each level's foundation: a circle on the ground, flatter further back,
+        // lit in its colour as he lines up with it
+        for (const c of menu.cards) {
+            if (c.level.key || !menuStands(c)) continue;
+            const near = menuNear(c);
+            menuArriveCard(c, k, () => {
+                ctx.save(); menuCamera(near);
+                const r = c.rise || 0, feet = c.level === MENU_VOID ? c.y + c.h * 0.35 : c.y + c.h / 2;
+                const rx = c.w * (c.level === MENU_VOID ? 0.75 : 0.62), ry = rx * menuLerp(0.16, 0.3, menuClamp(near));
+                ctx.beginPath(); ctx.ellipse(c.x, feet, rx, ry, 0, 0, Math.PI * 2);
+                ctx.fillStyle = '#12100e'; ctx.fill();
+                ctx.strokeStyle = r > 0.01 ? menuMix('#2a2520', c.level.ink, r * 0.6) : '#2a2520';
+                ctx.lineWidth = 1; ctx.stroke();
+                ctx.restore();
+            });
+        }
+    }
+
+    // Him, drawn by the town in among its buildings, smaller the further up
+    // he is. The engine only draws him here if it asked (menuPadHidden) this
+    // frame; the boss lab's engine never asks, and draws him itself.
+    function menuDrawHim() {
+        if (typeof drawPaddle !== 'function') return;
+        const s = menuShrinkAt(padY());
+        menu.drawingHim = true;
+        ctx.save();
+        ctx.translate(paddle.x, padY()); ctx.scale(s, s); ctx.translate(-paddle.x, -padY());
+        drawPaddle();
+        ctx.restore();
+        menu.drawingHim = false;
+    }
 
     // What a level says: its name, its key (the CASTLE's four), and its best
     // there once it has one, which lifts the key a little to make room. No
@@ -2162,12 +2265,13 @@
     // the town and running off the edge on the other, drawn like the buildings
     // -- a flat dark shape with a rim of that paddle's colour, slate while he is
     // out in the town and lighting as he walks toward the wall. The name reads
-    // along it, high up, since he stands in front of the lower half; a chevron
-    // at the top points the way out. With only the one paddle there is nowhere
+    // along it, and the note beside it names the paddle while he stands in
+    // front of it; a chevron at the top points the way out. With only the one paddle there is nowhere
     // for a gate to lead, so there are no gates until a second is won.
     const M_GATE = { w: 24, y: 470, h: 118 };
-    const M_GATE_TOP = M_GATE.y - 14;        // standing a little over the post it was, to just under the FARM and the VOLCANO
-    const M_GATE_NAME_Y = M_GATE_TOP + 58;
+    const M_GATE_TALL = 86;                  // its foot on the floor, and no taller: the space over it belongs to the FARM and the VOLCANO
+    const M_GATE_TOP = M_GATE.y + M_GATE.h - M_GATE_TALL;
+    const M_GATE_NAME_Y = M_GATE_TOP + M_GATE_TALL / 2 + 6;
     const M_GATE_ROUND = 12;
     function menuTabPath(side, y0, y1) {
         const w = M_GATE.w, r = M_GATE_ROUND;
