@@ -38,7 +38,7 @@
     let FROST_EDGE = 1.5;    // ...spin off his ends...
     let FROST_SWIPE = 2.2;   // ...and off his travel, both far easier
     let FROST_DECK = 0.6;    // ...on a narrower flat, so more of him is a curve
-    let FROST_FLAKES = 14;   // snowflakes a second coming off him...
+    let FROST_FLAKES = 10;   // snowflakes a second coming off him...
     let FROST_BIG  = 0.25;   // ...this share of them a big one, six of him heads out
     let ICE_SECS   = 1;      // an icy brick struck sends the head off at full speed this long...
     let ICE_RAMP   = 0.15;   // ...getting there over this, and coming back down over twice it
@@ -48,8 +48,8 @@
     let EMB_SPREAD = 0.25;   // ...a burning brick this chance of catching each one beside it
     let EMB_SPREAD_AT = 1;   // ...seconds into burning that it does
     let EMB_GLOW   = 0.45;   // how much light he gives off
-    let EMB_SPARKS = 34;     // sparks a second rising off him
-    let EMB_ASH    = 12;     // wisps of smoke a second: ambiance, never something to look at...
+    let EMB_SPARKS = 17;     // sparks a second rising off him
+    let EMB_ASH    = 6;      // wisps of smoke a second: ambiance, never something to look at...
     let EMB_ASH_S  = 2.5;    // ...so each only about this many px either side of its middle...
     let EMB_ASH_A  = 0.3;    // ...and at most this solid
     let PAIR_LEN   = 0.62;   // the pair: two of him, each this much of one
@@ -647,7 +647,7 @@
         under() { padRim('padRimF', FROST_RIM, 2.5, 0.55); },
         skin(sg, o) { padLay(sg, o, padTint('padFrost', FROST_INK), 0.82); },
         mark: 'frost',
-        shedRate: 30,
+        shedRate: 21,
         // one of his flakes, off a head he has hit
         shed(x, y, k) {
             padBit(x, y, Math.random() < 0.5 ? FROST_RIM : FROST_INK, 0.9 + Math.random() * 0.6,
@@ -669,7 +669,7 @@
             // ...and a spray of ice behind him when he travels
             const fast = Math.min(1, Math.abs(paddle.vx) / 500);
             for (let n = 0; n < 2; n++) {
-                if (Math.random() > fast * 0.8) continue;
+                if (Math.random() > fast * 0.56) continue;
                 const p = padSomewhere(1);
                 padBit(p.x, padY() + (Math.random() - 0.5) * padH(),
                        FROST_RIM, 0.5 + Math.random() * 0.4, -paddle.vx * 0.12 + (Math.random() - 0.5) * 40,
@@ -705,7 +705,7 @@
         },
         skin(sg, o) { padLay(sg, o, padTint('padEmber', EMB_INK), 0.72); },
         mark: 'ember',
-        shedRate: 40,
+        shedRate: 20,
         // one of his sparks, off a head he has hit
         shed(x, y, k) {
             padBit(x, y, Math.random() < 0.4 ? EMB_RIM : EMB_INK, 0.5 + Math.random() * 0.5,
