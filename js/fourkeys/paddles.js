@@ -44,6 +44,9 @@
     let EMB_ANGLE  = 1.35;   // ...and his ends send a head off at a much sharper angle
     let EMB_GLOW   = 0.45;   // how much light he gives off
     let EMB_SPARKS = 34;     // sparks a second rising off him
+    let EMB_ASH    = 12;     // wisps of smoke a second: ambiance, never something to look at...
+    let EMB_ASH_S  = 2.5;    // ...so each only about this many px either side of its middle...
+    let EMB_ASH_A  = 0.3;    // ...and at most this solid
     let PAIR_LEN   = 0.62;   // the pair: two of him, each this much of one
     let PAIR_QUAD  = 0.7;    // ...and under DOUBLE, four, each this much of one of the two
     let PAD_MARK   = 3;      // seconds a head FROST or EMBER hits wears his frost or fire
@@ -53,6 +56,7 @@
     LAB_KNOBS.push('GILT_LEN', 'GILT_CAPS', 'GILT_SHINE', 'STAT_LEN', 'STAT_ANGLE', 'STAT_SPIN',
                    'STAT_DIP', 'FROST_LEN', 'FROST_EDGE', 'FROST_SWIPE', 'FROST_DECK', 'FROST_FLAKES', 'FROST_BIG',
                    'EMB_LEN', 'EMB_ANGLE', 'EMB_GLOW', 'EMB_SPARKS', 'PAIR_LEN', 'PAIR_QUAD', 'PAD_MARK', 'V2_GLOSS', 'V2_GLINT', 'V2_SWEEP');
+    LAB_KNOBS.push('EMB_ASH', 'EMB_ASH_S', 'EMB_ASH_A');
 
     const V2_RIM    = '#e6edf5';
     const GILT_INK  = '#efb920', GILT_RIM = '#ffe9a3';
@@ -154,7 +158,7 @@
                 ctx.save();
                 ctx.globalAlpha = a;
                 ctx.translate(b.x, b.y);
-                ctx.rotate(b.ph + b.t * (b.kind === 'head' ? 2.5 : 0.8));
+                ctx.rotate(b.ph + b.t * (b.kind === 'head' ? 0.6 : 0.8));
                 ctx.drawImage(baked, -w / 2, -h / 2, w, h);
                 ctx.restore();
                 continue;
@@ -602,12 +606,12 @@
                 }
                 n -= 1;
             }
-            // now and then a head of ash, drifting up slower and greyer,
+            // a thin smoke of his heads, drifting up slower and greyer,
             // turning over as it goes
-            if (Math.random() < dt * 3) {
+            if (Math.random() < dt * EMB_ASH) {
                 const p = padSomewhere(0.8);
                 padBit(p.x, padY() - padH() * 0.2, '#8a7f76', 1.8 + Math.random(),
-                       (Math.random() - 0.5) * 20, -18 - Math.random() * 20, -4, 7 + Math.random() * 2, 0.75, 'head');
+                       (Math.random() - 0.5) * 20, -18 - Math.random() * 20, -4, EMB_ASH_S * (0.8 + 0.4 * Math.random()), EMB_ASH_A, 'head');
             }
         }
     };
