@@ -350,6 +350,7 @@
         menu.lift = 0;
         menu.into = null;
         menu.going = null;
+        menu.leaving = null;
         menu.screen = null;
         menu.gait = 0;
         menu.cards = MENU_ALL.map(l => Object.assign({ level: l }, M_TOWN[l.n]))
@@ -477,15 +478,24 @@
     }
 
     // ---- going in ------------------------------------------------------------------------
-    // The door hold is done: a doorway opens at the foot of the building and
-    // he goes through it, drifting to its middle and shrinking to its width,
-    // fading as he goes. The wall hides whatever of him is not in the doorway
-    // yet. Only then does the level, or the room, take over. A door that
+    // PUSH IN. The door hold is done: a doorway of the building's own opens
+    // at its foot (menuDoorOf) and he walks up into it. Then the whole town
+    // rushes past into that doorway, nearer things faster than far ones,
+    // the doorway drifting to the middle of the screen, until only its inside
+    // is left -- and the level's first wall is already there in it, firming
+    // up as it comes, drawn exactly where the level will lay it, so the level
+    // takes over without a cut. Coming back, the town pulls back out of the
+    // same door and he walks out of it (menuOpen, menu.leaving). A door that
     // will not open (the boards, a shut CASTLE) just says why, and he stays out.
-    const GO_SECS = 0.7;
-    const GO_FADE = 0.45;            // the share of the way in he starts fading at
-    const DOOR_W = 0.3;              // the doorway, as shares of the building
-    const DOOR_H = 0.36;             // ...short enough to clear a corner's name
+    const M_PUSH_SECS = 1.3;         // going in
+    const M_PUSH_BACK = 1.2;         // coming back out
+    const M_PUSH_WALK = 0.5;         // the share of going in by which he is through the door
+    const M_PUSH_ZOOM_FROM = 0.4;    // ...and at which the town starts to rush past
+    const M_PUSH_DEPTH = 45;         // how many times over it grows, enough for a doorway to fill the screen
+    const M_PUSH_PARALLAX = 1.2;     // how much faster near things rush past than the door, far things slower
+    const M_PUSH_LEVEL_FROM = 0.55;  // the share of going in at which the level starts to show through
+    const M_NEAR_GROUND = 1.3, M_NEAR_SKY = -0.3;   // the gates and the sky, on menuNear's scale
+    const M_FIELD = '#000';          // the level's own background, what the doorway opens onto
 
     function menuCanEnter(l) {
         if (l.key) return l.key !== 'board' || menuBoardOn();
@@ -501,7 +511,7 @@
 
     function menuGoStep(dt) {
         const g = menu.going;
-        if ((g.t += dt) < GO_SECS) return;
+        if ((g.t += dt) < M_PUSH_SECS) return;
         menu.going = null;
         const l = g.card.level;
         if (l.key === 'settings' || l.key === 'memories' || l.key === 'board') {
@@ -512,41 +522,212 @@
         else menuEnter(l);
     }
 
-    // engine.js asks, and leaves him undrawn while menuDrawGoing draws him
-    function menuPadHidden() { return !!(menu && menu.going && menuUp()); }
-
-    function menuDoor(c) {
-        const w = c.w * DOOR_W, h = c.h * DOOR_H;
-        return { x: c.x - w / 2, y: c.y + c.h / 2 - h, w, h };
+    // back out of a level, the way it went in: the town pulling back out of
+    // the door, and him walking out of it to stand at home under it
+    function menuLeaveStep(dt) {
+        const lv = menu.leaving;
+        if ((lv.t += dt) < M_PUSH_BACK) return;
+        paddle.x = paddle.tx = lv.x;
+        menu.lift = 0;
+        menu.leaving = null;
     }
 
-    function menuDrawGoing() {
-        const g = menu.going;
-        if (!g) return;
-        const c = g.card, d = menuDoor(c);
-        const k = Math.min(1, g.t / GO_SECS), e = k * k * (3 - 2 * k);
-        const x = c.x - c.w / 2, y = c.y - c.h / 2;
-        // the doorway, opening from the floor up over the first part of it
-        const o = Math.min(1, k * 3);
-        ctx.globalAlpha = 0.22;
-        ctx.fillStyle = c.level.ink;
-        ctx.fillRect(d.x, d.y + d.h * (1 - o), d.w, d.h * o);
-        ctx.globalAlpha = 1;
-        ctx.strokeStyle = c.level.ink;
-        ctx.lineWidth = 1.5;
-        ctx.strokeRect(d.x, d.y + d.h * (1 - o), d.w, d.h * o);
-        // him, cut to everything but the wall: outside the building, or in
-        // the doorway
-        const w0 = padW();
-        const s = 1 + (d.w / w0 - 1) * e;
+    // engine.js asks, and leaves him undrawn while menuDrawPush draws him
+    function menuPadHidden() { return !!(menu && (menu.going || menu.leaving) && menuUp()); }
+
+    // going in or coming back out, as one: the card, how far in (0 at the
+    // door to 1 through it), and where he walks from or to
+    function menuMotion() {
+        if (menu.going) return { card: menu.going.card, k: menuClamp(menu.going.t / M_PUSH_SECS), x: menu.going.x, y: menu.going.y, going: true };
+        if (menu.leaving) return { card: menu.leaving.card, k: 1 - menuClamp(menu.leaving.t / M_PUSH_BACK), x: menu.leaving.x, y: padY() };
+        return null;
+    }
+    // how near a thing in the town is: 0 on the CASTLE's row, 1 on the FARM's
+    function menuNear(c) { return (c.y - M_TOWN[5].y) / (M_TOWN[1].y - M_TOWN[5].y); }
+
+    // the camera, for something `near` deep, while he is going in or coming out
+    function menuCamera(near) {
+        const m = menuMotion();
+        if (!m) return;
+        const d = menuDoorOf(m.card), fx = d.cx, fy = d.bot - d.h * 0.45;
+        const S = 1 + Math.pow(menuBand(m.k, M_PUSH_ZOOM_FROM, 1), 3) * M_PUSH_DEPTH;
+        // nearer than the door rushes past faster, further slower -- but it still comes
+        const s = Math.pow(S, Math.max(0.15, 1 + M_PUSH_PARALLAX * (near - menuNear(m.card))));
+        // the doorway drifts to the middle of the screen as it comes at you
+        const centre = menuEase(menuBand(m.k, M_PUSH_ZOOM_FROM - 0.1, 0.9));
+        ctx.translate(menuLerp(fx, LW / 2, centre), menuLerp(fy, LH / 2, centre));
+        ctx.scale(s, s);
+        ctx.translate(-fx, -fy);
+    }
+
+    // Each building's doorway is its own, like its cover: the FARM's barn doors,
+    // the RUINS' broken arch, the CITY's glass doors, the VOLCANO's cave mouth,
+    // the CASTLE's pointed gate, a portal in the VOID's eye; the signs keep a
+    // plain arch. A doorway that `grows` opens out of the floor (or, the VOID's,
+    // out of its middle); the rest are there at once and something in them
+    // opens (menuDoorLeaves).
+    function menuDoorOf(c) {
+        if (c.level === MENU_VOID) {
+            const w = c.w * 0.56, h = c.h * 0.5;
+            return { cx: c.x, bot: c.y + 3 + h / 2, w, h, cap: 'void', grows: true };
+        }
+        const h = c.level.small ? c.h * 0.8 : c.h * 0.42, cap = c.level.cap || 'arch';
+        return { cx: c.x, bot: c.y + c.h / 2, w: Math.max(18, c.w * 0.26), h, cap,
+                 grows: cap !== 'gable' && cap !== 'skyline' && cap !== 'crown' };
+    }
+    // the doorway's outline at `s` of its size, added to the path open (a new one if `fresh`)
+    function menuDoorPath(d, s = 1, fresh = true) {
+        const w = d.w * s, h = d.h * s, x0 = d.cx - w / 2, x1 = d.cx + w / 2, b = d.bot, cx = d.cx;
+        if (fresh) ctx.beginPath();
+        switch (d.cap) {
+            case 'void':        // an eye, opening from its middle
+                ctx.ellipse(cx, d.bot - d.h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+                break;
+            case 'gable':       // barn doors: square
+            case 'skyline':     // glass doors: tall and sharp
+                ctx.moveTo(x0, b); ctx.lineTo(x0, b - h); ctx.lineTo(x1, b - h); ctx.lineTo(x1, b);
+                break;
+            case 'broken':      // an arch with its keystone gone
+                ctx.moveTo(x0, b); ctx.lineTo(x0, b - h * 0.6);
+                ctx.quadraticCurveTo(x0, b - h * 0.96, cx - w * 0.12, b - h);
+                ctx.lineTo(cx - w * 0.03, b - h * 0.86); ctx.lineTo(cx + w * 0.06, b - h * 0.93); ctx.lineTo(cx + w * 0.12, b - h * 0.99);
+                ctx.quadraticCurveTo(x1, b - h * 0.96, x1, b - h * 0.6); ctx.lineTo(x1, b);
+                break;
+            case 'cone':        // a cave mouth
+                ctx.moveTo(x0 + w * 0.02, b);
+                ctx.bezierCurveTo(x0 - w * 0.12, b - h * 0.7, cx - w * 0.36, b - h * 1.04, cx - w * 0.04, b - h);
+                ctx.bezierCurveTo(cx + w * 0.3, b - h * 1.06, x1 + w * 0.14, b - h * 0.55, x1 - w * 0.02, b);
+                break;
+            case 'crown':       // a pointed gate
+                ctx.moveTo(x0, b); ctx.lineTo(x0, b - h * 0.55);
+                ctx.quadraticCurveTo(x0 + w * 0.08, b - h * 0.8, cx, b - h);
+                ctx.quadraticCurveTo(x1 - w * 0.08, b - h * 0.8, x1, b - h * 0.55); ctx.lineTo(x1, b);
+                break;
+            default: {          // a plain arch
+                const r = Math.min(w / 2, h * 0.5);
+                ctx.moveTo(x0, b); ctx.lineTo(x0, b - h + r); ctx.arc(cx, b - h + r, r, Math.PI, 0); ctx.lineTo(x1, b);
+            }
+        }
+        ctx.closePath();
+    }
+    // what opens in a doorway that does not grow: barn doors swinging out,
+    // glass panes sliding apart, a portcullis going up. `open` 0 shut, 1 open.
+    function menuDoorLeaves(d, open, ink) {
+        if (d.grows || open >= 1) return;
+        const w = d.w, h = d.h, x0 = d.cx - w / 2, top = d.bot - h;
+        ctx.save(); menuDoorPath(d); ctx.clip();
+        if (d.cap === 'gable') {
+            const lw = w / 2 * (1 - open);   // each leaf, foreshortened as it swings
+            ctx.lineWidth = 1.2;
+            for (const [lx, dir] of [[x0, 1], [x0 + w, -1]]) {
+                const a = Math.min(lx, lx + dir * lw), b = Math.max(lx, lx + dir * lw);
+                ctx.fillStyle = menuMix('#7a5a3a', ink, 0.25); ctx.fillRect(a, top, b - a, h);
+                ctx.strokeStyle = '#4a3522'; ctx.strokeRect(a, top, b - a, h);
+                ctx.beginPath(); ctx.moveTo(a, top); ctx.lineTo(b, d.bot); ctx.moveTo(b, top); ctx.lineTo(a, d.bot); ctx.stroke();
+            }
+        } else if (d.cap === 'skyline') {
+            const slide = open * w / 2;
+            for (const [px, dir] of [[x0, -1], [x0 + w / 2, 1]]) {
+                const x = px + dir * slide;
+                menuAlpha(0.4); ctx.fillStyle = ink; ctx.fillRect(x, top, w / 2, h);
+                menuAlpha(0.8); ctx.strokeStyle = menuMix(ink, '#ffffff', 0.4); ctx.lineWidth = 1;
+                ctx.strokeRect(x + 0.5, top + 0.5, w / 2 - 1, h - 1);
+                ctx.beginPath(); ctx.moveTo(x + w * 0.1, top + h * 0.3); ctx.lineTo(x + w * 0.3, top + h * 0.1); ctx.stroke();
+                menuAlpha(1);
+            }
+        } else if (d.cap === 'crown') {
+            const up = open * h;
+            ctx.strokeStyle = '#6d685f'; ctx.lineWidth = 2;
+            ctx.beginPath();
+            for (let i = 1; i < 5; i++) { const x = x0 + w * i / 5; ctx.moveTo(x, top - up); ctx.lineTo(x, d.bot - up + 4); }
+            for (let j = 1; j < 4; j++) { const y = top + h * j / 4 - up; ctx.moveTo(x0, y); ctx.lineTo(x0 + w, y); }
+            ctx.stroke();
+        }
+        ctx.restore();
+    }
+    // The VOID's portal: two rings of him turning opposite ways round the edge
+    // of the opening eye, glowing in its pale ink, with its light just inside
+    // the rim. The rings thin out as you pass through them (`fade`).
+    const M_PORTAL_RINGS = [{ n: 18, r: 1.06, spin: 1.2, len: 1.5, a: 0.9 }, { n: 12, r: 0.8, spin: -1.9, len: 1.3, a: 0.55 }];
+    function menuPortal(d, size, fade) {
+        if (size <= 0.02 || fade <= 0) return;
+        const cy = d.bot - d.h / 2, rx = d.w / 2 * size, ry = d.h / 2 * size, T = menuNow(), ink = MENU_VOID.ink;
+        const g = ctx.createRadialGradient(d.cx, cy, Math.min(rx, ry) * 0.4, d.cx, cy, Math.max(rx, ry) * 1.25);
+        g.addColorStop(0, ink + '00'); g.addColorStop(0.75, ink + '55'); g.addColorStop(1, ink + '00');
+        menuAlpha(fade);
+        ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(d.cx, cy, rx * 1.3, ry * 1.3, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.globalCompositeOperation = 'lighter';
+        for (const ring of M_PORTAL_RINGS) for (let i = 0; i < ring.n; i++) {
+            const a = T * ring.spin + i * 2 * Math.PI / ring.n;
+            menuAlpha(ring.a * fade);
+            menuLay(menuBody(ink, 'flat'), d.cx + Math.cos(a) * rx * ring.r, cy + Math.sin(a) * ry * ring.r,
+                    2 * Math.PI * rx * ring.r / ring.n * ring.len, Math.atan2(Math.cos(a) * ry, -Math.sin(a) * rx), false, i % 2);
+        }
+        ctx.globalCompositeOperation = 'source-over';
+        menuAlpha(1);
+    }
+
+    // The first screen of level n as the level will lay it (engine.js's
+    // buildStage): its bricks, where they will be. Only levels.js has the
+    // screens, so the boss lab, and a level that opens on its boss, show
+    // the dark alone.
+    function menuPreview(n) {
+        const set = typeof LV_SETS !== 'undefined' && LV_SETS[n];
+        const lvl = set && set[0];
+        if (!lvl || lvl.boss) return;
+        const cols = Math.max(...lvl.rows.filter(row => row[0] !== '>').map(row => row.length));
+        const w = (LW - MARGIN * 2 - GAP * (cols - 1)) / cols, h = w / SHAPE_ASPECT;
+        lvl.rows.forEach((row, r) => {
+            const half = row[0] === '>';
+            if (half) row = row.slice(1);
+            for (let c = 0; c < cols; c++) {
+                const ch = row[c];
+                if (!ch || ch === '.') continue;
+                const sp = ch === 'X' ? shapeSprite('X', STONE, w, h, 'statue') : shapeSprite(ch, brickColor(ch), w, h, false);
+                if (sp) ctx.drawImage(sp, MARGIN + (c + (half ? 0.5 : 0)) * (w + GAP), TOP + r * (h + GAP), w, h);
+            }
+        });
+    }
+
+    // the doorway, what is through it, and him, going in or coming back out
+    function menuDrawPush() {
+        const m = menuMotion();
+        if (!m) return;
+        const c = m.card, d = menuDoorOf(c), k = m.k, ink = c.level.ink;
+        const open = menuEase(menuBand(k, 0, 0.2)), walk = menuEase(menuBand(k, 0.05, M_PUSH_WALK));
+        const size = d.grows ? open : 1;
+        ctx.save();
+        menuCamera(menuNear(c));
+        menuDoorPath(d, size); ctx.fillStyle = M_FIELD; ctx.fill();
+        // the level, already in there, drawn in the screen's own terms so it lands where it will be
+        const lk = m.going ? menuEase(menuBand(k, M_PUSH_LEVEL_FROM, 1)) : 0;
+        if (lk > 0 && size > 0) {
+            ctx.save();
+            menuDoorPath(d, size); ctx.clip();
+            ctx.setTransform(menu.baseT);
+            menuAlpha(lk);
+            const sc = menuLerp(0.7, 1, lk);
+            ctx.translate(LW / 2, LH / 2); ctx.scale(sc, sc); ctx.translate(-LW / 2, -LH / 2);
+            menuPreview(c.level.n);
+            ctx.restore();
+            menuAlpha(1);
+        }
+        menuDoorLeaves(d, open, ink);
+        if (d.cap === 'void') menuPortal(d, size, 1 - menuBand(k, 0.7, 0.95));
+        menuDoorPath(d, size);
+        if (d.cap === 'cone') { ctx.strokeStyle = '#ffb347'; ctx.lineWidth = 3; menuAlpha(0.5); ctx.stroke(); menuAlpha(1); }
+        ctx.strokeStyle = ink; ctx.lineWidth = 1.5; ctx.stroke();
+        // him, cut to everything but the wall: outside the building, or in the doorway
         ctx.save();
         ctx.beginPath();
-        ctx.rect(0, 0, LW, LH);
-        ctx.rect(x, y, c.w, c.h);
-        ctx.rect(d.x, d.y, d.w, d.h);
+        ctx.rect(-LW, -LH, LW * 3, LH * 3);
+        ctx.roundRect(c.x - c.w / 2, c.y - c.h / 2, c.w, c.h, 6);
+        menuDoorPath(d, 1, false);
         ctx.clip('evenodd');
-        labPadIcon(LAB.pad, g.x + (c.x - g.x) * e, g.y + (d.y + d.h / 2 - g.y) * e, w0 * s, false,
-                   1 - Math.max(0, (k - GO_FADE) / (1 - GO_FADE)));
+        const w0 = padW();
+        labPadIcon(LAB.pad, menuLerp(m.x, d.cx, walk), menuLerp(m.y, d.bot - d.h * 0.3, walk),
+                   menuLerp(w0, d.w * 0.8, walk), false, 1 - menuBand(walk, 0.85, 1));
+        ctx.restore();
         ctx.restore();
     }
 
@@ -566,9 +747,10 @@
             menu.march = false;             // the door is shut: he stops there
             return;
         }
-        if (level.key === 'rush') { menuRush(); return; }
+        if (level.key === 'rush') { menu.cameFrom = level; menuRush(); return; }
         const boss = menuBossFor(level.n);
         if (!boss) { menuSay(level.name + ' · no boss is set to this stage'); return; }
+        menu.cameFrom = level;      // the door he comes back out of (menuOpen)
         menu.arriveT = -1;          // walked in before the town finished arriving
         menu.run = { n: level.n, over: false, cont: false, out: 0 };
         best = menu.best[level.n] || 0;
@@ -803,6 +985,14 @@
         LAB.mini = 'menu';
         LAB.stageAt(0, true);
         setHint(M_HINT);
+        // out of the door he went in by, if the building is still standing
+        const c = menu.cameFrom && menu.cards.find(o => o.level === menu.cameFrom && menuStands(o));
+        menu.cameFrom = null;
+        if (c) {
+            const hs = halfSpan();
+            menu.leaving = { card: c, t: 0, x: Math.max(hs, Math.min(LW - hs, c.x)) };
+            menu.lift = 0;
+        }
     }
 
     function menuUpdate(dt) {
@@ -825,6 +1015,7 @@
         // the initials and the table after them are the engine's, over the town
         if (phase === 'initials' || phase === 'scores') { menu.march = false; return; }
         if (menu.post && menu.post.ready) { menuBoardAsk(); return; }
+        if (menu.leaving) { menu.march = false; menuLeaveStep(dt); return; }
         if (menu.going) { menuGoStep(dt); return; }
         menuDustStep(dt);
         if (menu.sayT > 0) menu.sayT = Math.max(0, menu.sayT - dt);
@@ -1321,24 +1512,35 @@
 
         const k = menuArriveK();
         menuRiseStep();
+        // the field's own transform, for anything drawn in the screen's terms under the camera
+        menu.baseT = ctx.getTransform();
         // a warm light low over the far end of the town, the DAYBREAK the town was built from
+        ctx.save(); menuCamera(M_NEAR_SKY);
         ctx.globalAlpha = k;
         const g = ctx.createRadialGradient(LW / 2, 60, 10, LW / 2, 60, 420);
         g.addColorStop(0, 'rgba(74,50,34,0.35)'); g.addColorStop(1, 'rgba(74,50,34,0)');
         ctx.fillStyle = g; ctx.fillRect(0, 0, LW, LH);
+        ctx.restore();
         ctx.globalAlpha = 1;
         // the far ones first, so a near one growing past them is drawn over them
         for (const c of menu.cards.filter(menuStands).sort((a, b) => a.y - b.y)) {
-            menuArriveCard(c, k, () => { menu.a0 = ctx.globalAlpha; menuDrawLevel(c); ctx.globalAlpha = menu.a0; });
+            menuArriveCard(c, k, () => {
+                ctx.save(); menuCamera(menuNear(c));
+                menu.a0 = ctx.globalAlpha; menuDrawLevel(c); ctx.globalAlpha = menu.a0;
+                ctx.restore();
+            });
         }
-        menuDrawGoing();
         // the gates are at his feet, so they are simply there once the town is
+        ctx.save(); menuCamera(M_NEAR_GROUND);
         ctx.globalAlpha = k;
         menu.a0 = k;
         menuDrawGate(-1);
         menuDrawGate(1);
+        ctx.restore();
         ctx.globalAlpha = 1;
-        if (k < 1) return;
+        menu.a0 = 1;
+        menuDrawPush();
+        if (k < 1 || menuMotion()) return;
         menuPadPeek();
         menuDrawGateNote(-1);
         menuDrawGateNote(1);
@@ -1867,46 +2069,68 @@
         if (menu.best[l.n] > 0) text('BEST ' + menu.best[l.n], c.x, c.y + 21, 10, aimed ? '#f2efe9' : '#8d877d', 'center');
     }
 
-    // A gate on each wall, standing where he stands, naming the paddle it leads
-    // to: a dark post with a rim in that paddle's colour and three of him
-    // fanned over it. The name is stacked a letter at a time: a 24px post is
-    // too narrow to write across and turning the canvas to write up it is more
-    // machinery than six letters are worth. With only the one paddle there is
-    // nowhere for a gate to lead, so there are no gates until a second is won.
+    // A gate on each wall, standing where he stands, naming the paddle it
+    // leads to: a tab pulled in from off the screen, rounded on the side facing
+    // the town and running off the edge on the other, drawn like the buildings
+    // -- a flat dark shape with a rim of that paddle's colour, slate while he is
+    // out in the town and lighting as he walks toward the wall. The name reads
+    // along it, high up, since he stands in front of the lower half; a chevron
+    // at the top points the way out. With only the one paddle there is nowhere
+    // for a gate to lead, so there are no gates until a second is won.
     const M_GATE = { w: 24, y: 470, h: 118 };
+    const M_GATE_TOP = M_GATE.y - 14;        // standing a little over the post it was, to just under the FARM and the VOLCANO
+    const M_GATE_NAME_Y = M_GATE_TOP + 58;
+    const M_GATE_ROUND = 12;
+    function menuTabPath(side, y0, y1) {
+        const w = M_GATE.w, r = M_GATE_ROUND;
+        ctx.beginPath();
+        if (side < 0) {
+            ctx.moveTo(-30, y0); ctx.lineTo(w - r, y0); ctx.arcTo(w, y0, w, y0 + r, r);
+            ctx.lineTo(w, y1 - r); ctx.arcTo(w, y1, w - r, y1, r); ctx.lineTo(-30, y1);
+        } else {
+            const x = LW - w;
+            ctx.moveTo(LW + 30, y0); ctx.lineTo(x + r, y0); ctx.arcTo(x, y0, x, y0 + r, r);
+            ctx.lineTo(x, y1 - r); ctx.arcTo(x, y1, x + r, y1, r); ctx.lineTo(LW + 30, y1);
+        }
+        ctx.closePath();
+    }
     function menuDrawGate(side) {
-        const x = side < 0 ? 0 : LW - M_GATE.w;
         const to = menuNextPad(side);
         const p = to && LAB_PAD[to];
         if (!p) return;
-        const on = menu.side === side && !menu.sw && menu.lift <= 1 && !!p;
-        const ink = (p && (p.ink || p.rim)) || '#4a453d';
-        ctx.fillStyle = M_DARK;
-        ctx.fillRect(x, M_GATE.y, M_GATE.w, M_GATE.h);
-        // the lean, filling the post from the floor up
+        const on = menu.side === side && !menu.sw && menu.lift <= 1;
+        const ink = p.ink || p.rim || '#4a453d';
+        const hs = halfSpan(), far = side < 0 ? paddle.x - hs : LW - hs - paddle.x;
+        const near = menuClamp(1 - far / GATE_NEAR);
+        const col = on ? ink : menuMix(ink, M_DARK, 0.55 * (1 - near));
+        const y0 = M_GATE_TOP, y1 = M_GATE.y + M_GATE.h, cx = side < 0 ? M_GATE.w / 2 : LW - M_GATE.w / 2;
+        menuTabPath(side, y0, y1);
+        ctx.fillStyle = M_DARK; ctx.fill();
+        // the lean, filling the tab from the floor up
         const k = on ? Math.min(1, menu.hold / SWAP_HOLD) : 0;
         if (k > 0) {
+            ctx.save(); menuTabPath(side, y0, y1); ctx.clip();
             menuAlpha(0.45);
             ctx.fillStyle = ink;
-            ctx.fillRect(x, M_GATE.y + M_GATE.h * (1 - k), M_GATE.w, M_GATE.h * k);
+            ctx.fillRect(side < 0 ? 0 : LW - M_GATE.w, y1 - (y1 - y0) * k, M_GATE.w, (y1 - y0) * k);
+            ctx.restore();
             menuAlpha(1);
         }
-        ctx.strokeStyle = on ? ink : menuMix(ink, M_DARK, 0.6);
-        ctx.lineWidth = on ? 2 : 1;
-        ctx.strokeRect(x + 1, M_GATE.y + 1, M_GATE.w - 2, M_GATE.h - 2);
-        for (let i = -1; i <= 1; i++) {
-            menuLay(menuBody(on ? ink : menuMix(ink, M_SLATE, 0.5), 'wash'), x + M_GATE.w / 2 + i * 7, M_GATE.y - 9, 15, -Math.PI / 2 + i * 0.45, false);
-        }
-        text(side < 0 ? '◀' : '▶', x + M_GATE.w / 2, M_GATE.y + 16, 12,
-             on ? '#f2efe9' : '#8d877d', 'center');
-        // a space is a gap down the post, the height of half a letter, so a
-        // name of two words still reads as two
-        let y = M_GATE.y + 34;
-        for (const ch of p.name) {
-            if (ch === ' ') { y += 6; continue; }
-            text(ch, x + M_GATE.w / 2, y, 10, on ? '#f2efe9' : '#8d877d', 'center');
-            y += 11;
-        }
+        menuTabPath(side, y0, y1);
+        ctx.strokeStyle = col; ctx.lineWidth = on ? 2 : 1 + near * 0.5; ctx.stroke();
+        // the chevron, pointing out through the wall
+        const cy = y0 + 15;
+        ctx.strokeStyle = col; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(cx - side * 2, cy - 5); ctx.lineTo(cx + side * 3, cy); ctx.lineTo(cx - side * 2, cy + 5); ctx.stroke();
+        ctx.lineCap = 'butt';
+        // the name, reading up the left wall and down the right
+        ctx.save();
+        ctx.translate(cx, M_GATE_NAME_Y);
+        ctx.rotate(side < 0 ? -Math.PI / 2 : Math.PI / 2);
+        ctx.textBaseline = 'middle';
+        text(p.name, 0, 0, 11, on ? '#f2efe9' : '#a39d93', 'center');
+        ctx.restore();
+        ctx.textBaseline = 'alphabetic';
     }
 
     // Beside each gate, what the paddle through it would change: his name and
