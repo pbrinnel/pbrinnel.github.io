@@ -38,7 +38,8 @@
     let FROST_EDGE = 1.5;    // ...spin off his ends...
     let FROST_SWIPE = 2.2;   // ...and off his travel, both far easier
     let FROST_DECK = 0.6;    // ...on a narrower flat, so more of him is a curve
-    let FROST_FLAKES = 14;   // snowflakes a second coming off him
+    let FROST_FLAKES = 14;   // snowflakes a second coming off him...
+    let FROST_BIG  = 0.25;   // ...this share of them a big one, six of him heads out
     let EMB_LEN    = 0.88;   // ember: shorter...
     let EMB_ANGLE  = 1.35;   // ...and his ends send a head off at a much sharper angle
     let EMB_GLOW   = 0.45;   // how much light he gives off
@@ -50,7 +51,7 @@
     let V2_GLINT   = 5;      // ...seconds between one glint and the next...
     let V2_SWEEP   = 0.9;    // ...and how long a glint takes to cross him
     LAB_KNOBS.push('GILT_LEN', 'GILT_CAPS', 'GILT_SHINE', 'STAT_LEN', 'STAT_ANGLE', 'STAT_SPIN',
-                   'STAT_DIP', 'FROST_LEN', 'FROST_EDGE', 'FROST_SWIPE', 'FROST_DECK', 'FROST_FLAKES',
+                   'STAT_DIP', 'FROST_LEN', 'FROST_EDGE', 'FROST_SWIPE', 'FROST_DECK', 'FROST_FLAKES', 'FROST_BIG',
                    'EMB_LEN', 'EMB_ANGLE', 'EMB_GLOW', 'EMB_SPARKS', 'PAIR_LEN', 'PAIR_QUAD', 'PAD_MARK', 'V2_GLOSS', 'V2_GLINT', 'V2_SWEEP');
 
     const V2_RIM    = '#e6edf5';
@@ -146,7 +147,21 @@
         padBoth('over', []);
         for (const b of padBits) {
             const a = Math.max(0, 1 - b.t / b.life) * b.a;
-            if (b.kind === 'flake') {
+            const baked = b.kind === 'bigflake' ? padFlakeSprite(b.ink) : b.kind === 'head' ? padHeadSprite(b.ink) : null;
+            if (baked) {
+                // s is half its width, as a flake's is
+                const w = b.s * 2, h = w * baked.height / baked.width;
+                ctx.save();
+                ctx.globalAlpha = a;
+                ctx.translate(b.x, b.y);
+                ctx.rotate(b.ph + b.t * (b.kind === 'head' ? 2.5 : 0.8));
+                ctx.drawImage(baked, -w / 2, -h / 2, w, h);
+                ctx.restore();
+                continue;
+            }
+            if (b.kind === 'head') continue;          // his art is not in yet
+            // a big flake whose sprite is not ready yet is drawn as a small one
+            if (b.kind === 'flake' || b.kind === 'bigflake') {
                 // a six-armed speck of ice, turning as it goes
                 ctx.globalAlpha = a;
                 ctx.strokeStyle = b.ink;
@@ -164,12 +179,8 @@
             if (b.kind === 'glow') {
                 // a spark with light round it, added to what is under it
                 ctx.globalCompositeOperation = 'lighter';
-                const g = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.s * 2.4);
-                g.addColorStop(0, b.ink);
-                g.addColorStop(1, 'rgba(0,0,0,0)');
                 ctx.globalAlpha = a * 0.55;
-                ctx.fillStyle = g;
-                ctx.fillRect(b.x - b.s * 2.4, b.y - b.s * 2.4, b.s * 4.8, b.s * 4.8);
+                ctx.drawImage(padGlow(b.ink), b.x - b.s * 2.4, b.y - b.s * 2.4, b.s * 4.8, b.s * 4.8);
                 ctx.globalAlpha = a;
                 ctx.fillStyle = '#fff1d6';
                 ctx.fillRect(b.x - b.s / 4, b.y - b.s / 4, b.s / 2, b.s / 2);
@@ -181,6 +192,74 @@
             ctx.fillRect(b.x - b.s / 2, b.y - b.s / 2, b.s, b.s);
         }
         ctx.globalAlpha = 1;
+    }
+
+    // A spark's light, baked once per colour, so each spark in a frame is a
+    // drawImage rather than a gradient of its own: EMBER keeps dozens alive.
+    const padGlows = new Map();
+    function padGlow(ink) {
+        if (padGlows.has(ink)) return padGlows.get(ink);
+        const c = document.createElement('canvas');
+        c.width = c.height = 64;
+        const g = c.getContext('2d');
+        const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+        gr.addColorStop(0, ink);
+        gr.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = gr;
+        g.fillRect(0, 0, 64, 64);
+        padGlows.set(ink, c);
+        return c;
+    }
+
+    // Specks big enough to be him, baked small once so a speck is one
+    // drawImage and never the whole photograph scaled down every frame. They
+    // are the photograph washed, not a flat silhouette: flat, a head is a
+    // potato and nobody in particular.
+    const PAD_SPECK_BAKE = 96;        // px across a baked speck
+    const padSpecks = new Map();
+    function padBakeSpeck(key, w, h, ink, wash, draw) {
+        if (padSpecks.has(key)) return padSpecks.get(key);
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        const g = c.getContext('2d');
+        if (!draw(g)) return null;     // his art is not in yet
+        g.filter = 'none';
+        g.globalCompositeOperation = 'source-atop';
+        g.fillStyle = ink;
+        g.globalAlpha = wash;
+        g.fillRect(0, 0, w, h);
+        padSpecks.set(key, c);
+        return c;
+    }
+    // a snowflake of six of him, boots at the middle and heads out, lifted
+    // pale so the ink over him reads as ice
+    function padFlakeSprite(ink) {
+        const R = PAD_SPECK_BAKE / 2;
+        return padBakeSpeck('flake' + ink, R * 2, R * 2, ink, 0.7, g => {
+            const body = shapeSprite('padFlakeRaw', null, PAD_BAKE, PAD_BAKE / SHAPE_ASPECT, false);
+            if (!body) return false;
+            const th = R / SHAPE_ASPECT;
+            g.filter = 'grayscale(1) contrast(0.5) brightness(3)';
+            g.translate(R, R);
+            for (let k = 0; k < 6; k++) {
+                g.save();
+                g.rotate(k * Math.PI / 3);
+                g.drawImage(body, 0, -th / 2, R, th);
+                g.restore();
+            }
+            g.setTransform(1, 0, 0, 1, 0, 0);
+            return true;
+        });
+    }
+    // his head gone grey, with `ink` through it
+    function padHeadSprite(ink) {
+        const w = PAD_SPECK_BAKE, h = Math.round(w * BALL_RY / BALL_RX);
+        return padBakeSpeck('head' + ink, w, h, ink, 0.35, g => {
+            if (!ready(ballImg)) return false;
+            g.filter = 'grayscale(1) contrast(1.35) brightness(1.05)';
+            g.drawImage(ballImg, 0, 0, w, h);
+            return true;
+        });
     }
 
     // one speck of whatever he is shedding
@@ -451,13 +530,15 @@
         },
         step(dt) {
             // flakes coming off him all the time, drifting down and wandering
-            // as they go...
+            // as they go, the big ones slower and longer, so there is time to
+            // see what they are made of...
             if (Math.random() < dt * FROST_FLAKES) {
-                const p = padSomewhere(0.95);
+                const p = padSomewhere(0.95), big = Math.random() < FROST_BIG;
                 padBit(p.x, padY() + (Math.random() - 0.5) * padH() * 0.6,
-                       Math.random() < 0.5 ? FROST_RIM : FROST_INK, 1.4 + Math.random() * 1.2,
-                       (Math.random() - 0.5) * 14, 6 + Math.random() * 14, 8,
-                       2 + Math.random() * 2.2, 0.85, 'flake', 18 + Math.random() * 16);
+                       Math.random() < 0.5 ? FROST_RIM : FROST_INK, (big ? 2.2 : 1.4) + Math.random() * 1.2,
+                       (Math.random() - 0.5) * 14, (big ? 4 : 6) + Math.random() * (big ? 8 : 14), big ? 4 : 8,
+                       big ? 9 + Math.random() * 4 : 2 + Math.random() * 2.2, 0.85,
+                       big ? 'bigflake' : 'flake', 18 + Math.random() * 16);
             }
             // ...and a spray of ice behind him when he travels
             const fast = Math.min(1, Math.abs(paddle.vx) / 500);
@@ -519,11 +600,12 @@
                 }
                 n -= 1;
             }
-            // now and then a flake of ash, drifting up slower and greyer
+            // now and then a head of ash, drifting up slower and greyer,
+            // turning over as it goes
             if (Math.random() < dt * 3) {
                 const p = padSomewhere(0.8);
                 padBit(p.x, padY() - padH() * 0.2, '#8a7f76', 1.8 + Math.random(),
-                       (Math.random() - 0.5) * 20, -18 - Math.random() * 20, -4, 2 + Math.random() * 1.5, 0.6);
+                       (Math.random() - 0.5) * 20, -18 - Math.random() * 20, -4, 6 + Math.random() * 2, 0.75, 'head');
             }
         }
     };

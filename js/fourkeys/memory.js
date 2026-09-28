@@ -479,6 +479,7 @@
     const MF_ODIN_GLOW = 'rgba(255,210,120,0.9)';
     const MF_ODIN_RAYS = 28;
     const MF_STREAMS = 44;               // flecks of colour in flight at once, at the height of it
+    const MF_FLECK = 12;                 // px wide an average fleck is: a head of his, so no smaller
     // The Angel speaks first, and it is the Angel's name the dying one
     // screams; the Fallen is who asks forgiveness.
     const MF_LINES = {
@@ -735,6 +736,26 @@
         g.globalCompositeOperation = 'destination-in';
         g.drawImage(ballImg, 0, 0);
         memBalls.set(color, c);
+        return c;
+    }
+    // His face lifted pale with `color` washed through it, baked small once
+    // for a head drawn a few px across dozens of times a frame: the full
+    // photograph scaled that far down shimmers, and a flat one is no face.
+    const memFlecks = new Map();
+    function memFleck(color) {
+        if (memFlecks.has(color)) return memFlecks.get(color);
+        if (!ready(ballImg)) return null;
+        const c = document.createElement('canvas');
+        c.width = 48; c.height = Math.round(48 * BALL_RY / BALL_RX);
+        const g = c.getContext('2d');
+        g.filter = 'grayscale(1) contrast(1.05) brightness(1.55)';
+        g.drawImage(ballImg, 0, 0, c.width, c.height);
+        g.filter = 'none';
+        g.globalCompositeOperation = 'source-atop';
+        g.globalAlpha = 0.6;
+        g.fillStyle = color;
+        g.fillRect(0, 0, c.width, c.height);
+        memFlecks.set(color, c);
         return c;
     }
     // the character lab's own steady pseudo-random, so what it tuned is what shows
@@ -1043,6 +1064,7 @@
         if (s < a || s > b + 1) return;
         const L = MF_ODIN_H, cy = MF_GROUND - L / 2 - 6;
         const rate = Math.sin(memClamp((s - a) / (b - a)) * Math.PI);
+        const fleck = memFleck(MEM_CLAY);
         ctx.save();
         const base = ctx.globalAlpha;
         for (let i = 0; i < MF_STREAMS; i++) {
@@ -1058,12 +1080,21 @@
             const mx = (sx + to[0]) / 2, my = Math.min(sy, to[1]) - 90 - 60 * memHash(i + 340);
             const px = (1 - k) * (1 - k) * sx + 2 * (1 - k) * k * mx + k * k * to[0];
             const py = (1 - k) * (1 - k) * sy + 2 * (1 - k) * k * my + k * k * to[1];
-            const r = 2.5 + 3.5 * memHash(i + 350);
+            // each fleck a little head of his, turning as it is carried off
+            const w = MF_FLECK * (0.6 + 0.8 * memHash(i + 350)), h = w * BALL_RY / BALL_RX;
             ctx.globalAlpha = base * rate * Math.sin(life * Math.PI);
-            ctx.fillStyle = MEM_CLAY;
-            ctx.beginPath();
-            ctx.arc(px, py, r, 0, 2 * Math.PI);
-            ctx.fill();
+            if (!fleck) {
+                ctx.fillStyle = MEM_CLAY;
+                ctx.beginPath();
+                ctx.arc(px, py, w / 2, 0, 2 * Math.PI);
+                ctx.fill();
+                continue;
+            }
+            ctx.save();
+            ctx.translate(px, py);
+            ctx.rotate((memHash(i + 360) - 0.5) * 1.2 + life * (memHash(i + 370) - 0.5) * 6);
+            ctx.drawImage(fleck, -w / 2, -h / 2, w, h);
+            ctx.restore();
         }
         ctx.restore();
     }

@@ -232,12 +232,8 @@
         ctx.globalCompositeOperation = 'lighter';
         for (const p of lamp.sparks) {
             const a = Math.max(0, 1 - p.t / p.life);
-            const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.s * 2.4);
-            g.addColorStop(0, p.ink);
-            g.addColorStop(1, 'rgba(0,0,0,0)');
             ctx.globalAlpha = a * 0.55;
-            ctx.fillStyle = g;
-            ctx.fillRect(p.x - p.s * 2.4, p.y - p.s * 2.4, p.s * 4.8, p.s * 4.8);
+            ctx.drawImage(padGlow(p.ink), p.x - p.s * 2.4, p.y - p.s * 2.4, p.s * 4.8, p.s * 4.8);
             ctx.globalAlpha = a;
             ctx.fillStyle = '#fff1d6';
             ctx.fillRect(p.x - p.s / 4, p.y - p.s / 4, p.s / 2, p.s / 2);
