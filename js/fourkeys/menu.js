@@ -127,7 +127,7 @@
                  cards: [], run: null, side: 0, hold: 0, sw: null,
                  march: false, lift: 0, lastX: 0, into: null, walk: 0, gait: 0, arriveT: -1,
                  going: null, screen: null, press: null,
-                 shows: [], showT: 0 };
+                 shows: [], showT: 0, a0: 1 };
         let kept = null;
         try { kept = localStorage.getItem(MENU_PAD_KEY); } catch (e) { /* a private window */ }
         // The first load is engine.js's own setup (debugBuild), before its
@@ -162,9 +162,11 @@
     function menuOpened() { menuLoad(); return MENU_LEVELS.every(l => menu.keys[l.n]); }
 
     // whether a building is standing yet: most always are, the VOID waits on a
-    // win, MEMORIES on its first memory and BOSS RUSH on the VOID
+    // win, MEMORIES on its first memory, the LEADERBOARD on a score above
+    // nothing on any stage, and BOSS RUSH on the VOID
     function menuStands(c) {
         if (c.level.key === 'memories') return MENU_MEMS.some(m => !m.always && menu.mems[m.id]);
+        if (c.level.key === 'board') return MENU_ALL.some(l => menu.best[l.n] > 0);
         if (c.level.key === 'rush') return !!menu.keys[MENU_VOID.n];
         return !c.level.after || !!menu.keys[c.level.after];
     }
@@ -324,7 +326,7 @@
           at: { x: 70, y: 80, w: 116, h: 90 } },
         { key: 'settings', lines: ['SETTINGS'], ink: '#a9a39a', small: true,
           at: { x: 174, y: 44, w: 80, h: 28, lane: [162, 186] } },
-        { key: 'board', side: 1, lines: ['LEADER', 'BOARD'], ink: '#c9a94e',
+        { key: 'board', side: 1, lines: ['LEADERBOARD'], ink: '#c9a94e',
           at: { x: 730, y: 80, w: 116, h: 90 } },
         { key: 'rush', lines: ['BOSS RUSH'], ink: '#e0a040', small: true,
           at: { x: 626, y: 44, w: 80, h: 28, lane: [614, 638] } }
@@ -948,6 +950,11 @@
     }
 
     // ---- the picture ----------------------------------------------------------------
+    // The town is drawn the way the characters are: in the game's two pictures,
+    // his body and his head, and little else. Every building is a plain dark
+    // shape with a rim of its colour and ONE thing made of him that is its own
+    // (M_HERALDS), big enough to read as him. Nothing is ever darkened toward
+    // black to say it is asleep: it goes toward slate (M_SLATE) instead.
     function menuPanel(x, y, w, h, on, ink) {
         ctx.fillStyle = 'rgba(0,0,0,0.82)';
         ctx.beginPath();
@@ -958,35 +965,105 @@
         ctx.stroke();
     }
 
-    // A key, drawn as the only thing this game has: his head, flat, in the
-    // colour of the level that gives it -- or the space one has not filled yet.
-    function menuKey(x, y, r, got, ink) {
-        const rx = r, ry = r * (BALL_RY / BALL_RX);
-        if (got) {
-            const sp = headSprite2('flat', ink);
-            if (sp) ctx.drawImage(sp, x - rx, y - ry, rx * 2, ry * 2);
-            return;
+    const M_DARK = '#14110e';        // every building's own shape
+    const M_SLATE = '#6b665d';       // where a colour goes while he is elsewhere
+    const M_EMPTY = '#3a362f';       // a key not won yet
+    const M_RISE_IN = 3, M_RISE_OUT = 2;   // per second a building lights as he lines up, and goes back
+    const menuClamp = x => Math.max(0, Math.min(1, x));
+    const menuEase = x => { x = menuClamp(x); return x * x * (3 - 2 * x); };
+    const menuLerp = (a, b, k) => a + (b - a) * k;
+    const menuNow = () => performance.now() / 1000;
+    function menuHash(n) { const h = Math.sin(n * 12.9898) * 43758.5453; return h - Math.floor(h); }
+    function menuMix(a, b, t) {
+        const p = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16));
+        const A = p(a), B = p(b);
+        return '#' + A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, '0')).join('');
+    }
+    // a fixed random number for card c, the same every frame
+    function menuSeeded(c, i) { return menuHash(c.x * 13.1 + c.y * 7.7 + i * 1.618); }
+
+    // Alpha is multiplied into whatever the card is being drawn at, so the
+    // town's arrival (menuArriveCard) still fades everything in together.
+    function menuAlpha(a) { ctx.globalAlpha = menu.a0 * a; }
+
+    // him lying down, baked once: 'wash' is the bricks' own (lifted grey with
+    // the colour over it, so his shape still shows), 'flat' one solid colour
+    function menuBody(color, mode) {
+        const k = 'mBody' + mode + color;
+        if (spriteCache.has(k)) return spriteCache.get(k);
+        if (!ready(paddleImg)) return null;
+        const w = 240, h = Math.round(240 / SHAPE_ASPECT);
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        const g = c.getContext('2d');
+        placeShape(g, w, h, mode === 'wash');
+        g.globalCompositeOperation = 'source-atop';
+        g.globalAlpha = mode === 'wash' ? 0.8 : 1;
+        g.fillStyle = color;
+        g.fillRect(0, 0, w, h);
+        spriteCache.set(k, c);
+        return c;
+    }
+    // his head, baked once: 'flat', 'wash' as above, 'stone' flat with a pale
+    // whisper of his face, 'rock' with his face multiplied in as shading, and
+    // 'raw', the photograph
+    function menuHead(color, mode) {
+        const k = 'mHead' + mode + color;
+        if (spriteCache.has(k)) return spriteCache.get(k);
+        if (!ready(ballImg)) return null;
+        const w = ballImg.naturalWidth, h = ballImg.naturalHeight;
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        const g = c.getContext('2d');
+        if (mode === 'wash') g.filter = 'grayscale(1) contrast(1.1) brightness(1.95)';
+        g.drawImage(ballImg, 0, 0, w, h);
+        g.filter = 'none';
+        if (mode !== 'raw') {
+            g.globalCompositeOperation = mode === 'wash' ? 'source-atop' : 'source-in';
+            g.globalAlpha = mode === 'wash' ? 0.8 : 1;
+            g.fillStyle = color;
+            g.fillRect(0, 0, w, h);
+            g.globalAlpha = 1;
         }
-        ctx.strokeStyle = '#4a453d';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
-        ctx.stroke();
+        if (mode === 'rock') {
+            g.globalCompositeOperation = 'multiply';
+            g.filter = 'grayscale(1) contrast(1.4) brightness(1.25)';
+            g.drawImage(ballImg, 0, 0, w, h);
+            g.filter = 'none';
+            g.globalCompositeOperation = 'destination-in';
+            g.drawImage(ballImg, 0, 0, w, h);
+        }
+        if (mode === 'stone') {
+            g.globalCompositeOperation = 'source-atop';
+            g.globalAlpha = 0.5;
+            g.filter = 'grayscale(1) contrast(1.2) brightness(1.5)';
+            g.drawImage(ballImg, 0, 0, w, h);
+            g.filter = 'none';
+        }
+        spriteCache.set(k, c);
+        return c;
+    }
+    // him at (x, y), `len` long, turned `a`; stood on end, and mirrored, on request
+    function menuLay(img, x, y, len, a, standing, flip) {
+        if (!img) return;
+        const th = len / SHAPE_ASPECT;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(a + (standing ? -Math.PI / 2 : 0));
+        if (flip) ctx.scale(1, -1);
+        ctx.drawImage(img, -len / 2, -th / 2, len, th);
+        ctx.restore();
+    }
+    function menuPutHead(img, x, y, w) {
+        if (img) ctx.drawImage(img, x - w / 2, y - w * (BALL_RY / BALL_RX) / 2, w, w * (BALL_RY / BALL_RX));
     }
 
     // What makes a building that level's: a roofline over the box it is drawn
     // on. All five are a few straight lines -- the town is meant to read at a
     // glance from the other end of the field, not to be looked at closely.
     const ROOF_H = 22;
-    function menuCap(c, ink) {
-        ctx.fillStyle = ink;
-        ctx.beginPath();
-        menuCapPath(c);
-        ctx.fill();
-    }
 
-    // the roofline, added to whatever path is open -- menuCap fills it, and
-    // the dust cuts itself to it together with the building under it
+    // the roofline, added to whatever path is open
     function menuCapPath(c) {
         const x = c.x - c.w / 2, y = c.y - c.h / 2, w = c.w;
         const top = y - ROOF_H;
@@ -1027,12 +1104,182 @@
                 ctx.lineTo(x + w * 0.64, top);
                 ctx.lineTo(x + w * 0.94, y);
                 break;
-            default:                // crenellations
+            case 'crown':           // crenellations
                 for (let i = 0; i < 5; i++) {
                     const bw = w / 9;
                     ctx.rect(x + w * 0.06 + i * bw * 1.75, top + 6, bw, ROOF_H - 6);
                 }
                 ctx.rect(x, y - 8, w, 8);
+        }
+    }
+    // the whole building, roof and all, as one path
+    function menuOutline(c, r = 6) {
+        ctx.beginPath();
+        ctx.roundRect(c.x - c.w / 2, c.y - c.h / 2, c.w, c.h, r);
+        ctx.closePath();
+        if (c.level.cap) menuCapPath(c);
+    }
+    const menuTopOf = c => c.y - c.h / 2 - (c.level.cap ? ROOF_H : 0);
+    // slate while he is elsewhere, its own colour as he lines up
+    const menuAround = st => st.covered ? M_EMPTY : menuMix(st.ink, M_SLATE, 0.45 * (1 - st.rise));
+    // stood in the doorway: how full it is, 0..1
+    function menuDoorK(c) { return menu.into && menu.into.card === c ? Math.min(1, menu.into.t / DOOR_HOLD) : 0; }
+
+    // The building itself: its shape, dark, a rim of its colour that lights
+    // as he lines up, and the doorway filling from the floor while he stands
+    // in it. `shape` is a smaller card to draw in its place (the boards' plate).
+    function menuSilhouette(c, st, shape = c) {
+        menuOutline(shape);
+        ctx.fillStyle = M_DARK; ctx.fill();
+        ctx.strokeStyle = menuMix(st.ink, M_DARK, 0.55 * (1 - st.rise));
+        ctx.lineWidth = 1 + st.rise;
+        ctx.stroke();
+        const k = menuDoorK(c);
+        if (k) {
+            ctx.save(); menuOutline(shape); ctx.clip();
+            menuAlpha(0.45); ctx.fillStyle = st.ink;
+            ctx.fillRect(shape.x - shape.w / 2, shape.y + shape.h / 2 - (shape.h + ROOF_H) * k, shape.w, (shape.h + ROOF_H) * k);
+            ctx.restore();
+            menuAlpha(1);
+        }
+    }
+
+    // a building lights over a moment as he lines up with it, and goes back as he leaves
+    function menuRiseStep() {
+        const t = menuNow(), dt = Math.min(0.1, t - (menu.drawT || t));
+        menu.drawT = t;
+        for (const c of menu.cards) c.rise = menuClamp((c.rise || 0) + (menuAimed(c) ? dt * M_RISE_IN : -dt * M_RISE_OUT));
+    }
+    function menuState(c) {
+        const l = c.level, shut = l.n === 5 && !menuOpened();
+        return { aimed: menuAimed(c), rise: c.rise || 0, shut, covered: false,
+                 ink: shut ? '#6a655c' : l.ink, best: menu.best[l.n] || 0 };
+    }
+
+    // ---- the keys: a sigil for each boss ----------------------------------------------
+    // Each level's key is its boss, drawn in a few of him and a head, in shades
+    // of the level's own colour. Not won yet it is the same sigil in slate, so
+    // a door says what is behind it from the start. On the CASTLE the four sit
+    // smaller, in a row.
+    const M_FIRE = '#e0702f';
+    const M_ASHLAR = ['#a39a86', '#968c78', '#aaa18c', '#8e8674', '#9d9483', '#8a8470'];   // idol.js's stone
+    // the IDOL's chunk, shares of the picture, running off the right of it:
+    // the fight wears him down from the outside in
+    const M_IDOL_BITE = [[1.05, 0.4], [0.86, 0.42], [0.74, 0.5], [0.7, 0.58], [0.74, 0.64],
+                         [0.68, 0.72], [0.8, 0.8], [1.05, 0.82]];
+    // The IDOL as the fight has him: his head under a coat of him laid in
+    // courses like stone, coarser than the fight's so it reads at a key's
+    // size, with one chunk knocked off the edge and his face grey under it.
+    function menuIdolHead() {
+        const k = 'mIdol';
+        if (spriteCache.has(k)) return spriteCache.get(k);
+        if (!ready(ballImg) || !ready(paddleImg)) return null;
+        const W = 282, H = 418;
+        const c = document.createElement('canvas');
+        c.width = W; c.height = H;
+        const g = c.getContext('2d');
+        g.drawImage(ballImg, 0, 0, W, H);
+        g.globalCompositeOperation = 'source-atop';
+        const bite = new Path2D();
+        M_IDOL_BITE.forEach(([u, v], i) => i ? bite.lineTo(u * W, v * H) : bite.moveTo(u * W, v * H));
+        bite.closePath();
+        const rest = new Path2D();
+        rest.rect(0, 0, W, H);
+        rest.addPath(bite);
+        g.fillStyle = '#6f685b';
+        g.fill(rest, 'evenodd');
+        let seed = 7 * 7919 + 13;
+        const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+        const ch = H * 0.13, cw = ch * SHAPE_ASPECT;
+        for (let row = 0, y = ch / 2; y < H + ch; row++, y += ch * 0.6) {
+            for (let bx = (row % 2 ? -cw / 2 : 0) - rnd() * cw * 0.2; bx < W + cw; bx += cw * 0.8) {
+                const px = bx + cw / 2, py = y + (rnd() - 0.5) * ch * 0.15, tone = M_ASHLAR[(rnd() * 6) | 0], a = (rnd() - 0.5) * 0.12;
+                if (g.isPointInPath(bite, px, py)) continue;
+                g.save(); g.translate(px, py); g.rotate(a); g.drawImage(menuBody(tone, 'wash'), -cw / 2, -ch / 2, cw, ch); g.restore();
+            }
+        }
+        g.save(); g.clip(bite);
+        g.filter = 'grayscale(1) brightness(1.05)'; g.drawImage(ballImg, 0, 0, W, H); g.filter = 'none';
+        g.restore();
+        spriteCache.set(k, c);
+        return c;
+    }
+    // A torch's flame: three tongues, one inside the next, leaning and
+    // stretching on slow beats of their own. Its brightness holds, so it never flashes.
+    function menuFlame(x, y, w, h, t) {
+        const tongue = (k, ink, a) => {
+            const hh = h * k * (0.9 + 0.08 * Math.sin(t * 5.3) + 0.05 * Math.sin(t * 8.1 + 1));
+            const ww = w * k, sway = Math.sin(t * 3.1) * w * 0.35 * k;
+            menuAlpha(a); ctx.fillStyle = ink;
+            ctx.beginPath(); ctx.moveTo(x, y + ww * 0.35);
+            ctx.bezierCurveTo(x - ww, y + ww * 0.2, x - ww * 0.7, y - hh * 0.5, x + sway, y - hh);
+            ctx.bezierCurveTo(x + ww * 0.7, y - hh * 0.5, x + ww, y + ww * 0.2, x, y + ww * 0.35);
+            ctx.fill();
+        };
+        ctx.globalCompositeOperation = 'lighter';
+        tongue(1, M_FIRE, 0.75); tongue(0.66, '#f2a93e', 0.8); tongue(0.36, '#fff1d6', 0.7);
+        ctx.globalCompositeOperation = 'source-over'; menuAlpha(1);
+    }
+    // level n's sigil, `s` px across, in `ink` (M_EMPTY for one not won); `turn` spins the flower
+    function menuSigil(n, x, y, s, ink, turn) {
+        const mode = ink === M_EMPTY ? 'flat' : 'wash';
+        const b = menuBody(ink, mode), h = menuHead(ink, mode);
+        switch (n) {
+            case 1: {   // WINDMILL: one of its flowers, his head on five petals, on a stem
+                const hw = s * 0.3, R0 = hw * 0.45, L = s * 0.4;
+                ctx.strokeStyle = mode === 'flat' ? ink : menuMix(ink, '#1c2a14', 0.35);
+                ctx.fillStyle = ctx.strokeStyle;
+                ctx.lineWidth = Math.max(1.2, s * 0.045);
+                ctx.beginPath(); ctx.moveTo(x + s * 0.2, y - s * 0.62); ctx.quadraticCurveTo(x + s * 0.36, y - s * 0.25, x, y); ctx.stroke();
+                ctx.beginPath(); ctx.ellipse(x + s * 0.31, y - s * 0.38, s * 0.09, s * 0.035, -0.5, 0, Math.PI * 2); ctx.fill();
+                for (let i = 0; i < 5; i++) {
+                    const a = turn + i * 2 * Math.PI / 5 - Math.PI / 2;
+                    menuLay(b, x + Math.cos(a) * (R0 + L / 2), y + Math.sin(a) * (R0 + L / 2), L, a, false, i % 2);
+                }
+                menuPutHead(mode === 'flat' ? h : menuHead(menuMix(ink, '#ffffff', 0.2), 'wash'), x, y, hw);
+                break;
+            }
+            case 2:     // IDOL: his head in its coat of stone, the statues' pale rim round it
+                if (mode === 'flat') { menuPutHead(h, x, y, s * 0.52); break; }
+                menuPutHead(menuHead(STONE_RIM, 'flat'), x, y, s * 0.52 + Math.max(2, s * 0.05));
+                menuPutHead(menuIdolHead(), x, y, s * 0.52);
+                break;
+            case 3:     // TWINS: a big one and a small one, feet level
+                menuPutHead(h, x - s * 0.17, y - s * 0.03, s * 0.4);
+                menuPutHead(h, x + s * 0.23, y + s * 0.09, s * 0.28);
+                break;
+            case 4:     // LAMPS: three torches, each of him stood on end, burning
+                [-1, 0, 1].forEach(i => {
+                    const L = s * (i ? 0.56 : 0.7), bx = x + i * s * 0.3, foot = y + s * 0.46, t = menuNow() + i * 1.7;
+                    if (mode !== 'flat') {
+                        // the fire round his outline: him, flat in flame, a little out all round
+                        ctx.globalCompositeOperation = 'lighter';
+                        menuAlpha(0.35 + 0.08 * Math.sin(t * 2.3));
+                        const d = Math.max(1, s * 0.035);
+                        for (let k = 0; k < 8; k++) menuLay(menuBody(M_FIRE, 'flat'), bx + Math.cos(k * Math.PI / 4) * d, foot - L / 2 + Math.sin(k * Math.PI / 4) * d, L, 0, true);
+                        ctx.globalCompositeOperation = 'source-over'; menuAlpha(1);
+                    }
+                    menuLay(b, bx, foot - L / 2, L, 0, true);
+                    if (mode !== 'flat') menuFlame(bx, foot - L + s * 0.02, s * 0.1, s * 0.28, t);
+                });
+                break;
+            case 5: {   // GLEEOK: three heads on three short necks out of one collar
+                const cy = y + s * 0.46;
+                [-0.75, 0, 0.75].forEach((d, i) => {
+                    const a = -Math.PI / 2 + d, L = s * (i === 1 ? 0.4 : 0.34), r = L + s * 0.16;
+                    menuLay(b, x + Math.cos(a) * L / 2, cy + Math.sin(a) * L / 2, L, a, false, i % 2);
+                    menuPutHead(h, x + Math.cos(a) * r, cy + Math.sin(a) * r, s * 0.26);
+                });
+                break;
+            }
+            case 6:     // LUCIFER: a head between two wings, two of him each
+                for (const side of [-1, 1]) [[0.45, 0.5], [0.05, 0.4]].forEach(([d, l]) => {
+                    const a = side < 0 ? Math.PI + d : -d, L = s * l;
+                    const sx = x + side * s * 0.1, sy = y + s * 0.02;
+                    menuLay(b, sx + Math.cos(a) * L / 2, sy + Math.sin(a) * L / 2, L, a, false, side < 0);
+                });
+                menuPutHead(h, x, y + s * 0.04, s * 0.24);
+                break;
         }
     }
 
@@ -1047,13 +1294,21 @@
         if (menuScreenDraw()) return;
 
         const k = menuArriveK();
+        menuRiseStep();
+        // a warm light low over the far end of the town, the DAYBREAK the town was built from
+        ctx.globalAlpha = k;
+        const g = ctx.createRadialGradient(LW / 2, 60, 10, LW / 2, 60, 420);
+        g.addColorStop(0, 'rgba(74,50,34,0.35)'); g.addColorStop(1, 'rgba(74,50,34,0)');
+        ctx.fillStyle = g; ctx.fillRect(0, 0, LW, LH);
+        ctx.globalAlpha = 1;
         // the far ones first, so a near one growing past them is drawn over them
         for (const c of menu.cards.filter(menuStands).sort((a, b) => a.y - b.y)) {
-            menuArriveCard(c, k, () => menuDrawLevel(c));
+            menuArriveCard(c, k, () => { menu.a0 = ctx.globalAlpha; menuDrawLevel(c); ctx.globalAlpha = menu.a0; });
         }
         menuDrawGoing();
         // the gates are at his feet, so they are simply there once the town is
         ctx.globalAlpha = k;
+        menu.a0 = k;
         menuDrawGate(-1);
         menuDrawGate(1);
         ctx.globalAlpha = 1;
@@ -1068,44 +1323,269 @@
     }
     const M_TOTAL_Y = 592;
 
-    // Not a level: no roof and no key, just a sign.
-    function menuDrawSide(c) {
-        const s = c.level;
-        const x = c.x - c.w / 2, y = c.y - c.h / 2;
-        const aimed = menuLane(c);
-        menuPanel(x, y, c.w, c.h, aimed, s.ink);
-        if (menu.into && menu.into.card === c) {
-            const k = Math.min(1, menu.into.t / DOOR_HOLD);
-            ctx.globalAlpha = 0.5;
-            ctx.fillStyle = s.ink;
-            ctx.fillRect(x + 1, y + c.h * (1 - k) - 1, c.w - 2, c.h * k);
-            ctx.globalAlpha = 1;
-        }
-        const ink = aimed ? s.ink : '#8d877d';
-        // BOSS RUSH's best hangs under its sign, once it has one
-        if (s.key === 'rush' && menu.best[M_RUSH] > 0) {
-            text('BEST ' + menu.best[M_RUSH], c.x, y + c.h + 13, 10, ink, 'center');
-        }
+    // What a level says: its name, its key (the CASTLE's four), and its best
+    // there once it has one, which lifts the key a little to make room. No
+    // number on it: the town is walked in whatever order you like. Laid out in
+    // shares of the card, since the five are not the same size.
+    function menuLevelWords(c, st) {
+        const l = c.level, y = c.y - c.h / 2, big = l.n === 5;
+        const got = st.best > 0;
+        const nameY = y + c.h * 0.4, ky = y + c.h * (got ? (big ? 0.66 : 0.64) : 0.72);
+        const lit = menu.keys[l.n] ? (st.aimed ? '#fff' : menuMix(st.ink, '#f2efe9', 0.35))
+                  : st.shut ? '#6a655c' : st.aimed ? '#f2efe9' : '#a39d93';
+        text(l.name, c.x, nameY, big ? 19 : 20, lit, 'center');
+        const ink = o => menu.keys[o.n] ? (st.aimed ? menuMix(o.ink, '#ffffff', 0.2) : o.ink) : M_EMPTY;
+        const turn = st.aimed ? menuNow() * 0.8 : 0;
+        if (big) MENU_LEVELS.forEach((o, i) => menuSigil(o.n, c.x - 45 + i * 30, ky, M_KEY_SMALL, ink(o), turn));
+        else menuSigil(l.n, c.x, ky, M_KEY, ink(l), turn);
+        if (got) text('BEST ' + st.best, c.x, y + c.h * 0.9, 11, st.aimed ? '#f2efe9' : '#a39d93', 'center');
+    }
+    const M_KEY = 40, M_KEY_SMALL = 24;   // a sigil's size on its own level, and in the CASTLE's row
+
+    // Not a level: no key, just a sign. A one-line name is shrunk to fit it.
+    function menuSideWords(c, st) {
+        const s = c.level, y = c.y - c.h / 2;
+        const ink = st.aimed ? menuMix(s.ink, '#ffffff', 0.25) : '#a39d93';
+        const fit = (t, size) => {
+            ctx.font = size + 'px "Fira Sans", "Trebuchet MS", sans-serif';   // as text() sets it
+            return Math.min(size, Math.floor(size * (c.w - 16) / ctx.measureText(t).width));
+        };
+        if (s.key === 'rush' && menu.best[M_RUSH] > 0) text('BEST ' + menu.best[M_RUSH], c.x, y + c.h + 13, 10, ink, 'center');
         if (s.small) { text(s.lines[0], c.x, c.y + 4, 11, ink, 'center'); return; }
-        if (s.lines.length === 1) { text(s.lines[0], c.x, c.y + 6, 17, ink, 'center'); return; }
+        if (s.lines.length === 1) { text(s.lines[0], c.x, c.y + 6, fit(s.lines[0], 17), ink, 'center'); return; }
         text(s.lines[0], c.x, y + c.h * 0.44, 17, ink, 'center');
         text(s.lines[1], c.x, y + c.h * 0.72, 13, ink, 'center');
     }
 
-    // ---- the dust -------------------------------------------------------------------
-    // The five start out as old buildings nobody has been near: grey, soft at
-    // the edges and flecked with dust. Walk up and touch one and the dust
-    // dissolves off it, a fleck at a time over DUST_WIPE, and it stays clean
-    // for good -- `seen` is saved with the keys and the paddles, and
-    // forgotten with them. The softness is the building drawn several times
-    // slightly out of place, not a canvas filter: Safari ignores ctx.filter,
-    // and this is a phone game. The film and the flecks are cut to the
-    // building's own outline, roof and all, so the dust is ON it.
-    const DUST_WIPE = 0.8;           // seconds the dissolve takes
-    const DUST_INK = '#5b564e';      // what every colour on it is under the dust
-    const DUST_BLUR = 3.2;           // px each soft copy sits off true
-    const DUST_SPECKS = 46;          // flecks on each
-    const DUST_CELL = 5;             // px, the grain the dissolve goes in
+    // ---- the heraldry: one thing of its own on every building -----------------------
+    // Each is behind the building, in front of it, or both, and wakes as he
+    // lines up (st.rise): the sails spin up, the fallen lintel teeters, the
+    // windows light floor by floor, the plume thickens, the crow circles
+    // faster, the board's wings stir.
+    const M_CROW = '#4b4652';        // a crow's slate, never black
+    const M_CROW_ROUND = 6;          // seconds round MEMORIES, less as you line up
+    const M_WING_ROWS = [            // lucifer.js's LU_WING_ROWS
+        { n: 10, at: [0.1, 1],     sweep: [82, 12], len: [0.34, 1.1],  lift: 0 },
+        { n: 7,  at: [0.06, 0.78], sweep: [70, 34], len: [0.26, 0.46], lift: 0.1 },
+        { n: 5,  at: [0.03, 0.55], sweep: [46, 28], len: [0.17, 0.25], lift: 0.18 }
+    ];
+    const M_WING_FLAP = { period: 2.4, lag: 0.1, swing: [5, 8, 11, 14], feather: 5, featherLag: 0.08 };   // ...and LU_WING_FLAP
+    // The board's wings are the Corrupted's, and the fight is where they
+    // should be seen whole: still until the board is lit, then a small, slow beat.
+    const M_WING_BEAT_LIT = 0.2;     // share of the Corrupted's beat, when lit
+    const M_WING_SLOW = 2;           // times slower than his
+    const M_WING_FEATHER = 0.72;     // feathers this much of his length, to fit the corner
+    const M_WING_RISE = 48 * Math.PI / 180;   // how far above level the spines point, out of the plate's middle
+    const M_WING_SPAN = 42;
+
+    const M_HERALDS = {
+        // FARM: a windmill behind the barn, a dark tapering tower like the
+        // CITY's, a head for its window, and four of him for sails
+        1: {
+            behind(c, st) {
+                const tx = c.x + c.w * 0.24, hubY = menuTopOf(c) - 44, foot = menuTopOf(c) + 24;
+                ctx.beginPath();
+                ctx.moveTo(tx - 15, foot); ctx.lineTo(tx - 9, hubY + 4); ctx.lineTo(tx + 9, hubY + 4); ctx.lineTo(tx + 15, foot);
+                ctx.closePath();
+                ctx.fillStyle = M_DARK; ctx.fill();
+                ctx.strokeStyle = menuMix(st.ink, M_DARK, 0.55 * (1 - st.rise)); ctx.lineWidth = 1; ctx.stroke();
+                menuPutHead(menuHead(st.rise > 0.5 ? st.ink : menuMix(st.ink, M_DARK, 0.6), 'wash'), tx, hubY + 22, 7);
+            },
+            front(c, st) {
+                const ink = menuAround(st), tx = c.x + c.w * 0.24, hubY = menuTopOf(c) - 44, L = 54;
+                const a0 = menuNow() * (0.2 + 0.8 * st.rise);
+                for (let i = 0; i < 4; i++) {
+                    const a = a0 + i * Math.PI / 2;
+                    menuLay(menuBody(ink, 'wash'), tx + Math.cos(a) * (6 + L / 2), hubY + Math.sin(a) * (6 + L / 2), L, a, false, i % 2);
+                }
+                menuPutHead(menuHead(ink, 'wash'), tx, hubY, 12);
+            }
+        },
+        // RUINS: a henge standing up out of the broken roof, three trilithons of
+        // him, the last one fallen in, its lintel teetering as you line up
+        2: {
+            behind(c, st) {
+                const img = menuBody(menuAround(st), 'wash'), base = menuTopOf(c) + 14, post = 34, th = post / SHAPE_ASPECT, gap = 11;
+                const teeter = 0.05 * Math.sin(menuNow() * 2.2) * st.rise;
+                [[-0.3, false], [0.03, false], [0.33, true]].forEach(([u, fallen]) => {
+                    const cx = c.x + u * c.w;
+                    [-1, 1].forEach(sd => {
+                        const L = fallen && sd > 0 ? post * 0.7 : post;
+                        menuLay(img, cx + sd * gap, base - L / 2, L, fallen && sd > 0 ? 0.12 : 0, true);
+                    });
+                    const span = gap * 2 + th + 6;
+                    if (fallen) menuLay(img, cx - 1, base - post * 0.8, span, 0.42 + teeter, false);
+                    else menuLay(img, cx, base - post - th * 0.35, span, 0, false);
+                });
+            }
+        },
+        // CITY: three towers behind its skyline, dark like the buildings, their
+        // windows heads. Lined up with, the windows light a floor at a time from
+        // the bottom; the tallest has one of him stood on it for a mast.
+        3: {
+            behind(c, st) {
+                const x0 = c.x - c.w / 2, base = c.y - c.h / 2 + 4;
+                [[0.15, 24, 50], [0.45, 30, 88], [0.85, 24, 64]].forEach(([u, w, h], ti) => {
+                    const tx = x0 + u * c.w, top = base - h;
+                    ctx.beginPath(); ctx.rect(tx - w / 2, top, w, h);
+                    ctx.fillStyle = M_DARK; ctx.fill();
+                    ctx.strokeStyle = menuMix(st.ink, M_DARK, 0.55 * (1 - st.rise)); ctx.lineWidth = 1; ctx.stroke();
+                    const cols = Math.floor(w / 9), rows = Math.floor((h - 6) / 12);
+                    for (let r = 0; r < rows; r++) {
+                        const ink = (r + 1) / rows <= st.rise ? st.ink : menuMix(st.ink, M_DARK, 0.6);
+                        for (let q = 0; q < cols; q++) menuPutHead(menuHead(ink, 'wash'), tx - (cols - 1) * 4.5 + q * 9, base - 10 - r * 12, 6);
+                    }
+                    if (ti === 1) menuLay(menuBody(menuAround(st), 'wash'), tx, top - 11, 22, 0, true);
+                });
+            }
+        },
+        // VOLCANO: a plume of him out of the vent, hot at the bottom, cooling as it rises
+        4: {
+            front(c, st) {
+                const T = menuNow(), vx = c.x, vy = menuTopOf(c) + 5, rate = 0.08 + 0.14 * st.rise, N = 8;
+                const inks = [menuMix(st.ink, '#f2c14e', 0.5), st.ink, menuMix(st.ink, M_SLATE, 0.55)];
+                for (let k = 0; k < N; k++) {
+                    const p = (T * rate + k / N) % 1;
+                    menuAlpha(Math.min(1, p * 5) * (1 - p) * (0.55 + 0.45 * st.rise));
+                    menuLay(menuBody(inks[Math.min(2, Math.floor(p * 3))], 'wash'),
+                            vx + Math.sin(p * 3 + k) * 8 * p + (menuHash(k) - 0.5) * 16 * p, vy - p * 85,
+                            10 + 20 * p, menuHash(k) * 6 + p * 2 * (k % 2 ? 1 : -1), k % 2);
+                }
+                menuAlpha(1);
+            }
+        },
+        // CASTLE: a pennant flying off each end of the crown
+        5: {
+            front(c, st) {
+                const x = c.x - c.w / 2, w = c.w, top = c.y - c.h / 2 - ROOF_H, bw = w / 9, ink = menuAround(st), T = menuNow();
+                [x + w * 0.06 + bw / 2, x + w * 0.06 + 4 * bw * 1.75 + bw / 2].forEach((px, i) => {
+                    const side = i ? 1 : -1, py = top + 6, tip = Math.max(3, py - 18);
+                    ctx.strokeStyle = ink; ctx.lineWidth = 1.5;
+                    ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px, tip); ctx.stroke();
+                    const wave = (0.06 + 0.08 * st.rise) * Math.sin(T * (1.2 + 2 * st.rise) + i);
+                    const a = side > 0 ? 0.1 + wave : Math.PI - 0.1 - wave;
+                    menuLay(menuBody(ink, 'wash'), px + Math.cos(a) * 18, tip + 5 + Math.sin(a) * 18, 36, a, false, side < 0);
+                });
+            }
+        },
+        // MEMORIES: a crow circling the sign itself, behind it on the far side
+        // of its round and in front on the near
+        memories: {
+            behind(c, st) { menuCrow(c, st, false); },
+            front(c, st) { menuCrow(c, st, true); }
+        },
+        // LEADERBOARD: a plate across the sign with the Corrupted's wings in gold
+        // spreading out of it as a V, facing out -- a champion's standard
+        board: {
+            plate: c => ({ level: c.level, x: c.x, y: c.y + 4, w: c.w, h: 30 }),
+            behind(c, st) {
+                const beat = M_WING_BEAT_LIT * st.rise, ph = menuNow() / (M_WING_FLAP.period * M_WING_SLOW);
+                for (const tr of [-1, 1]) {
+                    const th = tr > 0 ? -M_WING_RISE : Math.PI + M_WING_RISE;
+                    menuWing(c.x + tr * 8, c.y - 4, th, tr, M_WING_SPAN, beat, ph, st);
+                }
+            }
+        }
+    };
+
+    // built the way Odin's birds are (memory.js): a body and a head, and two
+    // of him to each wing, in a crow's slate edged in MEMORIES' pink
+    function menuCrow(c, st, near) {
+        const T = menuNow(), ph = T * 2 * Math.PI / (M_CROW_ROUND - 1.5 * st.rise), depth = Math.cos(ph);
+        if ((depth >= 0) !== near) return;
+        const R = c.w / 2 + 8, ry = 16;
+        const x = c.x + Math.sin(ph) * R, y = c.y + 4 + depth * ry;
+        const a = Math.atan2(-Math.sin(ph) * ry, Math.cos(ph) * R);
+        const sz = 24 * (0.85 + 0.2 * depth), flap = Math.sin(T * 2 * Math.PI * 1.1);
+        const img = menuBody(M_CROW, 'flat'), edge = menuBody(menuAround(st), 'wash');
+        const A = 0.75 + 0.25 * st.rise;
+        const bone = (bx, by, len, ang, flip) => {
+            menuAlpha(A * 0.8); menuLay(edge, bx, by, len * 1.1, ang, false, flip);
+            menuAlpha(A); menuLay(img, bx, by, len, ang, false, flip);
+        };
+        for (const side of [-1, 1]) {
+            const w1 = a + side * (Math.PI / 2 + 0.3 - 0.45 * flap);
+            const ex = x + Math.cos(w1) * sz * 0.7, ey = y + Math.sin(w1) * sz * 0.7;
+            bone((x + ex) / 2, (y + ey) / 2, sz * 0.75, w1, side > 0);
+            const w2 = w1 + side * (0.4 + 0.35 * flap);
+            bone(ex + Math.cos(w2) * sz * 0.4, ey + Math.sin(w2) * sz * 0.4, sz * 0.85, w2, side < 0);
+        }
+        bone(x, y, sz, a, false);
+        menuAlpha(A);
+        menuPutHead(menuHead(M_CROW, 'flat'), x + Math.cos(a) * sz * 0.58, y + Math.sin(a) * sz * 0.58, sz * 0.32);
+        menuAlpha(1);
+    }
+
+    // lucifer.js's luWing, drawn straight to the field: a spine of four bones
+    // and three rows of feathers flapping down it joint by joint, dark gold at
+    // the shoulder and lighter to the tips, each feather over a gold edge
+    function menuWing(x0, y0, th, tr, span, beat, ph, st) {
+        const deg = d => d * Math.PI / 180, seg = span / 4;
+        const wave = lag => Math.sin(2 * Math.PI * (ph - lag)) * beat;
+        const joints = [];
+        let a = th, x = x0, y = y0;
+        for (let j = 0; j < 4; j++) {
+            a += tr * deg(M_WING_FLAP.swing[j] * wave(j * M_WING_FLAP.lag));
+            joints.push({ x, y, a });
+            x += Math.cos(a) * seg; y += Math.sin(a) * seg;
+        }
+        const at = f => {
+            const s2 = Math.min(span * f, span - 1e-6), jn = Math.min(3, Math.floor(s2 / seg)), jt = joints[jn], u = s2 - jn * seg;
+            return [jt.x + Math.cos(jt.a) * u, jt.y + Math.sin(jt.a) * u, jt.a];
+        };
+        const reach = span * 1.25;
+        const tone = (fx, fy, lift) => menuClamp(0.03 + 0.9 * menuEase((Math.hypot(fx - x0, fy - y0) / reach - 0.2) / 0.75) + lift);
+        const out = [];
+        M_WING_ROWS.forEach((row, ri) => {
+            for (let i = row.n - 1; i >= 0; i--) {
+                const f = i / (row.n - 1), [ax, ay, sa] = at(menuLerp(row.at[0], row.at[1], f));
+                const len = span * menuLerp(row.len[0], row.len[1], f) * M_WING_FEATHER;
+                const fa = sa + tr * deg(menuLerp(row.sweep[0], row.sweep[1], f) + M_WING_FLAP.feather * f * wave(f * 4 * M_WING_FLAP.lag + M_WING_FLAP.featherLag));
+                const fx = ax + Math.cos(fa) * len / 2, fy = ay + Math.sin(fa) * len / 2;
+                out.push({ x: fx, y: fy, a: fa, len, flip: (i + ri) % 2, tone: tone(fx, fy, row.lift) });
+            }
+        });
+        joints.forEach((jt, j) => {
+            const bl = seg * 1.12, off = -tr * bl / SHAPE_ASPECT * 0.3;
+            const mx = jt.x + Math.cos(jt.a) * seg / 2 - Math.sin(jt.a) * off, my = jt.y + Math.sin(jt.a) * seg / 2 + Math.cos(jt.a) * off;
+            out.push({ x: mx, y: my, a: jt.a, len: bl, flip: j % 2, tone: tone(mx, my, 0.2) });
+        });
+        const dim = k => menuMix(k, M_SLATE, 0.45 * (1 - st.rise));
+        const ink = menuBody(dim('#5a4312'), 'flat'), light = menuBody(dim('#ecd27a'), 'flat'), edge = menuBody(dim('#c9a94e'), 'wash');
+        for (const f of out) {
+            menuAlpha(0.6); menuLay(edge, f.x, f.y, f.len * 1.04, f.a, false, f.flip);
+            menuAlpha(1);   menuLay(ink, f.x, f.y, f.len, f.a, false, f.flip);
+            if (f.tone > 0.01) { menuAlpha(f.tone); menuLay(light, f.x, f.y, f.len, f.a, false, f.flip); }
+        }
+        menuAlpha(1);
+    }
+
+    // a sign that is not a level: its heraldry, its shape (or its plate), its words
+    function menuDrawSide(c) {
+        const st = menuState(c), h = M_HERALDS[c.level.key] || {};
+        if (h.behind) h.behind(c, st);
+        menuSilhouette(c, st, h.plate ? h.plate(c) : c);
+        if (h.front) h.front(c, st);
+        menuSideWords(c, st);
+    }
+
+    function menuDrawClean(c) {
+        const st = menuState(c), h = M_HERALDS[c.level.n] || {};
+        if (h.behind) h.behind(c, st);
+        menuSilhouette(c, st);
+        if (h.front) h.front(c, st);
+        menuLevelWords(c, st);
+    }
+
+    // ---- the covers -----------------------------------------------------------------
+    // The five start out hidden under something of their own place -- the FARM
+    // grown over, the RUINS under a rockfall, the CITY fenced off, the VOLCANO
+    // under a lava flow, the CASTLE barricaded -- over the plain dark shape,
+    // with no name, key or best showing. Walk up and touch one and it is
+    // cleared over M_COVER_WIPE, and it stays clear for good: `seen` is saved
+    // with the keys and the paddles, and forgotten with them. Lined up with,
+    // a cover stirs. Each cover takes k, 0 covered to 1 cleared.
+    const M_COVER_WIPE = 1;          // seconds a cover takes to clear
 
     function menuDust(n) {
         menu.seen[n] = true;
@@ -1114,7 +1594,7 @@
     }
 
     function menuDustStep(dt) {
-        if (menu.dusting && (menu.dusting.t += dt) >= DUST_WIPE) menu.dusting = null;
+        if (menu.dusting && (menu.dusting.t += dt) >= M_COVER_WIPE) menu.dusting = null;
     }
 
     function menuDrawLevel(c) {
@@ -1122,118 +1602,197 @@
         if (l.key) { menuDrawSide(c); return; }
         if (l === MENU_VOID) { menuDrawVoid(c); return; }
         const w = menu.dusting && menu.dusting.n === l.n ? menu.dusting : null;
-        if (menu.seen[l.n] && !w) { menuDrawClean(c, false); return; }
-        if (!w) { menuDrawDusty(c); return; }
-        // Dissolving: the clean building under it, and the dust only in the
-        // grains whose own moment has not come yet. Each grain's moment is a
-        // hash of where it is, so the pattern holds still from frame to frame.
-        const k = Math.min(1, w.t / DUST_WIPE);
-        const pad = DUST_BLUR * 2 + 2;
-        const x0 = c.x - c.w / 2 - pad, x1 = c.x + c.w / 2 + pad;
-        const y0 = c.y - c.h / 2 - ROOF_H - pad, y1 = c.y + c.h / 2 + pad;
-        menuDrawClean(c, false);
-        ctx.save();
-        ctx.beginPath();
-        for (let gy = y0, j = 0; gy < y1; gy += DUST_CELL, j++) {
-            for (let gx = x0, i = 0; gx < x1; gx += DUST_CELL, i++) {
-                const h = Math.sin(i * 12.9898 + j * 78.233 + c.level.n * 37.719) * 43758.5453;
-                if (h - Math.floor(h) > k) ctx.rect(gx, gy, DUST_CELL, DUST_CELL);
-            }
-        }
-        ctx.clip();
-        menuDrawDusty(c);
-        ctx.restore();
+        if (menu.seen[l.n] && !w) { menuDrawClean(c); return; }
+        const st = Object.assign(menuState(c), { covered: true });
+        if (!w) { menuCovered(c); M_COVERS[l.n](c, st, 0); return; }
+        menuDrawClean(c);
+        M_COVERS[l.n](c, st, Math.min(1, w.t / M_COVER_WIPE));
     }
 
-    function menuDrawDusty(c) {
-        const a0 = ctx.globalAlpha;
-        // eight soft copies round a circle, which is what makes it fuzzy
-        // rather than doubled
-        for (let i = 0; i < 8; i++) {
-            const a = i * Math.PI / 4;
+    // the building under its cover: its shape, dark, a faint rim of its colour
+    function menuCovered(c) {
+        menuOutline(c);
+        ctx.fillStyle = M_DARK; ctx.fill();
+        ctx.strokeStyle = menuMix(c.level.ink, M_DARK, 0.75); ctx.lineWidth = 1; ctx.stroke();
+    }
+    const menuBand = (k, from, to) => menuClamp((k - from) / (to - from));
+
+    // FARM: long grass grown up over it, the roof's peak still above it, some
+    // blades gone to seed and the seed his head. Cleared, it is mown left to right.
+    const M_GRASS = ['#5d7f45', '#7fa85a', '#6f9150', '#9aa35a', '#b3a765'];
+    function menuCoverGrass(c, st, k) {
+        const T = menuNow(), y1 = c.y + c.h / 2 + 3, H = c.h + ROOF_H + 6, x0 = c.x - c.w / 2 - 6, W = c.w + 12;
+        const cut = x0 - 20 + (W + 40) * menuEase(k);
+        ctx.lineCap = 'round';
+        for (let i = 0; i < 110; i++) {
+            const bx = x0 + menuSeeded(c, i) * W, tall = (0.4 + 0.45 * menuSeeded(c, i + 200)) * H;
+            const left = k ? menuClamp((bx - cut) / 30) : 1;   // 0 once mown
+            const h = Math.max(3, tall * left);
+            const sway = Math.sin(T * 1.3 + bx * 0.05) * (3 + 7 * st.rise) * h / 100;
+            const lean = (menuSeeded(c, i + 400) - 0.5) * 14 * h / 100;
+            const tx = bx + lean + sway, ty = y1 - h;
+            ctx.strokeStyle = M_GRASS[Math.floor(menuSeeded(c, i + 600) * M_GRASS.length)];
+            ctx.lineWidth = 2 + menuSeeded(c, i + 800) * 1.6;
+            ctx.beginPath(); ctx.moveTo(bx, y1); ctx.quadraticCurveTo(bx + lean * 0.3, y1 - h * 0.5, tx, ty); ctx.stroke();
+            if (i % 4 === 0 && left > 0.6) menuPutHead(menuHead('#c9b46a', 'wash'), tx, ty - 3, 6);
+        }
+        ctx.lineCap = 'butt';
+    }
+
+    // RUINS: a rockfall heaped over it, the boulders his head in stone,
+    // tumbled every which way. Cleared, it rolls off both sides, the top first.
+    const M_ROCK = ['#8e8674', '#9d9483', '#7d776b', '#a39a86'];
+    function menuRocks(c) {
+        if (c.rocks) return c.rocks;
+        const out = [], y1 = c.y + c.h / 2 + 4, H = c.h + ROOF_H + 4;
+        for (let row = 0, y = y1; y > y1 - H; row++) {
+            const w = 34 - row * 3.2, hh = w * (BALL_RY / BALL_RX);
+            for (let x = c.x - c.w / 2 - 4 + (row % 2) * w * 0.45; x < c.x + c.w / 2 + 6; x += w * 0.82)
+                out.push({ x: x + (menuSeeded(c, out.length) - 0.5) * 6, y: y - hh * 0.4, w: w * (0.85 + 0.3 * menuSeeded(c, out.length + 50)),
+                           rot: (menuSeeded(c, out.length + 90) - 0.5) * 2.4, tone: M_ROCK[Math.floor(menuSeeded(c, out.length + 130) * 4)] });
+            y -= hh * 0.62;
+        }
+        return (c.rocks = out);
+    }
+    function menuCoverBoulders(c, st, k) {
+        const y1 = c.y + c.h / 2, H = c.h + ROOF_H, ar = BALL_RY / BALL_RX;
+        const rim = menuHead('#3f3a33', 'flat');
+        for (const r of menuRocks(c)) {
+            const kk = k ? menuBand(k, 0.45 * (1 - (y1 - r.y) / H), 1) : 0;   // the top of the heap goes first
+            const dir = r.x < c.x ? -1 : 1, img = menuHead(r.tone, 'rock');
             ctx.save();
-            ctx.globalAlpha = a0 * 0.2;
-            ctx.translate(Math.cos(a) * DUST_BLUR, Math.sin(a) * DUST_BLUR);
-            menuDrawClean(c, true);
+            menuAlpha(1 - kk * kk);
+            ctx.translate(r.x + dir * kk * 90, r.y + kk * kk * 60 - Math.sin(kk * Math.PI) * 14);
+            ctx.rotate(r.rot + dir * kk * 4);
+            // a darker rim under each, so the heap reads as separate stones
+            if (rim) ctx.drawImage(rim, -r.w / 2 - 1.5, -r.w * ar / 2 - 1.5, r.w + 3, r.w * ar + 3);
+            if (img) ctx.drawImage(img, -r.w / 2, -r.w * ar / 2, r.w, r.w * ar);
             ctx.restore();
         }
-        // a film over it and the flecks, the same ones every frame, both cut
-        // to the building's outline
-        const x = c.x - c.w / 2, y = c.y - c.h / 2;
+        menuAlpha(1);
+    }
+
+    // CITY: closed off. Hazard tape crossed over it, striped barriers along the
+    // front with a lamp on each, and a cone at each corner -- the tape and the
+    // planks him lying down in hazard colours, the cones him stood up.
+    // Cleared, it all drops away.
+    const M_HAZARD = ['#e0702f', '#efe9dd'];
+    function menuCoverBarriers(c, st, k) {
+        const T = menuNow(), x0 = c.x - c.w / 2, y0 = c.y - c.h / 2 - ROOF_H + 6, y1 = c.y + c.h / 2;
         ctx.save();
-        ctx.beginPath();
-        ctx.roundRect(x, y, c.w, c.h, 8);
-        menuCapPath(c);
-        ctx.clip();
-        ctx.globalAlpha = a0 * 0.22;
-        ctx.fillStyle = '#8a8378';
-        ctx.fillRect(x, y - ROOF_H, c.w, c.h + ROOF_H);
-        ctx.globalAlpha = a0 * 0.45;
-        ctx.fillStyle = '#a39c90';
-        let seed = c.level.n * 9301 + 49297;
-        const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
-        for (let i = 0; i < DUST_SPECKS; i++) {
-            const s = 1 + rnd() * 2;
-            ctx.fillRect(x + rnd() * c.w, y - ROOF_H + rnd() * (c.h + ROOF_H), s, s);
+        menuAlpha(1 - k);
+        ctx.translate(0, k * k * 90);
+        for (const [ax, ay, bx, by] of [[x0 - 4, y0, x0 + c.w + 4, y1 - 22], [x0 + c.w + 4, y0 + 10, x0 - 4, y1 - 30]]) {
+            const n = 12, len = Math.hypot(bx - ax, by - ay) / n, a = Math.atan2(by - ay, bx - ax);
+            for (let i = 0; i < n; i++) {
+                const f = (i + 0.5) / n, sag = Math.sin(f * Math.PI) * (6 + 3 * Math.sin(T * 1.6 + ax) * (0.3 + st.rise));
+                menuLay(menuBody(i % 2 ? '#e8c547' : '#efe9dd', 'wash'), ax + (bx - ax) * f, ay + (by - ay) * f + sag, len * 1.05, a, false, i % 2);
+            }
+        }
+        for (let b = 0; b < 3; b++) {
+            const bx = x0 + c.w * (b + 0.5) / 3, py = y1 - 16, pw = c.w / 3 - 6;
+            ctx.strokeStyle = '#6d6a64'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(bx - pw * 0.35, py); ctx.lineTo(bx - pw * 0.45, y1 + 4); ctx.moveTo(bx + pw * 0.35, py); ctx.lineTo(bx + pw * 0.45, y1 + 4); ctx.stroke();
+            for (let s = 0; s < 3; s++) menuLay(menuBody(M_HAZARD[(s + b) % 2], 'wash'), bx - pw / 3 + s * pw / 3, py, pw / 3 + 1, 0, false, s % 2);
+            menuAlpha((1 - k) * (0.45 + 0.35 * Math.sin(T * 2 * Math.PI / 1.4 + b)));   // a slow swell, not a blink
+            menuPutHead(menuHead('#ffb347', 'flat'), bx, py - 9, 5);
+            menuAlpha(1 - k);
+        }
+        for (const cx of [x0 - 2, x0 + c.w + 2]) {
+            menuLay(menuBody(M_HAZARD[0], 'wash'), cx, y1 - 9, 22, 0, true);
+            ctx.save(); ctx.beginPath(); ctx.rect(cx - 8, y1 - 13, 16, 4); ctx.clip();
+            menuLay(menuBody(M_HAZARD[1], 'flat'), cx, y1 - 9, 22, 0, true); ctx.restore();
         }
         ctx.restore();
-        ctx.globalAlpha = a0;
+        menuAlpha(1);
     }
 
-    function menuDrawClean(c, dusty) {
-        const l = c.level;
-        const shut = l.n === 5 && !menuOpened();
-        const x = c.x - c.w / 2, y = c.y - c.h / 2;
-        // lit while he is standing in its lane, walking or not, so a walk is
-        // aimed before it is started
-        const aimed = menuAimed(c);
-        const ink = dusty ? DUST_INK : shut ? '#4a453d' : l.ink;
-        menuCap(c, aimed ? ink : shut ? '#241f1b' : '#2e2a24');
-        menuPanel(x, y, c.w, c.h, aimed, ink);
-        // stood in the doorway: the level fills up under him, and going in is
-        // what happens when it is full
-        if (menu.into && menu.into.card === c) {
-            const k = Math.min(1, menu.into.t / DOOR_HOLD);
-            ctx.globalAlpha = 0.5;
-            ctx.fillStyle = ink;
-            ctx.fillRect(x + 1, y + c.h * (1 - k) - 1, c.w - 2, c.h * k);
-            ctx.globalAlpha = 1;
+    // VOLCANO: a lava flow out of its vent and down over it, pooling along the
+    // front; bright ones of him carried down in it quickly, crust drifting
+    // slower. Cleared, it cools to crust and falls away.
+    function menuCoverLava(c, st, k) {
+        const T = menuNow() * (1 + 0.6 * st.rise), vx = c.x, vy = c.y - c.h / 2 - ROOF_H + 5, y1 = c.y + c.h / 2 + 4;
+        const cool = menuBand(k, 0, 0.5), fall = menuBand(k, 0.4, 1);
+        const hot = menuMix('#d2622f', '#6b5a50', cool), core = menuMix('#ffb347', '#8a7a70', cool);
+        ctx.save();
+        menuAlpha(1 - fall);
+        ctx.translate(0, fall * fall * 40);
+        const streams = [-0.5, 0, 0.55].map(d => y => vx + d * (y - vy) * 0.55 + Math.sin(y * 0.08 + d * 3) * 3);
+        const path = new Path2D();
+        for (const sx of streams) {
+            for (let y = vy; y <= y1; y += 6) { const w = 4 + (y - vy) * 0.12; y === vy ? path.moveTo(sx(y) - w, y) : path.lineTo(sx(y) - w, y); }
+            for (let y = y1; y >= vy; y -= 6) { const w = 4 + (y - vy) * 0.12; path.lineTo(sx(y) + w, y); }
+            path.closePath();
         }
-        // Its name and what it has given you, and no number on it: the town is
-        // walked in whatever order you like, so numbering the buildings only
-        // suggested an order that is not there. Laid out in shares of the card
-        // rather than in pixels, since the five are not the same size.
-        const lit = dusty ? DUST_INK : menu.keys[l.n] ? ink : shut ? '#4a453d' : '#8d877d';
-        const big = l.n === 5;
-        text(l.name, c.x, y + c.h * 0.4, big ? 19 : 20, lit, 'center');
-        // the last one keeps the four slots on it: what it is waiting for is the
-        // only thing about it worth saying
-        // ...and under it your best there, once there is one, which lifts
-        // the key a little to make room
-        const keyInk = o => dusty ? DUST_INK : o.ink;
-        const got = !dusty && menu.best[l.n] > 0;
-        const ky = y + c.h * (got ? (big ? 0.66 : 0.63) : 0.72);
-        if (big) MENU_LEVELS.forEach((o, i) => menuKey(c.x - 42 + i * 28, ky, 8, !!menu.keys[o.n], keyInk(o)));
-        else menuKey(c.x, ky, 12, !!menu.keys[l.n], keyInk(l));
-        if (got) text('BEST ' + menu.best[l.n], c.x, y + c.h * 0.9, 11, aimed ? '#f2efe9' : '#8d877d', 'center');
+        // the pool, wound the same way round as the streams, or where they cross it would cut holes in it
+        path.moveTo(c.x + c.w / 2 + 6, y1); path.bezierCurveTo(c.x + c.w / 2, y1 - 44, c.x - c.w / 2, y1 - 40, c.x - c.w / 2 - 6, y1); path.closePath();
+        ctx.fillStyle = hot; ctx.fill(path);
+        ctx.save(); ctx.clip(path);
+        const g = ctx.createLinearGradient(0, vy, 0, y1);
+        g.addColorStop(0, core); g.addColorStop(1, hot);
+        menuAlpha((1 - fall) * 0.6); ctx.fillStyle = g; ctx.fillRect(c.x - c.w, vy, c.w * 2, y1 - vy);
+        for (let i = 0; i < 14; i++) {
+            const crust = i % 3 === 0, sx = streams[i % 3], p = (T * (crust ? 0.06 : 0.14) + menuSeeded(c, i)) % 1, y = vy + p * (y1 - vy);
+            menuAlpha((1 - fall) * (crust ? 0.85 : 0.5 + 0.3 * (1 - cool)));
+            menuLay(menuBody(crust ? menuMix('#5a3326', '#6b6258', cool) : core, crust ? 'wash' : 'flat'),
+                    sx(y) + (menuSeeded(c, i + 30) - 0.5) * 10, y, crust ? 16 : 11, menuSeeded(c, i + 60) * 6, false, i % 2);
+        }
+        ctx.restore();
+        ctx.restore();
+        menuAlpha(1);
     }
+
+    // CASTLE: barricaded. Boards nailed across its face, a great cross of him
+    // over them with a head for every nail, stakes along the front. Cleared,
+    // the cross comes down first, then the stakes and the boards.
+    const M_WOOD = ['#7a5a3a', '#8b6a45', '#6b4c30'];
+    function menuCoverBarricade(c, st, k) {
+        const T = menuNow(), x0 = c.x - c.w / 2, y0 = c.y - c.h / 2, y1 = c.y + c.h / 2;
+        const creak = 0.015 * Math.sin(T * 1.7) * st.rise;
+        [[y0 + 22, -0.05], [c.y + 4, 0.04], [y1 - 22, -0.03]].forEach(([by, a], i) => {
+            const kk = menuBand(k, 0.55 + i * 0.1, 1);
+            ctx.save();
+            menuAlpha(1 - kk);
+            ctx.translate(c.x, by + kk * kk * 80); ctx.rotate(a + creak + kk * 0.6 * (i % 2 ? 1 : -1));
+            ctx.fillStyle = M_WOOD[(i + 1) % 3]; ctx.fillRect(-c.w / 2 - 6, -7, c.w + 12, 14);
+            ctx.strokeStyle = '#4a3522'; ctx.lineWidth = 1; ctx.strokeRect(-c.w / 2 - 6, -7, c.w + 12, 14);
+            ctx.beginPath(); ctx.moveTo(-c.w / 2, -1); ctx.lineTo(c.w / 2, 1); ctx.stroke();
+            ctx.restore();
+        });
+        [[c.x, c.y + 4, 118, 0.62], [c.x, c.y + 4, 118, -0.62]].forEach(([bx, by, len, a], i) => {
+            const kk = menuBand(k, i * 0.12, i * 0.12 + 0.5);
+            menuAlpha(1 - kk * kk);
+            menuLay(menuBody(M_WOOD[i % 3], 'wash'), bx + kk * 20 * (i % 2 ? 1 : -1), by + kk * kk * 90, len, a + creak + kk * (i % 2 ? 1.2 : -1.2), false, i % 2);
+            if (kk < 0.1) menuPutHead(menuHead('#8d877d', 'flat'), bx, by, 5);
+        });
+        for (let s = 0; s < 7; s++) {
+            const kk = menuBand(k, 0.5, 1), sx = x0 + c.w * (s + 0.5) / 7;
+            menuAlpha(1 - kk);
+            menuLay(menuBody(M_WOOD[(s + 1) % 3], 'wash'), sx, y1 - 10 + kk * 30, 30, (s % 2 ? 0.5 : -0.5), true, s % 2);
+        }
+        menuAlpha(1);
+    }
+
+    const M_COVERS = { 1: menuCoverGrass, 2: menuCoverBoulders, 3: menuCoverBarriers, 4: menuCoverLava, 5: menuCoverBarricade };
 
     // The VOID is not a building but a hole in the town: an oval of black with
-    // arms of light wound into it and turning, slowly, inward to a still black
-    // eye with its name in it, and a rim that will not hold its shape. Slow on purpose -- it is the one thing in the
-    // town that moves on its own, and it only has to look wrong, not busy.
-    // Nothing in it flashes. Stood in its doorway, the hole fills from the
-    // floor up like any other door.
+    // arms wound into it and turning, slowly, inward to a still black eye with
+    // its name in it, and a rim that will not hold its shape. Each arm is a
+    // chain of him, smaller as it goes in. Slow on purpose -- it only has to
+    // look wrong, not busy. Nothing in it flashes. Stood in its doorway, the
+    // hole fills from the floor up like any other door.
     const VOID_ARMS = 5;
     const VOID_TWIST = 7.5;          // radians an arm winds through, rim to middle
     const VOID_SPIN = 0.9;           // radians a second the arms turn
     const VOID_WOBBLE = 0.07;        // how far the rim strays, as a share of it
     const VOID_WOBBLE_HZ = 0.35;
-    const VOID_EYE = 0.45;           // the still black middle its name is in, as a share of it
+    const VOID_EYE = 0.45;           // how far in the arms reach, as a share of it
+    const VOID_LINK = 15;            // px, one of him at the rim of an arm
+    const VOID_STEP = 0.075;         // an arm's links, as shares of its length
 
     function menuDrawVoid(c) {
         const l = c.level, aimed = menuAimed(c);
-        const t = performance.now() / 1000;
+        const t = menuNow();
         const rx = c.w / 2, ry = c.h / 2;
         // the rim, three lobes drifting round it
         const rim = () => {
@@ -1246,48 +1805,46 @@
             }
             ctx.closePath();
         };
-        const a0 = ctx.globalAlpha;
         ctx.save();
         rim();
         ctx.fillStyle = '#000';
         ctx.fill();
         ctx.clip();
-        ctx.strokeStyle = l.ink;
-        ctx.lineCap = 'round';
+        const img = menuBody(l.ink, 'flat');
+        menuAlpha(aimed ? 0.8 : 0.4);
         for (let i = 0; i < VOID_ARMS; i++) {
-            ctx.beginPath();
-            for (let s = 0; s <= 1.001; s += 0.04) {
+            for (let s = 0; s < 1; s += VOID_STEP) {
                 const a = -t * VOID_SPIN + i * Math.PI * 2 / VOID_ARMS + s * VOID_TWIST;
                 const r = 1.1 - s * (1.1 - VOID_EYE);
                 const x = c.x + Math.cos(a) * rx * r, y = c.y + Math.sin(a) * ry * r;
-                if (s) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+                menuLay(img, x, y, VOID_LINK * r, Math.atan2(Math.cos(a) * ry, -Math.sin(a) * rx) + Math.PI, false);
             }
-            ctx.globalAlpha = a0 * (aimed ? 0.55 : 0.25);
-            ctx.lineWidth = 2.2;
-            ctx.stroke();
         }
-        if (menu.into && menu.into.card === c) {
-            const k = Math.min(1, menu.into.t / DOOR_HOLD);
-            ctx.globalAlpha = a0 * 0.5;
+        const k = menuDoorK(c);
+        if (k) {
+            menuAlpha(0.5);
             ctx.fillStyle = l.ink;
             ctx.fillRect(c.x - rx * 1.2, c.y + ry * 1.2 - c.h * 1.2 * k, rx * 2.4, c.h * 1.2 * k);
         }
         ctx.restore();
-        ctx.globalAlpha = a0 * (aimed ? 1 : 0.45);
+        menuAlpha(aimed ? 1 : 0.5);
         rim();
         ctx.strokeStyle = l.ink;
         ctx.lineWidth = aimed ? 2 : 1.5;
         ctx.stroke();
-        ctx.globalAlpha = a0;
+        menuAlpha(1);
+        // the still black eye its name is in
+        ctx.beginPath(); ctx.ellipse(c.x, c.y + 3, rx * 0.56, ry * 0.5, 0, 0, Math.PI * 2); ctx.fillStyle = '#000'; ctx.fill();
         text(l.name, c.x, c.y + 6, 17, aimed ? '#f2efe9' : '#8d877d', 'center');
         if (menu.best[l.n] > 0) text('BEST ' + menu.best[l.n], c.x, c.y + 21, 10, aimed ? '#f2efe9' : '#8d877d', 'center');
     }
 
     // A gate on each wall, standing where he stands, naming the paddle it leads
-    // to. The name is stacked a letter at a time: a 24px post is too narrow to
-    // write across and turning the canvas to write up it is more machinery than
-    // six letters are worth. With only the one paddle there is nowhere for a
-    // gate to lead, so there are no gates until a second is won.
+    // to: a dark post with a rim in that paddle's colour and three of him
+    // fanned over it. The name is stacked a letter at a time: a 24px post is
+    // too narrow to write across and turning the canvas to write up it is more
+    // machinery than six letters are worth. With only the one paddle there is
+    // nowhere for a gate to lead, so there are no gates until a second is won.
     const M_GATE = { w: 24, y: 470, h: 118 };
     function menuDrawGate(side) {
         const x = side < 0 ? 0 : LW - M_GATE.w;
@@ -1296,27 +1853,30 @@
         if (!p) return;
         const on = menu.side === side && !menu.sw && menu.lift <= 1 && !!p;
         const ink = (p && (p.ink || p.rim)) || '#4a453d';
-        ctx.fillStyle = 'rgba(0,0,0,0.86)';
+        ctx.fillStyle = M_DARK;
         ctx.fillRect(x, M_GATE.y, M_GATE.w, M_GATE.h);
         // the lean, filling the post from the floor up
         const k = on ? Math.min(1, menu.hold / SWAP_HOLD) : 0;
         if (k > 0) {
-            ctx.globalAlpha = 0.45;
+            menuAlpha(0.45);
             ctx.fillStyle = ink;
             ctx.fillRect(x, M_GATE.y + M_GATE.h * (1 - k), M_GATE.w, M_GATE.h * k);
-            ctx.globalAlpha = 1;
+            menuAlpha(1);
         }
-        ctx.strokeStyle = on ? ink : '#2e2a24';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x + 0.5, M_GATE.y + 0.5, M_GATE.w - 1, M_GATE.h - 1);
+        ctx.strokeStyle = on ? ink : menuMix(ink, M_DARK, 0.6);
+        ctx.lineWidth = on ? 2 : 1;
+        ctx.strokeRect(x + 1, M_GATE.y + 1, M_GATE.w - 2, M_GATE.h - 2);
+        for (let i = -1; i <= 1; i++) {
+            menuLay(menuBody(on ? ink : menuMix(ink, M_SLATE, 0.5), 'wash'), x + M_GATE.w / 2 + i * 7, M_GATE.y - 9, 15, -Math.PI / 2 + i * 0.45, false);
+        }
         text(side < 0 ? '◀' : '▶', x + M_GATE.w / 2, M_GATE.y + 16, 12,
-             on ? '#f2efe9' : '#6d685f', 'center');
+             on ? '#f2efe9' : '#8d877d', 'center');
         // a space is a gap down the post, the height of half a letter, so a
         // name of two words still reads as two
         let y = M_GATE.y + 34;
         for (const ch of p.name) {
             if (ch === ' ') { y += 6; continue; }
-            text(ch, x + M_GATE.w / 2, y, 10, on ? '#f2efe9' : '#6d685f', 'center');
+            text(ch, x + M_GATE.w / 2, y, 10, on ? '#f2efe9' : '#8d877d', 'center');
             y += 11;
         }
     }
