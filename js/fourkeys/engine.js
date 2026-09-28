@@ -520,6 +520,7 @@
     // lifts over SHADE_SECS and leaves him in colour for the serve. Lucifer's
     // later parts are the same fight, not a new entrance, so they never get it.
     const SHADE_SECS = 1.4;
+    const SHADE_IN = 1.2;       // seconds the hall light takes to come up, from the entrance's start
     const CONTINUE_KEEP = 0.5;  // what survives of your score when you re-up
     // The clock is on the OFFER, not on the ceremony. Ten seconds to decide
     // whether to spend another quarter, and if you let it run out the run is
@@ -4370,9 +4371,9 @@
     // the field under him when he is drawn, so what is on it is him: laid
     // flat in ink over only what is there, his edge laid under it, and the
     // court memory's hall light under everything, in the colour of the level
-    // he is fought in (the town draws each level in it). Lucifer keeps the
-    // edge alone, in the court's ember. It all lifts the way Lucifer's
-    // silhouette does as he changes, eased, all of him at once.
+    // he is fought in (the town draws each level in it). Lucifer's is the
+    // court's own ember, the memory exactly: it is his hall. It all lifts the
+    // way Lucifer's silhouette does as he changes, eased, all of him at once.
     function drawShade(gone) {
         const who = (LEVELS[stage] && LEVELS[stage].who) || LAB.boss;
         const ink = who === 'lucifer' ? null : menuInkOf(who);
@@ -4390,14 +4391,14 @@
         for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
             ctx.drawImage(memCanvas, dx * MC_RIM_PX, dy * MC_RIM_PX, LW, LH);
         }
-        if (ink) {
-            const gr = ctx.createRadialGradient(LW / 2, 220, 20, LW / 2, 260, 560);
-            gr.addColorStop(0, menuMix(ink, '#000000', 0.35) + 'bf');
-            gr.addColorStop(0.5, menuMix(ink, '#000000', 0.7) + '73');
-            gr.addColorStop(1, 'rgba(0,0,0,0)');
-            ctx.fillStyle = gr;
-            ctx.fillRect(0, 0, LW, LH);
-        }
+        const up = phase === 'entrance' ? Math.min(1, enterT / SHADE_IN) : 1;
+        ctx.globalAlpha *= up * up * (3 - 2 * up);
+        const gr = ctx.createRadialGradient(LW / 2, 220, 20, LW / 2, 260, 560);
+        gr.addColorStop(0, ink ? menuMix(ink, '#000000', 0.35) + 'bf' : 'rgba(150,72,40,0.75)');
+        gr.addColorStop(0.5, ink ? menuMix(ink, '#000000', 0.7) + '73' : 'rgba(70,28,18,0.45)');
+        gr.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = gr;
+        ctx.fillRect(0, 0, LW, LH);
         ctx.restore();
     }
 
