@@ -1062,26 +1062,57 @@
     function clearBest() { best = 0; }
 
     // ---- the leaderboard -----------------------------------------------------
-    // One shared table for everyone, held by a small Cloudflare Worker (its
-    // source is _worker/brandon-leaderboard-worker.js). Everything
-    // here fails soft: if the board is unreachable the game plays exactly as it
-    // did before, just without a table. It is never awaited on a hot path.
+    // A shared table for every stage, and TOTAL, held by a small Cloudflare
+    // Worker of brandon2's own (its source is
+    // _worker/brandon2-leaderboard-worker.js). Each stage's table works the way
+    // brandon.html's one does; TOTAL is worked out by the worker from everyone's
+    // best on each stage it counts. Everything here fails soft: if the board is
+    // unreachable the game plays exactly as it did before, just without a
+    // table. It is never awaited on a hot path.
     // Paste the deployed worker's URL here to switch the board on. While it is
     // empty the game behaves exactly as it did before one existed: no table, no
     // initials prompt, no network calls at all.
     //
-    const BOARD_URL = '';
+    const BOARD_URL = 'https://brandon2-board.pbrinnel.workers.dev/';
     const BOARD_ON = !!BOARD_URL;
     const TOP_N = 10;
+    // The worker's name for each of the town's stages (menu.js's `n`, and
+    // M_RUSH). They are the save file's tokens and pinned like them: the
+    // worker has the same list, and renaming one orphans its table.
+    const BOARD_IDS = { 1: 'FARM', 2: 'RUINS', 3: 'CITY', 4: 'VOLCANO', 5: 'CASTLE', 6: 'VOID',
+                        rush: 'BOSS RUSH' };
+    const BOARD_TOTAL = 'TOTAL';
+    // the initials you last put in, so the next entry is one press
+    const BOARD_INI_KEY = 'brandon2.initials';
+    let boards = {}, boardId = null;
+    // the town's, once the table after an entry has been read (boardAsk)
+    let boardThen = null, boardWas = null, boardScore = 0;
 
-    // rows come back from a public endpoint, so treat them as untrusted text
-    function cleanRows(raw) {
+    // rows come back from a public endpoint, so treat them as untrusted text.
+    // TOTAL adds up every stage it counts, so it can run past one run's cap.
+    function cleanRows(raw, cap) {
         if (!Array.isArray(raw)) return [];
         return raw.map(r => ({
             ini: String((r && r.ini) || '???').toUpperCase()
                      .replace(/[^A-Z]/g, '').slice(0, 3).padEnd(3, '?'),
-            score: Math.max(0, Math.min(9999999, parseInt(r && r.score, 10) || 0))
+            score: Math.max(0, Math.min(cap || SCORE_CAP, parseInt(r && r.score, 10) || 0))
         })).sort((a, b) => b.score - a.score).slice(0, TOP_N);
+    }
+
+    function takeBoards(raw) {
+        boards = {};
+        for (const id of Object.values(BOARD_IDS)) boards[id] = cleanRows(raw && raw.boards && raw.boards[id]);
+        boards[BOARD_TOTAL] = cleanRows(raw && raw.total, SCORE_CAP * Object.keys(BOARD_IDS).length);
+        board = boards[boardId] || [];
+        boardLive = true;
+    }
+
+    // which table `board` is: a stage's `n`, or BOARD_TOTAL
+    function boardPick(n) {
+        const id = n === BOARD_TOTAL ? n : BOARD_IDS[n] || null;
+        if (id !== boardId) entryRank = -1;     // your row is lit on its own table only
+        boardId = id;
+        board = boards[boardId] || [];
     }
 
     async function fetchBoard() {
@@ -1089,22 +1120,21 @@
         try {
             const res = await fetch(BOARD_URL, { cache: 'no-store' });
             if (!res.ok) throw new Error(res.status);
-            board = cleanRows(await res.json());
-            boardLive = true;
+            takeBoards(await res.json());
         } catch (e) { boardLive = false; }
     }
 
     async function submitScore(ini, n) {
-        if (!BOARD_URL) return;
+        if (!BOARD_URL || !boardId || boardId === BOARD_TOTAL) return;
         try {
             const res = await fetch(BOARD_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ini, score: n })
+                body: JSON.stringify({ stage: boardId, ini, score: n })
             });
             if (!res.ok) throw new Error(res.status);
-            board = cleanRows(await res.json());
-            boardLive = true;
+            takeBoards(await res.json());
+            try { localStorage.setItem(BOARD_INI_KEY, ini); } catch (e) { /* private window */ }
         } catch (e) { boardLive = false; }
         entryRank = board.findIndex(r => r.ini === ini && r.score === n);
     }
@@ -1113,8 +1143,34 @@
     // worst means someone types three letters and does not appear -- the server
     // is the one that actually sorts.
     function qualifies(n) {
-        if (!boardLive || n <= 0) return false;
+        if (!boardLive || n <= 0 || !boardId) return false;
         return board.length < TOP_N || n > board[board.length - 1].score;
+    }
+
+    // The town's way onto the board, once a run is over and everything it
+    // earned has been shown: the initials for `points` on stage n's table,
+    // then the table, and a press on that runs `then`. The phase it
+    // interrupted comes back with it. The run's score is kept apart, since
+    // the town has its own by now.
+    function boardAsk(n, points, then) {
+        boardPick(n);
+        boardScore = points;
+        let ini = '';
+        try { ini = localStorage.getItem(BOARD_INI_KEY) || ''; } catch (e) { /* private window */ }
+        entry = /^[A-Z]{3}$/.test(ini) ? ini : '';
+        entryRank = -1;
+        boardThen = then;
+        boardWas = phase;
+        freeMouse();
+        showCursor(true);
+        phase = 'initials';
+    }
+    function boardLeave() {
+        const then = boardThen;
+        boardThen = null;
+        showCursor(false);
+        phase = boardWas;
+        then();
     }
 
     // ---- the ball's real, non-round shape -----------------------------------
@@ -2131,7 +2187,7 @@
         else if (k === 'OK') {
             if (entry.length !== 3) return;
             sending = true;
-            submitScore(entry, score).then(() => {
+            submitScore(entry, boardThen ? boardScore : score).then(() => {
                 sending = false;
                 showCursor(false);
                 phase = 'scores';
@@ -2160,6 +2216,7 @@
     }
 
     function action() {
+        if (phase === 'scores' && boardThen) { boardLeave(); return; }     // the town's table, before the town
         if (menuUp() || menuUnlockUp()) return;     // the VOID's memory takes the tap too
         if (!debugEl.hidden) return;              // ignore taps behind the menu
         // the gauntlet: a tap is a thrown head, and nothing else. the ceremony
@@ -4716,7 +4773,7 @@
         // title baseline to the foot of the tenth row is 10.5 pitches
         const pitch = Math.min(BOARD_PITCH * Math.min(hudU, 1.25), (bottom - top) / 10.5);
         const size = pitch * 0.76, k = size / 16;
-        text('HIGH SCORES', LW / 2, top, pitch * 0.62, '#6d685f', 'center');
+        text((boardId ? boardId + ' ' : '') + 'HIGH SCORES', LW / 2, top, pitch * 0.62, '#6d685f', 'center');
         if (!boardLive) {
             text('leaderboard unreachable', LW / 2, top + pitch * 1.43, pitch * 0.67, '#4a453e', 'center');
             return;
@@ -4835,7 +4892,7 @@
         ctx.fillRect(0, 0, LW, LH);
 
         text('NEW HIGH SCORE', LW / 2, 150, 34 * u, '#c9a94e', 'center');
-        text('score ' + score, LW / 2, 182, 15 * u, '#9a958c', 'center');
+        text((boardId ? boardId + ' · ' : '') + 'score ' + (boardThen ? boardScore : score), LW / 2, 182, 15 * u, '#9a958c', 'center');
 
         // the three slots
         for (let i = 0; i < 3; i++) {
@@ -5515,7 +5572,7 @@
             ctx.fillRect(0, 0, LW, LH);
             // down to just above the line under it
             drawBoard(120, 520 - 15 * u - 16, u);
-            text('click/tap to play again', LW / 2, 520, 15 * u, '#9a958c', 'center');
+            text(boardThen ? 'click/tap to go on' : 'click/tap to play again', LW / 2, 520, 15 * u, '#9a958c', 'center');
             return;
         }
 

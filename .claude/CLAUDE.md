@@ -34,9 +34,20 @@ The sequel, under a codename. `brandon.html` is the released game and sequel wor
 touches it.
 
 - **Unlisted, like brandon.html**: `noindex, nofollow`, not linked from anywhere, and no
-  `og:`/`twitter:` tags at all, so a pasted link shows nothing. Its `BOARD_URL` is empty
-  and its bests are its own, one per level, kept with the town's progress (`menuBestIs`
-  in `menu.js`) — nothing it does can reach brandon's live leaderboard or best.
+  `og:`/`twitter:` tags at all, so a pasted link shows nothing. Its bests are its own,
+  one per level, kept with the town's progress (`menuBestIs` in `menu.js`).
+- **Its leaderboards are live and public, and separate from brandon's.** `BOARD_URL` in
+  `engine.js` points at the `brandon2-board` worker (source in
+  `_worker/brandon2-leaderboard-worker.js`, its own KV namespace `brandon2-board`): a table
+  per stage plus TOTAL. Anything long-lived is named `brandon2`, the name it launches
+  under. Any test that gets past the initials screen posts a real row, and one also
+  counts toward TOTAL, so stub `window.fetch` for `workers.dev` first, exactly as for
+  brandon.html. Only Paul can remove rows, in the Cloudflare dashboard (KV →
+  `brandon2-board` → keys `view` and `bests`; a row gone from `view` still counts in TOTAL
+  until it is gone from `bests` too).
+- The worker's stage list (`STAGES`, `IN_TOTAL`) must stay in step with `BOARD_IDS` in
+  `engine.js`, and its caps with `TOP_N` and `SCORE_CAP`. A new stage means editing
+  the worker and redeploying it in the dashboard.
 - Its code is in `js/fourkeys/`: `engine.js` (brandon.html's game, forked 22 Sep 2026 and
   edited here from now on), `runtime.js` (the seam the bosses plug into), a file per boss,
   mini-boss and paddle, `levels.js` (each level's three screens: a wall, a second

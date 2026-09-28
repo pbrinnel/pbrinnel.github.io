@@ -189,6 +189,50 @@
     // for more of them. BOSS RUSH keeps its own, and it is not one of the six.
     function menuBestLabel() { return menu && menu.run && menu.run.n === M_RUSH ? 'RUSH BEST' : 'STAGE BEST'; }
 
+    // ---- the leaderboards -------------------------------------------------------------
+    // The shared tables are the engine's (its `the leaderboard`); the town says
+    // when they come up. Once a run is over and everything it earned has been
+    // shown, the town asks for your initials if the score makes the stage's
+    // table -- or beats your own best there, because TOTAL adds up everyone's
+    // best on each stage, and a run that only raises yours still counts in it.
+    // The boss lab runs brandon.html's engine, which has none of this, so
+    // everything here asks first.
+    function menuBoardOn() { return typeof boardPick === 'function' && BOARD_ON; }
+
+    // a run has begun: the table it could end on, and the best it has to beat
+    function menuBoardRun() {
+        if (!menuBoardOn()) return;
+        menu.post = null;                // one left from a run the town never got to ask about
+        menu.run.was = best;
+        boardPick(menu.run.n);           // the one the game-over screen shows
+    }
+    // ...and ended, on its way back to the town. It is decided against the
+    // tables as they are once they have been fetched again (menuUpdate waits).
+    function menuBoardPost(run) {
+        if (!menuBoardOn() || !(score > 0)) return;
+        const p = menu.post = { n: run.n, score, was: run.was || 0, ready: false };
+        fetchBoard().then(() => { p.ready = true; });
+    }
+    function menuBoardAsk() {
+        const p = menu.post;
+        menu.post = null;
+        boardPick(p.n);
+        if (qualifies(p.score) || (boardLive && p.score > p.was)) boardAsk(p.n, p.score, () => {});
+    }
+
+    // The LEADERBOARD building: a tab for TOTAL and one for every stage that
+    // is standing in the town, so it names nothing you have not found yet.
+    // The table up is whichever tab he is under; a press on one fetches it
+    // again, and BACK is the way out.
+    function menuBoardTabs() {
+        const tab = (id, label, ink, view) => ({ id, label, ink, view, act: fetchBoard });
+        const side = k => M_SIDES.find(s => s.key === k);
+        return [{ id: 'back', label: 'BACK', ink: M_SAFE, act: menuLeave },
+                tab('total', 'TOTAL', side('board').ink, BOARD_TOTAL)]
+            .concat(MENU_ALL.filter(l => !l.after || menu.keys[l.after]).map(l => tab('s' + l.n, l.name, l.ink, l.n)))
+            .concat(menu.keys[MENU_VOID.n] ? [tab('rush', 'BOSS RUSH', side('rush').ink, M_RUSH)] : []);
+    }
+
     function menuName(n) { if (n === M_RUSH) return 'BOSS RUSH'; const l = MENU_ALL.find(o => o.n === n); return l ? l.name : 'STAGE ' + n; }
 
     // the first boss whose level slider points at this one, if any
@@ -402,7 +446,7 @@
     const DOOR_H = 0.36;             // ...short enough to clear a corner's name
 
     function menuCanEnter(l) {
-        if (l.key) return l.key !== 'board';
+        if (l.key) return l.key !== 'board' || menuBoardOn();
         if (l.n === 5 && !menuOpened()) return false;
         return !!menuBossFor(l.n);
     }
@@ -418,7 +462,11 @@
         if ((g.t += dt) < GO_SECS) return;
         menu.going = null;
         const l = g.card.level;
-        if (l.key === 'settings' || l.key === 'memories') { menuShow(l.key); menu.screen.from = g.x; }
+        if (l.key === 'settings' || l.key === 'memories' || l.key === 'board') {
+            if (l.key === 'board') fetchBoard();        // the tables as they are now, not as the game found them
+            menuShow(l.key);
+            menu.screen.from = g.x;
+        }
         else menuEnter(l);
     }
 
@@ -466,7 +514,7 @@
     function menuEnter(level) {
         menuLoad();
         if (level.key === 'board') {
-            menuSay('LEADERBOARD · COMING SOON');
+            menuSay('LEADERBOARD · COMING SOON');       // no worker to ask yet (menuBoardOn)
             menu.march = false;
             return;
         }
@@ -482,6 +530,7 @@
         menu.arriveT = -1;          // walked in before the town finished arriving
         menu.run = { n: level.n, over: false, cont: false, out: 0 };
         best = menu.best[level.n] || 0;
+        menuBoardRun();
         menu.sel = level.n;
         menu.march = false;
         LAB.mini = null;
@@ -502,6 +551,7 @@
         menu.arriveT = -1;
         menu.run = { n: M_RUSH, over: false, cont: false, out: 0 };
         best = menu.best[M_RUSH] || 0;
+        menuBoardRun();
         menu.march = false;
         LAB.mini = null;
         setHint(HINT_PLAY);
@@ -515,10 +565,12 @@
     function menuLost() { return menuUp(); }
 
     // END RUN in a level, or the CONTINUE clock running out: back to the town
-    // with nothing, rather than on to the initials. True means the town took it.
+    // with nothing but the score, which the town may ask your initials for
+    // (menuBoardPost). True means the town took it.
     function menuQuit() {
         if (!menu || !menu.run) return false;
         const n = menu.run.n;
+        menuBoardPost(menu.run);
         menuOpen();
         menuSay(menuName(n) + ' · NOT THIS TIME');
         return true;
@@ -557,6 +609,7 @@
         }
         if ((run.out += dt) < M_OUT) return;
         menu.run = null;
+        menuBoardPost(run);
         menuBeat(!run.cont, run.n);
         menuOpen();
     }
@@ -585,7 +638,7 @@
     function menuWon() {
         const run = menu && menu.run;
         const rush = !!(menu && menu.keys[MENU_VOID.n]);
-        if (run) menuBeat(!run.cont, run.n);
+        if (run) { menuBoardPost(run); menuBeat(!run.cont, run.n); }
         if (run && run.n === MENU_VOID.n) {
             menu.shows.push({ credits: true });
             if (!rush) menu.shows.push({ rushCard: true });
@@ -712,6 +765,9 @@
             if (menu.screen.kind === 'memory' && over(menu.screen.n, menu.screen.t)) menuShow('memories');
             return;
         }
+        // the initials and the table after them are the engine's, over the town
+        if (phase === 'initials' || phase === 'scores') { menu.march = false; return; }
+        if (menu.post && menu.post.ready) { menuBoardAsk(); return; }
         if (menu.going) { menuGoStep(dt); return; }
         menuDustStep(dt);
         if (menu.sayT > 0) menu.sayT = Math.max(0, menu.sayT - dt);
@@ -1505,8 +1561,17 @@
                   home: 'keep',
                   choices: sc => [
                       { id: 'keep', label: 'KEEP MINE', ink: M_SAFE, act: () => menuShow('settings') },
-                      { id: 'load', label: 'LOAD IT', ink: M_RISK, act: () => menuLoadSave(sc.n) }] }
+                      { id: 'load', label: 'LOAD IT', ink: M_RISK, act: () => menuLoadSave(sc.n) }] },
+        // a table, not a question: the title and line go up out of its way and
+        // the choices are the smaller tabs along the bottom (menuBoardTabs)
+        board: { title: 'LEADERBOARD', ink: '#c9a94e', home: 'total', table: true,
+                 line: sc => sc.view === BOARD_TOTAL ? 'everyone\'s best on every stage but BOSS RUSH, added up'
+                                                     : 'the ten best runs',
+                 choices: menuBoardTabs }
     };
+    const M_TAB_Y = 470;             // a table screen's row of tabs...
+    const M_TAB_H = 48;
+    const M_TAB_GAP = 8;             // ...and the least room between two
 
     // Any number of choices, left to right, each the middle of an equal share
     // of the width: he picks by whichever middle is nearest, so a choice he
@@ -1514,6 +1579,14 @@
     function menuRow(list) {
         const share = LW / list.length, w = Math.min(M_CHOICE_W, share - M_CHOICE_GAP);
         return list.map((c, i) => Object.assign({ cx: share * (i + 0.5), w }, c));
+    }
+    // A table screen has more tabs than a row has room for at his reach, so
+    // they run from one end of where his middle can go to the other instead,
+    // the way the timeline does: however wide the paddle, every one is his.
+    function menuTabs(list) {
+        const hs = halfSpan(), step = (LW - hs * 2) / Math.max(1, list.length - 1);
+        const w = Math.min(M_CHOICE_W, step - M_TAB_GAP);
+        return list.map((c, i) => Object.assign({ cx: hs + step * i, w }, c));
     }
 
     function menuScreenUp() { return !!(menu && menu.screen && menuUp()); }
@@ -1715,7 +1788,8 @@
     // can stand.
     function menuChoices() {
         const sc = menu.screen;
-        if (M_SCREENS[sc.kind]) return menuRow(M_SCREENS[sc.kind].choices(sc));
+        const s = M_SCREENS[sc.kind];
+        if (s) return (s.table ? menuTabs : menuRow)(s.choices(sc));
         // the room: the timeline, oldest on the left, across the whole of
         // where he can stand. Its stops are evenly spaced, not to scale --
         // there are no years on it but the memories' own. A memory you have
@@ -1796,29 +1870,34 @@
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, LW, LH);
         const s = M_SCREENS[sc.kind];
+        const tab = !!(s && s.table);
+        const lit = menuChoiceAt(paddle.x);
+        // BACK has no table of its own, so the last one stays up under it
+        if (tab && lit.view !== undefined) sc.view = lit.view;
         if (s) {
-            text(s.title, LW / 2, 150, 34, s.ink || M_SAFE, 'center');
+            text(s.title, LW / 2, tab ? 52 : 150, tab ? 30 : 34, s.ink || M_SAFE, 'center');
             // a note is what the last choice did, and it stands in for the line
             const line = sc.note || (typeof s.line === 'function' ? s.line(sc) : s.line);
-            text(line, LW / 2, 195, 15, sc.note ? M_SAFE : '#9a958c', 'center');
+            text(line, LW / 2, tab ? 80 : 195, tab ? 14 : 15, sc.note ? M_SAFE : '#9a958c', 'center');
         } else text('MEMORIES', LW / 2, 150, 34, '#d9a5b3', 'center');
-        const lit = menuChoiceAt(paddle.x);
+        if (tab) { boardPick(sc.view); drawBoard(118, M_TAB_Y - M_TAB_H / 2 - 30, 1); }
+        const rowY = tab ? M_TAB_Y : M_CHOICE_Y, rowH = tab ? M_TAB_H : M_CHOICE_H;
         const choices = menuChoices();
         const stops = choices.filter(c => c.stop);
         if (stops.length) menuDrawTimeline();
         for (const c of choices) {
             const on = c === lit || c.id === lit.id;
             if (c.stop) { menuDrawStop(c, on); continue; }
-            const x = c.cx - c.w / 2, y = M_CHOICE_Y - M_CHOICE_H / 2;
-            menuPanel(x, y, c.w, M_CHOICE_H, on, c.ink);
+            const x = c.cx - c.w / 2, y = rowY - rowH / 2;
+            menuPanel(x, y, c.w, rowH, on, c.ink);
             if (on) {
                 ctx.globalAlpha = menu.press === c.id ? 0.4 : 0.18;
                 ctx.fillStyle = c.ink;
-                ctx.fillRect(x + 1, y + 1, c.w - 2, M_CHOICE_H - 2);
+                ctx.fillRect(x + 1, y + 1, c.w - 2, rowH - 2);
                 ctx.globalAlpha = 1;
             }
-            text(c.label, c.cx, M_CHOICE_Y + 6, 17, on ? (c.act ? '#f2efe9' : '#6d685f') : (c.act ? c.ink : '#4a453d'),
-                 'center');
+            text(c.label, c.cx, rowY + (tab ? 5 : 6), tab ? fitSize(c.label, 15, c.w - 8) : 17,
+                 on ? (c.act ? '#f2efe9' : '#6d685f') : (c.act ? c.ink : '#4a453d'), 'center');
         }
         // a line from him up to what he is under, so it is plain he is the pointer
         ctx.strokeStyle = lit.ink;
@@ -1827,13 +1906,13 @@
         ctx.setLineDash([4, 6]);
         ctx.beginPath();
         ctx.moveTo(paddle.x, PADDLE_Y - padH() / 2 - 8);
-        ctx.lineTo(lit.cx, !lit.stop ? M_CHOICE_Y + M_CHOICE_H / 2 + 8
+        ctx.lineTo(lit.cx, !lit.stop ? rowY + rowH / 2 + 8
                          : lit.under.length ? M_TL_Y + M_UNDER + (lit.under.length - 1) * M_UNDER_STEP + 8
                          : M_TL_Y + M_STOP_R * 1.6 + 8);
         ctx.stroke();
         ctx.setLineDash([]);
         ctx.globalAlpha = 1;
-        text('move under one · click, tap or space to pick it', LW / 2, 245, 17, '#6d685f', 'center');
+        if (!tab) text('move under one · click, tap or space to pick it', LW / 2, 245, 17, '#6d685f', 'center');
         labPadIcon(LAB.pad, paddle.x, PADDLE_Y, padW(), false, 1);
         return true;
     }
@@ -1877,6 +1956,7 @@
     // Asked as typeof since the boss lab builds this file without the opening.
     const introHas = () => typeof introUp === 'function' && introUp();
     const menuHeld = (down, e) => {
+        if (phase === 'initials' || phase === 'scores') return;     // the engine's screens (menuBoardAsk)
         if (down && introHas()) return;
         if (down && menuUnlockNext()) return;
         if (menuScreenPress(e, down)) { menu.march = false; return; }
