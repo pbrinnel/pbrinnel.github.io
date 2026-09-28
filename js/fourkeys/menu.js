@@ -64,7 +64,13 @@
                           lamps: 'LAMP_LVL', gleeok: 'GL_LVL', headless: 'HL_LVL',
                           agahnim: 'AG_LVL', dodongo: 'DOD_LVL', lucifer: 'LU_LVL' };
     const MENU_ALL = MENU_LEVELS.concat([MENU_LAST, MENU_VOID]);
+    // fourkeys.html's ?reset names this key and MENU_PAD_KEY itself, since it
+    // runs before this file: rename either and change it there too.
     const MENU_KEY = 'brandon-metalab.progress';
+    // The paddle last in your hands, so the next visit starts with it. Kept in
+    // this browser beside your progress, not in it: it is a preference, not
+    // something won, so a .brandon save neither carries it nor needs to.
+    const MENU_PAD_KEY = 'brandon2.paddle';
     // the line under the field: in the town there is nothing to serve
     const M_HINT = 'move to slide brandon · hold to walk him';
     // the rack, in the order the gates walk through it: the one you start with,
@@ -122,7 +128,20 @@
                  march: false, lift: 0, lastX: 0, into: null, walk: 0, gait: 0, arriveT: -1,
                  going: null, screen: null, press: null,
                  shows: [], showT: 0 };
+        let kept = null;
+        try { kept = localStorage.getItem(MENU_PAD_KEY); } catch (e) { /* a private window */ }
+        // The first load is engine.js's own setup (debugBuild), before its
+        // lets exist, and putting a paddle in hand writes some of them: so
+        // it waits for the script under way to finish.
+        if (kept && kept !== LAB.pad && menu.pads[kept] && LAB_PAD[kept]) {
+            LAB.pad = kept;
+            queueMicrotask(() => { if (LAB.pad === kept) labPadUse(kept); });
+        }
         return menu;
+    }
+    // LAB.usePad tells us each time the paddle in hand is changed
+    function menuPadKept(key) {
+        try { localStorage.setItem(MENU_PAD_KEY, key); } catch (e) { /* a private window just will not remember */ }
     }
 
     function menuSave() {
@@ -180,9 +199,12 @@
         menu.best[n] = v;
         menuSave();
     }
+    // ...and nothing at all until every one of the six has a best: a total
+    // with a stage missing from it is not the number it says it is
     function menuBestTotal() {
         menuLoad();
-        return MENU_ALL.reduce((s, l) => s + (menu.best[l.n] || 0), 0);
+        if (!MENU_ALL.every(l => menu.best[l.n] > 0)) return 0;
+        return MENU_ALL.reduce((s, l) => s + menu.best[l.n], 0);
     }
     // what the HUD calls the best it is showing. A player calls each of the
     // six a STAGE -- never a level, so the walls inside one are not mistaken
@@ -204,20 +226,21 @@
         if (!menuBoardOn()) return;
         menu.post = null;                // one left from a run the town never got to ask about
         menu.run.was = best;
+        menu.run.pad = LAB.pad;          // what the row will say it was played with
         boardPick(menu.run.n);           // the one the game-over screen shows
     }
     // ...and ended, on its way back to the town. It is decided against the
     // tables as they are once they have been fetched again (menuUpdate waits).
     function menuBoardPost(run) {
         if (!menuBoardOn() || !(score > 0)) return;
-        const p = menu.post = { n: run.n, score, was: run.was || 0, ready: false };
+        const p = menu.post = { n: run.n, score, was: run.was || 0, pad: run.pad, ready: false };
         fetchBoard().then(() => { p.ready = true; });
     }
     function menuBoardAsk() {
         const p = menu.post;
         menu.post = null;
         boardPick(p.n);
-        if (qualifies(p.score) || (boardLive && p.score > p.was)) boardAsk(p.n, p.score, () => {});
+        if (qualifies(p.score) || (boardLive && p.score > p.was)) boardAsk(p.n, p.score, () => {}, p.pad);
     }
 
     // The LEADERBOARD building: a tab for TOTAL and one for every stage that
@@ -577,9 +600,26 @@
     }
 
     // Runs every frame, hub or no hub -- it is what brings you back out of a
-    // level and hands you what you earned. The wait is the takeover: he comes
-    // apart and your brandon rises, and only then does the hub come back.
+    // level and hands you what you earned. After a wall it is M_OUT on STAGE
+    // CLEAR. After a boss it is his whole perish, to the last piece of him
+    // faded (menuPerished), then M_BEAT -- so MEMORY UNLOCKED, or BOSS RUSH's
+    // next boss, never cuts across him coming apart.
     const M_OUT = 2.6;
+    const M_BEAT = 0.7;
+    const M_PERISH_MAX = 12;         // seconds at most, whatever a boss has left falling
+    function menuPerished(run, dt) {
+        run.perish = (run.perish || 0) + dt;
+        const c = bossFall;
+        const gone = !c || !c.pieces || c.pieces.every(p => p.age >= F_GONE);
+        if (!gone && run.perish < M_PERISH_MAX) return false;
+        if ((run.out += dt) < M_BEAT) return false;
+        run.perish = 0;
+        return true;
+    }
+    // the first game's takeover -- you rising into his place -- is not this
+    // game's: in a level, the fight's end holds on him coming apart
+    function menuHoldsTakeover() { return !!(menu && menu.run); }
+
     function menuWatch(dt) {
         if (!menu || !menu.run) return;
         const run = menu.run;
@@ -598,7 +638,7 @@
         // except a boss in BOSS RUSH, whose takeover leads straight into the
         // next one's entrance
         if (stage < LEVELS.length - 1) {
-            if (phase !== 'ascend' || (run.out += dt) < M_OUT) return;
+            if (phase !== 'ascend' || !menuPerished(run, dt)) return;
             run.out = 0;
             impact = null;
             bossFall = null;
@@ -607,7 +647,7 @@
             banner = '';
             return;
         }
-        if ((run.out += dt) < M_OUT) return;
+        if (phase === 'ascend' ? !menuPerished(run, dt) : (run.out += dt) < M_OUT) return;
         menu.run = null;
         menuBoardPost(run);
         menuBeat(!run.cont, run.n);
@@ -708,12 +748,11 @@
         // and its end is the credits; all a win keeps is its key, which
         // opens BOSS RUSH
         if (level === MENU_VOID) { menu.keys[level.n] = true; menuSave(); return true; }
-        const first = !menu.keys[level.n];
+        // nothing is said about it: the unlock screens that follow say it all
         menu.keys[level.n] = true;
         // the run keeps its best as it goes (menuBestIs); this is for the
         // lab's buttons, which win a level without one
         menu.best[level.n] = Math.max(menu.best[level.n] || 0, score || 0);
-        let got = level.name + (first ? ' · A KEY' : ' · DONE AGAIN');
         // the stage's memory plays before any paddle is shown: after that
         // it is in MEMORIES
         menuNextMemory(level.n);
@@ -724,18 +763,15 @@
         if (clean && !menu.pads[level.pad]) {
             menu.pads[level.pad] = true;
             menu.shows.push({ pad: level.pad });
-            got += ' AND ' + (LAB_PAD[level.pad] ? LAB_PAD[level.pad].name : level.pad.toUpperCase());
             take = level.pad;
         }
         if (!menu.pads[MENU_SOUVENIR]) {
             menu.pads[MENU_SOUVENIR] = true;
             menu.shows.push({ pad: MENU_SOUVENIR });
-            got += ' · AND ' + LAB_PAD[MENU_SOUVENIR].name;
             take = take || MENU_SOUVENIR;
         }
         if (take && LAB_PAD[take]) LAB.usePad(take);
         menuSave();
-        menuSay(got);
         return true;
     }
 
@@ -762,7 +798,7 @@
         if (menuScreenUp()) {
             menu.screen.t += dt;
             menu.march = false;
-            if (menu.screen.kind === 'memory' && over(menu.screen.n, menu.screen.t)) menuShow('memories');
+            if (menu.screen && menu.screen.kind === 'memory' && over(menu.screen.n, menu.screen.t)) menuShow('memories');
             return;
         }
         // the initials and the table after them are the engine's, over the town

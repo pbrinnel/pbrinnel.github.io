@@ -32,15 +32,20 @@
     //
     // With no head left on a neck, the body is open: it has health of its own,
     // GL_BODY_HP, with its own bar, and it is the body that ends the fight.
-    // From then on it grows heads back one at a time, each over GL_REGROW,
-    // with nothing to hit until it is whole -- and a whole one shuts the body
-    // again. Kill the body and whatever it was still growing dies with it.
+    // Once he is under GL_BIG_AT of his health he grows back one head, GL_BIG
+    // times the size, in the middle, over GL_REGROW, with nothing to hit
+    // until it is whole -- and a whole one shuts the body again. It fires
+    // three ways at once, down its neck and out to both sides, GL_BIG_BURST
+    // down each: the way through is the diagonals under it. Before it does it
+    // shakes and draws back as it swells, which a small head never does. Tear
+    // it off and finish it and, after GL_REGROW_WAIT, he grows another. Kill
+    // the body and whatever it was still growing dies with it.
     //
     // He arrives slowly: one head pokes down out of the top first, then the
     // three fan apart as the whole of him lowers in, all three shouting.
     let GL_LVL      = 5;
     let GL_HEADS    = 3;      // how many he has
-    let GL_HEAD_HP  = 3;      // hits to tear one loose
+    let GL_HEAD_HP  = 4;      // hits to tear one loose
     let GL_LOOSE_HP = 1;      // ...and to finish it once it is off
     let GL_LOOSE_SIZE = 0.67; // ...how big it is, loose, of one on a neck
     let GL_LOOSE_SPIN = 1.2;  // ...and rad/s it turns at
@@ -63,7 +68,7 @@
     let GL_SEAT_U   = 12;     // px toward the necks
     let GL_SEAT_V   = -55;    // px across him
     let GL_CLIMB    = 0.15;   // how much of the original's climb this fight has
-    let GL_BODY_HP  = 8;      // hits on his body, once it has no head on a neck
+    let GL_BODY_HP  = 11;     // hits on his body, once it has no head on a neck
     let GL_REGROW   = 10;     // seconds to grow one head back
     let GL_ENTER    = 6;      // seconds he takes to arrive
     let GL_FIRE_MIN = 6;      // seconds between one head's bursts, at least...
@@ -77,14 +82,18 @@
     let GL_STONE_A0   = 0.35; // the stone over a shut body: at its thinnest...
     let GL_STONE_A1   = 0.7;  // ...at its thickest...
     let GL_STONE_HZ   = 0.5;  // ...and swells a second, slow enough never to read as a flash
-    let GL_REGROW_WAIT2 = 6;  // seconds after the first head is back before the second starts
-    let GL_REGROW_WAIT3 = 10; // ...and after the second before the third
+    let GL_REGROW_WAIT = 6;   // seconds after the big head is finished before the next starts
+    let GL_BIG      = 2;      // the big head's size, of a small one
+    let GL_BIG_AT   = 0.5;    // share of his health under which he grows it
+    let GL_BIG_HP   = 2;      // ...its hits to tear loose, of a small one's
+    let GL_BIG_CHARGE = 1.4;  // seconds of shaking and swelling before it fires, which is its tell
+    let GL_BIG_SHAKE = 5;     // ...px it shakes, at the height of that
     LAB_KNOBS.push('GL_LVL', 'GL_HEADS', 'GL_HEAD_HP', 'GL_LOOSE_HP', 'GL_W', 'GL_Y', 'GL_TILT',
                    'GL_DRIFT', 'GL_HEAD_W', 'GL_NECK', 'GL_FAN', 'GL_SWING', 'GL_RATE',
                    'GL_LOOSE', 'GL_THICK', 'GL_SEAT_U', 'GL_SEAT_V', 'GL_CLIMB', 'GL_FIRE_MIN', 'GL_FIRE_MAX', 'GL_CHARGE',
                    'GL_BURST_GAP', 'GL_BURST_ARC', 'GL_BURST_SPEED', 'GL_BURST_SIZE', 'GL_BURST_MAX', 'GL_LOOSE_SIZE',
-                   'GL_LOOSE_SPIN', 'GL_STONE_A0', 'GL_STONE_A1', 'GL_STONE_HZ', 'GL_REGROW_WAIT2',
-                   'GL_REGROW_WAIT3',
+                   'GL_LOOSE_SPIN', 'GL_STONE_A0', 'GL_STONE_A1', 'GL_STONE_HZ', 'GL_REGROW_WAIT',
+                   'GL_BIG', 'GL_BIG_AT', 'GL_BIG_HP', 'GL_BIG_CHARGE', 'GL_BIG_SHAKE',
                    'GL_BODY_HP', 'GL_REGROW', 'GL_ENTER');
 
     const GL_BEADS = 9;       // the neck, in heads shrinking into his body, from the collar out
@@ -92,6 +101,11 @@
     // and the row in GL_BURST_GAPs -- the middle column half a row behind the
     // outer two, so the three are staggered and there is always a lane
     const GL_BURST = [[-1, 0], [1, 0], [0, 0.5], [0, 1.5]];
+    // ...and the big head's, down each of its three ways: half as many again,
+    // in four columns, staggered the same way
+    const GL_BIG_BURST = [[-1.5, 0], [0.5, 0], [-0.5, 0.5], [1.5, 0.5], [-1.5, 1.5], [0.5, 1.5]];
+    // a head's size, of GL_HEAD_W
+    const glSize = k => k.big ? GL_BIG : 1;
 
     let gl = null;
 
@@ -107,7 +121,8 @@
                        // staggered, so the first bursts come one head at a time
                        fire: GL_FIRE_MIN * (0.6 + i * 0.55) + Math.random() * 2, charge: 0, shots: 0, shotT: 0,
                        grow: -1,              // seconds into growing back, or -1 when whole
-                       rot: 0                 // turned by, once it is loose
+                       rot: 0,                // turned by, once it is loose
+                       big: false, jx: 0      // the one he grows back, and its shake
                    })) };
             b.maxHp = n * (GL_HEAD_HP + GL_LOOSE_HP) + GL_BODY_HP;
             b.hp = b.maxHp;
@@ -134,18 +149,21 @@
                 if (!k.loose) {
                     // every neck out of the one collar, fanned and swaying
                     const a = Math.PI / 2 + (k.fan * GL_FAN + Math.sin(gl.t * GL_RATE + k.ph) * GL_SWING) * gl.spread;
-                    const reach = GL_NECK * glGrown(k);
+                    // the big one winds up: drawn back up its neck as it swells, then out
+                    const wind = k.big && k.charge > 0 ? Math.min(1, k.charge / GL_BIG_CHARGE) : 0;
+                    const reach = GL_NECK * glGrown(k) * (1 - 0.18 * wind * wind);
+                    k.jx = wind > 0 ? Math.sin(clock * 52) * GL_BIG_SHAKE * wind : 0;
                     k.ax = gl.cx; k.ay = gl.cy;
-                    k.x = gl.cx + Math.cos(a) * reach;
+                    k.x = gl.cx + Math.cos(a) * reach + k.jx;
                     k.y = gl.cy + Math.sin(a) * reach;
-                    if (phase === 'play' && k.grow < 0) glFire(k, a, dt);
+                    if (phase === 'play' && k.grow < 0) (k.big ? glFireBig : glFire)(k, a, dt);
                     else { k.charge = 0; k.shots = 0; }
                     continue;
                 }
                 if (phase !== 'play') continue;
                 // loose: it flies on, turning, off the walls and the ceiling, and off you
                 k.rot += GL_LOOSE_SPIN * dt;
-                const r = GL_HEAD_W * GL_LOOSE_SIZE / 2, ry = r * (BALL_RY / BALL_RX);
+                const r = GL_HEAD_W * glSize(k) * GL_LOOSE_SIZE / 2, ry = r * (BALL_RY / BALL_RX);
                 k.x += k.vx * dt;
                 k.y += k.vy * dt;
                 if (k.x < r && k.vx < 0) k.vx = -k.vx;
@@ -195,6 +213,7 @@
                 // torn loose: still alive, and now it has the run of the field
                 k.loose = true;
                 k.hp = GL_LOOSE_HP;
+                k.charge = 0; k.shots = 0; k.jx = 0;
                 gl.torn++;
                 const a = Math.PI * (0.15 + Math.random() * 0.7);
                 k.vx = Math.cos(a) * GL_LOOSE * (Math.random() < 0.5 ? -1 : 1);
@@ -205,7 +224,8 @@
             }
             k.alive = false;
             gl.done++;
-            award(BOSS_PTS * 3, cx, cy);
+            if (k.big) gl.wait = GL_REGROW_WAIT;
+            award(BOSS_PTS * (k.big ? 5 : 3), cx, cy);
         },
         enterSecs() { return GL_ENTER; },
         draw: glDraw,
@@ -231,7 +251,8 @@
             const growing = gl.heads.filter(k => k.alive && k.grow >= 0).length;
             return { name: 'GLEEOK', hp: b.hp, max: b.maxHp, w: GL_W,
                      line: on + ' on him · ' + loose + ' loose · ' + growing + ' growing · ' +
-                           (glOpen() ? 'body open ' + gl.body + '/' + GL_BODY_HP : 'body shut') };
+                           (glOpen() ? 'body open ' + gl.body + '/' + GL_BODY_HP : 'body shut') +
+                           (gl.heads.some(k => k.alive && k.big) ? ' · big head' : '') };
         }
     };
 
@@ -268,7 +289,7 @@
     // A head: the ellipse inscribed in it, turned by however far it has spun
     // loose. Met in its own frame and handed back in the field's.
     function glHeadContact(ball, k) {
-        const rx = GL_HEAD_W * (k.loose ? GL_LOOSE_SIZE : 1) / 2, ry = rx * (BALL_RY / BALL_RX);
+        const rx = GL_HEAD_W * glSize(k) * (k.loose ? GL_LOOSE_SIZE : 1) / 2, ry = rx * (BALL_RY / BALL_RX);
         if (!k.loose) return ellipseContact(ball, k.x, k.y, rx, ry);
         const c = Math.cos(-k.rot), s = Math.sin(-k.rot);
         const dx = ball.x - k.x, dy = ball.y - k.y;
@@ -286,8 +307,10 @@
         return t * t * (3 - 2 * t);
     }
 
-    // Once he has been left with nothing on a neck he starts growing heads
-    // back, one at a time, into whichever places are empty.
+    // Once he has been left with nothing on a neck, and is under GL_BIG_AT
+    // of his health, he grows one big head back in the middle -- only ever
+    // the one, and the next only once it is finished and GL_REGROW_WAIT has
+    // gone by.
     function glRegrow(dt) {
         if (glOpen()) gl.bared = true;
         if (!gl.bared) return;
@@ -295,19 +318,18 @@
         if (growing) {
             if ((growing.grow += dt) >= GL_REGROW) {
                 growing.grow = -1;
-                growing.fire = GL_FIRE_MIN;
-                // a breather before the next: longer the more of him is back
-                const whole = gl.heads.filter(k => k.alive && !k.loose && k.grow < 0).length;
-                gl.wait = whole >= 2 ? GL_REGROW_WAIT3 : GL_REGROW_WAIT2;
+                growing.fire = GL_FIRE_MIN * 0.5;
             }
             return;
         }
-        if (glOpen()) gl.wait = 0;                 // stripped bare again: straight back to it
+        if (gl.heads.some(k => k.alive && k.big)) return;
         if ((gl.wait -= dt) > 0) return;
+        const b = bricks[0];
+        if (!b || b.hp >= b.maxHp * GL_BIG_AT) return;
         const empty = gl.heads.find(k => !k.alive);
         if (!empty) return;
-        Object.assign(empty, { alive: true, loose: false, hp: GL_HEAD_HP, flash: 0, spent: 0,
-                               charge: 0, shots: 0, grow: 0 });
+        Object.assign(empty, { alive: true, loose: false, big: true, fan: 0, hp: GL_HEAD_HP * GL_BIG_HP,
+                               flash: 0, spent: 0, charge: 0, shots: 0, grow: 0, rot: 0, jx: 0 });
         gl.regrown++;
     }
 
@@ -388,6 +410,37 @@
         if ((k.fire -= dt) <= 0) k.charge = 1e-6;
     }
 
+    // The big head: counting down, then shaking and drawing back as it swells
+    // for GL_BIG_CHARGE, then GL_BIG_BURST down its neck and out to either
+    // side of it at once, a row at a time.
+    function glFireBig(k, a, dt) {
+        if (k.shots > 0) {
+            k.shotT += dt;
+            while (k.shots > 0) {
+                const [col, row] = GL_BIG_BURST[GL_BIG_BURST.length - k.shots];
+                if (k.shotT < row * GL_BURST_GAP) break;
+                k.shots--;
+                for (const way of [0, -Math.PI / 2, Math.PI / 2]) {
+                    if (phantoms.length >= GL_BURST_MAX) break;
+                    const d = a + way + col * GL_BURST_ARC;
+                    phantoms.push({ x: k.x, y: k.y, vx: Math.cos(d) * GL_BURST_SPEED, vy: Math.sin(d) * GL_BURST_SPEED,
+                                    angle: Math.random() * 6.28, spin: (Math.random() - 0.5) * 6, scale: GL_BURST_SIZE,
+                                    life: PH_LIFE * PH_SPEED / GL_BURST_SPEED });
+                }
+            }
+            if (!k.shots) k.fire = GL_FIRE_MIN + Math.random() * (GL_FIRE_MAX - GL_FIRE_MIN);
+            return;
+        }
+        if (k.charge > 0) {
+            if ((k.charge += dt) < GL_BIG_CHARGE) return;
+            k.charge = 0;
+            k.shots = GL_BIG_BURST.length;
+            k.shotT = 0;
+            return;
+        }
+        if ((k.fire -= dt) <= 0) k.charge = 1e-6;
+    }
+
     // his body cut, in stone: the shape filled flat, with a faint pass of his
     // own shading kept so it is still him under it
     let glStoneBake = null;
@@ -432,7 +485,7 @@
         // the necks first: heads shrinking into him, so they read as one animal
         for (const k of gl.heads) {
             if (!k.alive || k.loose) continue;
-            const gs = 0.25 + 0.75 * glGrown(k);
+            const gs = (0.25 + 0.75 * glGrown(k)) * (k.big ? 1 + (GL_BIG - 1) * 0.5 : 1);
             for (let i = 0; i < GL_BEADS; i++) {
                 const t = i / GL_BEADS;
                 const w = hw * (0.45 + 0.35 * t) * gs, hgt = w * (BALL_RY / BALL_RX);
@@ -466,6 +519,7 @@
         ctx.restore();
         for (const k of gl.heads) {
             if (!k.alive) continue;
+            const hw = GL_HEAD_W * glSize(k), hh = hw * (BALL_RY / BALL_RX);
             // still growing: small, and see-through, since there is nothing to hit yet
             if (k.grow >= 0) {
                 const gw = hw * (0.25 + 0.75 * glGrown(k)), gh = gw * (BALL_RY / BALL_RX);
@@ -476,7 +530,7 @@
             }
             // the swell before a burst: green washing up over him and a glow
             // round him, rising once -- a tell, not a flash
-            const sw = k.charge > 0 ? Math.min(1, k.charge / GL_CHARGE) : k.shots > 0 ? 1 : 0;
+            const sw = k.charge > 0 ? Math.min(1, k.charge / (k.big ? GL_BIG_CHARGE : GL_CHARGE)) : k.shots > 0 ? 1 : 0;
             if (sw > 0) {
                 const r = hw * 0.95;
                 const g = ctx.createRadialGradient(k.x, k.y, hw * 0.2, k.x, k.y, r);
@@ -516,10 +570,8 @@
                 ctx.globalAlpha = 1;
             }
             // what it has left, over it, the way the wall's bricks wear theirs
-            if (k.hp < (k.loose ? GL_LOOSE_HP : GL_HEAD_HP)) {
-                labBar(k.x - hw * 0.35, k.y - hh / 2 - 7, hw * 0.7,
-                       k.hp / (k.loose ? GL_LOOSE_HP : GL_HEAD_HP), 3);
-            }
+            const full = k.loose ? GL_LOOSE_HP : GL_HEAD_HP * (k.big ? GL_BIG_HP : 1);
+            if (k.hp < full) labBar(k.x - hw * 0.35, k.y - hh / 2 - 7, hw * 0.7, k.hp / full, 3);
         }
         // the body's own bar, just above the collar, from the first time it is open
         if (gl.bared) labBar(gl.cx - 80, gl.cy - 24, 160, gl.body / GL_BODY_HP, 5);

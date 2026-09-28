@@ -28,6 +28,7 @@
     let TW_THROW       = 2.4;     // seconds between phantom heads, for whoever throws them
     let TW_HEAL        = 0.33;    // share of his health the survivor gets back
     let TW_ALONE_PACE  = 2;       // how much faster the survivor goes
+    let TW_ALONE_PACE_SMALL = 1.4;// ...if it is the small one, who is quick already
     let TW_YELL_MIN    = 4;       // seconds between their shouts, at least...
     let TW_YELL_MAX    = 8;       // ...and at most
     let TW_Y           = 135;     // where they hang
@@ -37,7 +38,7 @@
     // -- the longest fight of the new ones.
     let TW_LVL         = 3;
     LAB_KNOBS.push('TW_LVL', 'TW_HP_BIG', 'TW_HP_SMALL', 'TW_W_BIG', 'TW_W_SMALL', 'TW_SWEEP_BIG',
-                   'TW_SWEEP_SMALL', 'TW_THROW', 'TW_HEAL', 'TW_Y', 'TW_CLIMB', 'TW_ALONE_PACE', 'TW_YELL_MIN', 'TW_YELL_MAX', 'TW_SOLO');
+                   'TW_SWEEP_SMALL', 'TW_THROW', 'TW_HEAL', 'TW_Y', 'TW_CLIMB', 'TW_ALONE_PACE', 'TW_ALONE_PACE_SMALL', 'TW_YELL_MIN', 'TW_YELL_MAX', 'TW_SOLO');
 
     let tw = null;
 
@@ -95,7 +96,7 @@
                 tw.yell = TW_YELL_MIN + Math.random() * (TW_YELL_MAX - TW_YELL_MIN);
                 const live = tw.twins.filter(t => t.alive);
                 const here = live.filter(t => t.away < 0.05);
-                for (const t of here) labShout(t.x, twY(t) + t.h / 2 + 8, live.length > 1 ? 'BRANDON!' : '...');
+                for (const t of here) twShout(t, live.length > 1 ? 'BRANDON!' : '...');
             }
             b.hp = tw.twins.reduce((s, t) => s + (t.alive ? t.hp : 0), 0);
             twBox(b);
@@ -156,6 +157,13 @@
                      line: tw.twins.map(says).join(' · ') + (tw.order.length ? ' · ' + tw.order[0] + ' went first' : '') };
         }
     };
+
+    // a bubble that rides under him wherever he patrols to
+    function twShout(t, text) {
+        const at = () => ({ x: t.x, y: twY(t) + t.h / 2 + 8 });
+        const p = at();
+        labShout(p.x, p.y, text, SHOUT_SECS, at);
+    }
 
     // where he is drawn and met: drawn back or come forward by his lunge...
     function twY(t) { return t.y + (t.lunge ? t.lunge.off : 0); }
@@ -292,8 +300,8 @@
             other.throws = other.throws || t.throws;
             other.slams = other.slams || t.slams;
             other.hp = Math.min(other.maxHp, other.hp + Math.round(TW_HEAL * other.maxHp));
-            other.pace = TW_ALONE_PACE;
-            labShout(other.x, other.y + other.h / 2 + 8, '...');
+            other.pace = other.key === 'small' ? TW_ALONE_PACE_SMALL : TW_ALONE_PACE;
+            twShout(other, '...');
             award(BOSS_PTS * 3, t.x, t.y);
             b.hp = other.hp;
             return;
@@ -338,10 +346,14 @@
         for (const t of tw.twins.slice().reverse()) {
             if (!t.alive) continue;
             twDrawBody(t);
+            // his bar goes up and out with him, and is not left pinned to the
+            // top of the screen while he is off it
             const grow = phase === 'entrance' ? enterK() : 1;
-            if (grow > 0.001) {
+            if (grow > 0.001 && t.away < 0.99) {
                 const w = Math.min(t.w * 0.7, 300) * grow;
+                ctx.globalAlpha = 1 - t.away;
                 labBar(t.x - w / 2, Math.max(10, t.y - t.h / 2 - 12), w, t.hp / t.maxHp, 4);
+                ctx.globalAlpha = 1;
             }
         }
     }

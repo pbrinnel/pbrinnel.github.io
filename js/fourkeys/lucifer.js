@@ -24,7 +24,10 @@
     //   CLAP   both hands, open either side of the head's way up, shut on
     //          it as it arrives. They reach through it, so they are no wall
     //   WINGS  a wing out of each shoulder, built as the Corrupted's six are:
-    //          each arm's pieces are its long feathers, a feather at a time
+    //          each arm's pieces are its long feathers, a feather at a time.
+    //          With them out he swoops: up to one side, then down across the
+    //          field in an arc toward you and up the far side. Anything of his
+    //          that meets a head on the way down spikes it back at you
     //
     // Hits on him hurt him, and he shakes with each. Hits on a hand put that
     // hand back together as an arm after LU_FORM_HP of them; a feather is
@@ -40,7 +43,9 @@
     // clap, which a head goes straight through, is only half there.
     //
     // Beating the second part is a scene, not a fight: the world holds still
-    // and your head is put away, a hand reaches down and your light runs up
+    // and your head is put away -- the first time, the game's last memory
+    // plays here, before anything of the change can give it away -- then a
+    // hand reaches down and your light runs up
     // it into him -- you go grey -- and with it he changes, his bar filling
     // as he does, the one time it ever goes up. You serve again when he is
     // done. His arms fly up into wheels round his head and turn red, the
@@ -112,6 +117,14 @@
     let LU_WING_SECS  = 10;     // how long the wings stay out
     let LU_WING2_SPAN = 190;    // ...a wing's spine, rig px
     let LU_WING2_DEG  = -35;    // ...and where it points (right side, 0 out, -90 up)
+    let LU_SWOOP_X    = 250;    // px either side of the middle a swoop runs from and to
+    let LU_SWOOP_DEPTH = 170;   // ...how far below his line it comes, at the bottom of it
+    let LU_SWOOP_WIND = 0.7;    // seconds going up to its start, wings raised, which is the tell
+    let LU_SWOOP_SECS = 0.95;   // ...the swoop itself
+    let LU_SWOOP_HOME = 0.8;    // ...and back to where he drifts
+    let LU_SWOOP_REST = 1.2;    // seconds between one swoop and the next
+    let LU_SWOOPS     = 2;      // swoops in one set of wings
+    let LU_SPIKE      = 1.35;   // how much faster than the rally a head he spikes comes down
     let LU_REGROW     = 6;      // seconds a knocked-off feather or little one takes to grow back
     let LU_BEAM_Y     = 230;    // the line a hand hangs on to fire down
     let LU_BEAM_CHARGE = 1.5;   // seconds a beam gathers, following you, before it fires
@@ -119,6 +132,7 @@
     let LU_BEAM_SECS  = 0.8;    // seconds it fires
     let LU_BEAM_W     = 26;     // px across
     let LU_BEAM_DRAG  = 2.5;    // SLUGGISH it leaves on you
+    let LU_BEAM_LOOK12 = 0.55;  // how bright a hand's beam is next to the last part's, so that one lands
     let LU_TREE_Y     = 150;    // the line a hand hangs on to grow the tree down from
     let LU_TREE_OUT   = 170;    // px out from his middle it hangs, on its own side
     let LU_TREE_LEN   = 64;     // px long the tree's first branches are; each fork shorter
@@ -184,8 +198,10 @@
                    'LU_CLAW_DRAG', 'LU_PALM_Y', 'LU_PALM_SPEED', 'LU_FIST_Y', 'LU_FIST_TRACK', 'LU_FIST_AIM',
                    'LU_FIST_G', 'LU_FIST_REST', 'LU_FIST_RISE', 'LU_FIST_SLAMS', 'LU_FIST_DRAG', 'LU_FIST_R',
                    'LU_CAGE_R', 'LU_CAGE_SPIN', 'LU_CAGE_SECS', 'LU_CLAP_Y', 'LU_CLAP_GAP', 'LU_CLAP_SHUT',
-                   'LU_CLAP_REACH', 'LU_WING_SECS', 'LU_REGROW', 'LU_BEAM_Y', 'LU_BEAM_CHARGE', 'LU_BEAM_TRACK',
-                   'LU_BEAM_SECS', 'LU_BEAM_W', 'LU_BEAM_DRAG', 'LU_TREE_Y', 'LU_TREE_OUT', 'LU_TREE_LEN',
+                   'LU_CLAP_REACH', 'LU_WING_SECS', 'LU_REGROW',
+                   'LU_SWOOP_X', 'LU_SWOOP_DEPTH', 'LU_SWOOP_WIND', 'LU_SWOOP_SECS', 'LU_SWOOP_HOME',
+                   'LU_SWOOP_REST', 'LU_SWOOPS', 'LU_SPIKE', 'LU_BEAM_Y', 'LU_BEAM_CHARGE', 'LU_BEAM_TRACK',
+                   'LU_BEAM_SECS', 'LU_BEAM_W', 'LU_BEAM_DRAG', 'LU_BEAM_LOOK12', 'LU_TREE_Y', 'LU_TREE_OUT', 'LU_TREE_LEN',
                    'LU_TREE_GROW', 'LU_TREE_SECS', 'LU_BIRD_WAIT', 'LU_BIRD_Y', 'LU_BIRD_AIM', 'LU_BIRD_SPEED',
                    'LU_BIRD_DRAG', 'LU_BREAK', 'LU_DRAIN_SECS', 'LU_CORRUPT_SECS', 'LU_WITHER', 'LU_SLUMP',
                    'LU_HEAD_SIZE', 'LU_HEAD_GROW_SECS', 'LU_RING_GROW_SECS', 'LU_WING_GROW_SECS', 'LU_WING_LEAD',
@@ -377,6 +393,7 @@
                pieces: [], orbs: [], trees: [], birds: [], beams: [], debris: [], crown: null, now: null,
                attack: null, wingPh: 0, limp: 0, odin: 0, odinShow: 0, flash3: 0, shake: 0, grey: 0,
                refill: 0, end: null, perish: null, ash: [],
+               swoop: null, sw: null, swoops: 0, swoopRest: 0,
                hands: [-1, 1].map(side => ({ side, form: 'arm', t: 0, hits: 0,
                    done: false, st: '', stT: 0, x: LW / 2 + side * LU_HOME, y: LU_Y, vy: 0, open: 0,
                    held: null, holdT: 0, slams: 0, tree: null, beam: null, charge: 0, wingK: 0, deco: [] })) };
@@ -743,6 +760,14 @@
             lu.x = LW / 2 + Math.sin(lu.t * LU_DRIFT_RATE) * LU_DRIFT;
             lu.y = lu.stage === 3 || lu.stage === 'dying' || lu.stage === 'end' ? LU_Y3
                  : lu.stage === 'turn' ? luLerp(LU_Y, LU_Y3, luStraight()) : LU_Y;
+            // a swoop takes him off his drift, and eases him back onto it
+            if (lu.sw) {
+                lu.x = luLerp(lu.x, lu.sw.x, lu.sw.k);
+                lu.y = luLerp(lu.y, lu.sw.y, lu.sw.k);
+                // how fast he is going, for what he spikes
+                if (dt > 0 && lu.sw.lx !== undefined) { lu.sw.vx = (lu.x - lu.sw.lx) / dt; lu.sw.vy = (lu.y - lu.sw.ly) / dt; }
+                lu.sw.lx = lu.x; lu.sw.ly = lu.y;
+            }
         }
         // a hit that hurts him shakes all of him, crown and hands with him
         lu.shake = Math.max(0, lu.shake - dt / LU_SHAKE_SECS);
@@ -805,11 +830,18 @@
     function luStage(b, dt) {
         const pace = luPace();
         lu.stT += dt;
+        if (lu.swoop && lu.stage !== 2) luSwoopStep(dt, pace);      // the part ended mid-swoop: home
         if (lu.stage === 'break') {
             if (lu.stT >= LU_BREAK) { lu.stage = 2; lu.stT = 0; lu.mi = 0; lu.restT = LU_REST / pace; }
             return;
         }
         if (lu.stage === 'drain') {
+            if (lu.mem) {
+                lu.stT = 0;
+                if (menuFightShowStep(dt)) return;
+                lu.mem = false;
+                luReach();
+            }
             for (const h of lu.hands) luHandStep(h, dt, pace);
             if (lu.stT >= LU_DRAIN_SECS) luTurnStart();
             return;
@@ -817,17 +849,6 @@
         if (lu.stage === 'turn') {
             const end = luCorruptTimes().end;
             lu.sec = Math.min(end, lu.sec + dt);
-            // Changed, and the second part is over: the game's last memory is
-            // earned here, not at the end, and plays over the fight while it
-            // holds on him as he now is. Only the first time -- once it has
-            // been earned, or with nothing left to earn, part 3 just starts.
-            if (lu.sec >= end && lu.mem === undefined) {
-                lu.mem = typeof menuVoidMemory === 'function' && menuVoidMemory();
-            }
-            if (lu.mem) {
-                if (menuFightShowStep(dt)) return;
-                lu.mem = false;
-            }
             if (lu.sec >= end) {
                 lu.stage = 3; lu.stT = 0; lu.mi = 0; lu.restT = LU_REST3 / LU_PACE3;
                 b.hp = b.maxHp = luCrownLeft() + LU_HEAD_HP;
@@ -847,6 +868,7 @@
         }
         if (lu.stage === 3) { luAttack3(dt, pace); return; }
         for (const h of lu.hands) luHandStep(h, dt, pace);
+        luSwoopStep(dt, pace);
         luDirect(dt, pace);
     }
 
@@ -856,6 +878,8 @@
         if ((lu.restT -= dt) > 0) return;
         const list = LU_MOVES[lu.stage];
         const m = list[lu.mi++ % list.length];
+        lu.swoops = 0;
+        lu.swoopRest = LU_REFORM + LU_STAGGER * 2;      // the wings grow in before the first
         if (m.B) {
             for (const h of lu.hands) luForm(h, m.B);
             if (m.B === 'clap') lu.clap = { x: lu.x, y: LU_CLAP_Y, gap: LU_CLAP_GAP, st: 'open', t: 0 };
@@ -865,6 +889,47 @@
         }
         lu.restT = LU_REST / pace;
     }
+
+    // With his wings out: up to one side, wings raised (the tell), down across
+    // the field in an arc toward you and up the far side, and back onto his
+    // drift. Wings gone, or the part over, and he only goes home.
+    function luSwoopStep(dt, pace) {
+        const winged = lu.stage === 2 && lu.hands.some(h => h.form === 'wings');
+        let s = lu.swoop;
+        if (!s) {
+            if (!winged || lu.swoops >= LU_SWOOPS || (lu.swoopRest -= dt) > 0) return;
+            const wing = lu.hands.find(h => h.form === 'wings');
+            if (wing.t > LU_WING_SECS / pace - (LU_SWOOP_WIND + LU_SWOOP_SECS + LU_SWOOP_HOME) / pace) return;
+            // the first from the side he is nearer, across to the other; the
+            // next back the other way
+            const dir = lu.swoops ? -lu.swoopDir : lu.x < LW / 2 ? 1 : -1;
+            s = lu.swoop = { st: 'wind', t: 0, dir };
+            lu.swoopDir = dir;
+            lu.sw = { x: lu.x, y: lu.y, k: 0, vx: 0, vy: 0 };
+        }
+        if (!winged && s.st !== 'home') { s.st = 'home'; s.t = 0; s.k0 = lu.sw.k; }
+        s.t += dt;
+        const top = LU_Y - 30, x0 = LW / 2 - s.dir * LU_SWOOP_X;
+        if (s.st === 'wind') {
+            const k = luClamp(s.t / (LU_SWOOP_WIND / pace));
+            Object.assign(lu.sw, { x: x0, y: top, k: luEase(k) });
+            if (k >= 1) { s.st = 'dive'; s.t = 0; }
+        } else if (s.st === 'dive') {
+            const u = luClamp(s.t / (LU_SWOOP_SECS / pace));
+            Object.assign(lu.sw, { x: LW / 2 - s.dir * LU_SWOOP_X * Math.cos(Math.PI * u),
+                                   y: top + (LU_SWOOP_DEPTH + 30) * Math.sin(Math.PI * u), k: 1 });
+            if (u >= 1) { s.st = 'home'; s.t = 0; s.k0 = 1; }
+        } else {
+            const k = luClamp(s.t / (LU_SWOOP_HOME / pace));
+            lu.sw.k = s.k0 * (1 - luEase(k));
+            if (k >= 1) {
+                lu.swoop = null; lu.sw = null;
+                lu.swoops++;
+                lu.swoopRest = LU_SWOOP_REST / pace;
+            }
+        }
+    }
+    function luDiving() { return !!lu.swoop && lu.swoop.st === 'dive'; }
 
     // The last part: one thing at a time, and a rest between.
     function luAttack3(dt, pace) {
@@ -1108,7 +1173,7 @@
     // From wherever `src` says down to the floor. It gathers first, a thin line
     // growing brighter where it will land and following you, then fires.
     function luBeam(src, pace) {
-        const bm = { src, x: paddle.x, st: 'charge', t: 0, pace, hit: false };
+        const bm = { src, x: paddle.x, st: 'charge', t: 0, pace, hit: false, look: lu.stage === 3 ? 1 : LU_BEAM_LOOK12 };
         lu.beams.push(bm);
         return bm;
     }
@@ -1254,13 +1319,23 @@
     // ---- the change ------------------------------------------------------------------
     // Part two beaten: everything he has out stops, the world holds still,
     // and a hand reaches down over you while your light runs up it.
+    // The second part is over. The game's last memory is earned here, before
+    // anything of the change -- it is how he fell, and the change would give
+    // it away -- and plays over the fight, the world held and both his arms
+    // at rest, before a hand comes down for you. Only the first time: once it
+    // has been earned, or with nothing left to earn, the drain just starts.
     function luDrainStart() {
         lu.stage = 'drain'; lu.stT = 0;
         luCallOff();
         luFreeze();
         capsule = null;
+        for (const h of lu.hands) luForm(h, 'arm');
+        lu.mem = typeof menuVoidMemory === 'function' && menuVoidMemory();
+        if (!lu.mem) luReach();
+    }
+    function luReach() {
         const near = paddle.x < lu.x ? lu.hands[0] : lu.hands[1];
-        for (const h of lu.hands) luForm(h, h === near ? 'reach' : 'arm');
+        luForm(near, 'reach');
     }
     // ...and with it, he changes
     function luTurnStart() {
@@ -1648,10 +1723,27 @@
     }
 
     function luTouch(br, ball, hit) {
-        if (!lu.pend || !lu.pend.pocket) return false;
-        luCatch(lu.pend.pocket, ball);
-        lu.pend = null;
-        return true;
+        if (!lu.pend) return false;
+        if (lu.pend.pocket) {
+            luCatch(lu.pend.pocket, ball);
+            lu.pend = null;
+            return true;
+        }
+        // swooping, he meets a head with all of him moving: it goes back
+        // down at you, harder, carried the way he was going -- and the hit
+        // still counts, on a feather or on him
+        if (luDiving() && (lu.pend.body || lu.pend.piece) && !(ball.luSpikeT > clock)) {
+            labBounce(ball, hit);
+            const sp = effSpeed() * LU_SPIKE;
+            const vx = ball.vx + (lu.sw.vx || 0) * 0.5, vy = Math.max(Math.abs(ball.vy), sp * 0.6);
+            const n = Math.hypot(vx, vy) || 1;
+            ball.vx = vx / n * sp; ball.vy = vy / n * sp;
+            ball.boost = LU_SPIKE;
+            ball.luSpikeT = clock + 0.3;
+            luHit(bricks[0], hit.cx, hit.cy);
+            return true;
+        }
+        return false;
     }
 
     // A ring where it struck, for the hits that do nothing: everything drawn
@@ -1738,6 +1830,7 @@
         b.hp = b.maxHp = stage === 3 ? luCrownLeft() + LU_HEAD_HP : luHp12();
         if (stage === 2) b.hp = LU_HP2 + LU_DRAIN_LEFT;
         lu.shake = 0; lu.grey = 0; lu.end = null; lu.perish = null; lu.ash = [];
+        lu.swoop = null; lu.sw = null;
         for (const h of lu.hands) h.wingK = 0;
         for (const h of lu.hands) luForm(h, 'arm');
         for (const o of lu.orbs) o.gone = 0;
@@ -2569,40 +2662,43 @@
     function luDrawBeams() {
         for (const bm of lu.beams) {
             const [sx, sy] = bm.src(), ey = padY() + padH();
+            // a hand's beam is dimmer and thinner (look < 1); still as wide as
+            // what it hits, glow and all, so it never catches you off its edge
+            const lk = bm.look, wk = 0.75 + 0.25 * lk;
             ctx.save();
             ctx.lineCap = 'round';
             if (bm.st === 'charge') {
                 const k = luClamp(bm.t / (LU_BEAM_CHARGE / bm.pace));
                 ctx.setLineDash([6, 8]);
                 ctx.lineDashOffset = -clock * 60;
-                ctx.strokeStyle = 'rgba(224,40,60,' + (0.15 + 0.45 * k).toFixed(3) + ')';
-                ctx.lineWidth = 1 + 2 * k;
+                ctx.strokeStyle = 'rgba(224,40,60,' + ((0.15 + 0.45 * k) * (0.5 + 0.5 * lk)).toFixed(3) + ')';
+                ctx.lineWidth = 1 + 2 * k * wk;
                 ctx.beginPath();
                 ctx.moveTo(sx, sy);
                 ctx.lineTo(bm.x, ey);
                 ctx.stroke();
                 ctx.setLineDash([]);
                 ctx.globalCompositeOperation = 'lighter';
-                const r = 8 + 26 * k;
-                ctx.globalAlpha = 0.5 + 0.4 * k;
+                const r = (8 + 26 * k) * wk;
+                ctx.globalAlpha = (0.5 + 0.4 * k) * lk;
                 ctx.drawImage(luBlob('rgba(255,40,30,1)'), sx - r, sy - r, r * 2, r * 2);
             } else {
                 const fade = bm.st === 'fade' ? 1 - bm.t / 0.3 : 1;
                 const flick = 0.9 + 0.1 * Math.sin(clock * 60);
-                ctx.globalAlpha = 0.6 * fade;
+                ctx.globalAlpha = 0.6 * fade * lk;
                 ctx.strokeStyle = 'rgba(20,0,4,1)';
-                ctx.lineWidth = LU_BEAM_W * 1.6;
+                ctx.lineWidth = LU_BEAM_W * 1.6 * wk;
                 ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(bm.x, ey); ctx.stroke();
                 ctx.globalCompositeOperation = 'lighter';
                 for (const [wd, col, al] of [[LU_BEAM_W * 1.3, '224,40,60', 0.45], [LU_BEAM_W, '224,40,60', 0.75],
                                              [LU_BEAM_W * 0.35, '255,210,190', 0.95]]) {
-                    ctx.globalAlpha = al * fade * flick;
+                    ctx.globalAlpha = al * fade * flick * lk;
                     ctx.strokeStyle = 'rgb(' + col + ')';
-                    ctx.lineWidth = wd;
+                    ctx.lineWidth = wd * wk;
                     ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(bm.x, ey); ctx.stroke();
                 }
-                const r = LU_BEAM_W * 2;
-                ctx.globalAlpha = 0.8 * fade;
+                const r = LU_BEAM_W * 2 * wk;
+                ctx.globalAlpha = 0.8 * fade * lk;
                 ctx.drawImage(luBlob('rgba(255,40,30,1)'), bm.x - r, ey - r * 0.6, r * 2, r * 1.2);
             }
             ctx.restore();

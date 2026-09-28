@@ -72,12 +72,13 @@
             // a colonnade: pillars with lanes between them under a cracked
             // silver lintel, two of the lanes running up through the cracks
             // to the back of it. The CONGA walks the floor under it, turning
-            // at the one block that has fallen there
+            // at the one block that has fallen there. The pillars are two
+            // high, with silver at their feet, so that block lies where the
+            // line walks rather than down where it would crowd the paddle
             { dbg: 'RUINS 2', pace: 1, silverHp: 2, mini: 'conga',
               rows: ['S.SSS.S',
                      'Y.O.O.Y',
-                     'O.Y.Y.O',
-                     'Y.O.O.Y',
+                     'O.S.S.O',
                      '.......',
                      '...X...'] },
             LV_BOSS
@@ -133,14 +134,19 @@
                      'R.R.R.R',
                      'ROOOOOR',
                      'RX...XR'] },
-            // breached: the gate open up to the keep, PONG on the ceiling
-            // behind it all, and every head past him is one of his
+            // the court behind the battlements is PONG's: an empty row under
+            // the ceiling where he drops in on the first head to get up
+            // there, and every head past him is one of his. Two sally lanes
+            // run straight up either side of the keep to it, and what he
+            // sends back comes down on the battlements from above. No stone:
+            // nothing may keep a head from reaching him, or him from
+            // sending it back down
             { dbg: 'CASTLE 2', pace: 3, silverHp: 2, mini: 'pong',
-              rows: ['S.SAS.S',
-                     '.S...S.',
-                     'R.ROR.R',
-                     'ROO.OOR',
-                     '.X...X.'] },
+              rows: ['.......',
+                     'S.SAS.S',
+                     'R.OOO.R',
+                     'R.O.O.R',
+                     'Y.YYY.Y'] },
             LV_BOSS
         ]
     };

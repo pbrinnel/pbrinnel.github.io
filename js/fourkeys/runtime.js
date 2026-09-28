@@ -51,7 +51,11 @@
         },
         get stageNames() { return LEVELS.map(l => l.dbg); },
         fight(who) { LAB.boss = who; LAB.open = false; startAt(LEVELS.length - 1); },
-        usePad(key) { LAB.pad = key; labPadUse(key); },
+        usePad(key) {
+            LAB.pad = key;
+            labPadUse(key);
+            if (typeof menuPadKept === 'function') menuPadKept(key);     // remembered for next time
+        },
         stageAt(n, open) { LAB.open = !!open; startAt(n); },
         // every capsule the game has, for the lab's give buttons
         get caps() { return CAP_KEYS.map(k => ({ key: k, name: CAPS[k].short })); },
@@ -118,10 +122,13 @@
     //
     // A level's rider makes an entrance. The screen starts without him, and
     // only once the rally has been going MINI_WAIT0..MINI_WAIT1 seconds --
-    // rolled fresh every time -- does he come on, shouting as he does. How he
-    // comes on (walking, lowering, fading) is his own `enter`; the shout is
-    // here, so every one of them has it. The screen cannot end while he is
-    // still to come, and if the wall is gone before he is, he comes at once.
+    // rolled fresh every time, or his own `wait` [from, to] -- does he come
+    // on, shouting as he does. One with a `due()` of his own comes when that
+    // says so instead (PONG, the moment a head is about to reach the back
+    // wall). How he comes on (walking, lowering, fading) is his own `enter`;
+    // the shout is here, so every one of them has it. The screen cannot end
+    // while he is still to come, and if the wall is gone before he is, he
+    // comes at once.
     const MINI_WAIT0 = 5, MINI_WAIT1 = 10;
     let labMiniWait = null;          // { who, t }: a rider still to come
     function labMiniStart() {
@@ -129,7 +136,8 @@
         labMiniWait = null;
         const own = LEVELS[stage] && LEVELS[stage].mini;
         if (own && LAB_MINI[own]) {
-            labMiniWait = { who: own, t: MINI_WAIT0 + Math.random() * (MINI_WAIT1 - MINI_WAIT0) };
+            const m = LAB_MINI[own], w = m.wait || [MINI_WAIT0, MINI_WAIT1];
+            labMiniWait = { who: own, t: m.due ? Infinity : w[0] + Math.random() * (w[1] - w[0]) };
             return;
         }
         const who = LAB.mini;
@@ -142,7 +150,8 @@
         const w = labMiniWait;
         if (!w || phase !== 'play') return;
         const wall = bricks.some(b => b.alive && b.kind !== 'X');
-        if ((w.t -= dt) > 0 && wall) return;
+        const due = LAB_MINI[w.who].due;
+        if ((w.t -= dt) > 0 && wall && !(due && due())) return;
         labMiniWait = null;
         labM = LAB_MINI[w.who];
         if (!labM.start(true)) { labM = null; labClearIfDone(); return; }
@@ -153,8 +162,9 @@
     }
 
     // A rider has been beaten, not merely outlasted: the round pays MINI BOSS
-    // CLEAR for it. The MOLE getting off the edge does not count.
-    function labMiniDown() { if (round) round.mini = true; }
+    // CLEAR for it, or for `share` of it where he comes in more than one (the
+    // MOLEs). One getting off the edge does not count.
+    function labMiniDown(share) { if (round) round.mini = Math.min(1, (round.mini || 0) + (share || 1)); }
 
     function labHolds(ball) { return !!(labB && labB.holds && labB.holds(ball)); }
 
@@ -526,6 +536,9 @@
     // wrong for a head, so his own flash stands in for it while the blow holds.
     // A head that had already gone grey before it died (the WINDMILL's last
     // flower) sets c.grey, and starts there rather than flushing back to colour.
+    // One that dies wearing something (the IDOL's stone) sets c.cover, drawn
+    // over the face as it greys, and c.crumble, the grey head wearing it, to
+    // come apart as.
     function labHeadFall(extra) {
         const c = bossFall;
         if (!c || !c.head) return;
@@ -544,12 +557,13 @@
                     ctx.drawImage(g, c.x - w / 2, c.y - h / 2 + e * F_SAG, w, h);
                     ctx.globalAlpha = 1;
                 }
+                if (c.cover) c.cover(c.x - w / 2, c.y - h / 2 + e * F_SAG, w, h);
             }
         } else {
             // from where the sag left him, or he jumps back up as he comes apart
             ctx.save();
             ctx.translate(0, F_SAG);
-            drawHeadCrumble(c, headSprite2('grey'));
+            drawHeadCrumble(c, c.crumble || headSprite2('grey'));
             ctx.restore();
         }
         const a = impact ? (impact.t < HIT_HOLD ? 1 : 1 - (impact.t - HIT_HOLD) / HIT_FADE) : 0;

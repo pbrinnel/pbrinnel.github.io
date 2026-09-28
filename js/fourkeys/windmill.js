@@ -31,7 +31,7 @@
     let WM_HUB      = 60;     // px, how wide a head is
     let WM_SPIN0    = 0.5;    // rad/s a flower turns with every petal on
     let WM_SPIN1    = 1.6;    // ...and with one left
-    let WM_Y        = 150;    // where the outer flowers' heads hang
+    let WM_Y        = 60;     // where the outer flowers' heads hang
     let WM_STAGGER  = 80;     // ...and how much lower every other one hangs
     let WM_DRIFT    = 18;     // px each one sways either side
     let WM_FALL     = 420;    // px/s^2 a petal comes down at once it is off
@@ -345,7 +345,9 @@
     }
 
     // a stem from the top of the screen down to the back of the head, bowed
-    // a little the way it sways, with a leaf off it
+    // a little the way it sways, with a leaf off it. The leaf grows from the
+    // stem's own midpoint and turns with it there -- the curve's control point
+    // is off the stem, so a leaf hung on that drifts away from it on a sway.
     function wmDrawStem(f) {
         const top = f.u * LW;
         const mx = (top + f.cx) / 2 + (f.cx - top) * 0.6, my = f.cy * 0.45;
@@ -355,9 +357,13 @@
         ctx.moveTo(top, 0);
         ctx.quadraticCurveTo(mx, my, f.cx, f.cy);
         ctx.stroke();
+        const lx = (top + 2 * mx + f.cx) / 4, ly = (2 * my + f.cy) / 4;
+        const along = Math.atan2(f.cy, f.cx - top);            // the stem's heading there
+        const out = along - Math.PI / 2 * f.dir;               // square off it, to one side
         ctx.fillStyle = WM_STEM;
         ctx.beginPath();
-        ctx.ellipse(mx + 9 * f.dir, my, 12, 5, 0.6 * f.dir, 0, Math.PI * 2);
+        ctx.ellipse(lx + Math.cos(out) * 10, ly + Math.sin(out) * 10, 12, 5,
+                    out - 0.5 * f.dir, 0, Math.PI * 2);
         ctx.fill();
         ctx.lineWidth = 1;
     }

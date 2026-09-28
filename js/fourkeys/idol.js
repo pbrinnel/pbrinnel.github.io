@@ -34,7 +34,15 @@
     // except that a head going over the top of him to the other side sends
     // him straight back up, quickly (IDOL_RISE_QUICK), so you are never left
     // walled off from your own head.
-    let IDOL_HP        = 10;     // hits on bare face to finish him
+    //
+    // Under IDOL_SMASH_AT of his health he has a second attack, and it takes
+    // turns with the drop. Its tell is nothing like the drop's: instead of a
+    // fast tremor where he hangs, he rocks slowly side to side, tilting, and
+    // lifts, gliding to the middle as he winds up. Then he smashes down one
+    // diagonal to the floor at the left and back, and down the other at the
+    // right and back. The drop says get out from under him; this says get
+    // under where he was, because the middle is the one place both miss.
+    let IDOL_HP        = 18;     // hits on bare face to finish him
     let IDOL_W         = 290;    // how wide he is
     let IDOL_Y         = 105;    // where his middle hangs; his crown is off the top
     let IDOL_BITE      = 40;     // px round where a head lands that its stone comes off
@@ -56,6 +64,13 @@
     let IDOL_RISE      = 150;    // px/s he goes back up at
     let IDOL_RISE_QUICK = 700;   // ...and when a head has gone over him
     let IDOL_CLIMB     = 0.4;    // how much of the original's climb this fight has
+    let IDOL_SMASH_AT  = 0.8;    // share of his health under which the smash joins the drop
+    let IDOL_ROCK      = 1.6;    // seconds of rocking before a smash, which is its tell
+    let IDOL_ROCK_TILT = 0.14;   // ...how far he tilts each way, in radians
+    let IDOL_ROCK_LIFT = 16;     // ...and how far he lifts, winding up
+    let IDOL_SMASH_T   = 0.42;   // seconds each smash takes to reach the floor
+    let IDOL_SMASH_HOLD = 0.3;   // ...how long it stays there
+    let IDOL_SMASH_BACK = 0.55;  // ...and how long it takes back up
     // The act a run draws him from, 1 easy to 3 hard. The drop is his only
     // attack and it is telegraphed, and at Paul's numbers a bite stays open
     // for several returns, so what he mostly asks for is aim.
@@ -64,7 +79,9 @@
                    'IDOL_BRICK', 'IDOL_CRACK', 'IDOL_CRACK_MAX', 'IDOL_CRACK_W',
                    'IDOL_STREAK_GAP', 'IDOL_WALK', 'IDOL_WAIT_MIN',
                    'IDOL_WAIT_MAX', 'IDOL_DROP_MIN', 'IDOL_DROP_MAX', 'IDOL_SHAKE', 'IDOL_SHAKE_PX',
-                   'IDOL_G', 'IDOL_DOWN', 'IDOL_RISE', 'IDOL_RISE_QUICK', 'IDOL_CLIMB');
+                   'IDOL_G', 'IDOL_DOWN', 'IDOL_RISE', 'IDOL_RISE_QUICK', 'IDOL_CLIMB',
+                   'IDOL_SMASH_AT', 'IDOL_ROCK', 'IDOL_ROCK_TILT', 'IDOL_ROCK_LIFT',
+                   'IDOL_SMASH_T', 'IDOL_SMASH_HOLD', 'IDOL_SMASH_BACK');
 
     // His two coats, each a heap of whole pieces (idolCoat). A piece is there
     // or it is gone, so he breaks in Brandon-shaped chunks, never in squares.
@@ -84,7 +101,8 @@
             b.y = -(bh + 40);
             idol = { stone: idolCoat(IDOL_STONE), brick: idolCoat(IDOL_BRICKS), chips: [], dust: [], t: 0, pend: null, bites: 0, streak: 0, lastHit: -99,
                      x: LW / 2, tx: LW / 2, wander: IDOL_WAIT_MIN, cy: IDOL_Y,
-                     stage: 'idle', st: 0, vy: 0, jx: 0, pin: null, side: 0, drops: 0,
+                     stage: 'idle', st: 0, vy: 0, jx: 0, rock: 0, pin: null, side: 0, drops: 0,
+                     smashes: 0, smashNext: true, sm: null,
                      next: IDOL_DROP_MIN + Math.random() * (IDOL_DROP_MAX - IDOL_DROP_MIN) };
         },
         reset() { idol = null; },
@@ -118,9 +136,9 @@
             else idol.pend = { bare: true };
             return hit;
         },
-        // falling, he only knocks the ball down ahead of him: no chip, no wound
+        // falling or smashing, he only knocks the ball down ahead of him: no chip, no wound
         touch(br, ball, hit) {
-            if (idol.stage !== 'fall') return false;
+            if (idol.stage !== 'fall' && !(idol.stage === 'smash' && idol.sm.ph === 'go')) return false;
             labBounce(ball, hit);
             ball.vy = Math.abs(ball.vy);
             idol.pend = null;
@@ -173,7 +191,8 @@
             const bare = gone(idol.brick);
             return { name: 'IDOL', hp: b.hp, max: b.maxHp, w: bw,
                      line: 'stone ' + gone(idol.stone) + '% off, rubble ' + bare + '% off · ' + idol.bites + ' bites · streak ' + idol.streak + ' · ' +
-                           idol.stage + (idol.pin ? ', pinning you' : '') + ' · ' + idol.drops + ' drops' };
+                           idol.stage + (idol.pin ? ', pinning you' : '') + ' · ' + idol.drops + ' drops, ' +
+                           idol.smashes + ' smashes' };
         }
     };
 
@@ -227,9 +246,35 @@
                 const d = idol.tx - idol.x;
                 const v = Math.sign(d) * IDOL_WALK * Math.min(1, Math.abs(d) / 40);
                 idol.x += Math.abs(v * dt) > Math.abs(d) ? d : v * dt;
-                if (phase === 'play' && (idol.next -= dt) <= 0) { idol.stage = 'shake'; idol.st = 0; }
+                if (phase === 'play' && (idol.next -= dt) <= 0) {
+                    // under IDOL_SMASH_AT the two attacks take turns, the smash first
+                    const b = bricks[0], hurt = b && b.hp < b.maxHp * IDOL_SMASH_AT;
+                    idol.stage = hurt && idol.smashNext ? 'rock' : 'shake';
+                    if (hurt) idol.smashNext = !idol.smashNext;
+                    idol.st = 0;
+                }
                 break;
             }
+            case 'rock': {
+                // the smash's tell: a slow rock, tilting, lifting, and drifting
+                // to the middle -- nothing like the drop's tremor
+                idol.st += dt;
+                const k = Math.min(1, idol.st / (IDOL_ROCK * 0.5));
+                idol.rock = Math.sin(idol.st * 7) * IDOL_ROCK_TILT * k;
+                idol.cy = IDOL_Y - IDOL_ROCK_LIFT * k;
+                const d = LW / 2 - idol.x;
+                idol.x += Math.sign(d) * Math.min(Math.abs(d), 260 * dt);
+                if (idol.st >= IDOL_ROCK) {
+                    idol.rock = 0;
+                    idol.stage = 'smash';
+                    idol.smashes++;
+                    idolSmashLeg(0);
+                }
+                break;
+            }
+            case 'smash':
+                idolSmash(dt, h);
+                break;
             case 'shake':
                 idol.st += dt;
                 // a tremor that builds, not a strobe: he moves, nothing flashes
@@ -274,6 +319,59 @@
                     idol.next = idolRand(IDOL_DROP_MIN, IDOL_DROP_MAX);
                 }
                 break;
+        }
+    }
+
+    // One leg of the smash: from where he hangs, down the diagonal to the
+    // floor on side i (0 the left, 1 the right).
+    function idolSmashLeg(i) {
+        const h = bw * (BALL_RY / BALL_RX);
+        const floor = padY() + padH() / 2 + 6 - h / 2;
+        const dx = floor - IDOL_Y;
+        const x = i ? Math.min(LW - bw / 2, idol.x + dx) : Math.max(bw / 2, idol.x - dx);
+        idol.sm = { i, ph: 'go', t: 0, from: { x: idol.x, y: idol.cy }, to: { x, y: floor } };
+        idol.side = 0;
+    }
+
+    function idolSmash(dt, h) {
+        const sm = idol.sm;
+        sm.t += dt;
+        if (sm.ph === 'go') {
+            const k = Math.min(1, sm.t / IDOL_SMASH_T), e = k * k;       // gathering speed, like a fall
+            idol.x = sm.from.x + (sm.to.x - sm.from.x) * e;
+            idol.cy = sm.from.y + (sm.to.y - sm.from.y) * e;
+            // the drop's rule: your middle under his footprint and he stops on
+            // you; anything less and he shoves you out to your side
+            const c = idolChord();
+            if (c && Math.abs(paddle.x - idol.x) < idolChord(sm.to.y)) {
+                idol.pin = { x: paddle.x };
+            } else if (c && idolOver() > 0 && !idol.side) {
+                idol.side = paddle.x < idol.x ? -1 : 1;
+            }
+            if (k >= 1 || idol.pin) {
+                sm.ph = 'hold'; sm.t = 0;
+                for (let n = 0; n < 10; n++) idolDust(idol.x - bw * 0.25 + Math.random() * bw * 0.5, idol.cy + h * 0.45);
+            }
+        } else if (sm.ph === 'hold') {
+            if (sm.t >= IDOL_SMASH_HOLD) {
+                sm.ph = 'back'; sm.t = 0;
+                sm.at = { x: idol.x, y: idol.cy };
+                idol.pin = null;
+                idol.side = 0;
+            }
+        } else {
+            // back up the way he came, and after the second, down off the
+            // lift onto his own line
+            const k = Math.min(1, sm.t / IDOL_SMASH_BACK), e = k * k * (3 - 2 * k);
+            const y = sm.i ? IDOL_Y : sm.from.y;
+            idol.x = sm.at.x + (sm.from.x - sm.at.x) * e;
+            idol.cy = sm.at.y + (y - sm.at.y) * e;
+            if (k >= 1) {
+                if (sm.i === 0) { idolSmashLeg(1); return; }
+                idol.sm = null;
+                idol.stage = 'idle';
+                idol.next = idolRand(IDOL_DROP_MIN, IDOL_DROP_MAX);
+            }
         }
     }
 
@@ -475,14 +573,30 @@
         ctx.globalAlpha = 1;
     }
 
+    // He dies in whatever stone he still had on: the colour goes out of the
+    // bare face under it and he comes apart with the coats still on him.
     function idolDie(b) {
-        // whatever is left of both coats comes off him
-        for (const coat of [idol.stone, idol.brick]) {
-            for (const pc of coat.pieces) if (pc.on) idolFall(coat, b, pc);
-        }
+        idol.rock = 0;
         b.alive = false;
         clearStage();
         labHeadDied(b.x + bw / 2, b.y + bh / 2, bw);
+        bossFall.cover = (x, y, w, h) => { idolDrawCoat(idol.brick, x, y, w, h); idolDrawCoat(idol.stone, x, y, w, h); };
+        bossFall.crumble = idolDeadSprite();
+    }
+
+    // the grey head with both coats as they were, for coming apart
+    function idolDeadSprite() {
+        const grey = headSprite2('grey');
+        if (!grey) return null;
+        const c = document.createElement('canvas');
+        c.width = grey.width; c.height = grey.height;
+        const g = c.getContext('2d');
+        g.drawImage(grey, 0, 0);
+        for (const coat of [idol.brick, idol.stone]) {
+            const k = idolBake(coat);
+            if (k) g.drawImage(k, 0, 0, c.width, c.height);
+        }
+        return c;
     }
 
     // The sprite one piece is drawn with: a Brandon carved the way the
@@ -582,6 +696,13 @@
         const x = b.x + b.jnx * o, y = b.y + b.jny * o, w = bw, h = bh;
         const rim = headSprite2('flat', STONE_RIM);
         if (!rim) return;
+        // the smash's rocking tilts all of him, about his middle
+        ctx.save();
+        if (idol.rock) {
+            ctx.translate(x + w / 2, y + h / 2);
+            ctx.rotate(idol.rock);
+            ctx.translate(-(x + w / 2), -(y + h / 2));
+        }
         // the pale stone round the outside of him, the statues' mark
         const m = STONE_RIM_W * 1.6;
         ctx.drawImage(rim, x - m, y - m * h / w, w + 2 * m, h + 2 * m * h / w);
@@ -595,6 +716,7 @@
             ctx.drawImage(headSprite2('flat', '#f2efe9'), x, y, w, h);
             ctx.globalAlpha = 1;
         }
+        ctx.restore();
         idolDrawChips();
         // his crown is off the top of the screen, so his health runs along it
         const grow = phase === 'entrance' ? enterK() : 1;

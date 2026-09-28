@@ -5,7 +5,11 @@
 // Cloudflare dashboard.
 //
 //   GET  /  -> { boards: { FARM: [...], ... }, total: [...] }
-//   POST /  -> { stage: "FARM", ini: "ABC", score: 1234 }, returns the same
+//   POST /  -> { stage: "FARM", ini: "ABC", score: 1234, pad: "ember" }, returns the same
+//
+// A stage's row keeps the paddle the run was played with, when it is one of
+// PADS, and the page shows it beside the score. TOTAL adds up runs that may
+// have been played with different paddles, so its rows have none.
 //
 // Every stage in STAGES is a table of its own, exactly like brandon.html's:
 // the best TOP_N runs, the same initials as often as they earn it. TOTAL is
@@ -35,6 +39,9 @@ const BESTS = 'bests';
 // here and in the page's BOARD_IDS.
 const STAGES = ['FARM', 'RUINS', 'CITY', 'VOLCANO', 'CASTLE', 'VOID', 'BOSS RUSH'];
 const IN_TOTAL = ['FARM', 'RUINS', 'CITY', 'VOLCANO', 'CASTLE', 'VOID'];
+// The paddles' keys, as the save file pins them (_ref/BRANDON-SAVE.md). One the
+// page sends that is not here is left off the row rather than refused.
+const PADS = ['standard', 'classic', 'gilt', 'statue', 'frost', 'ember', 'pair'];
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -88,6 +95,7 @@ export default {
       const stage = String(body?.stage ?? '');
       const ini = String(body?.ini ?? '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
       const score = Math.floor(Number(body?.score));
+      const pad = PADS.includes(body?.pad) ? body.pad : null;
 
       if (!STAGES.includes(stage)) return json({ error: 'no such stage' }, 400);
       if (ini.length !== 3) return json({ error: 'need three letters' }, 400);
@@ -110,7 +118,7 @@ export default {
       const list = view.boards[stage];
       const onBoard = list.length < TOP_N || score > list[list.length - 1].score;
       if (onBoard) {
-        list.push({ ini, score, at: Date.now() });
+        list.push(pad ? { ini, score, at: Date.now(), pad } : { ini, score, at: Date.now() });
         list.sort(byScore);
         view.boards[stage] = list.slice(0, TOP_N);
       }

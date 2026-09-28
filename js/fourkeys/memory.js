@@ -1553,11 +1553,13 @@
     const MS_GROUND = 575;
     const MS_ODIN_H = 250;
     const MS_SURTR_H = MS_ODIN_H * 2;
-    const MS_ODIN_X = [210, 300];    // where he stands, and where he walks to
+    const MS_ODIN_X = [240, 320];    // where he stands, and where he walks to
     const MS_SURTR_X = 590;
     const MS_SURGE_PX = 70, MS_BACK_PX = 700;
     const MS_ANGEL_H = MS_ODIN_H / 1.5;
-    const MS_ANGEL_X = 120;          // among the ranks, behind the front of them
+    // among the ranks, behind the front of them -- and far enough back that
+    // the surge (MS_SURGE_PX) never carries him in behind HIM
+    const MS_ANGEL_X = 60;
     const MS_LINES = {
         taunt: [['You will not triumph today, ', 'odin'], ['BRANDON', 'surtr'], ['!', 'odin']],
         halt: [['This moment is mine. Stand back.', 'odin']],
@@ -1631,8 +1633,13 @@
     const MC_LU = [400, 150, 0.5];   // where the Fallen is, his middle, and his scale
     const MC_SMALL_H = 90;           // how tall each of the five is when he comes
     const MC_CELL = 7;               // px, the grain they come apart in
-    // where the five stand, left to right, and which level's boss each becomes
-    const MC_RING = [[156, 318, 1], [262, 412, 2], [400, 450, 3], [538, 412, 4], [644, 318, 5]];
+    // where the five stand, left to right, and which level's boss each becomes:
+    // spread the width of the hall and staggered in height, so that grown
+    // they overlap only at their edges
+    const MC_RING = [[110, 540, 1], [255, 330, 2], [400, 575, 3], [560, 330, 4], [700, 455, 5]];
+    // ...and how big each is grown, of the size his fight has him: a little
+    // under, so the five fit the hall together
+    const MC_SCALE = 0.8;
     const MC_LINE = [['...and to my loyal followers I grant you your own kingdom in this new world.', 'fallen']];
 
     const mcZap = i => MC_ZAP + i * MC_ZAP_GAP;
@@ -1685,7 +1692,7 @@
         memLine(MC_LINE, 'fallen', LW / 2, 34, 22, memClamp((s - MC_SAY[0]) / (MC_SAY[1] - MC_SAY[0])), MC_SAY);
         MC_RING.forEach(([x, y, n], i) => {
             const a = MC_SHOUT[0] + i * 0.15;
-            const top = y + MC_TOP[n];
+            const top = y + MC_TOP[n] * MC_SCALE;
             memLine([['BRANDON!', 'fallen']], 'you', x, Math.max(70, top - 14), 18,
                     memClamp((s - a) / (MC_SHOUT[1] - a)), [a, MC_SHOUT[1]]);
         });
@@ -1720,7 +1727,7 @@
         if (s < a || s > b) return;
         const on = Math.min(1, (s - a) / 0.2, (b - s) / MC_ARC_TAIL);
         const k = memCourtGrow(mcTurn(s, i));
-        const r = memLerp(MC_SMALL_H * 0.6, MC_REACH[n], k), cy = y + memLerp(0, MC_MID[n], k);
+        const r = memLerp(MC_SMALL_H * 0.6, MC_REACH[n] * MC_SCALE, k), cy = y + memLerp(0, MC_MID[n] * MC_SCALE, k);
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
         ctx.globalAlpha *= on * 0.5;
@@ -1772,7 +1779,7 @@
             g.save();
             g.translate(x, y);
             g.rotate(wig(2, 1.3));
-            const sc = memLerp(MC_TURN_FROM, 1, memCourtGrow(turn)) * (1 + 0.02 * Math.sin(s * 2.1 + i));
+            const sc = memLerp(MC_TURN_FROM, 1, memCourtGrow(turn)) * MC_SCALE * (1 + 0.02 * Math.sin(s * 2.1 + i));
             g.scale(sc, sc);
             MC_BOSSES[n](g, s);
             g.restore();
@@ -1786,7 +1793,7 @@
         if (turn >= 1) { big(); return; }
         // the boss's cells are coarser, since there is so much more of him;
         // they run up off the top, where the stems and the long bodies go
-        const r = MC_REACH[n] * 1.4;
+        const r = MC_REACH[n] * MC_SCALE * 1.4;
         g.save(); memCourtCells(g, turn, i, true, x - r, 0, x + r, y + r, MC_CELL * 2); big(); g.restore();
     }
 

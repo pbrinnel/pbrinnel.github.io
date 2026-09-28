@@ -31,21 +31,43 @@
                    'PONG_AIM', 'PONG_HOME', 'PONG_Y', 'PONG_W', 'PONG_PTS');
 
     let pong = null;
-    // Making an entrance he slides in along the ceiling from off one side to
-    // the middle over PONG_ENTER, and no head gets past him or off him until
-    // he is there.
+    // Making a level's entrance he is a jumpscare. He waits, unseen, for the
+    // first head that is about to reach the back wall with nothing left in
+    // its way (`due`), then drops out of the ceiling in PONG_POP right where
+    // it will get there, shouting, and sends it back. If the wall goes before
+    // any head gets up there, he slides in along the ceiling over PONG_ENTER
+    // instead. No head gets past him until he is there.
     const PONG_ENTER = 1.8;
+    const PONG_POP = 0.22;
+    let pongAt = null;               // where `due` saw the head going to reach him
 
     LAB_MINI.pong = {
+        due() {
+            const line = PONG_Y + pongH() / 2;
+            for (const b of balls) {
+                if (b.stuck || caught(b) || b.vy >= 0) continue;
+                const t = (b.y - extY(b) - line) / -b.vy;
+                if (t < 0 || t > PONG_POP + 0.08) continue;
+                const x = labFold(b.x + b.vx * t), mid = (b.x + x) / 2;
+                const open = !bricks.some(o => o.alive && o.y + bh > line && o.y < b.y &&
+                                               Math.abs(o.x + bw / 2 - mid) < bw / 2 + extX(b));
+                if (open) { pongAt = x; return true; }
+            }
+            return false;
+        },
         start(entering) {
             const from = Math.random() < 0.5 ? -1 : 1;
-            pong = { x: entering ? LW / 2 + from * (LW / 2 + PONG_W) : LW / 2, vx: 0, home: LW / 2,
+            const pop = entering && pongAt !== null;
+            const x0 = pop ? Math.max(PONG_W / 2, Math.min(LW - PONG_W / 2, pongAt))
+                     : entering ? LW / 2 + from * (LW / 2 + PONG_W) : LW / 2;
+            pongAt = null;
+            pong = { x: x0, vx: 0, home: LW / 2, dy: pop ? -(PONG_Y + pongH()) : 0, pop,
                      hp: PONG_HP, maxHp: PONG_HP, flash: 0, jt: 0,
                      goals: 0, returns: 0, fall: null, enter: entering ? 0 : 1, from };
             return true;
         },
         enter() {
-            const at = () => ({ x: Math.max(70, Math.min(LW - 70, pong.x)), y: PONG_Y + pongH() + 16 });
+            const at = () => ({ x: Math.max(70, Math.min(LW - 70, pong.x)), y: PONG_Y + (pong.dy || 0) + pongH() + 16 });
             return Object.assign(at(), { at });
         },
         reset() { pong = null; },
@@ -80,6 +102,14 @@
         if (pong.flash > 0) pong.flash = Math.max(0, pong.flash - dt * 4);
         if (pong.jt > 0) pong.jt = Math.max(0, pong.jt - dt * JIG_DECAY);
         if (pong.enter < 1) {
+            if (pong.pop) {
+                // down out of the ceiling, a little past his line and back
+                pong.enter = Math.min(1, pong.enter + dt / PONG_POP);
+                const k = pong.enter, e = 1 + 2.2 * Math.pow(k - 1, 3) + 1.2 * Math.pow(k - 1, 2);
+                pong.dy = -(PONG_Y + pongH()) * (1 - e);
+                if (pong.enter >= 1) { pong.dy = 0; pong.jt = 1; }
+                return;
+            }
             pong.enter = Math.min(1, pong.enter + dt / PONG_ENTER);
             const k = pong.enter, e = 1 - Math.pow(1 - k, 3);
             pong.x = LW / 2 + pong.from * (LW / 2 + PONG_W) * (1 - e);
@@ -122,7 +152,8 @@
     // down off it, angled by where on him it landed, and spun by his travel
     // the way yours spins it -- turned the other way, since he is upside down
     function pongBallStep(b) {
-        if (!pong || pong.hp <= 0 || b.vy >= 0 || pong.enter < 1) return;
+        // dropping in, he is there to meet it just before he has settled
+        if (!pong || pong.hp <= 0 || b.vy >= 0 || pong.enter < (pong.pop ? 0.7 : 1)) return;
         const line = PONG_Y + pongH() / 2, ry = extY(b);
         if (b.y - ry > line || b.y < PONG_Y) return;              // not up to him yet, or already past
         if (Math.abs(b.x - pong.x) > PONG_W / 2 + extX(b) * 0.6) return;   // beside him
@@ -150,7 +181,7 @@
         // a knock puts him up into the ceiling a little, the way yours puts you down
         const o = pong.jt > 0 ? wobble(pong.jt) * JIG_PADDLE : 0;
         ctx.save();
-        ctx.translate(pong.x, PONG_Y - Math.abs(o));
+        ctx.translate(pong.x, PONG_Y + (pong.dy || 0) - Math.abs(o));
         ctx.scale(1, -1);
         ctx.drawImage(sp, -w / 2, -h / 2, w, h);
         if (pong.flash > 0) {
@@ -159,7 +190,7 @@
             ctx.globalAlpha = 1;
         }
         ctx.restore();
-        labBar(pong.x - 40, PONG_Y + h / 2 + 5, 80, pong.hp / pong.maxHp, 3);
+        if (pong.enter >= 1) labBar(pong.x - 40, PONG_Y + h / 2 + 5, 80, pong.hp / pong.maxHp, 3);
     }
 
     // drawCrumble, the right way up for a man lying on the ceiling: each piece

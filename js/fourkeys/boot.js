@@ -10,7 +10,9 @@
     // It does not stay. After BOOT_STAY0..BOOT_STAY1 seconds of a rally it
     // lifts off the top of the screen and is gone for BOOT_AWAY0..BOOT_AWAY1,
     // then comes down again shouting, somewhere over you -- the wall is
-    // yours to work on while it is away, and it is never away for long.
+    // yours to work on while it is away, and it is never away for long: out
+    // of sight and back again inside three seconds. Seen off, it explodes
+    // where it is.
     let BOOT_HP    = 6;       // hits on the sole to see it off
     let BOOT_W     = 180;     // px along the sole
     let BOOT_SINK  = 26;      // px/s it comes down
@@ -20,15 +22,16 @@
     let BOOT_LIFT  = 1.2;     // seconds it takes to lift again after a stamp
     let BOOT_PTS   = 120;     // a hit on the sole
     let BOOT_STAY0 = 8,  BOOT_STAY1 = 14;     // seconds it stays before it goes...
-    let BOOT_AWAY0 = 1,  BOOT_AWAY1 = 3;      // ...and is gone
+    let BOOT_AWAY0 = 0.4, BOOT_AWAY1 = 1.2;   // ...and is gone, off the top
     let BOOT_ARRIVE = 1.1;    // seconds it takes to come down into view, near enough
+    let BOOT_LEAVE = 950;     // px/s it goes back up and out at
     // The act a run draws it from, 1 easy to 3 hard. It is the only one of
     // them that takes a life off you outright, and it asks for a hit on the
     // sole every few seconds while you are keeping a head alive.
     let BOOT_LVL   = 4;
     LAB_KNOBS.push('BOOT_LVL', 'BOOT_HP', 'BOOT_W', 'BOOT_SINK', 'BOOT_KNOCK', 'BOOT_TRACK',
                    'BOOT_TOP', 'BOOT_LIFT', 'BOOT_PTS', 'BOOT_STAY0', 'BOOT_STAY1', 'BOOT_AWAY0',
-                   'BOOT_AWAY1', 'BOOT_ARRIVE');
+                   'BOOT_AWAY1', 'BOOT_ARRIVE', 'BOOT_LEAVE');
     const bootRoll = (a, b) => a + Math.random() * (b - a);
 
     // Read off the levelled art: the toe and heel of his sole in his own box
@@ -133,7 +136,7 @@
         if (!boot) return;
         if (boot.flash > 0) boot.flash = Math.max(0, boot.flash - dt * 5);
         if (boot.iframes > 0) boot.iframes = Math.max(0, boot.iframes - dt);
-        if (boot.hp <= 0) { boot.sole -= 700 * dt; return; }     // off it goes, back where it came from
+        if (boot.boom) { boot.boom.t += dt; return; }
         // down into view, slowly, at the start and every time it comes back
         if (boot.arriving) {
             boot.sole += (BOOT_TOP - boot.sole) * (1 - Math.exp(-dt / (BOOT_ARRIVE / 3)));
@@ -154,7 +157,7 @@
         }
         // going: straight up and out, and away once it is out of sight
         if (boot.leaving) {
-            boot.sole -= 520 * dt;
+            boot.sole -= BOOT_LEAVE * dt;
             if (boot.sole < -BOOT_W * 2) {
                 boot.leaving = false;
                 boot.away = bootRoll(BOOT_AWAY0, BOOT_AWAY1);
@@ -203,11 +206,67 @@
         boot.iframes = 0.2;
         boot.sole = Math.max(BOOT_TOP, boot.sole - BOOT_KNOCK);
         award(BOOT_PTS, hit.cx, hit.cy);
-        if (boot.hp <= 0) { labMiniDown(); labClearIfDone(); }
+        if (boot.hp <= 0) { bootBoom(); labMiniDown(); labClearIfDone(); }
+    }
+
+    // Seen off: the boot and shin fly apart where they are, in pieces of the
+    // picture, with one flash and a ring -- the same end a head gets.
+    const BOOT_BOOM_SECS = 1.3, BOOT_BOOM_COLS = 6, BOOT_BOOM_ROWS = 6;
+    function bootBoom() {
+        const g = bootGeom(), pieces = [];
+        const cx = g.sw / 2, cy = g.sh / 2;
+        for (let r = 0; r < BOOT_BOOM_ROWS; r++) {
+            for (let c = 0; c < BOOT_BOOM_COLS; c++) {
+                const px = (c + 0.5) / BOOT_BOOM_COLS * g.sw, py = (r + 0.5) / BOOT_BOOM_ROWS * g.sh;
+                const a = Math.atan2(py - cy, px - cx), sp = 160 + Math.random() * 260;
+                pieces.push({ c, r, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 120,
+                              va: (Math.random() - 0.5) * 12 });
+            }
+        }
+        boot.boom = { t: 0, x: boot.x - g.ax, y: boot.sole - g.ay, pieces };
+        boot.flash = 0;
+    }
+
+    function bootDrawBoom() {
+        const bm = boot.boom, t = bm.t;
+        if (t >= BOOT_BOOM_SECS) return;
+        const g = bootGeom(), sp = bootSprite('raw');
+        if (!sp) return;
+        const cw = g.sw / BOOT_BOOM_COLS, ch = g.sh / BOOT_BOOM_ROWS;
+        const sw = sp.width / BOOT_BOOM_COLS, sh = sp.height / BOOT_BOOM_ROWS;
+        const mx = boot.x, my = boot.sole - BOOT_W * BOOT_TALL / 2;
+        ctx.save();
+        if (t < 0.15) {
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.globalAlpha = 0.8 * (1 - t / 0.15);
+            const gr = ctx.createRadialGradient(mx, my, 0, mx, my, BOOT_W);
+            gr.addColorStop(0, 'rgba(255,240,210,1)');
+            gr.addColorStop(1, 'rgba(255,150,60,0)');
+            ctx.fillStyle = gr;
+            ctx.beginPath(); ctx.arc(mx, my, BOOT_W, 0, 2 * Math.PI); ctx.fill();
+            ctx.globalCompositeOperation = 'source-over';
+        }
+        if (t < 0.45) {
+            ctx.globalAlpha = 0.7 * (1 - t / 0.45);
+            ctx.strokeStyle = '#ffd9a0';
+            ctx.lineWidth = 3 * (1 - t / 0.45) + 1;
+            ctx.beginPath(); ctx.arc(mx, my, BOOT_W * (0.3 + 2.2 * t), 0, 2 * Math.PI); ctx.stroke();
+        }
+        const k = t / BOOT_BOOM_SECS;
+        ctx.globalAlpha = Math.max(0, 1 - k * k);
+        for (const p of bm.pieces) {
+            ctx.save();
+            ctx.translate(bm.x + (p.c + 0.5) * cw + p.vx * t, bm.y + (p.r + 0.5) * ch + p.vy * t + 350 * t * t);
+            ctx.rotate(p.va * t);
+            ctx.drawImage(sp, p.c * sw, p.r * sh, sw, sh, -cw / 2, -ch / 2, cw, ch);
+            ctx.restore();
+        }
+        ctx.restore();
     }
 
     function bootDraw() {
         if (!boot || boot.sole < -BOOT_W * 4) return;
+        if (boot.boom) { bootDrawBoom(); return; }
         const g = bootGeom(), sp = bootSprite('raw');
         if (!sp) return;
         const x = boot.x - g.ax, y = boot.sole - g.ay;

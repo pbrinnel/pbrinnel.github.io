@@ -1,7 +1,7 @@
 'use strict';
 
     // ---- MOLE (mini-boss) ------------------------------------------------------------
-    // Somewhere in an ordinary stage, one brandon is the photograph nobody
+    // Somewhere in an ordinary stage, MOLE_COUNT brandons are the photograph nobody
     // dyed -- the gauntlet's bounty, so anyone who has sat on the throne knows
     // to look at him. When a head comes at him he trades places with a brick
     // beside him, and the brick takes the hit meant for him. He cannot hide in
@@ -9,8 +9,9 @@
     // MOLE_REACH spaces, and failing that to the nearest few anywhere -- so
     // breaking the wall round him never leaves him a sitting duck; a longer
     // hop only takes him longer, which is your moment. The stage cannot end
-    // while he is up, and once he is the last one standing he runs for the
-    // edge, the way the hat's last few do.
+    // while one is up, and once they are all that is left standing they run
+    // for the edge, the way the hat's last few do. Each is his own share of
+    // MINI BOSS CLEAR.
     let MOLE_HP     = 4;       // hits to finish him
     let MOLE_NOTICE = 110;     // px from his edge a head coming at him gets a move
     let MOLE_SWAP   = 0.16;    // seconds a trade takes
@@ -22,75 +23,95 @@
     let MOLE_RUN    = 6;       // seconds his run takes, once he is the last one
     let MOLE_REACH  = 2.5;     // spaces he will hop, with nothing next to him
     let MOLE_FAR    = 3;       // ...and with nothing that close either, the nearest this many anywhere
+    let MOLE_COUNT  = 2;       // how many come up
     // The act a run draws him from, 1 easy to 3 hard. He cannot touch you: all
     // he does is refuse to be hit, so the only thing he costs is time.
     let MOLE_LVL    = 1;
     LAB_KNOBS.push('MOLE_LVL', 'MOLE_HP', 'MOLE_NOTICE', 'MOLE_SWAP', 'MOLE_COOL', 'MOLE_DAZE',
-                   'MOLE_ODDS', 'MOLE_DIAG', 'MOLE_PTS', 'MOLE_RUN', 'MOLE_REACH', 'MOLE_FAR');
+                   'MOLE_ODDS', 'MOLE_DIAG', 'MOLE_PTS', 'MOLE_RUN', 'MOLE_REACH', 'MOLE_FAR', 'MOLE_COUNT');
 
-    let mole = null;
+    let moles = [];                // each: { brick, cool, daze, swaps, ran, gone, fade }
+    function moleOf(b) { return moles.find(m => m.brick === b) || null; }
 
     // Making an entrance, he surfaces in a hole the wall has lost, fading up
     // out of it over MOLE_FADE, and cannot be hit or move until he is there.
     const MOLE_FADE = 1.4;
 
     LAB_MINI.mole = {
-        // one of the stage's own, picked where he has the most places to go --
-        // and no wall, no mole. Making an entrance, he is one more instead,
-        // in whichever empty slot of the wall has the most round it.
+        // they come on early: there are two to find
+        wait: [1.5, 3],
+        // each one of the stage's own, picked where he has the most places to
+        // go -- and no wall, no moles. Making an entrance, each is one more
+        // instead, in whichever empty slot of the wall has the most round it.
         start(entering) {
-            const pool = bricks.filter(b => b.alive && b.kind !== 'X');
-            if (!pool.length) return false;
-            const room = b => moleMoves(b).length;
-            let b = null;
-            if (entering) {
-                const holes = moleHoles();
-                const most = holes.length ? Math.max(...holes.map(room)) : 0;
-                if (most > 0) {
-                    const picks = holes.filter(h => room(h) >= Math.min(3, most));
-                    const h = picks[(Math.random() * picks.length) | 0];
-                    b = newBrick(h.x, h.y, 'R', 1);
-                    bricks.push(b);
+            moles = [];
+            for (let i = 0; i < Math.max(1, Math.round(MOLE_COUNT)); i++) {
+                const pool = bricks.filter(b => b.alive && b.kind !== 'X' && !b.mole);
+                if (!pool.length) break;
+                const room = b => moleMoves(b).length;
+                let b = null;
+                if (entering) {
+                    const holes = moleHoles();
+                    const most = holes.length ? Math.max(...holes.map(room)) : 0;
+                    if (most > 0) {
+                        const picks = holes.filter(h => room(h) >= Math.min(3, most));
+                        const h = picks[(Math.random() * picks.length) | 0];
+                        b = newBrick(h.x, h.y, 'R', 1);
+                        bricks.push(b);
+                    }
                 }
+                if (!b) {
+                    const most = Math.max(...pool.map(room));
+                    const picks = pool.filter(o => room(o) >= Math.min(3, most));
+                    b = picks[(Math.random() * picks.length) | 0];
+                }
+                b.mole = true;
+                b.lab = true;
+                b.hp = b.maxHp = MOLE_HP;
+                moles.push({ brick: b, cool: 0, daze: 0, swaps: 0, ran: false, gone: false, fade: entering ? 0 : 1 });
             }
-            if (!b) {
-                const most = Math.max(...pool.map(room));
-                const picks = pool.filter(o => room(o) >= Math.min(3, most));
-                b = picks[(Math.random() * picks.length) | 0];
-            }
-            b.mole = true;
-            b.lab = true;
-            b.hp = b.maxHp = MOLE_HP;
-            mole = { brick: b, cool: 0, daze: 0, swaps: 0, ran: false, gone: false, fade: entering ? 0 : 1 };
-            return true;
+            return moles.length > 0;
         },
+        // the first shouts through the runtime; the rest shout for themselves
         enter() {
-            const b = mole.brick;
-            return { x: b.x + bw / 2, y: b.y + bh + 8, at: () => ({ x: b.x + bw / 2, y: b.y + bh + 8 }) };
+            const at = b => () => ({ x: b.x + bw / 2, y: b.y + bh + 8 });
+            for (const m of moles.slice(1)) {
+                const p = at(m.brick)();
+                labShout(p.x, p.y, 'BRANDON!', SHOUT_SECS * 1.6, at(m.brick));
+            }
+            const b = moles[0].brick;
+            return Object.assign(at(b)(), { at: at(b) });
         },
         // still surfacing: a head goes straight through where he is coming up
-        contact(br) { return br.mole && mole && mole.fade < 1 ? null : undefined; },
-        reset() { mole = null; },
+        contact(br) { const m = br.mole && moleOf(br); return m && m.fade < 1 ? null : undefined; },
+        reset() { moles = []; },
         update: moleUpdate,
         hit: moleHit,
         left: moleLeft,
         drawBrick(b) { if (!b.mole) return false; moleDraw(b); return true; },
-        finish() { if (!mole || !mole.brick.alive) return false; mole.brick.hp = 1; return true; },
+        finish() {
+            const up = moles.filter(m => m.brick.alive);
+            for (const m of up) m.brick.hp = 1;
+            return up.length > 0;
+        },
         acts: {
-            // the mole and whatever is beside him, and nothing else breakable
+            // the moles and whatever is beside them, and nothing else breakable
             alone() {
-                if (!mole || !mole.brick.alive) return false;
-                const keep = new Set([mole.brick, ...moleMoves(mole.brick)]);
+                const up = moles.filter(m => m.brick.alive);
+                if (!up.length) return false;
+                const keep = new Set(up.flatMap(m => [m.brick, ...moleMoves(m.brick)]));
                 for (const b of bricks) if (b.alive && b.kind !== 'X' && !keep.has(b)) b.alive = false;
-                moleLeft(bricks.filter(b => b.alive && b.kind !== 'X'));   // alone already: he runs
+                moleLeft(bricks.filter(b => b.alive && b.kind !== 'X'));   // alone already: they run
                 return true;
             }
         },
         state() {
-            const m = mole.brick;
-            return { name: 'MOLE', hp: m.hp, max: m.maxHp, alive: m.alive,
-                     line: !m.alive ? (mole.gone ? 'got away' : 'finished')
-                         : 'traded ' + mole.swaps + ' · ' + moleMoves(m).length + ' places to go' + (m.flee ? ' · running' : '') };
+            const up = moles.filter(m => m.brick.alive);
+            return { name: 'MOLE', hp: up.reduce((s, m) => s + m.brick.hp, 0), max: moles.length * MOLE_HP,
+                     alive: up.length > 0,
+                     line: moles.map(m => !m.brick.alive ? (m.gone ? 'got away' : 'finished')
+                         : 'traded ' + m.swaps + ' · ' + moleMoves(m.brick).length + ' places to go'
+                           + (m.brick.flee ? ' · running' : '')).join(' / ') };
         }
     };
 
@@ -115,11 +136,11 @@
     function moleSlot(b) { return b.slide ? { x: b.slide.x1, y: b.slide.y1 } : { x: b.x, y: b.y }; }
 
     // the bricks beside him he could trade with: alive, breakable, standing
-    // still, and next to him on the grid
+    // still, next to him on the grid, and not the other mole
     function moleMoves(m) {
         const a = moleSlot(m), px = (bw + GAP) * 1.01, py = (bh + GAP) * 1.01;
         return bricks.filter(o => {
-            if (o === m || !o.alive || o.kind === 'X' || o.flee || o.slide) return false;
+            if (o === m || o.mole || !o.alive || o.kind === 'X' || o.flee || o.slide) return false;
             const dx = Math.abs(o.x - a.x), dy = Math.abs(o.y - a.y);
             if (dx > px || dy > py) return false;
             return MOLE_DIAG >= 0.5 || dx < 1 || dy < 1;
@@ -132,7 +153,7 @@
         const near = moleMoves(m);
         if (near.length) return near;
         const a = moleSlot(m), step = bw + GAP;
-        const rest = bricks.filter(o => o !== m && o.alive && o.kind !== 'X' && !o.flee && !o.slide)
+        const rest = bricks.filter(o => o !== m && !o.mole && o.alive && o.kind !== 'X' && !o.flee && !o.slide)
             .map(o => ({ o, d: Math.hypot(o.x - a.x, o.y - a.y) })).sort((p, q) => p.d - q.d);
         const reach = rest.filter(r => r.d <= step * MOLE_REACH);
         return (reach.length ? reach : rest.slice(0, Math.max(1, Math.round(MOLE_FAR)))).map(r => r.o);
@@ -175,7 +196,10 @@
             b.y = s.y0 + (s.y1 - s.y0) * k + s.ny * lift;
             if (s.t >= 1) { b.x = s.x1; b.y = s.y1; b.slide = null; }
         }
-        if (!mole) return;
+        for (const mole of moles) moleStep(mole, dt);
+    }
+
+    function moleStep(mole, dt) {
         const m = mole.brick;
         if (mole.fade < 1) { mole.fade = Math.min(1, mole.fade + dt / MOLE_FADE); return; }
         if (!m.alive) {
@@ -187,9 +211,9 @@
             return;
         }
         if (phase !== 'play') return;
-        // the rest of the wall gone from round him another way (run off): he runs too
-        if (!mole.ran && !m.flee && !bricks.some(o => o !== m && o.alive && o.kind !== 'X')) {
-            moleLeft([m]);
+        // the rest of the wall gone from round them another way (run off): they run too
+        if (!mole.ran && !m.flee && !bricks.some(o => !o.mole && o.alive && o.kind !== 'X')) {
+            moleLeft(bricks.filter(o => o.alive && o.kind !== 'X'));
             return;
         }
         mole.cool = Math.max(0, mole.cool - dt);
@@ -215,13 +239,14 @@
     // hitBrick's work for him: health instead of one hit, and a capsule always
     function moleHit(b) {
         b.flash = 1;
+        const mole = moleOf(b);
         if (mole) mole.daze = MOLE_DAZE;
         if (--b.hp > 0) { award(MOLE_PTS, b.x + bw / 2, b.y); return; }
         b.alive = false;
         b.slide = null;
         shockwave(b);
         award(MOLE_PTS * 5, b.x + bw / 2, b.y);
-        labMiniDown();
+        labMiniDown(1 / Math.max(1, moles.length));
         if (b.flee) round.hunter++;
         if (!capsule) {
             const pool = capsulePool();
@@ -230,29 +255,32 @@
         if (++hits === 4 || hits === 12) bumpSpeed(1.12);
         const left = bricks.filter(x => x.alive && x.kind !== 'X');
         if (!left.length) clearStage();
+        else if (moleLeft(left)) { /* the last of them are off */ }
         else if (LEVELS[stage].talks && left.length <= FLEE_AT && fleeRoll < 0) {
             fleeRoll = FLEE_REROLL;
             tossForFlight();
         }
     }
 
-    // A brick has just died and the stage goes on. If he is all that is left,
-    // there is nowhere to hide: he runs. True if he has set off.
+    // A brick has just died and the stage goes on. If the moles are all that
+    // is left, there is nowhere to hide: they run. True if they have set off.
     function moleLeft(left) {
-        if (!mole || mole.ran || !mole.brick.alive) return false;
-        if (left.length !== 1 || left[0] !== mole.brick) return false;
-        const m = mole.brick;
-        m.slide = null;
-        mole.ran = true;
-        walkOff(m, FLEE_WAIT, MOLE_RUN);
-        return true;
+        if (!left.length || !left.every(b => b.mole)) return false;
+        const off = moles.filter(m => m.brick.alive && !m.ran);
+        for (const mole of off) {
+            mole.brick.slide = null;
+            mole.ran = true;
+            walkOff(mole.brick, FLEE_WAIT, MOLE_RUN);
+        }
+        return off.length > 0;
     }
 
     function moleDraw(b) {
         const sp = shapeSprite('mole', null, bw, bh, false);    // the photograph, undyed
         if (!sp) return;
         const o = b.jt > 0 ? wobble(b.jt) * JIG_BRICK : 0;
-        const k = mole && mole.brick === b ? mole.fade : 1;
+        const mole = moleOf(b);
+        const k = mole ? mole.fade : 1;
         ctx.save();
         // surfacing: up out of the hole as he fades in
         ctx.translate(b.x + b.jnx * o + bw / 2, b.y + b.jny * o + bh / 2 + (1 - k) * (1 - k) * bh * 0.8);
@@ -271,7 +299,7 @@
             const w = bw * 0.72;
             labBar(b.x + (bw - w) / 2, b.y - 8, w, b.hp / b.maxHp, 3);
         }
-        if (LAB.moves && mole && mole.brick === b && !b.flee) {
+        if (LAB.moves && mole && !b.flee) {
             ctx.strokeStyle = 'rgba(201,169,78,0.8)';
             ctx.lineWidth = 1.5;
             ctx.setLineDash([4, 4]);

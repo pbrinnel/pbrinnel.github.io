@@ -15,7 +15,7 @@
     // the lowest brick still breakable (congaCeil), so it never walks over
     // the wall, and it has more room to rise into as the wall is cleared.
     let CONGA_AT    = 7;       // bricks left when they get up
-    let CONGA_N     = 7;       // how many walk on to an open field
+    let CONGA_N     = 10;      // how many walk on to an open field, or onto a level
     let CONGA_SPEED = 80;      // px/s the front one walks at
     let CONGA_RUSH  = 0.12;    // ...and this share faster for every one knocked out
     let CONGA_DROP  = 46;      // px, a notch

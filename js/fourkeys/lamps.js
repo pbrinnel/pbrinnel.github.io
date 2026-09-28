@@ -14,16 +14,21 @@
     // one that is fading, or take the shot while the window is open. They
     // drift slowly up and down where they stand, each on its own beat, so the
     // shot that lit one a moment ago is not the shot that lights it now.
+    //
+    // Under LAMP_BLOW_AT of his health he fights back: every LAMP_BLOW_EVERY
+    // seconds there is a LAMP_BLOW_ODDS chance he swells up, turned to one
+    // lamp that is lit, and blows it out -- the gust visible all the way
+    // across, and the swell before it the warning.
     let LAMP_LVL    = 4;
     let LAMP_HP     = 16;     // hits to finish him, once you can reach him
     let LAMP_N      = 3;      // how many lamps there are
     let LAMP_SECS   = 10.9;   // how long a hit keeps one lit
     let LAMP_W      = 143;    // how long a lamp is
-    let LAMP_Y      = 305;    // the line they drift about
-    let LAMP_BOB    = 75;     // px either side of it they drift, a quarter of the field top to bottom
+    let LAMP_Y      = 250;    // the line they drift about
+    let LAMP_BOB    = 40;     // px either side of it they drift
     let LAMP_BOB_RATE = 0.4;  // rad/s of that drift
     let LAMP_BOSS_W = 420;    // how long he is
-    let LAMP_BOSS_Y = 95;     // ...and where he hangs
+    let LAMP_BOSS_Y = 80;     // ...and where he hangs, as high as he goes and still all on screen
     let LAMP_SPARKS = 22;     // sparks a second off a lit lamp, or off him burning
     let LAMP_COOL   = 0.6;    // seconds his fire takes to go out, or to come back
     let LAMP_STEAL  = 0.9;    // seconds the stream of his fire runs into a lamp being lit
@@ -31,8 +36,14 @@
     let LAMP_MOTE_SECS = 0.7; // ...each one's trip across
     let LAMP_SWEEP  = 0.4;    // rad/s of his patrol
     let LAMP_CLIMB  = 0.6;    // how much of the original's climb this fight has
+    let LAMP_BLOW_AT    = 0.6;  // share of his health under which he blows lamps out
+    let LAMP_BLOW_EVERY = 7;    // seconds between his chances to
+    let LAMP_BLOW_ODDS  = 0.3;  // ...and the chance he takes one
+    let LAMP_BLOW_WIND  = 0.8;  // seconds he swells up first, which is the tell
+    let LAMP_BLOW_GUST  = 0.5;  // ...and the gust's trip across to the lamp
     LAB_KNOBS.push('LAMP_LVL', 'LAMP_HP', 'LAMP_N', 'LAMP_SECS', 'LAMP_W', 'LAMP_Y',
-                   'LAMP_BOSS_W', 'LAMP_BOSS_Y', 'LAMP_SWEEP', 'LAMP_CLIMB', 'LAMP_BOB', 'LAMP_BOB_RATE', 'LAMP_SPARKS', 'LAMP_COOL', 'LAMP_STEAL', 'LAMP_MOTES', 'LAMP_MOTE_SECS');
+                   'LAMP_BOSS_W', 'LAMP_BOSS_Y', 'LAMP_SWEEP', 'LAMP_CLIMB', 'LAMP_BOB', 'LAMP_BOB_RATE', 'LAMP_SPARKS', 'LAMP_COOL', 'LAMP_STEAL', 'LAMP_MOTES', 'LAMP_MOTE_SECS',
+                   'LAMP_BLOW_AT', 'LAMP_BLOW_EVERY', 'LAMP_BLOW_ODDS', 'LAMP_BLOW_WIND', 'LAMP_BLOW_GUST');
 
     const LAMP_UP = -Math.PI / 2;     // stood on end, head at the top
 
@@ -47,7 +58,7 @@
             lamp = { t: 0, x: LW / 2, y: -LAMP_BOSS_W, pend: null, lit: 0, windows: 0, wasOpen: false, heat: 1, sparks: [],
                      lamps: Array.from({ length: n }, (_, i) => ({ u: (i + 0.5) / n, on: 0, y: LAMP_Y,
                                                                   ph: i * 2.3, lit: 99, acc: 0 })),
-                     motes: [] };
+                     motes: [], blowT: LAMP_BLOW_EVERY, blow: null, gust: [], blown: 0 };
             lampBox(b);
         },
         reset() { lamp = null; },
@@ -69,6 +80,7 @@
             // is all the way out
             const want = 1 - lamp.lamps.reduce((s, l) => s + lampHeld(l), 0) / lamp.lamps.length;
             lamp.heat += Math.max(-dt / LAMP_COOL, Math.min(dt / LAMP_COOL, want - lamp.heat));
+            lampBlowStep(b, dt);
             lampStealStep(dt);
             lampSparkStep(b, dt);
             lampBox(b);
@@ -138,11 +150,71 @@
             return { name: 'LAMPS', hp: b.hp, max: b.maxHp,
                      line: on + ' of ' + lamp.lamps.length + ' lit' +
                            (on === lamp.lamps.length ? ' · he is open, ' + soon.toFixed(1) + ' s left'
-                            : ' · he cannot be touched') + ' · ' + lamp.windows + ' windows' };
+                            : ' · he cannot be touched') + ' · ' + lamp.windows + ' windows · blown out ' +
+                           lamp.blown + (lamp.blow ? ' · blowing' : '') };
         }
     };
 
     function lampOpen() { return lamp.lamps.every(l => l.on > 0); }
+
+    // his answer, once he is hurt enough: a roll every LAMP_BLOW_EVERY, a
+    // swell toward one lit lamp, and the gust that puts it out
+    function lampBlowStep(b, dt) {
+        lamp.gust = lamp.gust.filter(g => (g.t += dt) < LAMP_BLOW_GUST * 1.4);
+        if (phase !== 'play') { lamp.blow = null; return; }
+        const bl = lamp.blow;
+        if (bl) {
+            bl.t += dt;
+            const h = LAMP_BOSS_W / SHAPE_ASPECT;
+            if (bl.t >= LAMP_BLOW_WIND && !bl.gone) {
+                bl.gone = true;
+                for (let i = 0; i < 26; i++) {
+                    lamp.gust.push({ t: -Math.random() * LAMP_BLOW_GUST * 0.4, l: bl.l,
+                                     sx: lamp.x + LAMP_BOSS_W * 0.36, sy: lamp.y - h * 0.1,     // his mouth
+                                     sway: (Math.random() - 0.5) * 50, len: 10 + Math.random() * 18 });
+                }
+            }
+            if (bl.t >= LAMP_BLOW_WIND + LAMP_BLOW_GUST) {
+                if (bl.l.on > 0) { bl.l.on = 0; bl.l.lit = 99; lamp.blown++; }
+                lamp.blow = null;
+            }
+            return;
+        }
+        if (b.hp >= b.maxHp * LAMP_BLOW_AT) return;
+        if ((lamp.blowT -= dt) > 0) return;
+        lamp.blowT = LAMP_BLOW_EVERY;
+        const lit = lamp.lamps.filter(l => l.on > 0);
+        if (!lit.length || Math.random() >= LAMP_BLOW_ODDS) return;
+        lamp.blow = { l: lit[(Math.random() * lit.length) | 0], t: 0, gone: false };
+    }
+
+    // how swollen he is: up over the wind-up, and out again with the gust
+    function lampSwell() {
+        const bl = lamp.blow;
+        if (!bl) return 0;
+        if (bl.t < LAMP_BLOW_WIND) { const k = bl.t / LAMP_BLOW_WIND; return k * k; }
+        return Math.max(0, 1 - (bl.t - LAMP_BLOW_WIND) / (LAMP_BLOW_GUST * 0.5));
+    }
+
+    // the gust: pale streaks from his mouth across to the lamp
+    function lampDrawGust() {
+        if (!lamp.gust.length) return;
+        ctx.save();
+        ctx.strokeStyle = '#e8eef2';
+        ctx.lineCap = 'round';
+        for (const g of lamp.gust) {
+            if (g.t < 0) continue;
+            const p = Math.min(1, g.t / LAMP_BLOW_GUST);
+            const tx = g.l.u * LW, ty = g.l.y;
+            const at = q => ({ x: g.sx + (tx - g.sx) * q + Math.sin(q * Math.PI) * g.sway,
+                               y: g.sy + (ty - g.sy) * q });
+            const a = at(p), z = at(Math.max(0, p - g.len / Math.hypot(tx - g.sx, ty - g.sy)));
+            ctx.globalAlpha = 0.55 * Math.sin(Math.min(1, g.t / (LAMP_BLOW_GUST * 1.4)) * Math.PI);
+            ctx.lineWidth = 2.5;
+            ctx.beginPath(); ctx.moveTo(z.x, z.y); ctx.lineTo(a.x, a.y); ctx.stroke();
+        }
+        ctx.restore();
+    }
 
     // the box the physics looks in: him and the whole row, wherever it
     // drifts -- stood on end, a lamp is its length tall
@@ -287,6 +359,13 @@
         const body = shapeSprite('boss', null, BOSS_W0, BOSS_H, false);
         if (body) {
             lampGlow(lamp.x, lamp.y, LAMP_BOSS_W * 0.6, lamp.heat);
+            // swelling to blow, he leans a little toward the lamp he means
+            const sw = lampSwell(), side = lamp.blow ? Math.sign(lamp.blow.l.u * LW - lamp.x) : 0;
+            ctx.save();
+            ctx.translate(lamp.x, lamp.y);
+            ctx.rotate(side * 0.12 * sw);
+            ctx.scale(1 + 0.08 * sw, 1 + 0.16 * sw);
+            ctx.translate(-lamp.x, -lamp.y);
             ctx.drawImage(body, lamp.x - LAMP_BOSS_W / 2, lamp.y - h / 2, LAMP_BOSS_W, h);
             lampLay(padTint('lampBossEmber', EMB_INK), lamp.x, lamp.y, LAMP_BOSS_W, h, 0, 0.72 * lamp.heat);
             if (b.flash > 0) {
@@ -295,7 +374,9 @@
                               lamp.x - LAMP_BOSS_W / 2, lamp.y - h / 2, LAMP_BOSS_W, h);
                 ctx.globalAlpha = 1;
             }
+            ctx.restore();
         }
+        lampDrawGust();
         lampDrawSparks();
         lampDrawMotes();
         const grow = phase === 'entrance' ? enterK() : 1;

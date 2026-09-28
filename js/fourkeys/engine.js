@@ -227,8 +227,10 @@
         { key: 'heads',    label: HEADS_AT + ' HEADS', pts: 600 },
         { key: 'grit',     label: 'NEVER GIVE UP',   pts: 400 },
         { key: 'hunter',   label: 'HUNTER',          pts: 300, many: true },
-        // a level's mini-boss beaten, not outlasted (see labMiniDown)
-        { key: 'mini',     label: 'MINI BOSS CLEAR', pts: 250 }
+        // a level's mini-boss beaten, not outlasted (see labMiniDown). It pays
+        // by the share of him beaten, so two MOLEs are half of it each and the
+        // one who gets away takes his half with him.
+        { key: 'mini',     label: 'MINI BOSS CLEAR', pts: 500 }
     ];
 
     // The reveal. The score does not move until the last line has landed --
@@ -1086,16 +1088,18 @@
     const BOARD_INI_KEY = 'brandon2.initials';
     let boards = {}, boardId = null;
     // the town's, once the table after an entry has been read (boardAsk)
-    let boardThen = null, boardWas = null, boardScore = 0;
+    let boardThen = null, boardWas = null, boardScore = 0, boardPad = null;
 
     // rows come back from a public endpoint, so treat them as untrusted text.
     // TOTAL adds up every stage it counts, so it can run past one run's cap.
+    // A row's paddle is kept only if it is one this game has.
     function cleanRows(raw, cap) {
         if (!Array.isArray(raw)) return [];
         return raw.map(r => ({
             ini: String((r && r.ini) || '???').toUpperCase()
                      .replace(/[^A-Z]/g, '').slice(0, 3).padEnd(3, '?'),
-            score: Math.max(0, Math.min(cap || SCORE_CAP, parseInt(r && r.score, 10) || 0))
+            score: Math.max(0, Math.min(cap || SCORE_CAP, parseInt(r && r.score, 10) || 0)),
+            pad: r && typeof r.pad === 'string' && Object.hasOwn(LAB_PAD, r.pad) ? r.pad : null
         })).sort((a, b) => b.score - a.score).slice(0, TOP_N);
     }
 
@@ -1130,7 +1134,7 @@
             const res = await fetch(BOARD_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ stage: boardId, ini, score: n })
+                body: JSON.stringify({ stage: boardId, ini, score: n, pad: boardPad || LAB.pad })
             });
             if (!res.ok) throw new Error(res.status);
             takeBoards(await res.json());
@@ -1151,10 +1155,12 @@
     // earned has been shown: the initials for `points` on stage n's table,
     // then the table, and a press on that runs `then`. The phase it
     // interrupted comes back with it. The run's score is kept apart, since
-    // the town has its own by now.
-    function boardAsk(n, points, then) {
+    // the town has its own by now -- and so is the paddle it was played with,
+    // since the town may have put a new one in your hands since.
+    function boardAsk(n, points, then, pad) {
         boardPick(n);
         boardScore = points;
+        boardPad = pad || null;
         let ini = '';
         try { ini = localStorage.getItem(BOARD_INI_KEY) || ''; } catch (e) { /* private window */ }
         entry = /^[A-Z]{3}$/.test(ini) ? ini : '';
@@ -1168,6 +1174,7 @@
     function boardLeave() {
         const then = boardThen;
         boardThen = null;
+        boardPad = null;
         showCursor(false);
         phase = boardWas;
         then();
@@ -1409,7 +1416,7 @@
         shoutT = -1;            // ...and leaves no yell of the boss's still waiting
         // a round's tally starts here and nowhere else -- a lost life and a
         // continue both happen inside one, and neither may wipe it
-        round = { lost: false, fast: false, heads: false, grit: false, hunter: 0, peak: 1, mini: false };
+        round = { lost: false, fast: false, heads: false, grit: false, hunter: 0, peak: 1, mini: 0 };
         eor = null;
 
         if (lvl.boss) {
@@ -2405,14 +2412,17 @@
         }
 
         if (b.kind === 'S' || b.kind === 'A') {
-            if (--b.hp > 0) return;
+            labBrickStruck(b);           // FROST's ice, if it was icy
+            if (--b.hp > 0) { labBrickHeld(b); return; }
             b.alive = false;
             shockwave(b);
             award(25 * b.maxHp, b.x + bw / 2, b.y);
+            labBrickGone(b);
         } else {
             b.alive = false;
             shockwave(b);
             award(TIERS[b.kind].pts, b.x + bw / 2, b.y);
+            labBrickGone(b);
             if (!tierSeen[b.kind] && (b.kind === 'O' || b.kind === 'R')) {
                 tierSeen[b.kind] = true;
                 bumpSpeed(1.1);
@@ -2455,7 +2465,7 @@
             heads:    round.heads ? 1 : 0,
             grit:     round.grit ? 1 : 0,
             hunter:   round.hunter,
-            mini:     round.mini ? 1 : 0
+            mini:     round.mini
         };
         for (const r of EOR_ROWS) {
             const n = met[r.key];
@@ -3081,7 +3091,9 @@
             if (fx.P > 0 && br.kind !== 'X' && br.kind !== 'Z') {
                 if (!b.pierced.has(br)) {     // one point of damage each, per trip
                     b.pierced.add(br);
+                    labHitBy = b;
                     hitBrick(br);
+                    labHitBy = null;
                 }
                 continue;
             }
@@ -3110,7 +3122,9 @@
             const glances = labGlances(br, hit);
             if (glances) rings.push({ x: hit.cx, y: hit.cy, t: 1 });
             else kick(br, -nx, -ny, 1);   // shoved away from where the ball struck
+            labHitBy = b;                  // EMBER's fire goes where his heads do
             hitBrick(br, hit.cx, hit.cy);
+            labHitBy = null;
             // it is the bounce that pays, not the wound: a glance off stone
             // winds you up as much as breaking a red does. PIERCE is the one
             // contact that does not, because it does not turn you -- and a
@@ -3274,7 +3288,8 @@
         if (phase === 'ascend') {
             // held on the blow: the ceremony does not begin until it is over
             if (!stepImpact(dt)) {
-                ascendT += dt;
+                // the town's levels stop short of you rising (menuHoldsTakeover)
+                ascendT = menuHoldsTakeover() ? Math.min(A_RISE, ascendT + dt) : ascendT + dt;
                 stepCrumble(bossFall, dt, A_DIE);
             }
             // ...and the handover waits for the screen to have gone as well as
@@ -4369,6 +4384,7 @@
             ctx.drawImage(shapeSprite('flash', '#f2efe9', bw, bh, true), -bw / 2, -bh / 2, bw, bh);
             ctx.globalAlpha = 1;
         }
+        labPadBurn(b);               // EMBER's fire in it
         ctx.restore();
     }
 
@@ -4791,6 +4807,8 @@
             text(String(i + 1), LW / 2 - 128 * k, y, size, col, 'right');
             text(r.ini, LW / 2 - 60 * k, y, size, col);
             text(String(r.score), LW / 2 + 160 * k, y, size, col, 'right');
+            // the paddle the run was played with, level with the row's letters
+            if (r.pad) labPadIcon(r.pad, LW / 2 + 215 * k, y - size * 0.33, 64 * k, false, mine || i === 0 ? 1 : 0.75);
         }
     }
 
@@ -5443,7 +5461,8 @@
         if (hud) {
             text('SCORE ' + score, 15 * u, 27 * u, 15 * u, '#f2efe9');
             text(menuBestLabel() + ' ' + best, 15 * u, 46 * u, 13 * u, '#8d877d');
-            text('TOTAL HIGH SCORE ' + menuBestTotal(), 15 * u, 63 * u, 13 * u, '#6d685f');
+            const total = menuBestTotal();
+            if (total > 0) text('TOTAL HIGH SCORE ' + total, 15 * u, 63 * u, 13 * u, '#6d685f');
         }
 
         // no lives counter over the ending -- it is meaningless by then, and it

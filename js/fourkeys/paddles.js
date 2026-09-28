@@ -40,8 +40,13 @@
     let FROST_DECK = 0.6;    // ...on a narrower flat, so more of him is a curve
     let FROST_FLAKES = 14;   // snowflakes a second coming off him...
     let FROST_BIG  = 0.25;   // ...this share of them a big one, six of him heads out
-    let EMB_LEN    = 0.88;   // ember: shorter...
-    let EMB_ANGLE  = 1.35;   // ...and his ends send a head off at a much sharper angle
+    let ICE_SECS   = 1;      // an icy brick struck sends the head off at full speed this long...
+    let ICE_RAMP   = 0.15;   // ...getting there over this, and coming back down over twice it
+    let ICE_TURN   = 0.35;   // ...turned this far (rad) the way it is spinning, at the most spin
+    let EMB_LEN    = 0.7;    // ember: much shorter...
+    let EMB_CATCH  = 0.1;    // ...but a brick a head of his breaks has this chance of going up in embers
+    let EMB_SPREAD = 0.25;   // ...a burning brick this chance of catching each one beside it
+    let EMB_SPREAD_AT = 1;   // ...seconds into burning that it does
     let EMB_GLOW   = 0.45;   // how much light he gives off
     let EMB_SPARKS = 34;     // sparks a second rising off him
     let EMB_ASH    = 12;     // wisps of smoke a second: ambiance, never something to look at...
@@ -54,8 +59,8 @@
     let V2_GLINT   = 5;      // ...seconds between one glint and the next...
     let V2_SWEEP   = 0.9;    // ...and how long a glint takes to cross him
     LAB_KNOBS.push('GILT_LEN', 'GILT_CAPS', 'GILT_SHINE', 'STAT_LEN', 'STAT_ANGLE', 'STAT_SPIN',
-                   'STAT_DIP', 'FROST_LEN', 'FROST_EDGE', 'FROST_SWIPE', 'FROST_DECK', 'FROST_FLAKES', 'FROST_BIG',
-                   'EMB_LEN', 'EMB_ANGLE', 'EMB_GLOW', 'EMB_SPARKS', 'PAIR_LEN', 'PAIR_QUAD', 'PAD_MARK', 'V2_GLOSS', 'V2_GLINT', 'V2_SWEEP');
+                   'STAT_DIP', 'FROST_LEN', 'FROST_EDGE', 'FROST_SWIPE', 'FROST_DECK', 'FROST_FLAKES', 'FROST_BIG', 'ICE_SECS', 'ICE_RAMP', 'ICE_TURN',
+                   'EMB_LEN', 'EMB_CATCH', 'EMB_SPREAD', 'EMB_SPREAD_AT', 'EMB_GLOW', 'EMB_SPARKS', 'PAIR_LEN', 'PAIR_QUAD', 'PAD_MARK', 'V2_GLOSS', 'V2_GLINT', 'V2_SWEEP');
     LAB_KNOBS.push('EMB_ASH', 'EMB_ASH_S', 'EMB_ASH_A');
 
     const V2_RIM    = '#e6edf5';
@@ -118,6 +123,8 @@
         if (labPFrom && (labPFade += dt) >= labPFadeSecs) labPFrom = null;
         if (labP && labP.step && !(king && phase === 'fall')) labP.step(dt);
         padMarkStep(dt);
+        padBurnStep(dt);
+        padIceStep(dt);
         for (const b of padBits) {
             b.t += dt;
             b.x += b.vx * dt;
@@ -312,6 +319,119 @@
         ctx.globalAlpha = 0.5 * (m.t / PAD_MARK);
         ctx.drawImage(sp, -w / 2, -h / 2, w, h);
         ctx.restore();
+    }
+
+    // ---- EMBER's wildfire -------------------------------------------------------
+    // A brick broken by a head that EMBER has marked has EMB_CATCH of going
+    // up: it bursts in embers and every brick next to it (corners too)
+    // catches. A burning brick wears the head's mark -- his tint, his sparks
+    // -- and burns up when PAD_MARK is out, scoring as if you had hit it. Each
+    // has one roll of EMB_SPREAD for each brick beside it, EMB_SPREAD_AT into
+    // its burning, so now and then a vein of it runs on through the wall.
+    // Only the wall's own bricks down to their last hit ever burn: never a
+    // boss, stone, a mini-boss, or silver or gold with more than one hit in it.
+    let labHitBy = null;             // the head a hit is from, while the engine hands it over
+
+    function padBurnable(o) {
+        return o.alive && !o.lab && !o.burn && 'YGORSA'.includes(o.kind) && o.hp === 1;
+    }
+    function padBeside(b) {
+        const px = (bw + GAP) * 1.01, py = (bh + GAP) * 1.01;
+        return bricks.filter(o => o !== b && Math.abs(o.x - b.x) <= px && Math.abs(o.y - b.y) <= py);
+    }
+    function padIgnite(o) { o.burn = { t: PAD_MARK, spread: EMB_SPREAD_AT, rolled: false }; }
+
+    // a brick has just been broken, by whatever labHitBy says
+    function labBrickGone(b) {
+        const ball = labHitBy;
+        if (!ball || !ball.mark || ball.mark.key !== 'ember' || Math.random() >= EMB_CATCH) return;
+        for (let n = 0; n < 26; n++) {
+            const a = Math.random() * Math.PI * 2, v = 60 + Math.random() * 160;
+            padBit(b.x + bw / 2, b.y + bh / 2, Math.random() < 0.4 ? EMB_RIM : EMB_INK, 0.5 + Math.random() * 0.6,
+                   Math.cos(a) * v, Math.sin(a) * v - 40, 60, 2 + Math.random() * 2.5, 0.95, 'glow');
+        }
+        for (const o of padBeside(b)) if (padBurnable(o)) padIgnite(o);
+    }
+
+    function padBurnStep(dt) {
+        if (phase !== 'play' || !bricks) return;
+        const shed = LAB_PAD.ember.shed;
+        for (const b of bricks) {
+            const f = b.burn;
+            if (!f) continue;
+            if (!b.alive) { b.burn = null; continue; }
+            f.t -= dt;
+            if (!f.rolled && PAD_MARK - f.t >= f.spread) {
+                f.rolled = true;
+                for (const o of padBeside(b)) if (padBurnable(o) && Math.random() < EMB_SPREAD) padIgnite(o);
+            }
+            const k = Math.max(0, f.t / PAD_MARK);
+            if (Math.random() < dt * 30 * (0.4 + 0.6 * k)) shed(b.x + Math.random() * bw, b.y + Math.random() * bh, k);
+            if (f.t <= 0) {
+                b.burn = null;
+                if (b.alive) hitBrick(b, b.x + bw / 2, b.y + bh / 2);
+            }
+        }
+    }
+
+    // ---- FROST's ice -----------------------------------------------------------------
+    // A head FROST has marked that strikes a silver or gold and leaves it
+    // standing leaves it icy. The next head to strike an icy brick, whoever
+    // sent it, goes off it at MAX_SPEED for ICE_SECS, turned a little the way
+    // it is spinning -- and the ice is spent, unless that head is FROST's
+    // too and the brick still stands.
+    function labBrickStruck(b) {
+        const ball = labHitBy;
+        if (!ball) return;
+        if (b.icy) {
+            b.icy = false;
+            const a = ICE_TURN * Math.max(-1, Math.min(1, ball.spin / SPIN_MAX));
+            const c = Math.cos(a), sn = Math.sin(a);
+            [ball.vx, ball.vy] = [ball.vx * c - ball.vy * sn, ball.vx * sn + ball.vy * c];
+            ball.ice = { t: 0 };
+            for (let n = 0; n < 12; n++) {
+                padBit(b.x + Math.random() * bw, b.y + Math.random() * bh, Math.random() < 0.5 ? FROST_RIM : FROST_INK,
+                       0.6 + Math.random() * 0.4, (Math.random() - 0.5) * 120, (Math.random() - 0.5) * 120, 60,
+                       2 + Math.random() * 2, 0.9, 'flake');
+            }
+        }
+    }
+    // ...and one that it did not break
+    function labBrickHeld(b) {
+        const ball = labHitBy;
+        if (ball && ball.mark && ball.mark.key === 'frost' && b.hp >= 1 && !b.lab) b.icy = true;
+    }
+    function padIceStep(dt) {
+        if (!balls) return;
+        for (const b of balls) {
+            const ic = b.ice;
+            if (!ic) continue;
+            ic.t += dt;
+            const full = MAX_SPEED / Math.max(1, effSpeed());
+            const up = Math.min(1, ic.t / ICE_RAMP), down = Math.max(0, (ic.t - ICE_SECS) / (ICE_RAMP * 2));
+            b.boost = 1 + (Math.max(1, full) - 1) * up * (1 - Math.min(1, down));
+            if (down >= 1) { b.ice = null; b.boost = 1; }
+            else if (Math.random() < dt * 40) padBit(b.x, b.y, FROST_RIM, 0.5, 0, 0, 0, 2, 0.8, 'flake');
+        }
+    }
+
+    // a burning or icy brick's tint, over it where drawBrick has it
+    function labPadBurn(b) {
+        if (b.icy) {
+            const sp = shapeSprite('iceFrost', FROST_INK, bw, bh, true);
+            if (sp) {
+                ctx.globalAlpha = 0.45 + 0.08 * Math.sin(clock * 2 + b.x);
+                ctx.drawImage(sp, -bw / 2, -bh / 2, bw, bh);
+                ctx.globalAlpha = 1;
+            }
+        }
+        const f = b.burn;
+        if (!f) return;
+        const sp = shapeSprite('burnEmber', EMB_INK, bw, bh, true);
+        if (!sp) return;
+        ctx.globalAlpha = 0.25 + 0.4 * Math.max(0, 1 - f.t / PAD_MARK) + 0.08 * Math.sin(clock * 9 + b.x);
+        ctx.drawImage(sp, -bw / 2, -bh / 2, bw, bh);
+        ctx.globalAlpha = 1;
     }
 
     // somewhere along one of him, picked at random
@@ -517,7 +637,7 @@
     LAB_PAD.frost = {
         name: 'FROST',
         ink: FROST_INK, rim: FROST_RIM,
-        blurb: 'easier to add spin · smaller sweet spot',
+        blurb: 'easier to add spin · smaller sweet spot · ices what it cannot break',
         lore: 'Cut from the ice that sealed the city the winter {odin}\'s light went out. ' +
               'Still cold to hold, and a head slides off him any way you like.',
         len: () => FROST_LEN,
@@ -558,17 +678,17 @@
         }
     };
 
-    // EMBER: lit from underneath, throwing sparks that rise. Shorter than
-    // standard, and his ends send a head off sharper than anyone else's --
-    // the whole field is reachable off him, and so is the wall beside you.
+    // EMBER: lit from underneath, throwing sparks that rise. Much shorter than
+    // standard, but a head off him carries his fire into the wall, and now
+    // and then a brick it breaks goes up and the fire runs on from there
+    // (EMBER's wildfire, above).
     LAB_PAD.ember = {
         name: 'EMBER',
         ink: EMB_INK, rim: EMB_RIM,
-        blurb: 'sharper angles off his ends · shorter',
+        blurb: 'much shorter · sets the wall alight',
         lore: 'Forged in the fire of {surtr}\'s footsteps, where the mountain still remembers the ' +
               'weight of him. He has never quite stopped burning.',
         len: () => EMB_LEN,
-        angle: () => EMB_ANGLE,
         under() {
             const r = padW() * 0.95;
             const g = ctx.createRadialGradient(paddle.x, padY(), 8, paddle.x, padY(), r);
