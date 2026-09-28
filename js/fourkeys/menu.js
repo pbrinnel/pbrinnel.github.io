@@ -978,6 +978,12 @@
     const M_SLATE = '#6b665d';       // where a colour goes while he is elsewhere
     const M_EMPTY = '#3a362f';       // a key not won yet
     const M_RISE_IN = 3, M_RISE_OUT = 2;   // per second a building lights as he lines up, and goes back
+    // Each building keeps a clock of its own (c.stir) that everything moving
+    // on it runs by, and it runs up to 1 + M_STIR times as fast while lit: a
+    // stir, not a spin-up. Times of day multiplied by a speed that changes
+    // would lurch everything a long way forward the moment he lined up.
+    const M_STIR = 0.6;
+    const M_KEY_TURN = 0.8;          // radians a second a lit key's flower turns
     const menuClamp = x => Math.max(0, Math.min(1, x));
     const menuEase = x => { x = menuClamp(x); return x * x * (3 - 2 * x); };
     const menuLerp = (a, b, k) => a + (b - a) * k;
@@ -1157,7 +1163,11 @@
     function menuRiseStep() {
         const t = menuNow(), dt = Math.min(0.1, t - (menu.drawT || t));
         menu.drawT = t;
-        for (const c of menu.cards) c.rise = menuClamp((c.rise || 0) + (menuAimed(c) ? dt * M_RISE_IN : -dt * M_RISE_OUT));
+        for (const c of menu.cards) {
+            c.rise = menuClamp((c.rise || 0) + (menuAimed(c) ? dt * M_RISE_IN : -dt * M_RISE_OUT));
+            c.stir = (c.stir || 0) + dt * (1 + M_STIR * c.rise);
+            c.turn = (c.turn || 0) + dt * M_KEY_TURN * c.rise;
+        }
     }
     function menuState(c) {
         const l = c.level, shut = l.n === 5 && !menuOpened();
@@ -1344,7 +1354,7 @@
                   : st.shut ? '#6a655c' : st.aimed ? '#f2efe9' : '#a39d93';
         text(l.name, c.x, nameY, big ? 19 : 20, lit, 'center');
         const ink = o => menu.keys[o.n] ? (st.aimed ? menuMix(o.ink, '#ffffff', 0.2) : o.ink) : M_EMPTY;
-        const turn = st.aimed ? menuNow() * 0.8 : 0;
+        const turn = c.turn || 0;
         if (big) MENU_LEVELS.forEach((o, i) => menuSigil(o.n, c.x - 45 + i * 30, ky, M_KEY_SMALL, ink(o), turn));
         else menuSigil(l.n, c.x, ky, M_KEY, ink(l), turn);
         if (got) text('BEST ' + st.best, c.x, y + c.h * 0.9, 11, st.aimed ? '#f2efe9' : '#a39d93', 'center');
@@ -1367,12 +1377,14 @@
     }
 
     // ---- the heraldry: one thing of its own on every building -----------------------
-    // Each is behind the building, in front of it, or both, and wakes as he
-    // lines up (st.rise): the sails spin up, the fallen lintel teeters, the
+    // Each is behind the building, in front of it, or both, and stirs as he
+    // lines up (st.rise, c.stir): the sails turn faster, the fallen lintel teeters, the
     // windows light floor by floor, the plume thickens, the crow circles
     // faster, the board's wings stir.
     const M_CROW = '#4b4652';        // a crow's slate, never black
-    const M_CROW_ROUND = 6;          // seconds round MEMORIES, less as you line up
+    const M_CROW_ROUND = 6;          // seconds round MEMORIES, on its own clock
+    const M_SAIL_TURN = 0.2;         // radians a second the FARM's sails turn, on its own clock
+    const M_PLUME_RATE = 0.08;       // the VOLCANO's plume, rising puffs a second, on its own clock
     const M_WING_ROWS = [            // lucifer.js's LU_WING_ROWS
         { n: 10, at: [0.1, 1],     sweep: [82, 12], len: [0.34, 1.1],  lift: 0 },
         { n: 7,  at: [0.06, 0.78], sweep: [70, 34], len: [0.26, 0.46], lift: 0.1 },
@@ -1402,7 +1414,7 @@
             },
             front(c, st) {
                 const ink = menuAround(st), tx = c.x + c.w * 0.24, hubY = menuTopOf(c) - 44, L = 54;
-                const a0 = menuNow() * (0.2 + 0.8 * st.rise);
+                const a0 = c.stir * M_SAIL_TURN;
                 for (let i = 0; i < 4; i++) {
                     const a = a0 + i * Math.PI / 2;
                     menuLay(menuBody(ink, 'wash'), tx + Math.cos(a) * (6 + L / 2), hubY + Math.sin(a) * (6 + L / 2), L, a, false, i % 2);
@@ -1451,10 +1463,10 @@
         // VOLCANO: a plume of him out of the vent, hot at the bottom, cooling as it rises
         4: {
             front(c, st) {
-                const T = menuNow(), vx = c.x, vy = menuTopOf(c) + 5, rate = 0.08 + 0.14 * st.rise, N = 8;
+                const vx = c.x, vy = menuTopOf(c) + 5, N = 8;
                 const inks = [menuMix(st.ink, '#f2c14e', 0.5), st.ink, menuMix(st.ink, M_SLATE, 0.55)];
                 for (let k = 0; k < N; k++) {
-                    const p = (T * rate + k / N) % 1;
+                    const p = (c.stir * M_PLUME_RATE + k / N) % 1;
                     menuAlpha(Math.min(1, p * 5) * (1 - p) * (0.55 + 0.45 * st.rise));
                     menuLay(menuBody(inks[Math.min(2, Math.floor(p * 3))], 'wash'),
                             vx + Math.sin(p * 3 + k) * 8 * p + (menuHash(k) - 0.5) * 16 * p, vy - p * 85,
@@ -1471,7 +1483,7 @@
                     const side = i ? 1 : -1, py = top + 6, tip = Math.max(3, py - 18);
                     ctx.strokeStyle = ink; ctx.lineWidth = 1.5;
                     ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px, tip); ctx.stroke();
-                    const wave = (0.06 + 0.08 * st.rise) * Math.sin(T * (1.2 + 2 * st.rise) + i);
+                    const wave = (0.06 + 0.08 * st.rise) * Math.sin(c.stir * 1.2 + i);
                     const a = side > 0 ? 0.1 + wave : Math.PI - 0.1 - wave;
                     menuLay(menuBody(ink, 'wash'), px + Math.cos(a) * 18, tip + 5 + Math.sin(a) * 18, 36, a, false, side < 0);
                 });
@@ -1500,7 +1512,7 @@
     // built the way Odin's birds are (memory.js): a body and a head, and two
     // of him to each wing, in a crow's slate edged in MEMORIES' pink
     function menuCrow(c, st, near) {
-        const T = menuNow(), ph = T * 2 * Math.PI / (M_CROW_ROUND - 1.5 * st.rise), depth = Math.cos(ph);
+        const T = menuNow(), ph = c.stir * 2 * Math.PI / M_CROW_ROUND, depth = Math.cos(ph);
         if ((depth >= 0) !== near) return;
         const R = c.w / 2 + 8, ry = 16;
         const x = c.x + Math.sin(ph) * R, y = c.y + 4 + depth * ry;
@@ -1720,7 +1732,7 @@
     // front; bright ones of him carried down in it quickly, crust drifting
     // slower. Cleared, it cools to crust and falls away.
     function menuCoverLava(c, st, k) {
-        const T = menuNow() * (1 + 0.6 * st.rise), vx = c.x, vy = c.y - c.h / 2 - ROOF_H + 5, y1 = c.y + c.h / 2 + 4;
+        const T = c.stir, vx = c.x, vy = c.y - c.h / 2 - ROOF_H + 5, y1 = c.y + c.h / 2 + 4;
         const cool = menuBand(k, 0, 0.5), fall = menuBand(k, 0.4, 1);
         const hot = menuMix('#d2622f', '#6b5a50', cool), core = menuMix('#ffb347', '#8a7a70', cool);
         ctx.save();
