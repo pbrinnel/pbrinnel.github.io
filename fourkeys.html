@@ -427,6 +427,22 @@
      ?v= is a cache-buster. GitHub Pages holds a page for ten minutes, so a
      deploy that changes two of these can otherwise reach someone as one new
      file and one old one. Bump all of them together, every deploy. -->
+<script>
+// fourkeys.html?reset forgets this browser's progress and paddle. It is here,
+// ahead of every game file, so it still works when a save stops the game from
+// loading far enough to reach SETTINGS or the debug menu. It asks first,
+// because it is a link, and a link can be passed on. The two keys are
+// MENU_KEY and MENU_PAD_KEY in menu.js; initials are left alone.
+if (new URLSearchParams(location.search).has('reset')) {
+    if (confirm('Forget all progress on this device, and start again from the beginning?')) {
+        try {
+            localStorage.removeItem('brandon-metalab.progress');
+            localStorage.removeItem('brandon2.paddle');
+        } catch (e) { /* a private window has nothing kept to forget */ }
+    }
+    history.replaceState(null, '', location.pathname);
+}
+</script>
 <script src="js/fourkeys/runtime.js?v=35"></script>
 <script src="js/fourkeys/headless.js?v=35"></script>
 <script src="js/fourkeys/idol.js?v=35"></script>
