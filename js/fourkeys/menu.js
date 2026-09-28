@@ -1070,16 +1070,19 @@
 
     // ---- arriving -----------------------------------------------------------------------
     // Out of the opening cards, the town comes into view as if he were walking
-    // into it: he paces on the spot, and every building grows out of a point
-    // on the horizon (ARRIVE_AT) into its place. The near ones start smaller
-    // and travel further than the far ones, which is what makes it read as
-    // coming closer rather than as the picture zooming. He is yours from the
-    // first frame of it: the town is where it will be, only not drawn there
-    // yet, so a walk started now arrives at the building it is aimed at.
-    const ARRIVE_SECS = 3;
-    const ARRIVE_AT = { x: 400, y: 60 };
-    const ARRIVE_FAR = 0.55;         // the size the CASTLE's row starts at...
-    const ARRIVE_NEAR = 0.2;         // ...and the FARM's
+    // into it, pacing on the spot: WALK IN. The horizon, the sky and the army
+    // on it are infinitely far and are there from the first frame. Everything
+    // on the ground is seen from M_ARRIVE_BACK further back and comes to where
+    // it belongs, each at the rate its distance says -- one projection for the
+    // ground's bands and the buildings alike, so the ground streams toward him
+    // and they ride in on it: near ones sweep in, the far row hardly moves.
+    // The ground he crosses to reach the town is the town's own, carried on.
+    // He is yours from the first frame of it: the town is where it will be,
+    // only not drawn there yet, so a walk started now arrives at the building
+    // it is aimed at.
+    const ARRIVE_SECS = 1.5;
+    const M_ARRIVE_BACK = 6;         // how far back he starts, in lengths of the nearest ground (the gates' foot)
+    const M_SIGN_FEET = 80 + 45 + 4; // the four signs ride at the depth of the big two's posts, together
     const ARRIVE_SETTLE = 0.4;       // the last of it, where his pace slows to a stop
 
     function menuArrive() { menuLoad(); menu.arriveT = 0; }
@@ -1117,17 +1120,21 @@
         return 1 - Math.pow(1 - t, 3);
     }
 
+    // A point on the ground's depth, from where it is on the screen once he has
+    // arrived; and how much further back he still is, `k` of the way in. A
+    // thing at depth z is drawn z / (z + d) of its size, out of the horizon's middle.
+    const menuDepth = y => 1 / Math.max(1, y - M_HORIZON);
+    const menuArriveBack = k => M_ARRIVE_BACK * menuDepth(M_GATE.y + M_GATE.h) * (1 - k);
+
     // draw one building as it would be `k` of the way in
     function menuArriveCard(c, k, draw) {
         if (k >= 1) { draw(); return; }
-        const near = Math.max(0, Math.min(1, (c.y - M_TOWN[5].y) / (M_TOWN[1].y - M_TOWN[5].y)));
-        const z = ARRIVE_FAR + (ARRIVE_NEAR - ARRIVE_FAR) * near;
-        const s = z + (1 - z) * k;
+        const z = menuDepth(c.level.key ? M_SIGN_FEET : c.y + c.h / 2), s = z / (z + menuArriveBack(k));
         ctx.save();
-        ctx.globalAlpha = Math.min(1, k * 2.5);
-        ctx.translate(ARRIVE_AT.x, ARRIVE_AT.y);
+        ctx.globalAlpha = Math.min(1, k * 4);
+        ctx.translate(LW / 2, M_HORIZON);
         ctx.scale(s, s);
-        ctx.translate(-ARRIVE_AT.x, -ARRIVE_AT.y);
+        ctx.translate(-LW / 2, -M_HORIZON);
         draw();
         ctx.restore();
     }
@@ -1616,6 +1623,24 @@
     const M_ARMY = 40, M_ARMY_PACE = 9, M_ARMY_STEP = 5.5;   // the distant army: how many, px a second, steps a second
     const M_ARMY_INK = '#29241f';
 
+    // The bands' edges as depths, bottom band first: M_BAND_NEAR px thick at
+    // the bottom of the screen easing to M_BAND_FAR at the horizon, carried on
+    // nearer than the screen, at the nearest spacing, for as far back as an
+    // arrival starts -- the ground he crosses to reach the town.
+    let menuBandZ = null;
+    function menuBandDepths() {
+        if (menuBandZ) return menuBandZ;
+        const zs = [];
+        for (let y = LH + 40; y > M_HORIZON && zs.length < 400;) {
+            zs.push(menuDepth(y));
+            y -= Math.max(1, menuLerp(M_BAND_NEAR, M_BAND_FAR, menuClamp((LH - y) / (LH - M_HORIZON))));
+        }
+        const dz = zs[1] - zs[0], nearer = [];
+        for (let z = zs[0] - dz; z > zs[0] - menuArriveBack(0) - dz * 2; z -= dz) nearer.unshift(z);
+        if (nearer.length % 2) nearer.shift();           // whole bands only, so the stripes keep their order
+        return (menuBandZ = nearer.concat(zs));
+    }
+
     // how big he is drawn with his middle at y: 1 at home, M_FAR_SIZE at the far row's feet
     function menuShrinkAt(y) {
         const far = M_TOWN[5].y + M_TOWN[5].h / 2;
@@ -1624,7 +1649,7 @@
 
     function menuDrawGround(k) {
         const T = menuNow();
-        const layer = (near, fn) => { ctx.save(); menuCamera(near); ctx.globalAlpha = k; fn(); ctx.restore(); };
+        const layer = (near, fn) => { ctx.save(); menuCamera(near); fn(); ctx.restore(); };
         // a warm light low over the far end of the town, the DAYBREAK the town was built from
         layer(M_NEAR_SKY, () => {
             const g = ctx.createRadialGradient(LW / 2, 60, 10, LW / 2, 60, 420);
@@ -1637,15 +1662,15 @@
             ctx.strokeStyle = M_SKY_LINE; ctx.lineWidth = 1;
             ctx.beginPath(); ctx.moveTo(-LW, M_HORIZON); ctx.lineTo(LW * 2, M_HORIZON); ctx.stroke();
         });
-        // the ground in bands, every other one a shade lighter, thinner further back
+        // the ground in bands, every other one a shade lighter, thinner further
+        // back, streaming toward him while he arrives
         layer(0.2, () => {
+            const zs = menuBandDepths(), d = menuArriveBack(k);
+            const yOf = z => z + d <= 0 ? LH + 100 : Math.min(LH + 100, M_HORIZON + 1 / (z + d));
             ctx.fillStyle = menuMix('#0b0a09', '#4a433a', M_BAND_TONE);
-            let y = LH + 40, i = 0;
-            while (y > M_HORIZON && i < 400) {
-                const th = Math.max(1, menuLerp(M_BAND_NEAR, M_BAND_FAR, menuClamp((LH - y) / (LH - M_HORIZON))));
-                const top = Math.max(M_HORIZON, y - th);
-                if (i % 2 === 0) ctx.fillRect(-LW, top, LW * 3, y - top);
-                y -= th; i++;
+            for (let i = 0; i + 1 < zs.length; i += 2) {
+                const bot = yOf(zs[i]), top = Math.max(M_HORIZON, yOf(zs[i + 1]));
+                if (bot > M_HORIZON && top < LH) ctx.fillRect(-LW, top, LW * 3, bot - top);
             }
         });
         // the army that ends the first game, marching past on the horizon, in
