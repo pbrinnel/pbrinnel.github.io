@@ -392,7 +392,16 @@
     // second takes it all back.
     const MARCH_UP = 118;            // px/s forward
     const MARCH_BACK = 300;          // px/s back home
-    const MARCH_MAX = 470;           // past the last door, SETTINGS', for the empty lanes
+    // How far up he can walk: until his top edge is MARCH_PAST beyond the
+    // bottom of the highest doors (SETTINGS' and BOSS RUSH's), which is where
+    // an empty lane ends. Worked out from the paddle he is holding, since a
+    // shorter one is less tall and needs further to go: a fixed limit sized
+    // for MODERN left THE PAIR's top short of those two doors.
+    const MARCH_PAST = 4;
+    function menuMarchMax() {
+        const doors = Math.min(...M_SIDES.map(s => s.at.y + s.at.h / 2));
+        return padY() + menu.lift - padH() / 2 - (doors - MARCH_PAST);
+    }
     const DOOR_HOLD = 0.8;           // stood in the doorway before it opens
     const WALK_HZ = 2.3;             // paces a second, which is what the bob is
     const WALK_BOB = 0.8;            // how much he rises and falls, in jig units
@@ -401,7 +410,7 @@
     function menuMarch(dt) {
         if (menu.sw) { menu.gait = Math.max(0, menu.gait - dt * 4); return; }
         const was = menu.lift;
-        menu.lift = menu.march ? Math.min(MARCH_MAX, menu.lift + MARCH_UP * dt)
+        menu.lift = menu.march ? Math.min(menuMarchMax(), menu.lift + MARCH_UP * dt)
                                : Math.max(0, menu.lift - MARCH_BACK * dt);
         // He is wider than the gaps between the buildings, so what counts as
         // reaching one is his middle arriving, not his shoulder brushing it.
