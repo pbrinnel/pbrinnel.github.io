@@ -515,6 +515,11 @@
     // arrives gradually rather than all at once
     const ENTER_WAIT = 0.7;
     const ENTER_SECS = 2.6;
+    // He comes on as a silhouette against a hall light, the court memory's
+    // (memCourt), in his level's colour (drawShade). Once he is in place it
+    // lifts over SHADE_SECS and leaves him in colour for the serve. Lucifer's
+    // later parts are the same fight, not a new entrance, so they never get it.
+    const SHADE_SECS = 1.4;
     const CONTINUE_KEEP = 0.5;  // what survives of your score when you re-up
     // The clock is on the OFFER, not on the ceremony. Ten seconds to decide
     // whether to spend another quarter, and if you let it run out the run is
@@ -1029,6 +1034,7 @@
     // rises from there, not from the line he opened the fight on
     let ascendFrom = { y: PADDLE_Y, w: PADDLE_W };
     let phantoms = [], phGap = 0, shout = null, enterT = 0, rings = [], overT = 0;
+    let shadeT = Infinity;   // seconds since an entrance ended, while his silhouette lifts
     let talk = [], fleeRoll = -1; // the hat stage's voices, and seconds to its next coin toss
     let stallT = 0;               // seconds the last few have gone without a hit -- see STALL_AT
     let round = null;             // what this round has done so far -- see EOR_ROWS
@@ -3265,8 +3271,8 @@
 
         if (phase === 'entrance') {
             enterT += dt;
-            if (enterT >= ENTER_WAIT + labEnterSecs()) phase = 'ready';
-        }
+            if (enterT >= ENTER_WAIT + labEnterSecs()) { phase = 'ready'; shadeT = 0; }
+        } else shadeT += dt;
 
         // the continue clock. dt is clamped and rAF sleeps in a hidden tab, so
         // this only ever runs down while someone is actually looking at it.
@@ -4360,6 +4366,41 @@
         ctx.fillRect(barX, barY, barW * frac, 5);
     }
 
+    // The boss as a silhouette, `gone` of the way to lifted. Nothing is on
+    // the field under him when he is drawn, so what is on it is him: laid
+    // flat in ink over only what is there, his edge laid under it, and the
+    // court memory's hall light under everything, in the colour of the level
+    // he is fought in (the town draws each level in it). Lucifer keeps the
+    // edge alone, in the court's ember. It all lifts the way Lucifer's
+    // silhouette does as he changes, eased, all of him at once.
+    function drawShade(gone) {
+        const who = (LEVELS[stage] && LEVELS[stage].who) || LAB.boss;
+        const ink = who === 'lucifer' ? null : menuInkOf(who);
+        const g = memOffscreen();
+        g.drawImage(canvas, 0, 0, LW, LH);
+        g.globalCompositeOperation = 'source-atop';
+        g.fillStyle = ink || MC_RIM;
+        g.fillRect(0, 0, LW, LH);
+        ctx.save();
+        ctx.globalAlpha = 1 - gone * gone * (3 - 2 * gone);
+        ctx.globalCompositeOperation = 'source-atop';
+        ctx.fillStyle = MC_INK;
+        ctx.fillRect(0, 0, LW, LH);
+        ctx.globalCompositeOperation = 'destination-over';
+        for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+            ctx.drawImage(memCanvas, dx * MC_RIM_PX, dy * MC_RIM_PX, LW, LH);
+        }
+        if (ink) {
+            const gr = ctx.createRadialGradient(LW / 2, 220, 20, LW / 2, 260, 560);
+            gr.addColorStop(0, menuMix(ink, '#000000', 0.35) + 'bf');
+            gr.addColorStop(0.5, menuMix(ink, '#000000', 0.7) + '73');
+            gr.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = gr;
+            ctx.fillRect(0, 0, LW, LH);
+        }
+        ctx.restore();
+    }
+
     function drawBrick(b) {
         if (b.kind === 'Z') { drawBoss(b); return; }
         if (labDrawBrick(b)) return;
@@ -5413,6 +5454,8 @@
         // overlap, the one on top is the one it hits -- see hitOrder
         const drawn = [...hitOrder()];
         for (let i = drawn.length - 1; i >= 0; i--) if (drawn[i].alive) drawBrick(drawn[i]);
+        if (phase === 'entrance') drawShade(0);
+        else if (shadeT < SHADE_SECS) drawShade(shadeT / SHADE_SECS);
         labDrawMini();
         if (phase === 'ascend') { drawBossFall(); drawImpact(); }
         drawRings();

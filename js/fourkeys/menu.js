@@ -266,6 +266,13 @@
         return null;
     }
 
+    // the colour of the level a boss is fought in, for his entrance (drawShade)
+    function menuInkOf(who) {
+        const n = MENU_BOSSES[who] ? LAB.ev(MENU_BOSSES[who]) : null;
+        const l = MENU_ALL.find(o => o.n === n);
+        return l ? l.ink : null;
+    }
+
     // ---- the town -------------------------------------------------------------------
     // He walks up from y 542, so the near pair is a short walk and the far one
     // is a long one. Their x spans never overlap and each is a lane straight up
