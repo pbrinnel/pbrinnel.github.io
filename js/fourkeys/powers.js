@@ -440,9 +440,10 @@
     const PT_IN  = '#ff9a3c';   // the left edge's colour, and the right's
     const PT_OUT = '#3ca0ff';
 
-    // On while the capsule lasts, and all the time in CHELL's hands -- but
-    // not where the capsule never drops (CAPS.T.noBoss), whoever is holding it
-    const ptOn = () => fx.T > 0 || (labPadPortal() && !(LEVELS[stage].boss && CAPS.T.noBoss));
+    // On while the capsule lasts, and all the time in CHELL's hands -- bosses
+    // included: the capsule never drops on a boss (CAPS.T.noBoss), but it is
+    // her paddle's own, not a capsule
+    const ptOn = () => fx.T > 0 || labPadPortal();
 
     // stepBall's side walls: true when PORTAL has taken them
     function powWrap(b) {

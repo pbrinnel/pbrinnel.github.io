@@ -941,9 +941,11 @@
     // code -- they just never drop on his stage. KATAMARI and MIDAS sit it out
     // too, having no bricks there to work on, as does CROWD, whose runners come
     // out of broken bricks; and LUCKY, since his capsules come by hits rather
-    // than chance. PORTAL would let a head wrap round a boss who walls you off
-    // (the IDOL down on the floor), MIRROR's copy lies along the ceiling right
-    // where the bosses hang, and WIGGLY has no wall to sway, only you.
+    // than chance. PORTAL stays off them by choice (CHELL's own is still on
+    // there: a head wrapping round the IDOL while he walls you off is a head
+    // gone over him, and sends him back up -- idolCrossed), MIRROR's copy lies
+    // along the ceiling right where the bosses hang, and WIGGLY has no wall to
+    // sway, only you.
     // PORTAL never drops for a paddle that has it on already (CHELL): it
     // would be a capsule that does nothing.
     function capsulePool() {
@@ -4746,10 +4748,11 @@
     // WHICH head to track; the colour is the tell for where it came from.
     function drawPhantoms() {
         if (!phantoms.length) return;
-        const look = PH_LOOK;
-        const sprite = look.color ? phantomSprite(look) : null;
-
         for (const p of phantoms) {
+            // a boss may colour his own (p.look), so you can see which of his
+            // heads threw it; the rest are PH_LOOK's
+            const look = p.look || PH_LOOK;
+            const sprite = look.color ? phantomSprite(look) : null;
             const fade = Math.min(1, p.life / 0.5);      // fade as they die
             const k = p.scale || 1, w = BALL_RX * 2 * k, h = BALL_RY * 2 * k;
 

@@ -37,9 +37,9 @@
     // body is open only until it is whole. Open, he sags GL_SAG into the
     // field and thrashes -- rocks GL_THRASH either side of GL_TILT, his
     // collar swinging wider -- and the stump of his neck spits a burst of its
-    // own. Empty the body in time and the big head hurries to finish. Once it
-    // is whole the stone is back; tear it loose and the body opens again with
-    // whatever it had left.
+    // own. Empty the body in time and he is done, the big head blowing up
+    // with him, grown or not. Once it is whole the stone is back; tear it
+    // loose and the body opens again with whatever it had left.
     //
     // The big head is GL_BIG times the size. It fires three ways at once,
     // down its neck and out to both sides -- the way through is the diagonals
@@ -47,8 +47,10 @@
     // the fight that does, so it stays a surprise. Loose, it is the chase the
     // fight ends on: GL_BIG_LOOSE_HP hits, faster than a small one, knocked
     // across the field by every one of them, and it bounces off you rather
-    // than bursting. He dies when the body is empty and the big head is gone,
-    // in whichever order.
+    // than bursting. The last of him is whichever goes first: finish the big
+    // head and it is thrown into his body (GL_FINALE) and the two blow up
+    // together; empty the body and the big head goes up with it. The bar
+    // drops to nothing either way.
     //
     // The one bar, along the top, is all of it: the small heads, loose hits
     // and all, the body, and the big head, which is counted from the start.
@@ -72,12 +74,12 @@
     // three fan apart as the whole of him lowers in, all three shouting.
     let GL_LVL      = 5;
     let GL_HEADS    = 3;      // how many he has
-    let GL_HEAD_HP  = 6;      // hits to tear one loose
+    let GL_HEAD_HP  = 8;      // hits to tear one loose
     let GL_LOOSE_HP = 1;      // ...and to finish it once it is off
     let GL_LOOSE_SIZE = 0.67; // ...how big it is, loose, of one on a neck
     let GL_LOOSE_SPIN = 1.2;  // ...and rad/s it turns at
     let GL_W        = 560;    // how long his body is
-    let GL_Y        = 140;    // where the collar hangs
+    let GL_Y        = 100;    // where the collar hangs
     let GL_TILT     = 1.0472; // rad his body is turned by, about the collar: legs up, leant 30 degrees off upright
     let GL_DRIFT    = 90;     // px either side the collar drifts
     let GL_HEAD_W   = 78;     // how wide a head is
@@ -87,6 +89,7 @@
     let GL_SWING    = 0.25;   // rad either side the necks sway through
     let GL_RATE     = 0.7;    // rad/s of that sway
     let GL_LOOSE    = 140;    // px/s a loose head flies at
+    let GL_CHIN     = 0.6;    // rad from straight down a ball off the underside of a head goes at, at least
     let GL_THICK    = 0.17;   // how thick his body is to a head, as a share of it
     // The hole his head left is where its middle was, not where his neck
     // meets his shoulders. So he is slid along his length by GL_SEAT_U and
@@ -98,12 +101,12 @@
     let GL_BODY_HP  = 8;      // hits on his body, once it has no head on a neck
     let GL_REGROW   = 8;      // seconds the big head takes to grow, which is how long the body is open for
     let GL_SAG      = 100;    // px he sags into the field while he is open
-    let GL_STUMP_MIN = 4;     // seconds between the stump's bursts while he is open, at least...
-    let GL_STUMP_MAX = 6;     // ...and at most
+    let GL_STUMP_MIN = 8;     // seconds between the stump's bursts while he is open, at least...
+    let GL_STUMP_MAX = 11;    // ...and at most
     let GL_HEAD_IF  = 0.25;   // seconds after a head is hit before it can be hit again
     let GL_ENTER    = 6;      // seconds he takes to arrive
-    let GL_FIRE_MIN = 9;      // seconds between one head's bursts, at least...
-    let GL_FIRE_MAX = 14;     // ...and at most
+    let GL_FIRE_MIN = 13;     // seconds between one head's bursts, at least...
+    let GL_FIRE_MAX = 20;     // ...and at most
     let GL_CHARGE   = 0.7;    // the green swell before it fires, which is the tell
     let GL_BURST_GAP  = 1.3;  // seconds from one row of a burst to the next
     let GL_BURST_ARC  = 0.62; // rad between one column and the next
@@ -114,17 +117,18 @@
     let GL_STONE_A1   = 0.7;  // ...at its thickest...
     let GL_STONE_HZ   = 0.5;  // ...and swells a second, slow enough never to read as a flash
     let GL_STONE_STEER = 0.6; // share of the way a ball off the stone is turned toward the nearest head
-    let GL_BIG      = 2;      // the big head's size, of a small one
-    let GL_BIG_HP   = 2;      // ...its hits to tear loose, of a small one's
+    let GL_BIG      = 1.6;    // the big head's size, of a small one
+    let GL_BIG_HP   = 9;      // ...its hits to tear loose, its own number so the small heads can change without it
     let GL_BIG_CHARGE = 1.4;  // seconds of shaking and swelling before it fires, which is its tell
     let GL_BIG_SHAKE = 5;     // ...px it shakes, at the height of that
     let GL_BIG_ARC  = 0.6;    // rad between its columns, down each way
-    let GL_BIG_NECK = 0.6;    // its neck, of a small one's
+    let GL_BIG_NECK = 0.45;   // its neck, of a small one's
     let GL_BIG_BOB  = 6;      // px it bobs while it waits...
     let GL_BIG_ROLL = 0.07;   // ...rad it rolls...
     let GL_BIG_HZ   = 0.35;   // ...and how many times a second
     let GL_BIG_STUN = 1.0;    // seconds its bite holds you STUNNED, before the SLUGGISH
-    let GL_BIG_LOOSE_HP = 8;  // hits to finish it once it is loose
+    let GL_BIG_LOOSE_HP = 4;  // hits to finish it once it is loose
+    let GL_FINALE   = 0.45;   // seconds a finished big head takes to fly into his body
     let GL_BIG_LOOSE = 260;   // ...and px/s it flies at, and is knocked away at
     let GL_BIG_KNOCK_IF = 0.9; // ...and seconds it tumbles after a knock before it can be hit again
     let GL_LUNGE_FIRST = 6;   // seconds into the fight before the first lunge
@@ -149,13 +153,25 @@
     // Looks being tried out in the boss lab, each on its own switch, all off
     // here, so the game draws him as he has been until one is picked.
     let GL_LOOK_GLOW   = 0;      // fire light round his collar and under each head
-    let GL_LOOK_WINGS  = 0;      // wings behind him, their bones Brandons, their skin crimson
-    let GL_LOOK_HORNS  = 0;      // bone horns on every head and spines down every neck
-    let GL_LOOK_HYDRA  = 0;      // each head its own element: fire, ice, storm; the big one crimson
+    let GL_LOOK_WINGS  = 0;      // little wings on his shoulders, see-through, fluttering
+    let GL_LOOK_HYDRA  = 0;      // each head its own colour, the one it throws in
     let GL_LOOK_BREATH = 0;      // fire at the mouth as a head swells, and a jet as it fires
     let GL_LOOK_SKY    = 0;      // the top of the field burning, ash drifting up through it
-    let GL_WING_HZ     = 0.35;   // wingbeats a second
-    LAB_KNOBS.push('GL_LOOK_GLOW', 'GL_LOOK_WINGS', 'GL_LOOK_HORNS', 'GL_LOOK_HYDRA', 'GL_LOOK_BREATH', 'GL_LOOK_SKY', 'GL_WING_HZ');
+    let GL_WING_HZ     = 0.47;   // wingbeats a second
+    // Whole looks being tried out in the boss lab: 0 as he is, 1 a heraldic
+    // wyvern in crimson and gold, 2 a stained-glass window come alive. Either
+    // of the new two trades HEADLESS's body for one of its own, centred over
+    // the collar -- the body he is hit on as well as the one drawn -- and
+    // makes the heads GL_STYLE_HEAD times the size.
+    let GL_STYLE       = 2;
+    let GL_STYLE_HEAD  = 1.35;
+    let GL_STYLE_NECK  = 1.05;    // ...and the necks times as long, to keep the bigger heads apart
+    let GL_STYLE_BODY  = 0;      // ...and his body: 0 his own, turned as ever; 1 two of him head to head
+    let GL_BODY_RX     = 190;    // the pair's half-width...
+    let GL_BODY_RY     = 55;     // ...and half-height
+    LAB_KNOBS.push('GL_STYLE', 'GL_STYLE_HEAD', 'GL_STYLE_NECK', 'GL_STYLE_BODY', 'GL_BODY_RX', 'GL_BODY_RY');
+    LAB_KNOBS.push('GL_LOOK_GLOW', 'GL_LOOK_WINGS', 'GL_LOOK_HYDRA', 'GL_LOOK_BREATH', 'GL_LOOK_SKY', 'GL_WING_HZ');
+    LAB_KNOBS.push('GL_CHIN', 'GL_FINALE');
     LAB_KNOBS.push('GL_LVL', 'GL_HEADS', 'GL_HEAD_HP', 'GL_LOOSE_HP', 'GL_W', 'GL_Y', 'GL_TILT',
                    'GL_DRIFT', 'GL_HEAD_W', 'GL_NECK', 'GL_FAN', 'GL_SWING', 'GL_RATE',
                    'GL_LOOSE', 'GL_THICK', 'GL_SEAT_U', 'GL_SEAT_V', 'GL_CLIMB', 'GL_FIRE_MIN', 'GL_FIRE_MAX', 'GL_CHARGE',
@@ -180,9 +196,9 @@
     const GL_BIG_BURST = [[-1, 0], [1, 0], [0, 0.5], [-1, 1.5], [1, 1.5], [0, 2]];
     const GL_AMMO_LIFE = 2;   // seconds a shot head flies before it is spent, whatever it meets
     // a head's size, of GL_HEAD_W
-    const glSize = k => k.big ? GL_BIG : 1;
+    const glSize = k => (k.big ? GL_BIG : 1) * (GL_STYLE ? GL_STYLE_HEAD : 1);
     // the big head's hits to tear loose
-    const glBigHp = () => Math.max(1, Math.round(GL_HEAD_HP * GL_BIG_HP));
+    const glBigHp = () => Math.max(1, Math.round(GL_BIG_HP));
     // what a head still has in it, loose hits and all
     const glLeft = k => k.loose ? k.hp : k.hp + (k.big ? GL_BIG_LOOSE_HP : GL_LOOSE_HP);
 
@@ -205,7 +221,7 @@
         start(b) {
             const n = Math.max(1, Math.round(GL_HEADS));
             gl = { t: 0, ph: 0, cx: LW / 2, cy: -GL_W, pend: null, hitBall: null, torn: 0, done: 0, spread: 0, yelled: false,
-                   stone: 1, tilt: GL_TILT, thrash: 0, sag: 0,
+                   stone: 1, tilt: GL_TILT, thrash: 0, sag: 0, finale: null, booms: [],
                    body: GL_BODY_HP, bodyFlash: 0, bodyIF: 0, bigUsed: false, pops: [], away: false,
                    lungeT: GL_LUNGE_FIRST, stump: { x: LW / 2, y: 0, fire: 1.5, charge: 0, shots: 0, shotT: 0 },
                    heads: Array.from({ length: n }, (_, i) => {
@@ -235,6 +251,7 @@
                 gl.spread = 1;
                 gl.tilt = GL_TILT + Math.sin(gl.t * GL_THRASH_HZ * Math.PI * 2) * GL_THRASH * gl.thrash;
             }
+            if (gl.finale) { glFinaleStep(b, dt); glBox(b); return; }
             if (gl.bodyFlash > 0) gl.bodyFlash = Math.max(0, gl.bodyFlash - dt * 6);
             if (gl.bodyIF > 0) gl.bodyIF = Math.max(0, gl.bodyIF - dt);
             if (phase === 'play') {
@@ -261,7 +278,7 @@
                     const want = k.big && k.charge > 0 ? Math.min(1, k.charge / GL_BIG_CHARGE) : 0;
                     k.wind = want > k.wind ? want : Math.max(want, k.wind - dt * 3);
                     const wind = k.wind;
-                    const reach = GL_NECK * (k.big ? GL_BIG_NECK : 1) * glGrown(k) * (1 - 0.18 * wind * wind);
+                    const reach = GL_NECK * (GL_STYLE ? GL_STYLE_NECK : 1) * (k.big ? GL_BIG_NECK : 1) * glGrown(k) * (1 - 0.18 * wind * wind);
                     k.jx = k.charge > 0 ? Math.sin(clock * 52) * GL_BIG_SHAKE * wind : 0;
                     // the big one idles while it waits: a slow bob and roll, stilled by the wind-up
                     const idle = k.big && !k.lg ? (1 - wind) * glGrown(k) : 0, ph = clock * GL_BIG_HZ * Math.PI * 2;
@@ -303,12 +320,18 @@
             glBox(b);
         },
         contact(br, ball) {
+            if (gl.finale) { gl.pend = null; return null; }     // nothing to hit: it is over
             for (const k of gl.heads) {
                 // nothing to hit until it is whole, and a shot one is the ball's already
                 if (!k.alive || k.grow >= 0 || k.shot) continue;
                 if (glEject(ball, k)) { gl.pend = null; return null; }
                 const hit = glHeadContact(ball, k);
                 if (hit) { gl.pend = k; return hit; }
+            }
+            if (glPair()) {
+                const e = glBodyEll(), hit = ellipseContact(ball, e.x, e.y, e.rx, e.ry);
+                gl.pend = hit ? 'body' : null;
+                return hit;
             }
             // his body as one turned capsule: a mask is a grid of upright cells
             // and his body is not upright any more
@@ -348,6 +371,7 @@
             const k = gl.pend, ball = gl.hitBall, away = gl.away;
             gl.pend = null; gl.hitBall = null; gl.away = false;
             if (!k) return;
+            if (k !== 'body' && ball) glChin(k, ball, cx, cy);
             if (k === 'body') {
                 if (!glOpen() || gl.bodyIF > 0) return;
                 glBodyWound(1, cx, cy);
@@ -385,8 +409,10 @@
             const tilt = gl ? gl.tilt : GL_TILT;
             const wilt = Math.max(0, Math.min(1, ascendT / A_DIE));
             const e = wilt * wilt * (3 - 2 * wilt);
-            if (ascendT < A_DIE) drawFigure(c.x, c.y, c.w, 1, e, tilt);
+            if (GL_STYLE && gl) glStyleBody(1 - e);
+            else if (ascendT < A_DIE) drawFigure(c.x, c.y, c.w, 1, e, tilt);
             else drawCrumble(c, 0, tilt, true);
+            glDrawBooms();
         },
         climb() { return GL_CLIMB; },
         finish(b) {
@@ -452,8 +478,27 @@
         return glLocal(x0 + (x1 - x0) * t, o.y + h / 2);
     }
 
+    // two of him head to head (GL_STYLE_BODY), in place of his own body
+    const glPair = () => !!(GL_STYLE && GL_STYLE_BODY);
+    // ...hit as an ellipse lying across the collar, rocked with him as he thrashes
+    function glBodyEll() {
+        const r = gl.tilt - GL_TILT;
+        return { x: gl.cx, y: gl.cy + GL_BODY_RY * 0.2, rx: GL_BODY_RX, ry: GL_BODY_RY, rot: r };
+    }
+
+    // where on his body a head thrown at it goes for
+    function glBodyAim() {
+        if (!glPair()) return glSpine(0.15);
+        const e = glBodyEll();
+        return { x: e.x, y: e.y + e.ry * 0.3 };
+    }
+
     // how far (x, y) is from his body's outline, less than 0 inside it
     function glBodyGap(x, y) {
+        if (glPair()) {
+            const e = glBodyEll();
+            return (Math.hypot((x - e.x) / e.rx, (y - e.y) / e.ry) - 1) * Math.min(e.rx, e.ry);
+        }
         const a = glSpine(0), z = glSpine(1);
         const vx = z.x - a.x, vy = z.y - a.y, l2 = vx * vx + vy * vy || 1;
         const t = Math.max(0, Math.min(1, ((x - a.x) * vx + (y - a.y) * vy) / l2));
@@ -463,6 +508,7 @@
     // the middle of the box his body is drawn in, which is where drawFigure
     // and the crumble turn him about
     function glMiddle() {
+        if (glPair()) { const e = glBodyEll(); return { x: e.x, y: e.y }; }
         const o = glOrigin(), h = GL_W / SHAPE_ASPECT;
         return glLocal(o.x + GL_W / 2, o.y + h / 2);
     }
@@ -506,6 +552,20 @@
         return true;
     }
 
+    // Off the underside of a head on its neck, a ball goes away at a slant,
+    // never within GL_CHIN of straight down: it is only a head's height or
+    // two above you, and one coming straight back down was on you faster than
+    // anyone can react -- most heads lost in the fight were lost that way.
+    // It goes off the side of the head it struck.
+    function glChin(k, ball, cx, cy) {
+        if (k.loose || cy < k.y || ball.vy <= 0 || !GL_CHIN) return;
+        const s = Math.hypot(ball.vx, ball.vy);
+        if (Math.atan2(Math.abs(ball.vx), ball.vy) >= GL_CHIN) return;
+        const side = Math.sign(ball.x - k.x) || Math.sign(ball.vx) || (Math.random() < 0.5 ? -1 : 1);
+        ball.vx = side * Math.sin(GL_CHIN) * s;
+        ball.vy = Math.cos(GL_CHIN) * s;
+    }
+
     // A head hurt, by the ball or by a head shot into it. On a neck, its last
     // hit tears it loose; loose, the big one's last is the end of him.
     function glWound(k, n, cx, cy) {
@@ -527,25 +587,69 @@
             return;
         }
         award(BOSS_PTS * (k.big ? 5 : 3), cx, cy);
-        glPop(k);
-        glDoneYet();
+        if (!k.big) { glPop(k); return; }
+        // the big one finished: thrown into his body, and that is the end of both
+        gl.finale = { k, t: 0, x0: k.x, y0: k.y };
     }
 
-    // the body empty and the big head gone, in either order, is the end of him
-    function glDoneYet() {
-        if (gl.body <= 0 && gl.bigUsed && !gl.heads.some(k => k.alive && k.big)) glDie(bricks[0]);
-    }
-
-    // The open body hurt. Emptied while the big head is still growing, it
-    // hurries, so winning the race is not rewarded with a wait.
+    // The open body hurt. Emptied, he is done, and the big head -- whole,
+    // loose or still growing -- blows up with him.
     function glBodyWound(n, cx, cy) {
         gl.body = Math.max(0, gl.body - n);
         gl.bodyFlash = 1;
         gl.bodyIF = BOSS_IF;
-        award(BOSS_PTS * (gl.body <= 0 ? 3 : n), cx, cy);
+        award(BOSS_PTS * (gl.body <= 0 ? 5 : n), cx, cy);
         if (gl.body > 0) return;
-        for (const k of gl.heads) if (k.alive && k.grow >= 0) k.grow = Math.max(k.grow, GL_REGROW - 1);
-        glDoneYet();
+        for (const k of gl.heads) if (k.alive && k.big) glBoom(k);
+        glDie(bricks[0]);
+    }
+
+    // The big head flying into his body, and the two of them going up together
+    // when it gets there.
+    function glFinaleStep(b, dt) {
+        const f = gl.finale, k = f.k;
+        f.t += dt;
+        const e = Math.min(1, f.t / GL_FINALE), q = e * e;
+        const to = glBodyAim();
+        k.x = f.x0 + (to.x - f.x0) * q;
+        k.y = f.y0 + (to.y - f.y0) * q;
+        k.rot += dt * 14;
+        if (e < 1) return;
+        gl.finale = null;
+        glBoom(k);
+        glDie(b);
+    }
+
+    // A head going up: it swells and burns off where it was, once, over
+    // GL_BOOM_SECS, drawn with his fall after he is gone.
+    const GL_BOOM_SECS = 0.7;
+    function glBoom(k) {
+        const w = GL_HEAD_W * glSize(k) * (k.loose ? GL_LOOSE_SIZE : 1) * (k.grow >= 0 ? 0.25 + 0.75 * glGrown(k) : 1);
+        gl.booms.push({ x: k.x, y: k.y, w, rot: k.rot || 0, t0: clock });
+    }
+    function glDrawBooms() {
+        if (!gl || !gl.booms.length) return;
+        gl.booms = gl.booms.filter(o => clock - o.t0 < GL_BOOM_SECS);
+        for (const o of gl.booms) {
+            const k = (clock - o.t0) / GL_BOOM_SECS, w = o.w * (1 + 0.9 * k), h = w * (BALL_RY / BALL_RX);
+            // the light of it: rising once to a peak and gone, never pulsing
+            const g = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, w * 1.4);
+            g.addColorStop(0, '#fff1d6');
+            g.addColorStop(0.4, '#e2683a');
+            g.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.globalAlpha = 0.8 * Math.sin(Math.min(1, k * 1.4) * Math.PI);
+            ctx.fillStyle = g;
+            ctx.beginPath(); ctx.arc(o.x, o.y, w * 1.4, 0, Math.PI * 2); ctx.fill();
+            ctx.restore();
+            ctx.save();
+            ctx.translate(o.x, o.y);
+            ctx.rotate(o.rot);
+            ctx.globalAlpha = 1 - k;
+            ctx.drawImage(ballImg, -w / 2, -h / 2, w, h);
+            ctx.restore();
+        }
     }
 
     // every small head gone and the body empty: where the lab's jumps and
@@ -720,7 +824,7 @@
             if (o === k || !o.alive || o.grow >= 0 || o.shot || (o.loose && !o.big)) continue;
             out.push({ ref: o, x: o.x, y: o.y });
         }
-        if (glOpen()) { const p = glSpine(0.15); out.push({ ref: 'body', x: p.x, y: p.y }); }
+        if (glOpen()) { const p = glBodyAim(); out.push({ ref: 'body', x: p.x, y: p.y }); }
         return out;
     }
 
@@ -750,7 +854,7 @@
         const S = k.shot;
         S.t += dt;
         k.rot += GL_LOOSE_SPIN * 6 * dt;
-        const t = S.tgt === 'body' ? (glOpen() ? glSpine(0.15) : null)
+        const t = S.tgt === 'body' ? (glOpen() ? glBodyAim() : null)
                 : S.tgt && S.tgt.alive && !S.tgt.shot ? S.tgt : null;
         if (t) {
             const now = Math.atan2(k.vy, k.vx);
@@ -794,7 +898,7 @@
                 // enough to cross the field at it
                 phantoms.push({ x: k.x, y: k.y, vx: Math.cos(d) * GL_BURST_SPEED, vy: Math.sin(d) * GL_BURST_SPEED,
                                 angle: Math.random() * 6.28, spin: (Math.random() - 0.5) * 6, scale: GL_BURST_SIZE,
-                                life: PH_LIFE * PH_SPEED / GL_BURST_SPEED });
+                                life: PH_LIFE * PH_SPEED / GL_BURST_SPEED, look: glPhLook(k) });
             }
             if (!k.shots) k.fire = lo + Math.random() * (hi - lo);
             return;
@@ -824,7 +928,7 @@
                     const d = a + way + col * GL_BIG_ARC;
                     phantoms.push({ x: k.x, y: k.y, vx: Math.cos(d) * GL_BURST_SPEED, vy: Math.sin(d) * GL_BURST_SPEED,
                                     angle: Math.random() * 6.28, spin: (Math.random() - 0.5) * 6, scale: GL_BURST_SIZE,
-                                    life: PH_LIFE * PH_SPEED / GL_BURST_SPEED });
+                                    life: PH_LIFE * PH_SPEED / GL_BURST_SPEED, look: glPhLook(k) });
                 }
             }
             if (!k.shots) k.fire = GL_FIRE_MIN + Math.random() * (GL_FIRE_MAX - GL_FIRE_MIN);
@@ -862,9 +966,9 @@
     // the box the physics looks for him in: his body and wherever his heads are
     function glBox(b) {
         const h = GL_W / SHAPE_ASPECT, r = GL_HEAD_W;
-        const a = glSpine(0), boot = glSpine(1);
-        let x0 = Math.min(gl.cx, a.x, boot.x) - h / 2, x1 = Math.max(gl.cx, a.x, boot.x) + h / 2;
-        let y0 = Math.min(gl.cy, a.y, boot.y) - h / 2, y1 = Math.max(gl.cy, a.y, boot.y) + h / 2;
+        const a = glSpine(0), boot = glSpine(1), e = glPair() ? glBodyEll() : null;
+        let x0 = e ? e.x - e.rx - 60 : Math.min(gl.cx, a.x, boot.x) - h / 2, x1 = e ? e.x + e.rx + 60 : Math.max(gl.cx, a.x, boot.x) + h / 2;
+        let y0 = e ? e.y - e.ry : Math.min(gl.cy, a.y, boot.y) - h / 2, y1 = e ? gl.cy + 10 : Math.max(gl.cy, a.y, boot.y) + h / 2;
         for (const k of gl.heads) {
             if (!k.alive) continue;
             x0 = Math.min(x0, k.x - r); x1 = Math.max(x1, k.x + r);
@@ -872,14 +976,14 @@
         }
         b.x = x0; b.y = y0; bw = x1 - x0; bh = y1 - y0;
         // everything left to hit, the big head from the start, so it only goes down
-        b.hp = gl.heads.reduce((s, k) => s + (k.alive ? glLeft(k) : 0), 0) + gl.body +
+        b.hp = gl.finale ? 0 : gl.heads.reduce((s, k) => s + (k.alive ? glLeft(k) : 0), 0) + gl.body +
                (gl.bigUsed ? 0 : glBigHp() + GL_BIG_LOOSE_HP);
     }
 
     // ---- looks being tried out (the GL_LOOK_ switches) ---------------------------
     const GL_FIRE = '#e2683a', GL_FIRE_RIM = '#ffb072', GL_FIRE_CORE = '#fff1d6';
-    // each head's element, by where it sits in the fan: fire, ice, storm; the big one's crimson
-    const glInk = k => k.big ? '#ff3a44' : GL_LOOK_HYDRA ? (['#ff6a2a', '#86d8ff', '#ffe36a'][Math.round(k.fan) + 1] || GL_FIRE) : GL_FIRE;
+    // each head's light in its own colour (glElement), or all in fire
+    const glInk = k => GL_LOOK_HYDRA ? glElement(k) : GL_FIRE;
 
     // a soft round light, added over what is there
     function glLight(x, y, r, ink, a) {
@@ -917,97 +1021,42 @@
             }
             ctx.restore();
         }
-        if (GL_LOOK_WINGS) glLookWings();
         if (GL_LOOK_GLOW) glLight(gl.cx, gl.cy, 280, GL_FIRE, 0.28 + 0.06 * Math.sin(clock * 1.2));
     }
 
-    // Two wings out of his shoulders, beating slowly: each bone a run of
-    // Brandons shrinking to its tip, the way his necks are, and a crimson skin
-    // between the bones, scalloped in toward his shoulder between the tips.
-    // angle from level (down is positive) and length, lowest bone first: spread across the
-    // top of the field, since anything pointing up is off the screen
-    const GL_WING_BONES = [[0.42, 290], [0.12, 340], [-0.18, 330], [-0.48, 270]];
+    // Two little wings on his shoulders, Dragonite's and about as much use:
+    // each a fan of his own lying body, four small washed copies with the
+    // longest in front, each on a dark copy of itself, see-through, fluttering
+    // about the shoulder. Drawn over his body and under his heads.
+    let GL_WING_SIZE  = 70;      // px, the longest body in a wing
+    let GL_WING_ALPHA = 0.6;     // how solid a wing is
+    LAB_KNOBS.push('GL_WING_SIZE', 'GL_WING_ALPHA');
+    const GL_WING_FAN = [[-0.25, 1], [-0.62, 0.9], [-0.98, 0.76], [-1.32, 0.6]];   // angle up from level, share of GL_WING_SIZE
     function glLookWings() {
-        const beat = Math.sin(clock * GL_WING_HZ * Math.PI * 2);
+        // red against his greens and the heads' element colours; gold on the crimson wyvern
+        const ink = GL_STYLE === 1 ? HER_GOLD : '#d8303a';
+        const wing = shapeSprite('glWing' + ink, ink, 200, 200 / SHAPE_ASPECT, false);
+        const lead = shapeSprite('glWingLead', GL_STYLE === 1 ? HER_DARK : GLASS_LEAD, 200, 200 / SHAPE_ASPECT, true);
+        if (!wing || !lead) return;
+        const flap = Math.sin(clock * GL_WING_HZ * Math.PI * 2) * 0.28;
         for (const side of [-1, 1]) {
-            const sx = gl.cx + side * 26, sy = gl.cy - 18;
-            const tips = GL_WING_BONES.map(([a, len], i) => {
-                const ang = a - beat * 0.14 * (1 + i * 0.25) - 0.05;
-                return { x: sx + side * Math.cos(ang) * len, y: sy + Math.sin(ang) * len };
-            });
-            // the skin
             ctx.save();
-            const g = ctx.createRadialGradient(sx, sy, 20, sx, sy, 340);
-            g.addColorStop(0, 'rgba(170, 30, 40, 0.8)');
-            g.addColorStop(1, 'rgba(110, 16, 28, 0.5)');
-            ctx.fillStyle = g;
-            ctx.beginPath();
-            ctx.moveTo(sx, sy);
-            ctx.lineTo(tips[0].x, tips[0].y);
-            for (let i = 1; i < tips.length; i++) {
-                const a = tips[i - 1], z = tips[i];
-                const mx = (a.x + z.x) / 2, my = (a.y + z.y) / 2;
-                ctx.quadraticCurveTo(mx + (sx - mx) * 0.35, my + (sy - my) * 0.35, z.x, z.y);
+            ctx.translate(gl.cx + side * GL_HEAD_W * 0.55, gl.cy - GL_HEAD_W * 0.3);
+            ctx.scale(side, 1);
+            ctx.rotate(-flap);
+            // back to front, so the longest lies over the rest
+            for (let i = GL_WING_FAN.length - 1; i >= 0; i--) {
+                const [a, k] = GL_WING_FAN[i], L = GL_WING_SIZE * k, T = L / SHAPE_ASPECT;
+                ctx.save();
+                ctx.rotate(a);
+                ctx.translate(L / 2, 0);
+                ctx.globalAlpha = GL_WING_ALPHA;
+                ctx.drawImage(lead, -L * 0.54, -T * 0.62, L * 1.08, T * 1.24);
+                ctx.drawImage(wing, -L / 2, -T / 2, L, T);
+                ctx.restore();
             }
-            ctx.closePath();
-            ctx.fill();
-            ctx.strokeStyle = 'rgba(255, 170, 120, 0.55)';
-            ctx.lineWidth = 2;
-            ctx.stroke();
             ctx.restore();
-            // the bones
-            for (const t of tips) {
-                const n = 9;
-                for (let i = n; i >= 1; i--) {
-                    const k = i / n, w = GL_HEAD_W * (0.5 - 0.32 * k), h = w * (BALL_RY / BALL_RX);
-                    ctx.drawImage(ballImg, sx + (t.x - sx) * k - w / 2, sy + (t.y - sy) * k - h / 2, w, h);
-                }
-            }
         }
-    }
-
-    // Spines down a neck: a bone point off its outside every other bead.
-    function glLookSpines(k, beads, gs) {
-        const dx = k.x - k.ax, dy = k.y - k.ay, l = Math.hypot(dx, dy) || 1;
-        // the outside of the neck is away from the middle of the fan
-        const side = (k.fan > 0 ? 1 : k.fan < 0 ? -1 : 1);
-        const nx = -dy / l * side, ny = dx / l * side;
-        ctx.save();
-        ctx.fillStyle = '#e6dac0';
-        ctx.strokeStyle = '#5b4d38';
-        ctx.lineWidth = 1;
-        for (let i = 1; i < beads; i += 2) {
-            const t = i / beads, w = GL_HEAD_W * (0.45 + 0.35 * t) * gs;
-            const bx = k.ax + dx * t, by = k.ay + dy * t, r = w * 0.4, len = w * 0.35;
-            ctx.beginPath();
-            ctx.moveTo(bx + nx * r - dx / l * len * 0.3, by + ny * r - dy / l * len * 0.3);
-            ctx.lineTo(bx + nx * (r + len) - dx / l * len * 0.4, by + ny * (r + len) - dy / l * len * 0.4);
-            ctx.lineTo(bx + nx * r + dx / l * len * 0.3, by + ny * r + dy / l * len * 0.3);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-        }
-        ctx.restore();
-    }
-
-    // Two horns off the top of a head, drawn in its own frame before the
-    // head, so they grow out from behind it: swept back and out, and curling up.
-    function glLookHorns(w, h) {
-        ctx.save();
-        ctx.fillStyle = '#e6dac0';
-        ctx.strokeStyle = '#5b4d38';
-        ctx.lineWidth = Math.max(1, w * 0.02);
-        for (const s of [-1, 1]) {
-            const bx = s * w * 0.22, by = -h * 0.3;
-            ctx.beginPath();
-            ctx.moveTo(bx - s * w * 0.09, by + h * 0.06);
-            ctx.quadraticCurveTo(bx + s * w * 0.5, by - h * 0.05, bx + s * w * 0.55, by - h * 0.42);
-            ctx.quadraticCurveTo(bx + s * w * 0.3, by - h * 0.12, bx + s * w * 0.08, by + h * 0.02);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-        }
-        ctx.restore();
     }
 
     // Under a head: its element's light round it, and fire at its mouth as
@@ -1040,6 +1089,229 @@
         ctx.restore();
     }
 
+    // ---- the two whole looks (GL_STYLE) ----------------------------------------------
+    // Both made of nothing but the two photographs, as every character is:
+    // his own body and heads, washed in a colour (the WINDMILL's gold), laid
+    // in pieces with a darker copy of each behind as its setting (the IDOL's
+    // mortar), and strung and ringed. The one thing that is not him is the
+    // light behind the glass, as the LAMPS' glow is not.
+    const HER_RED = '#b3202a', HER_GOLD = '#e2b43e', HER_DARK = '#2a0a0e', HER_IRON = '#5a5860';
+    const GLASS = ['#c8283a', '#2a5bc8', '#2f9a58', '#e0a22a', '#7a3ab8', '#d8602a', '#3aa8b8'];
+    const GLASS_LEAD = '#141318';
+    // Each head's own colour, left to right, and the big one's: the colour of
+    // what it throws, its tell and its mane. None of them near the real
+    // ball's skin, for the reason PH_LOOK gives -- no red, no orange, no pink.
+    const GL_ELEMENT = ['#6faf3a', '#3fc4ff', '#a060ff'];
+    const GL_ELEMENT_BIG = '#dfe8ff';
+    const glElement = k => k.big ? GL_ELEMENT_BIG : GL_ELEMENT[Math.round(k.fan) + 1] || GL_ELEMENT[0];
+    // ...and as a look for what it throws, one per colour
+    const glLooks = {};
+    const glPhLook = k => {
+        if (k.fan === undefined) return null;             // the stump throws the usual green
+        const ink = glElement(k);
+        return glLooks[ink] || (glLooks[ink] = { color: ink, wash: PH_LOOK.wash, glow: PH_LOOK.glow });
+    };
+    // each element's darker glass, for the back of a mane
+    const GL_MANE_DEEP = { '#6faf3a': '#3d6e1c', '#3fc4ff': '#1d6e9a', '#a060ff': '#5a2aa8', '#dfe8ff': '#8a94b8' };
+    const GL_MANE_OPEN = 0.55;   // rad either side of straight down a mane leaves open, under the chin
+    // A mane is only glass round a head: nothing meets the ball there, so it
+    // is see-through (GL_MANE_ALPHA) to say so, and kept small, the big head's
+    // bigger than the rest.
+    let GL_MANE     = 0.4;       // a small head's mane, as a share of its locks at full length
+    let GL_MANE_BIG = 0.56;      // ...and the big head's
+    let GL_MANE_ALPHA = 0.55;    // ...and how solid either is
+    LAB_KNOBS.push('GL_MANE', 'GL_MANE_BIG', 'GL_MANE_ALPHA');
+
+    // a canvas of `src` recoloured, cached under `key`: 'wash' lifts him to
+    // near-white and washes `ink` over only his own pixels, so his shading
+    // shows through the colour (shapeSprite's own wash); 'flat' fills him
+    function glTint(key, src, ink, kind) {
+        const k = 'gl-' + key + kind + ink;
+        if (spriteCache.has(k)) return spriteCache.get(k);
+        if (!src) return null;
+        const c = document.createElement('canvas');
+        c.width = src.width; c.height = src.height;
+        const g = c.getContext('2d');
+        if (kind === 'wash') g.filter = 'grayscale(1) contrast(1.1) brightness(1.95)';
+        g.drawImage(src, 0, 0);
+        g.filter = 'none';
+        g.globalCompositeOperation = 'source-atop';
+        g.globalAlpha = kind === 'wash' ? 0.8 : 1;
+        g.fillStyle = ink;
+        g.fillRect(0, 0, c.width, c.height);
+        spriteCache.set(k, c);
+        return c;
+    }
+
+    // His body in glass: scales, each one his head in glass on a dark copy of
+    // itself for its lead, in rows that overlap like a dragon's -- the IDOL's
+    // coat, made of light instead of stone. Deep greens with the odd ruby and
+    // gold, so it reads as one window rather than as confetti. Baked once.
+    const GL_SCALES = ['#16553b', '#1d6b4a', '#237a52', '#2c8a5d'];
+    function glGlassBody(body) {
+        const k = 'gl-glassbody2';
+        if (spriteCache.has(k)) return spriteCache.get(k);
+        const lead = headSprite2('flat', GLASS_LEAD);
+        if (!lead) return null;
+        const c = document.createElement('canvas');
+        c.width = body.width; c.height = body.height;
+        const g = c.getContext('2d');
+        const W = c.width, H = c.height, sw = W / 11, sh = sw * (BALL_RY / BALL_RX);
+        let seed = 17, n = 0;
+        const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+        const rows = Math.ceil(H / (sh * 0.5)) + 2;
+        for (let row = 0; row < rows; row++) {
+            const y = -sh * 0.3 + row * sh * 0.5;
+            // lighter along the middle of him, darker to his edges
+            const mid = 1 - Math.abs(y / H - 0.5) * 2;
+            for (let x = (row % 2 ? sw * 0.45 : 0) - sw * 0.2; x < W + sw; x += sw * 0.9, n++) {
+                let ink = GL_SCALES[Math.min(GL_SCALES.length - 1, Math.max(0, Math.round(mid * 3 + (rnd() - 0.5))))];
+                if (n % 17 === 5) ink = '#9a1f2c';
+                else if (n % 23 === 11) ink = '#c8962a';
+                const face = headSprite2('wash', ink);
+                if (!face) return null;
+                g.drawImage(lead, x - sw * 0.6, y - sh * 0.6, sw * 1.2, sh * 1.2);
+                g.drawImage(face, x - sw / 2, y - sh / 2, sw, sh);
+            }
+        }
+        g.globalCompositeOperation = 'destination-in';
+        g.drawImage(body, 0, 0);
+        spriteCache.set(k, c);
+        return c;
+    }
+
+    // His body in the chosen look, and the dark copy of it that sets it
+    function glStyledBodySprites(body) {
+        if (GL_STYLE === 1) return { lead: glTint('body', body, HER_DARK, 'flat'), face: glTint('body', body, HER_RED, 'wash') };
+        return { lead: glTint('body', body, GLASS_LEAD, 'flat'), face: glGlassBody(body) };
+    }
+
+    // His body, as solid as `a`: his own, turned about the collar as he always
+    // is, or two of him head to head either side of it (GL_STYLE_BODY).
+    function glStyleBody(a) {
+        if (a <= 0.002) return;
+        const body = hlSprite('raw');
+        if (!body) return;
+        const sp = glStyledBodySprites(body);
+        if (!sp.lead || !sp.face) return;
+        const shut = gl.stone;
+        const lay = (w, h, x, y) => {
+            ctx.globalAlpha = a;
+            ctx.drawImage(sp.lead, x - w * 0.02, y - h * 0.04, w * 1.04, h * 1.08);
+            ctx.globalAlpha = a * (GL_STYLE === 2 ? 0.55 + 0.35 * (1 - shut) : 1);
+            ctx.drawImage(sp.face, x, y, w, h);
+            // shut: tarnished toward iron on the wyvern, the glass dulled grey on the window
+            if (shut > 0.01) {
+                const dull = glTint('body', body, GL_STYLE === 1 ? HER_IRON : '#8c8c96', 'wash');
+                ctx.globalAlpha = a * shut * (GL_STYLE === 1 ? 0.55 : 0.45);
+                if (dull) ctx.drawImage(dull, x, y, w, h);
+            }
+            if (gl.bodyFlash > 0) {
+                const hot = glTint('body', body, GL_STYLE === 1 ? HER_GOLD : '#fff4dc', 'flat');
+                ctx.globalAlpha = a * Math.min(1, gl.bodyFlash) * 0.5;
+                if (hot) ctx.drawImage(hot, x, y, w, h);
+            }
+            ctx.globalAlpha = 1;
+        };
+        // the window's light, behind the glass, breathing slowly
+        if (GL_STYLE === 2) {
+            const m = glMiddle();
+            glLight(m.x, m.y, GL_STYLE_BODY ? GL_BODY_RX * 1.2 : GL_W * 0.45, '#ffe8b8', a * 0.3 * (1 - 0.7 * shut) * (0.9 + 0.1 * Math.sin(clock * 1.1)));
+        }
+        ctx.save();
+        if (GL_STYLE_BODY) {
+            // two of him, head to head, the holes their heads left meeting at the collar
+            const e = glBodyEll(), w = e.rx * 1.1, h = w / SHAPE_ASPECT;
+            ctx.translate(gl.cx, gl.cy);
+            ctx.rotate(e.rot);
+            for (const side of [-1, 1]) {
+                ctx.save();
+                ctx.scale(side, 1);
+                lay(w, h, -HL_HEAD_U * w, -HL_HEAD_V * h);
+                ctx.restore();
+            }
+        } else {
+            const o = glOrigin(), h = GL_W / SHAPE_ASPECT;
+            ctx.translate(gl.cx, gl.cy);
+            ctx.rotate(gl.tilt);
+            lay(GL_W, h, o.x, o.y);
+        }
+        ctx.restore();
+    }
+
+    // A styled neck: still a string of heads, as his necks are, only in the
+    // look -- crimson and gold by turns on the wyvern; on the window the
+    // head's element, each set on a dark copy of itself.
+    function glStyleNeck(k, gs) {
+        const hw = GL_HEAD_W * GL_STYLE_HEAD;
+        const beads = Math.max(GL_BEADS, Math.round(Math.hypot(k.x - k.ax, k.y - k.ay) / (hw * 0.3)));
+        const dark = headSprite2('flat', GL_STYLE === 1 ? HER_DARK : GLASS_LEAD);
+        for (let i = 0; i < beads; i++) {
+            const t = i / beads, w = hw * (0.45 + 0.35 * t) * gs, h = w * (BALL_RY / BALL_RX);
+            const x = k.ax + (k.x - k.ax) * t, y = k.ay + (k.y - k.ay) * t;
+            const face = GL_STYLE === 1 ? headSprite2('wash', i % 2 ? HER_GOLD : HER_RED) : headSprite2('wash', glElement(k));
+            if (dark) ctx.drawImage(dark, x - w * 0.56, y - h * 0.56, w * 1.12, h * 1.12);
+            if (face) {
+                ctx.globalAlpha = GL_STYLE === 2 ? 0.85 : 1;
+                ctx.drawImage(face, x - w / 2, y - h / 2, w, h);
+                ctx.globalAlpha = 1;
+            }
+        }
+    }
+
+    // What a styled head is set in, behind it: on the wyvern a gold copy of
+    // the head as its rim and a crown of three little gold heads; on the
+    // window a wreath of little heads in its element's glass.
+    function glStyleFrame(k, w, h, rot) {
+        if (!GL_STYLE || k.grow >= 0) return;
+        ctx.save();
+        ctx.translate(k.x, k.y);
+        ctx.rotate(rot);
+        const small = (ink, x, y, s, a) => {
+            const dark = headSprite2('flat', GL_STYLE === 1 ? HER_DARK : GLASS_LEAD), face = headSprite2('wash', ink);
+            const sw = w * s, sh = sw * (BALL_RY / BALL_RX);
+            ctx.save(); ctx.translate(x, y); ctx.rotate(a);
+            if (dark) ctx.drawImage(dark, -sw * 0.58, -sh * 0.58, sw * 1.16, sh * 1.16);
+            if (face) ctx.drawImage(face, -sw / 2, -sh / 2, sw, sh);
+            ctx.restore();
+        };
+        if (GL_STYLE === 1) {
+            for (const [x, s] of [[-0.22, 0.22], [0, 0.27], [0.22, 0.22]]) small(HER_GOLD, x * w, -h * 0.5 - w * s * 0.35, s, x * 0.8);
+            const dark = headSprite2('flat', HER_DARK), gold = headSprite2('flat', HER_GOLD);
+            if (dark) ctx.drawImage(dark, -w * 0.6, -h * 0.6, w * 1.2, h * 1.2);
+            if (gold) ctx.drawImage(gold, -w * 0.56, -h * 0.56, w * 1.12, h * 1.12);
+        } else {
+            // a mane: locks of him in the head's glass, fanned out from
+            // behind the head so it hides their roots -- thick over the top
+            // and down the sides, open under the chin, a darker layer behind a
+            // brighter one
+            const ink = glElement(k), deep = GL_MANE_DEEP[glElement(k)] || ink;
+            const lead = shapeSprite('glManeLead', GLASS_LEAD, 200, 200 / SHAPE_ASPECT, true);
+            let seed = 7 + Math.round(k.fan * 3) + (k.big ? 50 : 0);
+            const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+            for (const [layer, n, len, tone] of [[0, 10, 1.2, deep], [1, 8, 0.9, ink]]) {
+                const lock = shapeSprite('glMane' + tone, tone, 200, 200 / SHAPE_ASPECT, false);
+                if (!lock || !lead) continue;
+                for (let i = 0; i < n; i++) {
+                    // round from under one side of the chin, over the top, to the other
+                    const a = Math.PI * 0.5 + GL_MANE_OPEN + (i + (layer ? 0.5 : 0) + (rnd() - 0.5) * 0.5) / n * (Math.PI * 2 - GL_MANE_OPEN * 2);
+                    const L = w * len * (k.big ? GL_MANE_BIG : GL_MANE) * (0.8 + rnd() * 0.35), T = L / SHAPE_ASPECT;
+                    const r0 = w * 0.22, cx = Math.cos(a) * (r0 + L / 2), cy = Math.sin(a) * (r0 + L / 2) * 1.1;
+                    ctx.save();
+                    ctx.translate(cx, cy);
+                    ctx.rotate(a);
+                    if (i % 2) ctx.scale(1, -1);
+                    ctx.globalAlpha = GL_MANE_ALPHA;
+                    ctx.drawImage(lead, -L * 0.54, -T * 0.62, L * 1.08, T * 1.24);
+                    ctx.globalAlpha = GL_MANE_ALPHA * (layer ? 0.95 : 0.85);
+                    ctx.drawImage(lock, -L / 2, -T / 2, L, T);
+                    ctx.restore();
+                }
+            }
+        }
+        ctx.restore();
+    }
+
     function glDraw(b) {
         const h = GL_W / SHAPE_ASPECT;
         // HEADLESS's own cut: the same body with the same hole where the head
@@ -1068,6 +1340,7 @@
         for (const k of gl.heads) {
             if (!k.alive || k.loose) continue;
             const gs = (0.25 + 0.75 * glGrown(k)) * (k.big ? 1 + (GL_BIG - 1) * 0.5 : 1);
+            if (GL_STYLE) { glStyleNeck(k, gs); continue; }
             const beads = Math.max(GL_BEADS, Math.round(Math.hypot(k.x - k.ax, k.y - k.ay) / (hw * 0.3)));
             for (let i = 0; i < beads; i++) {
                 const t = i / beads;
@@ -1075,25 +1348,27 @@
                 ctx.drawImage(ballImg, k.ax + (k.x - k.ax) * t - w / 2,
                               k.ay + (k.y - k.ay) * t - hgt / 2, w, hgt);
             }
-            if (GL_LOOK_HORNS) glLookSpines(k, beads, gs);
         }
         // turned about the collar and seated on it, so his shoulders are
         // where his necks come out however he is turned
         const o = glOrigin();
+        if (GL_STYLE) glStyleBody(1);
         ctx.save();
         ctx.translate(gl.cx, gl.cy);
         ctx.rotate(gl.tilt);
+        if (GL_STYLE) ctx.globalAlpha = 0;     // the styled body is drawn above instead
         ctx.drawImage(body, o.x, o.y, GL_W, h);
         // shut, he is stone: a coat of it swelling slowly in and out over him
-        const stone = gl.stone > 0.002 ? glStoneBody(body) : null;
+        const stone = gl.stone > 0.002 && !GL_STYLE ? glStoneBody(body) : null;
         if (stone) {
             const breath = GL_STONE_A0 + (GL_STONE_A1 - GL_STONE_A0) * (0.5 + 0.5 * Math.sin(clock * GL_STONE_HZ * Math.PI * 2));
             ctx.globalAlpha = gl.stone * breath;
             ctx.drawImage(stone, o.x, o.y, GL_W, h);
             ctx.globalAlpha = 1;
         }
+        ctx.globalAlpha = 1;
         // struck while open: the same body again, added over itself
-        if (gl.bodyFlash > 0) {
+        if (gl.bodyFlash > 0 && !GL_STYLE) {
             ctx.globalCompositeOperation = 'lighter';
             ctx.globalAlpha = Math.min(1, gl.bodyFlash) * 0.6;
             ctx.drawImage(body, o.x, o.y, GL_W, h);
@@ -1101,6 +1376,7 @@
             ctx.globalAlpha = 1;
         }
         ctx.restore();
+        if (GL_LOOK_WINGS) glLookWings();
         // the stump swelling green before it spits, the same tell as a head's
         const st = gl.stump, ssw = st.charge > 0 ? Math.min(1, st.charge / GL_CHARGE) : st.shots > 0 ? 1 : 0;
         if (ssw > 0) {
@@ -1114,6 +1390,15 @@
             ctx.arc(gl.cx, gl.cy, r, 0, Math.PI * 2);
             ctx.fill();
             ctx.globalAlpha = 1;
+        }
+        // what each head is set in, all of them before any head, so none
+        // lies over a neighbour
+        if (GL_STYLE) {
+            for (const k of gl.heads) {
+                if (!k.alive) continue;
+                const w = GL_HEAD_W * glSize(k) * (k.loose ? GL_LOOSE_SIZE : 1), h = w * (BALL_RY / BALL_RX);
+                glStyleFrame(k, w, h, k.loose ? k.rot : k.roll || 0);
+            }
         }
         for (const k of gl.heads) {
             if (!k.alive) continue;
@@ -1130,10 +1415,11 @@
             // round him, rising once -- a tell, not a flash
             const sw = k.charge > 0 ? Math.min(1, k.charge / (k.big ? GL_BIG_CHARGE : GL_CHARGE)) : k.shots > 0 ? 1 : 0;
             glLookUnder(k, hw, hh);
+            const tell = glPhLook(k) || PH_LOOK;
             if (sw > 0) {
                 const r = hw * 0.95;
                 const g = ctx.createRadialGradient(k.x, k.y, hw * 0.2, k.x, k.y, r);
-                g.addColorStop(0, PH_LOOK.color);
+                g.addColorStop(0, tell.color);
                 g.addColorStop(1, 'rgba(0,0,0,0)');
                 ctx.globalAlpha = PH_LOOK.glow * 1.6 * sw;
                 ctx.fillStyle = g;
@@ -1157,7 +1443,6 @@
                 ctx.save();
                 ctx.translate(k.x, k.y);
                 ctx.rotate(k.rot);
-                if (GL_LOOK_HORNS) glLookHorns(lw, lh);
                 ctx.drawImage(ballImg, -lw / 2, -lh / 2, lw, lh);
                 if (k.flash > 0) {
                     ctx.globalAlpha = Math.min(1, k.flash) * 0.7;
@@ -1170,9 +1455,8 @@
             ctx.save();
             ctx.translate(k.x, k.y);
             if (k.roll) ctx.rotate(k.roll);
-            if (GL_LOOK_HORNS) glLookHorns(hw, hh);
             ctx.drawImage(ballImg, -hw / 2, -hh / 2, hw, hh);
-            const green = sw > 0 ? phantomSprite(PH_LOOK) : null;
+            const green = sw > 0 ? phantomSprite(tell) : null;
             if (green) {
                 ctx.globalAlpha = 0.55 * sw;
                 ctx.drawImage(green, -hw / 2, -hh / 2, hw, hh);
