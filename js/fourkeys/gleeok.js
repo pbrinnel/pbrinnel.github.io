@@ -146,6 +146,16 @@
     let GL_THRASH_HZ   = 0.6; // ...times a second
     let GL_THRASH_DRIFT = 1.4; // ...his drift, times GL_DRIFT
     let GL_THRASH_PACE = 2.5; // ...and times as fast
+    // Looks being tried out in the boss lab, each on its own switch, all off
+    // here, so the game draws him as he has been until one is picked.
+    let GL_LOOK_GLOW   = 0;      // fire light round his collar and under each head
+    let GL_LOOK_WINGS  = 0;      // wings behind him, their bones Brandons, their skin crimson
+    let GL_LOOK_HORNS  = 0;      // bone horns on every head and spines down every neck
+    let GL_LOOK_HYDRA  = 0;      // each head its own element: fire, ice, storm; the big one crimson
+    let GL_LOOK_BREATH = 0;      // fire at the mouth as a head swells, and a jet as it fires
+    let GL_LOOK_SKY    = 0;      // the top of the field burning, ash drifting up through it
+    let GL_WING_HZ     = 0.35;   // wingbeats a second
+    LAB_KNOBS.push('GL_LOOK_GLOW', 'GL_LOOK_WINGS', 'GL_LOOK_HORNS', 'GL_LOOK_HYDRA', 'GL_LOOK_BREATH', 'GL_LOOK_SKY', 'GL_WING_HZ');
     LAB_KNOBS.push('GL_LVL', 'GL_HEADS', 'GL_HEAD_HP', 'GL_LOOSE_HP', 'GL_W', 'GL_Y', 'GL_TILT',
                    'GL_DRIFT', 'GL_HEAD_W', 'GL_NECK', 'GL_FAN', 'GL_SWING', 'GL_RATE',
                    'GL_LOOSE', 'GL_THICK', 'GL_SEAT_U', 'GL_SEAT_V', 'GL_CLIMB', 'GL_FIRE_MIN', 'GL_FIRE_MAX', 'GL_CHARGE',
@@ -296,6 +306,7 @@
             for (const k of gl.heads) {
                 // nothing to hit until it is whole, and a shot one is the ball's already
                 if (!k.alive || k.grow >= 0 || k.shot) continue;
+                if (glEject(ball, k)) { gl.pend = null; return null; }
                 const hit = glHeadContact(ball, k);
                 if (hit) { gl.pend = k; return hit; }
             }
@@ -472,6 +483,27 @@
         if (!hit) return null;
         const hx = hit.cx - k.x, hy = hit.cy - k.y;
         return { cx: k.x + hx * c + hy * s, cy: k.y - hx * s + hy * c };
+    }
+
+    // A head whose middle has got inside a head -- grown round it, lunged
+    // over it, or thrown out over it by the big one's wind-up -- is put back
+    // outside, heading away. Left in, its outline pushed it further in every
+    // frame and it never came out. True if it moved one.
+    const GL_INSIDE = 0.9;           // how deep, as a share of a head's outline, counts as inside
+    function glEject(ball, k) {
+        const rx = GL_HEAD_W * glSize(k) * (k.loose ? GL_LOOSE_SIZE : 1) / 2, ry = rx * (BALL_RY / BALL_RX);
+        let dx = ball.x - k.x, dy = ball.y - k.y;
+        if (Math.hypot(dx / rx, dy / ry) >= GL_INSIDE) return false;
+        if (Math.hypot(dx, dy) < 1e-3) { dx = 0; dy = 1; }
+        const q = Math.hypot(dx / rx, dy / ry), ux = dx / q, uy = dy / q;      // the outline, that way
+        const l = Math.hypot(dx, dy), nx = dx / l, ny = dy / l;
+        ball.x = Math.max(extX(ball), Math.min(LW - extX(ball), k.x + ux + nx * (extX(ball) + 4)));
+        ball.y = k.y + uy + ny * (extY(ball) + 4);
+        const sp = effSpeed() * (ball.boost || 1);
+        ball.vx = nx * sp;
+        ball.vy = ny * sp;
+        labUnflat(ball, sp);
+        return true;
     }
 
     // A head hurt, by the ball or by a head shot into it. On a neck, its last
@@ -844,6 +876,170 @@
                (gl.bigUsed ? 0 : glBigHp() + GL_BIG_LOOSE_HP);
     }
 
+    // ---- looks being tried out (the GL_LOOK_ switches) ---------------------------
+    const GL_FIRE = '#e2683a', GL_FIRE_RIM = '#ffb072', GL_FIRE_CORE = '#fff1d6';
+    // each head's element, by where it sits in the fan: fire, ice, storm; the big one's crimson
+    const glInk = k => k.big ? '#ff3a44' : GL_LOOK_HYDRA ? (['#ff6a2a', '#86d8ff', '#ffe36a'][Math.round(k.fan) + 1] || GL_FIRE) : GL_FIRE;
+
+    // a soft round light, added over what is there
+    function glLight(x, y, r, ink, a) {
+        if (a <= 0.002 || !Number.isFinite(x + y + r)) return;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+        g.addColorStop(0, ink);
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.globalAlpha = a;
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+
+    // Behind everything: the sky, the wings, the light at his collar.
+    function glLookBack() {
+        if (GL_LOOK_SKY) {
+            ctx.save();
+            const g = ctx.createLinearGradient(0, 0, 0, 330);
+            g.addColorStop(0, 'rgba(150, 38, 18, 0.42)');
+            g.addColorStop(1, 'rgba(150, 38, 18, 0)');
+            ctx.fillStyle = g;
+            ctx.fillRect(0, 0, LW, 330);
+            // ash going up through it, the same forty flecks forever
+            ctx.globalCompositeOperation = 'lighter';
+            for (let i = 0; i < 40; i++) {
+                const sx = (i * 197.3) % LW, sp = 18 + (i * 7) % 23;
+                const y = 340 - ((clock * sp + i * 53) % 360), x = sx + Math.sin(clock * 0.7 + i) * 14;
+                ctx.globalAlpha = 0.5 * Math.max(0, Math.min(1, y / 120));
+                ctx.fillStyle = i % 3 ? GL_FIRE_RIM : GL_FIRE;
+                ctx.fillRect(x, y, 2, 2);
+            }
+            ctx.restore();
+        }
+        if (GL_LOOK_WINGS) glLookWings();
+        if (GL_LOOK_GLOW) glLight(gl.cx, gl.cy, 280, GL_FIRE, 0.28 + 0.06 * Math.sin(clock * 1.2));
+    }
+
+    // Two wings out of his shoulders, beating slowly: each bone a run of
+    // Brandons shrinking to its tip, the way his necks are, and a crimson skin
+    // between the bones, scalloped in toward his shoulder between the tips.
+    // angle from level (down is positive) and length, lowest bone first: spread across the
+    // top of the field, since anything pointing up is off the screen
+    const GL_WING_BONES = [[0.42, 290], [0.12, 340], [-0.18, 330], [-0.48, 270]];
+    function glLookWings() {
+        const beat = Math.sin(clock * GL_WING_HZ * Math.PI * 2);
+        for (const side of [-1, 1]) {
+            const sx = gl.cx + side * 26, sy = gl.cy - 18;
+            const tips = GL_WING_BONES.map(([a, len], i) => {
+                const ang = a - beat * 0.14 * (1 + i * 0.25) - 0.05;
+                return { x: sx + side * Math.cos(ang) * len, y: sy + Math.sin(ang) * len };
+            });
+            // the skin
+            ctx.save();
+            const g = ctx.createRadialGradient(sx, sy, 20, sx, sy, 340);
+            g.addColorStop(0, 'rgba(170, 30, 40, 0.8)');
+            g.addColorStop(1, 'rgba(110, 16, 28, 0.5)');
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.moveTo(sx, sy);
+            ctx.lineTo(tips[0].x, tips[0].y);
+            for (let i = 1; i < tips.length; i++) {
+                const a = tips[i - 1], z = tips[i];
+                const mx = (a.x + z.x) / 2, my = (a.y + z.y) / 2;
+                ctx.quadraticCurveTo(mx + (sx - mx) * 0.35, my + (sy - my) * 0.35, z.x, z.y);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(255, 170, 120, 0.55)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.restore();
+            // the bones
+            for (const t of tips) {
+                const n = 9;
+                for (let i = n; i >= 1; i--) {
+                    const k = i / n, w = GL_HEAD_W * (0.5 - 0.32 * k), h = w * (BALL_RY / BALL_RX);
+                    ctx.drawImage(ballImg, sx + (t.x - sx) * k - w / 2, sy + (t.y - sy) * k - h / 2, w, h);
+                }
+            }
+        }
+    }
+
+    // Spines down a neck: a bone point off its outside every other bead.
+    function glLookSpines(k, beads, gs) {
+        const dx = k.x - k.ax, dy = k.y - k.ay, l = Math.hypot(dx, dy) || 1;
+        // the outside of the neck is away from the middle of the fan
+        const side = (k.fan > 0 ? 1 : k.fan < 0 ? -1 : 1);
+        const nx = -dy / l * side, ny = dx / l * side;
+        ctx.save();
+        ctx.fillStyle = '#e6dac0';
+        ctx.strokeStyle = '#5b4d38';
+        ctx.lineWidth = 1;
+        for (let i = 1; i < beads; i += 2) {
+            const t = i / beads, w = GL_HEAD_W * (0.45 + 0.35 * t) * gs;
+            const bx = k.ax + dx * t, by = k.ay + dy * t, r = w * 0.4, len = w * 0.35;
+            ctx.beginPath();
+            ctx.moveTo(bx + nx * r - dx / l * len * 0.3, by + ny * r - dy / l * len * 0.3);
+            ctx.lineTo(bx + nx * (r + len) - dx / l * len * 0.4, by + ny * (r + len) - dy / l * len * 0.4);
+            ctx.lineTo(bx + nx * r + dx / l * len * 0.3, by + ny * r + dy / l * len * 0.3);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+        }
+        ctx.restore();
+    }
+
+    // Two horns off the top of a head, drawn in its own frame before the
+    // head, so they grow out from behind it: swept back and out, and curling up.
+    function glLookHorns(w, h) {
+        ctx.save();
+        ctx.fillStyle = '#e6dac0';
+        ctx.strokeStyle = '#5b4d38';
+        ctx.lineWidth = Math.max(1, w * 0.02);
+        for (const s of [-1, 1]) {
+            const bx = s * w * 0.22, by = -h * 0.3;
+            ctx.beginPath();
+            ctx.moveTo(bx - s * w * 0.09, by + h * 0.06);
+            ctx.quadraticCurveTo(bx + s * w * 0.5, by - h * 0.05, bx + s * w * 0.55, by - h * 0.42);
+            ctx.quadraticCurveTo(bx + s * w * 0.3, by - h * 0.12, bx + s * w * 0.08, by + h * 0.02);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+        }
+        ctx.restore();
+    }
+
+    // Under a head: its element's light round it, and fire at its mouth as
+    // it swells and fires.
+    function glLookUnder(k, hw, hh) {
+        if (GL_LOOK_GLOW || GL_LOOK_HYDRA) glLight(k.x, k.y + hh * 0.25, hw * (k.loose ? 0.6 : 0.95), glInk(k), GL_LOOK_HYDRA ? 0.55 : 0.35);
+        if (!GL_LOOK_BREATH || k.loose) return;
+        const sw = k.charge > 0 ? Math.min(1, k.charge / (k.big ? GL_BIG_CHARGE : GL_CHARGE)) : 0;
+        const firing = k.shots > 0;
+        if (!sw && !firing) return;
+        // along the neck, out of his mouth
+        const dx = k.x - k.ax, dy = k.y - k.ay, l = Math.hypot(dx, dy) || 1, ux = dx / l, uy = dy / l;
+        const mx = k.x + ux * hh * 0.42, my = k.y + uy * hh * 0.42;
+        const len = firing ? hw * 1.4 : hw * 0.5 * sw, ink = glInk(k);
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        for (let i = 0; i < 3; i++) {
+            const t = (i + 1) / 3, fl = 1 + 0.12 * Math.sin(clock * 11 + i * 2);
+            const cx = mx + ux * len * t * 0.6, cy = my + uy * len * t * 0.6, r = hw * (0.12 + 0.16 * t) * fl * (firing ? 1 : 0.6 + 0.4 * sw);
+            const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+            g.addColorStop(0, GL_FIRE_CORE);
+            g.addColorStop(0.4, ink);
+            g.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.globalAlpha = 0.85;
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.ellipse(cx, cy, r * 0.7, r * (1 + t), Math.atan2(uy, ux) - Math.PI / 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+
     function glDraw(b) {
         const h = GL_W / SHAPE_ASPECT;
         // HEADLESS's own cut: the same body with the same hole where the head
@@ -851,6 +1047,7 @@
         const body = hlSprite('raw');
         if (!body || !ready(ballImg)) return;
         const hw = GL_HEAD_W, hh = hw * (BALL_RY / BALL_RX);
+        glLookBack();
         // where a lunge means to land: a mark on your line that follows you
         // while it draws back, and stays put once it goes -- growing in once,
         // steady, never blinking. The big one's is STUNNED's colour.
@@ -878,6 +1075,7 @@
                 ctx.drawImage(ballImg, k.ax + (k.x - k.ax) * t - w / 2,
                               k.ay + (k.y - k.ay) * t - hgt / 2, w, hgt);
             }
+            if (GL_LOOK_HORNS) glLookSpines(k, beads, gs);
         }
         // turned about the collar and seated on it, so his shoulders are
         // where his necks come out however he is turned
@@ -931,6 +1129,7 @@
             // the swell before a burst: green washing up over him and a glow
             // round him, rising once -- a tell, not a flash
             const sw = k.charge > 0 ? Math.min(1, k.charge / (k.big ? GL_BIG_CHARGE : GL_CHARGE)) : k.shots > 0 ? 1 : 0;
+            glLookUnder(k, hw, hh);
             if (sw > 0) {
                 const r = hw * 0.95;
                 const g = ctx.createRadialGradient(k.x, k.y, hw * 0.2, k.x, k.y, r);
@@ -958,6 +1157,7 @@
                 ctx.save();
                 ctx.translate(k.x, k.y);
                 ctx.rotate(k.rot);
+                if (GL_LOOK_HORNS) glLookHorns(lw, lh);
                 ctx.drawImage(ballImg, -lw / 2, -lh / 2, lw, lh);
                 if (k.flash > 0) {
                     ctx.globalAlpha = Math.min(1, k.flash) * 0.7;
@@ -970,6 +1170,7 @@
             ctx.save();
             ctx.translate(k.x, k.y);
             if (k.roll) ctx.rotate(k.roll);
+            if (GL_LOOK_HORNS) glLookHorns(hw, hh);
             ctx.drawImage(ballImg, -hw / 2, -hh / 2, hw, hh);
             const green = sw > 0 ? phantomSprite(PH_LOOK) : null;
             if (green) {

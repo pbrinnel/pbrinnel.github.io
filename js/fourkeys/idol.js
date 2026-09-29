@@ -24,9 +24,20 @@
     // knock off. His face is a curve, so anything off its middle comes back
     // at a slant.
     //
+    // A hit on bare face knocks him back: he jolts up IDOL_RECOIL and settles
+    // over IDOL_RECOIL_SECS, so the next shot has further to go. Without it
+    // the ball ping-ponged between his chin and you faster than he could be
+    // hurt, and the fight was a rattle rather than shots.
+    //
     // He wanders along the top, slowly, to places of his own choosing. Every
-    // so often he shakes for IDOL_SHAKE and then drops like the stone he is,
-    // all the way to the floor. Land on your middle and he pins you where you
+    // so often he shakes for IDOL_SHAKE, his shadow gathering on the floor
+    // where he will land, and then drops like the stone he is, all the way
+    // to the floor. Landing, he throws IDOL_DEBRIS chunks off his chin along
+    // your line, out both ways: the first that reaches you is a helping of
+    // SLUGGISH -- one a landing, however many meet you -- so beside him is
+    // not safe either. Down there his crown is in
+    // reach, the one part of him the ball never gets to up top, and a bite
+    // out of it is IDOL_CROWN times the size. Land on your middle and he pins you where you
     // stand until he rises again, IDOL_DOWN later and slowly; land on your
     // end and he only shoves you aside. Down there he is a
     // wall: you cannot get past him, and nor can the ball, so whichever side
@@ -43,7 +54,7 @@
     // second comes down on wherever the first sent you.
     let IDOL_HP        = 18;     // hits on bare face to finish him
     let IDOL_W         = 290;    // how wide he is
-    let IDOL_Y         = 105;    // where his middle hangs; his crown is off the top
+    let IDOL_Y         = 50;     // where his middle hangs; his crown is off the top
     let IDOL_BITE      = 40;     // px round where a head lands that its stone comes off
     let IDOL_BRICK     = 0.8;    // ...and the rubble under it, as a share of that
     let IDOL_CRACK     = 22;     // px a crack runs inward, per hit in the streak after the first
@@ -56,13 +67,20 @@
     let IDOL_WAIT_MAX  = 4.5;    // ...and at most
     let IDOL_DROP_MIN  = 7;      // seconds between drops, at least...
     let IDOL_DROP_MAX  = 13;     // ...and at most
-    let IDOL_SHAKE     = 3;      // the shaking before a drop, which is the tell
+    let IDOL_SHAKE     = 1.5;    // the shaking before a drop, which is the tell
     let IDOL_SHAKE_PX  = 5;      // ...and how hard
     let IDOL_G         = 2600;   // px/s^2 he falls at
     let IDOL_DOWN      = 3;      // seconds he stays down
     let IDOL_RISE      = 150;    // px/s he goes back up at
     let IDOL_RISE_QUICK = 700;   // ...and when a head has gone over him
     let IDOL_CLIMB     = 0.4;    // how much of the original's climb this fight has
+    let IDOL_RECOIL    = 60;     // px a hit on bare face knocks him up
+    let IDOL_RECOIL_SECS = 0.5;  // ...and how quickly he settles back, a time constant
+    let IDOL_DEBRIS    = 2;      // chunks off his chin each way along your line when he lands
+    let IDOL_DEBRIS_V  = 420;    // ...px/s they set off at
+    let IDOL_DEBRIS_RUN = 120;   // ...and px they skitter before they stop
+    let IDOL_HOLD      = 2.5;    // seconds at most he waits, rising, for a head over him to go
+    let IDOL_CROWN     = 2.5;    // a bite out of his crown while he is down, times an ordinary one
     let IDOL_HURT_AT   = 0.8;    // share of his health under which he is in his second phase
     let IDOL_HURT_PACE = 2;      // ...and how many times as often he attacks in it
     let IDOL_STOMP_FAST = 1.6;   // a double stomp's fall and rise, times the single drop's
@@ -79,7 +97,8 @@
                    'IDOL_WAIT_MAX', 'IDOL_DROP_MIN', 'IDOL_DROP_MAX', 'IDOL_SHAKE', 'IDOL_SHAKE_PX',
                    'IDOL_G', 'IDOL_DOWN', 'IDOL_RISE', 'IDOL_RISE_QUICK', 'IDOL_CLIMB',
                    'IDOL_HURT_AT', 'IDOL_HURT_PACE', 'IDOL_STOMP_FAST', 'IDOL_STOMP_DOWN',
-                   'IDOL_STOMP_SHAKE', 'IDOL_STOMP_TRACK');
+                   'IDOL_STOMP_SHAKE', 'IDOL_STOMP_TRACK', 'IDOL_RECOIL', 'IDOL_RECOIL_SECS',
+                   'IDOL_DEBRIS', 'IDOL_DEBRIS_V', 'IDOL_DEBRIS_RUN', 'IDOL_CROWN', 'IDOL_HOLD');
 
     // His two coats, each a heap of whole pieces (idolCoat). A piece is there
     // or it is gone, so he breaks in Brandon-shaped chunks, never in squares.
@@ -100,7 +119,7 @@
             idol = { stone: idolCoat(IDOL_STONE), brick: idolCoat(IDOL_BRICKS), chips: [], dust: [], t: 0, pend: null, bites: 0, streak: 0, lastHit: -99,
                      x: LW / 2, tx: LW / 2, wander: IDOL_WAIT_MIN, cy: IDOL_Y,
                      stage: 'idle', st: 0, vy: 0, jx: 0, pin: null, side: 0, drops: 0,
-                     doubles: 0, dblNext: true, dbl: 0,
+                     doubles: 0, dblNext: true, dbl: 0, debris: [], debrisHits: 0, recoils: 0, crownBites: 0,
                      next: IDOL_DROP_MIN + Math.random() * (IDOL_DROP_MAX - IDOL_DROP_MIN) };
         },
         reset() { idol = null; },
@@ -121,6 +140,7 @@
             idolMove(dt);
             b.x = idol.x + idol.jx - bw / 2;
             b.y = idol.cy - bh / 2;
+            idolDebrisStep(dt);
             idol.chips = idol.chips.filter(c => clock - c.t0 < c.life);
             idol.dust = idol.dust.filter(c => clock - c.t0 < c.life);
         },
@@ -136,6 +156,7 @@
         },
         // falling, he only knocks the ball down ahead of him: no chip, no wound
         touch(br, ball, hit) {
+            idol.hitBall = ball;
             if (idol.stage !== 'fall') return false;
             labBounce(ball, hit);
             ball.vy = Math.abs(ball.vy);
@@ -153,7 +174,10 @@
                 // the same number the rule under BONUS is filled from
                 const k = Math.max(0, Math.min(1, (liveSpinMul() - 1) / (SPIN_MUL - 1)));
                 const low = p.coat === idol.brick;
-                const r = IDOL_BITE * (1 + IDOL_SPIN * k) * (low ? IDOL_BRICK : 1);
+                // down on the floor, his crown is in reach, and soft
+                const crown = (idol.stage === 'down' || idol.stage === 'rise') && cy < b.y + bh * 0.3;
+                if (crown) { idol.crownBites++; idolRollOff(cx, cy); }
+                const r = IDOL_BITE * (1 + IDOL_SPIN * k) * (low ? IDOL_BRICK : 1) * (crown ? IDOL_CROWN : 1);
                 idolChip(b, p.coat, cx, cy, r);
                 idolStreak();
                 if (idol.streak > 1) {
@@ -161,12 +185,18 @@
                 }
                 return;
             }
+            if ((idol.stage === 'down' || idol.stage === 'rise') && cy < b.y + bh * 0.3) idolRollOff(cx, cy);
             if (bossIF > 0) return;
             idolStreak();                  // a wound keeps the streak going too
             b.flash = 1;
             bossIF = BOSS_IF;
             b.hp = Math.max(0, b.hp - 1);
             bossHits++;
+            // knocked back up, if he is up there to be knocked
+            if (idol.stage === 'idle' || idol.stage === 'shake') {
+                idol.cy = Math.max(IDOL_Y - IDOL_RECOIL * 1.5, idol.cy - IDOL_RECOIL);
+                idol.recoils++;
+            }
             const done = b.hp <= 1e-6;
             award(BOSS_PTS * (done ? 5 : 1), cx, cy);
             if (done) { idolDie(b); return; }
@@ -189,7 +219,8 @@
             return { name: 'IDOL', hp: b.hp, max: b.maxHp, w: bw,
                      line: 'stone ' + gone(idol.stone) + '% off, rubble ' + bare + '% off · ' + idol.bites + ' bites · streak ' + idol.streak + ' · ' +
                            idol.stage + (idol.pin ? ', pinning you' : '') + ' · ' + idol.drops + ' drops, ' +
-                           idol.doubles + ' double stomps' };
+                           idol.doubles + ' double stomps · ' + idol.recoils + ' knocked back · ' + idol.crownBites +
+                           ' crown bites · debris ' + idol.debrisHits + ' on you' };
         }
     };
 
@@ -233,6 +264,8 @@
     function idolMove(dt) {
         const h = bw * (BALL_RY / BALL_RX);
         idol.jx = 0;
+        // settling back down after a knock, while he is up
+        if (idol.stage === 'idle' || idol.stage === 'shake') idol.cy += (IDOL_Y - idol.cy) * (1 - Math.exp(-dt / IDOL_RECOIL_SECS));
         switch (idol.stage) {
             case 'idle': {
                 if ((idol.wander -= dt) <= 0) {
@@ -296,10 +329,16 @@
                 }
                 break;
             case 'rise':
+                // Not up through a head over him: it would be pinned between him
+                // and the ceiling. He waits IDOL_HOLD at most, so a head that
+                // stays up there cannot keep him down; idolEject has it then.
+                if (balls.some(q => q.y < idol.cy - h * 0.3 && Math.abs(q.x - idol.x) < bw / 2 + BALL_RX) &&
+                    (idol.hold = (idol.hold || 0) + dt) < IDOL_HOLD) break;
                 idol.cy = Math.max(IDOL_Y, idol.cy - (idol.quick ? IDOL_RISE_QUICK
                                                    : IDOL_RISE * (idol.dbl ? IDOL_STOMP_FAST : 1)) * dt);
                 if (idol.cy <= IDOL_Y) {
                     idol.quick = false;
+                    idol.hold = 0;
                     if (idol.dbl === 2) { idol.dbl = 1; idol.stage = 'shake'; idol.st = 0; break; }
                     idol.dbl = 0;
                     idol.stage = 'idle';
@@ -307,6 +346,17 @@
                 }
                 break;
         }
+    }
+
+    // A head off his crown while he is down is turned off his nearer side,
+    // or it bounces between his crown and the ceiling for good.
+    function idolRollOff(cx, cy) {
+        const ball = idol.hitBall;
+        if (!ball) return;
+        let nx = ball.x - cx, ny = ball.y - cy;
+        const l = Math.hypot(nx, ny) || 1;
+        const side = ball.x < idol.x ? -1 : 1;
+        labSteer(ball, { nx: nx / l, ny: ny / l }, idol.x + side * (bw / 2 + 80), idol.cy, 0.6);
     }
 
     // in his second phase: under IDOL_HURT_AT of his health
@@ -324,6 +374,66 @@
         b.x = idol.x - bw / 2;
         b.y = idol.cy - bw * (BALL_RY / BALL_RX) / 2;
         for (let i = 0; i < 16; i++) idolDust(b.x + bw * (0.25 + Math.random() * 0.5), b.y + bh * 0.95);
+        // chunks off his chin, out along your line both ways
+        const c = idolChord(), n = Math.max(0, Math.round(IDOL_DEBRIS)), drop = { hit: false };
+        for (const dir of [-1, 1]) {
+            for (let i = 0; i < n; i++) {
+                const v = IDOL_DEBRIS_V * (0.7 + 0.3 * (i + 1) / n);
+                idol.debris.push({ drop, x: idol.x + dir * c * 0.9, dir, v, run: 0, max: IDOL_DEBRIS_RUN * (0.6 + 0.4 * (i + 1) / n),
+                                   rot: Math.random() * 6.28, spin: dir * (6 + Math.random() * 6), tone: (Math.random() * IDOL_RUBBLE.length) | 0,
+                                   hop: Math.random() * 6.28 });
+            }
+        }
+    }
+
+    // The chunks off his chin: they skitter out along your line, slowing to a
+    // stop, and one that meets you is spent on you.
+    const IDOL_DEBRIS_W = 26;        // how big a chunk is, across
+    function idolDebrisStep(dt) {
+        if (phase !== 'play') { idol.debris = []; return; }
+        for (let i = idol.debris.length - 1; i >= 0; i--) {
+            const d = idol.debris[i];
+            const k = Math.max(0, 1 - d.run / d.max), step = d.v * k * dt + 20 * dt;
+            d.x += d.dir * step;
+            d.run += step;
+            d.rot += d.spin * k * dt;
+            const sg = segs().find(s => Math.abs(d.x - s.cx) < s.w / 2 + IDOL_DEBRIS_W * 0.4);
+            // under him, you are pinned already: nothing he throws out reaches you there
+            if (sg && !idol.pin && !d.drop.hit) { d.drop.hit = true; addDrag(sg, d.x); idol.debrisHits++; idol.debris.splice(i, 1); continue; }
+            if (d.run >= d.max || d.x < -IDOL_DEBRIS_W || d.x > LW + IDOL_DEBRIS_W) idol.debris.splice(i, 1);
+        }
+    }
+
+    // his shadow on the floor while he shakes, gathering where he will land,
+    // and the chunks skittering along it after
+    function idolDrawFloor() {
+        const base = padY() + padH() / 2;
+        if (idol.stage === 'shake' || idol.stage === 'fall') {
+            const k = idol.stage === 'fall' ? 1 : Math.min(1, idol.st / (idol.dbl === 1 ? IDOL_STOMP_SHAKE : IDOL_SHAKE));
+            const w = bw * 0.45 * (0.5 + 0.5 * k);
+            ctx.save();
+            ctx.globalAlpha = 0.18 + 0.32 * k;
+            ctx.fillStyle = IDOL_RUBBLE[0];
+            ctx.beginPath();
+            ctx.ellipse(idol.x, base, w, 10, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 0.5 * k;
+            ctx.strokeStyle = IDOL_ASHLAR[0];
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.restore();
+        }
+        for (const d of idol.debris) {
+            const sp = idolCobble(IDOL_RUBBLE[d.tone]);
+            if (!sp) continue;
+            const w = IDOL_DEBRIS_W, h = w * (BALL_RY / BALL_RX);
+            const hop = Math.abs(Math.sin(d.run / 30 + d.hop)) * 6 * Math.max(0, 1 - d.run / d.max);
+            ctx.save();
+            ctx.translate(d.x, base - h / 2 - hop);
+            ctx.rotate(d.rot);
+            ctx.drawImage(sp, -w / 2, -h / 2, w, h);
+            ctx.restore();
+        }
     }
 
     // how far into the paddle's span his outline reaches across the band the
@@ -649,6 +759,7 @@
             ctx.globalAlpha = 1;
         }
         idolDrawChips();
+        idolDrawFloor();
         // his crown is off the top of the screen, so his health runs along it
         const grow = phase === 'entrance' ? enterK() : 1;
         if (grow > 0.001) labBar(LW / 2 - 150 * grow, 10, 300 * grow, b.hp / b.maxHp);
