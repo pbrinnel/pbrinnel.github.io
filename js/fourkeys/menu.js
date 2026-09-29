@@ -13,6 +13,7 @@
     //   every boss beaten counts, and the count buys MULTI, PRINCE and CHELL --
     //   or finish the FARM, the RUINS or the CITY without losing a head or a
     //   continue and it hands over its one of them
+    //   own enough paddles and the BRANDONS sign goes up: every one on a rack, to pick from
     //   each stage gives the next memory the first time you win it with one left to give
     //   win the CASTLE and the VOID stands in the way to it: its memory comes
     //   halfway through the fight, and its end is the credits
@@ -66,6 +67,8 @@
     // ...or, sooner, each one with a flawless win of its level: not a head
     // lost and no continue (menuBeatSlew)
     const MENU_FLAWLESS_PADS = { 1: 'multi', 2: 'prince', 3: 'chell' };
+    // paddles owned before the BRANDONS sign goes up (menuStands)
+    const MENU_RACK_AT = 5;
     // Who a level hands you is whoever the level sliders say, so moving a boss
     // in his own tab moves him in the town too. No second copy of the roster to
     // fall out of step with the first.
@@ -174,13 +177,16 @@
 
     // whether a building is standing yet: most always are, the VOID waits on a
     // win, MEMORIES on its first memory, the LEADERBOARD on a score above
-    // nothing on any stage, and BOSS RUSH on the VOID
+    // nothing on any stage, BOSS RUSH on the VOID, and BRANDONS on enough of them
     function menuStands(c) {
         if (c.level.key === 'memories') return MENU_MEMS.some(m => !m.always && menu.mems[m.id]);
         if (c.level.key === 'board') return MENU_ALL.some(l => menu.best[l.n] > 0);
         if (c.level.key === 'rush') return !!menu.keys[MENU_VOID.n];
+        if (c.level.key === 'paddles') return menuOwned().length >= MENU_RACK_AT;
         return !c.level.after || !!menu.keys[c.level.after];
     }
+    // the paddles you have, in the gates' order
+    function menuOwned() { return MENU_PADS.filter(k => menu.pads[k]); }
 
     // ---- what the debug menu reaches in through ---------------------------------------
     // Everything the town knows about you is in `menu`, and `menu` is this
@@ -338,7 +344,10 @@
     // is only a screen of choices (menuShow); erasing is two presses deeper.
     // BOSS RUSH is its mirror, up and to the left of the boards over the
     // gap between the CITY and the VOLCANO, and it is not there until the
-    // VOID has been won.
+    // VOID has been won. BRANDONS hangs beside SETTINGS, lower, over the
+    // RUINS' roof: up SETTINGS' gap until he is above the roof, then across.
+    // Its lane is the RUINS', so it stops where the CASTLE's starts. It goes
+    // up once you own MENU_RACK_AT paddles.
     const M_SIDES = [
         { key: 'memories', side: -1, lines: ['MEMORIES'], ink: '#d9a5b3',
           at: { x: 70, y: 80, w: 116, h: 90 } },
@@ -347,7 +356,9 @@
         { key: 'board', side: 1, lines: ['LEADERBOARD'], ink: '#c9a94e',
           at: { x: 730, y: 80, w: 116, h: 90 } },
         { key: 'rush', lines: ['BOSS RUSH'], ink: '#e0a040', small: true,
-          at: { x: 626, y: 44, w: 80, h: 28, lane: [614, 638] } }
+          at: { x: 626, y: 44, w: 80, h: 28, lane: [614, 638] } },
+        { key: 'paddles', lines: ['BRANDONS'], ink: '#6cb8a8', small: true,
+          at: { x: 262, y: 72, w: 96, h: 26, lane: [187, 305] } }
     ];
     const M_RUSH = 'rush';           // BOSS RUSH's name in menu.run and menu.best
 
@@ -529,7 +540,7 @@
         if ((g.t += dt) < menuPushSecs(g.card)) return;
         menu.going = null;
         const l = g.card.level;
-        if (l.key === 'settings' || l.key === 'memories' || l.key === 'board') {
+        if (l.key === 'settings' || l.key === 'memories' || l.key === 'board' || l.key === 'paddles') {
             if (l.key === 'board') fetchBoard();        // the tables as they are now, not as the game found them
             menuShow(l.key);
             menu.screen.from = g.x;
@@ -1974,7 +1985,7 @@
         menuAlpha(1);
     }
 
-    // ---- the signs: MEMORIES, SETTINGS, BOSS RUSH, the LEADERBOARD --------------------
+    // ---- the signs: MEMORIES, SETTINGS, BOSS RUSH, BRANDONS, the LEADERBOARD -------
     // A tier under the levels: they matter, but they should not compete. So
     // they are signs rather than buildings -- a board hung on two short chains
     // of little heads, from a post and arm on the big two and a bracket on the
@@ -1982,8 +1993,10 @@
     // and take their colour as he lines up, swaying a little more when lit.
     // Each board is cut to what it is for: MEMORIES a scroll, the LEADERBOARD
     // a plaque with a crest its wings rise out of, SETTINGS a tag, BOSS RUSH an
-    // arrow pointing into the town. The crow circles MEMORIES.
+    // arrow pointing into the town, BRANDONS a plain board with every paddle you
+    // own hung under it in miniature. The crow circles MEMORIES.
     const M_SIGN_WING = 22;          // the board's wings, smaller than a level's things would be
+    const M_SIGN_PAD = 12;           // longest a paddle hung under BRANDONS gets
     const M_SIGN_SWAY = 0.01, M_SIGN_SWAY_LIT = 0.035;   // radians a board swings, and the more it swings lit
     const menuSignLine = st => menuMix(st.ink, M_SLATE, M_RIM_REST * (1 - st.rise));
     const menuSignInk = st => st.aimed ? menuMix(st.ink, '#ffffff', 0.25) : M_WORD_REST;
@@ -2006,6 +2019,9 @@
             case 'board':           // a plaque with a crest
                 ctx.moveTo(x, y + 7); ctx.lineTo(x + w / 2 - 12, y + 7); ctx.lineTo(x + w / 2, y - 5); ctx.lineTo(x + w / 2 + 12, y + 7);
                 ctx.lineTo(x + w, y + 7); ctx.lineTo(x + w, y + h); ctx.lineTo(x, y + h); ctx.closePath();
+                break;
+            case 'paddles':         // a plain board: what hangs off it is the point
+                ctx.rect(x, y, w, h);
                 break;
             case 'settings':        // a tag, clipped at one end
                 ctx.moveTo(x + 9, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + h); ctx.lineTo(x + 9, y + h); ctx.lineTo(x, y + h / 2); ctx.closePath();
@@ -2057,6 +2073,15 @@
         }
         shape(); ctx.strokeStyle = line; ctx.lineWidth = 1 + 0.6 * st.rise; ctx.stroke();
         if (key === 'settings') { ctx.beginPath(); ctx.arc(G.left + 7, G.top + G.bh / 2, 2, 0, Math.PI * 2); ctx.stroke(); }
+        if (key === 'paddles') {
+            // each on a head of the chain's, faint until he lines up with it
+            const own = menuOwned(), step = G.bw / own.length;
+            own.forEach((k, i) => {
+                const x = G.left + step * (i + 0.5);
+                menuPutHead(link, x, G.top + G.bh + 2, 3);
+                labPadIcon(k, x, G.top + G.bh + 8, Math.min(M_SIGN_PAD, step - 1), false, 0.3 + 0.7 * st.rise);
+            });
+        }
         // the name, shrunk to fit, a little off the middle where the shape asks for it
         const name = c.level.lines.join(''), size = G.small ? 11 : 14, room = G.bw - 22;
         ctx.font = size + 'px "Fira Sans", "Trebuchet MS", sans-serif';   // as text() sets it
@@ -2714,8 +2739,8 @@
         ctx.globalAlpha = 1;
     }
 
-    // ---- inside: SETTINGS and the MEMORIES room --------------------------------------
-    // The two buildings you go into without leaving the town. Their choices
+    // ---- inside: SETTINGS, the MEMORIES room and the rack -----------------------------
+    // The buildings you go into without leaving the town. Their choices
     // are picked the way the game-over screen's are: he is down at the bottom
     // with them in a row over him, the one he is under is lit, and a press
     // takes it -- a click, a tap or Space. That is the one way that works
@@ -2787,6 +2812,8 @@
         menuCutHintOff(false);
         const s = M_SCREENS[kind];
         if (s) paddle.x = paddle.tx = menuChoices().find(c => c.id === s.home).cx;
+        // the rack's home is the peg of the one in his hands
+        if (kind === 'paddles') paddle.x = paddle.tx = menuRack().find(c => c.id === LAB.pad).cx;
         setHint(kind === 'memory' ? 'hold to skip'
                                   : 'move to choose · click/tap or space to pick');
     }
@@ -2987,6 +3014,7 @@
         const sc = menu.screen;
         const s = M_SCREENS[sc.kind];
         if (s) return (s.table ? menuTabs : menuRow)(s.choices(sc));
+        if (sc.kind === 'paddles') return menuRack();
         // the room: the timeline, oldest on the left, across the whole of
         // where he can stand. Its stops are evenly spaced, not to scale --
         // there are no years on it but the memories' own. A memory you have
@@ -3064,6 +3092,7 @@
         if (!menuScreenUp()) return false;
         const sc = menu.screen;
         if (sc.kind === 'memory') { menuMemoryCard(sc.n, sc.t); menuSkipDraw(); return true; }
+        if (sc.kind === 'paddles') { menuRackDraw(); return true; }
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, LW, LH);
         const s = M_SCREENS[sc.kind];
@@ -3149,6 +3178,119 @@
             menu.press = null;
         }
         return true;
+    }
+
+    // ---- the rack: every paddle at once ---------------------------------------------
+    // Behind the BRANDONS sign, the other way to change paddle than leaning on
+    // a wall. All of them hang from one rail in the gates' order, earned or
+    // not, with BACK at the left end, spread across his reach the way the
+    // timeline is. The one he is under is shown off big above the rail, as
+    // on his PADDLE UNLOCKED card; a press dashes him up and swaps him for
+    // it. The one in his hands is down there being him, so only a ghost of
+    // it is left on its peg. One not yet earned is his shape in flat dark --
+    // not stone, which is STATUE -- with no name, and what it takes to earn.
+    const M_RACK_Y = 452;            // the rail
+    const M_RACK_PAD = 58;           // a paddle on it...
+    const M_RACK_BIG = 400;          // ...and the lit one, shown off above
+    const M_RACK_BEAD = 7;           // the rail is a row of little slate heads this wide
+    const M_RACK_DARK = '#1c1a17';   // one not yet earned
+    const M_RACK_EDGE = '#2e2a25', M_RACK_EDGE_LIT = '#4a453d';   // ...and the rim that keeps it off the black
+    const M_RACK_GHOST = 0.15;       // what is left on the peg of the one in his hands
+    const M_RACK_REST = 0.7;         // an earned one he is not under
+
+    function menuRack() {
+        const list = [{ id: 'back', back: true, ink: M_SAFE, act: menuLeave }]
+            .concat(MENU_PADS.map(k => ({ id: k, pad: k, got: !!menu.pads[k],
+                                         ink: LAB_PAD[k].ink || LAB_PAD[k].rim || M_WORD_REST,
+                                         act: menu.pads[k] && k !== LAB.pad ? () => menuRackTake(k) : null })));
+        const hs = halfSpan(), step = (LW - hs * 2) / (list.length - 1);
+        return list.map((c, i) => Object.assign(c, { cx: hs + step * i }));
+    }
+
+    // his reach changes with him, so the rack moves: he is put back under
+    // the one he took, and so is the rest of his dash
+    function menuRackTake(k) {
+        LAB.usePad(k);
+        const x = menuRack().find(c => c.id === k).cx;
+        paddle.x = paddle.tx = x;
+        if (menu.screen.dash) menu.screen.dash.x = x;
+    }
+
+    // what it takes to earn one, from the same lists that hand them over
+    function menuRackHow(k) {
+        const lv = MENU_LEVELS.concat(MENU_LAST).find(l => l.pad === k);
+        if (lv) return 'win the ' + lv.name + ' without a continue';
+        if (k === MENU_SOUVENIR) return 'win any level';
+        const slain = MENU_SLAIN_PADS.find(s => s[1] === k);
+        if (!slain) return '';
+        const n = Object.keys(MENU_FLAWLESS_PADS).find(n => MENU_FLAWLESS_PADS[n] === k);
+        const clean = n && MENU_ALL.find(l => l.n === +n);
+        return 'beat ' + slain[0] + ' bosses' + (clean ? ', or win the ' + clean.name + ' without losing a head' : '');
+    }
+
+    function menuRackIcon(k, x, y, w, got, a, lit) {
+        if (got) { labPadIcon(k, x, y, w, false, a); return; }
+        const parts = LAB_PAD[k].twin ? [[-w * 0.28, w * 0.55], [w * 0.28, w * 0.55]] : [[0, w]];
+        const edge = lit ? M_RACK_EDGE_LIT : M_RACK_EDGE;
+        ctx.globalAlpha = a;
+        for (const [dx, ww] of parts) {
+            const hh = ww / SHAPE_ASPECT;
+            ctx.drawImage(padFlat('mRackEdge' + edge, edge), x + dx - ww * 0.53, y - hh * 0.53, ww * 1.06, hh * 1.06);
+            ctx.drawImage(padFlat('mRackDark', M_RACK_DARK), x + dx - ww / 2, y - hh / 2, ww, hh);
+        }
+        ctx.globalAlpha = 1;
+    }
+
+    function menuRackDraw() {
+        const sc = menu.screen, dash = sc.dash, rack = menuRack();
+        const lit = dash ? rack.find(c => c.id === dash.c.id) : menuChoiceAt(paddle.x);
+        const ink = M_SIDES.find(s => s.key === 'paddles').ink;
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, LW, LH);
+        text('BRANDONS', LW / 2, 56, 30, ink, 'center');
+        text(menuOwned().length + ' of ' + MENU_PADS.length, LW / 2, 82, 14, '#9a958c', 'center');
+
+        if (lit.back) {
+            text('BACK', LW / 2, 220, 40, M_SAFE, 'center');
+            text('to the town, holding ' + LAB_PAD[LAB.pad].name, LW / 2, 252, 15, '#9a958c', 'center');
+        } else {
+            const p = LAB_PAD[lit.pad];
+            menuRackIcon(lit.pad, LW / 2, 196, M_RACK_BIG, lit.got, 1, true);
+            if (lit.got) {
+                text(p.name + (lit.id === LAB.pad ? '  ·  IN HAND' : ''), LW / 2, 300, 36, lit.ink, 'center');
+                text(p.blurb, LW / 2, 326, 15, '#c9c4ba', 'center');
+                if (p.lore) menuLore(p.lore, LW / 2, 356, UNLOCK_LORE_PX, UNLOCK_LORE_W);
+            } else {
+                text('? ? ?', LW / 2, 300, 36, '#6d685f', 'center');
+                text(menuRackHow(lit.pad), LW / 2, 326, 15, '#9a958c', 'center');
+            }
+        }
+
+        const bead = menuHead(M_SLATE, 'flat');
+        for (let x = rack[0].cx - 30; x <= rack[rack.length - 1].cx + 30; x += M_RACK_BEAD * 0.8)
+            menuPutHead(bead, x, M_RACK_Y, M_RACK_BEAD);
+        for (const c of rack) {
+            const on = c.id === lit.id;
+            menuPutHead(menuHead(on ? c.ink : '#6d685f', 'flat'), c.cx, M_RACK_Y, on ? 13 : 10);
+            if (c.back) { text('BACK', c.cx, M_RACK_Y + 28, on ? 15 : 13, on ? M_SAFE : '#6d685f', 'center'); continue; }
+            const w = on ? M_RACK_PAD * 1.15 : M_RACK_PAD;
+            menuRackIcon(c.pad, c.cx, M_RACK_Y + 10 + w / SHAPE_ASPECT / 2, w, c.got,
+                         c.id === LAB.pad ? M_RACK_GHOST : on || !c.got ? 1 : M_RACK_REST, on);
+        }
+
+        const pose = dash && menuDashPose(dash, M_RACK_Y + 14, 28);
+        if (!pose) {
+            // a line up from him to what he is under, as every room has
+            ctx.strokeStyle = lit.ink; ctx.globalAlpha = 0.5; ctx.lineWidth = 2; ctx.setLineDash([4, 6]);
+            ctx.beginPath(); ctx.moveTo(paddle.x, PADDLE_Y - padH() / 2 - 8); ctx.lineTo(lit.cx, M_RACK_Y + 40); ctx.stroke();
+            ctx.setLineDash([]); ctx.globalAlpha = 1;
+            labPadIcon(LAB.pad, paddle.x, PADDLE_Y, padW(), false, 1);
+            return;
+        }
+        ctx.save();
+        ctx.translate(pose.x, pose.y + pose.bob); ctx.rotate(pose.rock);
+        labPadIcon(LAB.pad, 0, 0, padW(), false, 1);
+        ctx.restore();
     }
 
     // ---- picking: he dashes up into it ----------------------------------------------
