@@ -2420,6 +2420,7 @@
         menu.showT = 0;
         menu.skipT = -1;
         if (!menu.shows.length) menu.fightShow = false;
+        if (!menuCutUp()) menuCutHintOff(true);
     }
 
     function menuUnlockDraw() {
@@ -2589,9 +2590,13 @@
     // ---- held to skip, and tapped to go on -----------------------------------------
     // A memory and the credits play by themselves, and a tap does not end
     // them: one landing by accident, or meant for the card before, would
-    // throw away a scene there is no getting back to straight away. A press
-    // puts HOLD TO SKIP up, and held SKIP_HOLD it skips. Whatever instead
-    // waits on a tap says so at the foot of the field (menuTapPrompt).
+    // throw away a scene there is no getting back to straight away. Held
+    // SKIP_HOLD it skips. HOLD TO SKIP is the line under the field for as
+    // long as the scene is up, brightening as it is held, and nothing is
+    // written over the scene -- except on a phone, which has no line under
+    // the field, where a press puts it at the foot of the field with a bar.
+    // Whatever instead waits on a tap says so at the foot of the field
+    // (menuTapPrompt).
     const SKIP_HOLD = 2;             // seconds held to skip
     const SKIP_LINGER = 1.6;         // seconds the words stay up after a press lets go
     const SKIP_FADE = 0.3;           // ...and take to come and go
@@ -2618,8 +2623,17 @@
         menu.skipShow = 0;
         if (menuUnlockUp()) menuShowNext(); else menuShow('memories');
     }
+    const SKIP_INK0 = '#6d685f';     // the line under the field, as fourkeys.html has it...
+    const SKIP_INK1 = '#f2efe9';     // ...and held all the way
     function menuSkipDraw() {
         const held = menu.skipT >= 0;
+        const el = document.querySelector('.hint');
+        if (el && el.offsetParent) {
+            if (menu.hintWas === undefined) menu.hintWas = el.textContent;
+            el.textContent = 'hold to skip';
+            el.style.color = menuMix(SKIP_INK0, SKIP_INK1, held ? Math.min(1, menu.skipT / SKIP_HOLD) : 0);
+            return;
+        }
         const a = held ? 1 : Math.min(1, (menu.skipShow || 0) / SKIP_FADE);
         if (a <= 0) return;
         const u = uiScale;
@@ -2631,6 +2645,17 @@
         ctx.fillStyle = '#f2efe9';
         ctx.fillRect(LW / 2 - w / 2, y, w * (held ? Math.min(1, menu.skipT / SKIP_HOLD) : 0), 2);
         ctx.globalAlpha = 1;
+    }
+    // the line under the field back to what it said before the scene, or
+    // only let go of when whatever comes next says something of its own
+    function menuCutHintOff(restore) {
+        if (menu.hintWas === undefined) return;
+        const el = document.querySelector('.hint');
+        if (el) {
+            el.style.color = '';
+            if (restore) el.textContent = menu.hintWas;
+        }
+        menu.hintWas = undefined;
     }
     // "click/tap to continue", coming up `since` seconds after a tap would
     // take the screen (nothing while it is still negative), at the foot of
@@ -2712,6 +2737,7 @@
         const from = menu.screen ? menu.screen.from : undefined;
         menu.screen = { kind, n, t: 0, from, note: null };
         menu.press = null;
+        menuCutHintOff(false);
         const s = M_SCREENS[kind];
         if (s) paddle.x = paddle.tx = menuChoices().find(c => c.id === s.home).cx;
         setHint(kind === 'memory' ? 'hold to skip'

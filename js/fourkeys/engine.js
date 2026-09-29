@@ -907,7 +907,7 @@
         // R for bRain, because B was already spoken for
         R: { name: 'BIG BRAIN BRANDON', short: 'BRAIN',   color: '#d98cc0', secs: 9  },
         P: { name: 'PIERCING BRANDON',  short: 'PIERCE',  color: '#7fc4b0', secs: 6, noBoss: true },
-        W: { name: 'WIGGLY BRANDON',    short: 'WIGGLY',  color: '#c06a8f', secs: 9, bonus: true },
+        W: { name: 'WIGGLY BRANDON',    short: 'WIGGLY',  color: '#c06a8f', secs: 9, bonus: true, noBoss: true },
         // ENGLISH has no flat bonus. It does not need one: spin is paid for
         // directly by the multiplier below, and ENGLISH is a steady spin of its
         // own on top of whatever the head already has. It turns whichever way
@@ -921,9 +921,9 @@
         // step with its own let in powers.js.
         K: { name: 'KATAMARI BRANDON',  short: 'KATAMARI', color: '#a8c64e', secs: 6, noBoss: true },
         L: { name: 'LASER BRANDON',     short: 'LASER',   color: '#ff5f6d', secs: 6 },
-        T: { name: 'PORTAL BRANDON',    short: 'PORTAL',  color: '#ff9a3c', secs: 10 },
-        I: { name: 'MIRROR BRANDON',    short: 'MIRROR',  color: '#7fe3e0', secs: 10 },
-        C: { name: 'CROWD BRANDON',     short: 'CROWD',   color: '#f5a0c0', secs: 20 },
+        T: { name: 'PORTAL BRANDON',    short: 'PORTAL',  color: '#ff9a3c', secs: 10, noBoss: true },
+        I: { name: 'MIRROR BRANDON',    short: 'MIRROR',  color: '#7fe3e0', secs: 10, noBoss: true },
+        C: { name: 'CROWD BRANDON',     short: 'CROWD',   color: '#f5a0c0', secs: 20, noBoss: true },
         A: { name: 'MIDAS BRANDON',     short: 'MIDAS',   color: '#efb920', secs: 8, noBoss: true },
         U: { name: 'LUCKY BRANDON',     short: 'LUCKY',   color: '#5fbf6a', secs: 13, noBoss: true },
         '?': { name: 'WILD BRANDON',    short: 'WILD',    color: '#f2efe9', secs: 0 }
@@ -939,8 +939,11 @@
     // through, which is a straight downgrade during the only fight where being
     // hit costs you something. Neither needs a special case in the collision
     // code -- they just never drop on his stage. KATAMARI and MIDAS sit it out
-    // too, having no bricks there to work on, and LUCKY, since his capsules
-    // come by hits rather than chance.
+    // too, having no bricks there to work on, as does CROWD, whose runners come
+    // out of broken bricks; and LUCKY, since his capsules come by hits rather
+    // than chance. PORTAL would let a head wrap round a boss who walls you off
+    // (the IDOL down on the floor), MIRROR's copy lies along the ceiling right
+    // where the bosses hang, and WIGGLY has no wall to sway, only you.
     function capsulePool() {
         return LEVELS[stage].boss ? CAP_KEYS.filter(k => !CAPS[k].noBoss) : CAP_KEYS;
     }
