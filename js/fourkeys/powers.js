@@ -703,7 +703,7 @@
     let LK_MUL  = 2;
     LAB_KNOBS.push('LK_SECS', 'LK_MUL');
 
-    // what CAP_CHANCE is multiplied by, in maybeDropCapsule
+    // what a brick's chance of a capsule is multiplied by, in labCapRoll
     function powCapMul() { return fx.U > 0 ? LK_MUL : 1; }
 
     // ==== WILD ====================================================================

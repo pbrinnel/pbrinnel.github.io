@@ -241,6 +241,25 @@
     // how long this boss takes to arrive: his own, or the original's
     function labEnterSecs() { return labB && labB.enterSecs ? labB.enterSecs() : ENTER_SECS; }
 
+    // Whether a broken brick drops a capsule. Not a flat chance: each brick
+    // that drops nothing makes the next likelier by CAP_RAMP, from CAP_BASE
+    // straight after a drop, so the rate holds (about 24% a brick at these
+    // numbers) but a long dry spell cannot happen -- by the time the ramp
+    // reaches certainty one has come. CAP_BASE is kept above zero so two
+    // close together still happen now and then. Bricks broken while one is
+    // falling are not asked (maybeDropCapsule stops first), so they do not
+    // count, or a second would follow the first down almost at once. `mul`
+    // is LUCKY's. The count carries across screens and lives.
+    let CAP_BASE = 0.1;
+    let CAP_RAMP = 0.066;
+    LAB_KNOBS.push('CAP_BASE', 'CAP_RAMP');
+    let labCapDry = 0;            // bricks asked since the last drop
+    function labCapRoll(mul) {
+        if (Math.random() >= (CAP_BASE + CAP_RAMP * labCapDry++) * mul) return false;
+        labCapDry = 0;
+        return true;
+    }
+
     // Which capsule drops, for the engine and every boss alike. A shuffle bag:
     // each capsule the screen allows comes round once, in a random order,
     // before any comes round again, so none is starved for a whole run. A plain
