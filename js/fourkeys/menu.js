@@ -187,6 +187,18 @@
     }
     // the paddles you have, in the gates' order
     function menuOwned() { return MENU_PADS.filter(k => menu.pads[k]); }
+    // Every paddle comes in through here, so the one that makes MENU_RACK_AT
+    // puts up the BRANDONS sign with its BRANDONS UNLOCKED card. That card
+    // is kept last in the queue, after every paddle it counted, however many
+    // more one win hands over after it. `show` is his own PADDLE UNLOCKED card.
+    function menuAddPad(pad, show) {
+        const had = menuOwned().length;
+        menu.pads[pad] = true;
+        if (show) menu.shows.push({ pad });
+        const i = menu.shows.findIndex(s => s.rackCard);
+        if (i >= 0) menu.shows.push(...menu.shows.splice(i, 1));
+        else if (had < MENU_RACK_AT && menuOwned().length >= MENU_RACK_AT) menu.shows.push({ rackCard: true });
+    }
 
     // ---- what the debug menu reaches in through ---------------------------------------
     // Everything the town knows about you is in `menu`, and `menu` is this
@@ -199,7 +211,10 @@
     function menuHas(what, k) { menuLoad(); return !!menu[what][k]; }
     function menuSet(what, k, on) {
         menuLoad();
-        if (on) menu[what][k] = true; else delete menu[what][k];
+        // a paddle handed over here gets no card of its own, but it can still
+        // be the one that puts up the BRANDONS sign, and that card it gets
+        if (what === 'pads' && on) menuAddPad(k, false);
+        else if (on) menu[what][k] = true; else delete menu[what][k];
         // a paddle taken back out from under you leaves you holding nothing
         if (what === 'pads' && !on && LAB.pad === k) LAB.usePad('standard');
         menuSave();
@@ -1025,13 +1040,11 @@
         // or else the souvenir. A paddle kept back says nothing.
         let take = null;
         if (clean && !menu.pads[level.pad]) {
-            menu.pads[level.pad] = true;
-            menu.shows.push({ pad: level.pad });
+            menuAddPad(level.pad, true);
             take = level.pad;
         }
         if (!menu.pads[MENU_SOUVENIR]) {
-            menu.pads[MENU_SOUVENIR] = true;
-            menu.shows.push({ pad: MENU_SOUVENIR });
+            menuAddPad(MENU_SOUVENIR, true);
             take = take || MENU_SOUVENIR;
         }
         if (take && LAB_PAD[take]) LAB.usePad(take);
@@ -1054,8 +1067,7 @@
     // a paddle handed over with its PADDLE UNLOCKED card, or false if already had
     function menuGive(pad) {
         if (menu.pads[pad]) return false;
-        menu.pads[pad] = true;
-        menu.shows.push({ pad });
+        menuAddPad(pad, true);
         return true;
     }
     // A run's end, won. A flawless win's paddle and whatever its last boss
@@ -2471,7 +2483,8 @@
     // plays, then every paddle earned -- his name, and him, big, on a field
     // of his own colour, with what he does and a few lines of where he is from. Only a win shows them (menuBeat,
     // which the lab's "count it beaten" buttons also call); the debug menu's
-    // toggles and "unlock everything" do not.
+    // toggles and "unlock everything" do not -- except BRANDONS UNLOCKED,
+    // which a debug toggle that puts the sign up shows too (menuAddPad).
     const UNLOCK_WAIT = 0.6;         // seconds up before a tap takes it away
     const UNLOCK_IN = 0.45;          // him rising into place
     const UNLOCK_W = 500;            // how long he is drawn
@@ -2502,6 +2515,7 @@
         if (show.credits) { menuCreditsDraw(menu.showT); menuSkipDraw(); return true; }
         if (show.memCard) { menuMemoryUnlocked(show.memCard, menu.showT); menuTapPrompt(menu.showT - UNLOCK_WAIT); return true; }
         if (show.rushCard) { menuRushUnlocked(menu.showT); menuTapPrompt(menu.showT - UNLOCK_WAIT); return true; }
+        if (show.rackCard) { menuRackUnlocked(menu.showT); menuTapPrompt(menu.showT - UNLOCK_WAIT); return true; }
         const key = show.pad, p = LAB_PAD[key];
         const ink = (p && (p.ink || p.rim)) || '#8d877d';
         ctx.fillStyle = '#000';
@@ -2619,6 +2633,29 @@
         text('BOSS RUSH', LW / 2, 320 + (1 - e) * 30, 54, ink, 'center');
         text('every boss, back to back, for a best of its own', LW / 2, 368 + (1 - e) * 30, 15, '#c9c4ba', 'center');
         ctx.globalAlpha = 1;
+    }
+
+    // BRANDONS UNLOCKED, the BOSS RUSH card's twin, with every paddle you own
+    // rising in a row under it: what the sign has on its rack
+    const M_RACK_CARD_Y = 450;       // the row's middle
+    const M_RACK_CARD_W = 110;       // longest one of them gets
+    function menuRackUnlocked(t) {
+        const ink = M_SIDES.find(s => s.key === 'paddles').ink;
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, LW, LH);
+        ctx.globalAlpha = UNLOCK_BACK;
+        ctx.fillStyle = ink;
+        ctx.fillRect(0, 0, LW, LH);
+        const e = 1 - Math.pow(1 - Math.min(1, t / UNLOCK_IN), 3);
+        ctx.globalAlpha = 1;
+        text('UNLOCKED', LW / 2, 160, 34, '#f2efe9', 'center');
+        ctx.globalAlpha = e;
+        text('BRANDONS', LW / 2, 280 + (1 - e) * 30, 54, ink, 'center');
+        text('every paddle you own, on one rack, to pick from', LW / 2, 328 + (1 - e) * 30, 15, '#c9c4ba', 'center');
+        ctx.globalAlpha = 1;
+        const own = menuOwned(), step = Math.min(M_RACK_CARD_W * 1.1, (LW - 80) / own.length);
+        own.forEach((k, i) => labPadIcon(k, LW / 2 + (i - (own.length - 1) / 2) * step, M_RACK_CARD_Y + (1 - e) * 40,
+                                         Math.min(M_RACK_CARD_W, step * 0.9), false, e));
     }
 
     // The credits, after the VOID: one card at a time out of the black and
