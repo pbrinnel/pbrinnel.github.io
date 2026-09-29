@@ -19,8 +19,8 @@
     //    along whatever line it had been hitting bricks on and ended up a
     //    stick; drawn in, it stays a ball.
     //
-    // The others each have their own section below: LASER, PORTAL, MAGNET,
-    // MIRROR, CROWD, MIDAS and WILD.
+    // The others each have their own section below: LASER, PORTAL, MIRROR,
+    // CROWD, MIDAS, LUCKY and WILD.
     //
     // Every number is a let so the lab's panel can reach it and Paul can tune
     // it live.
@@ -51,7 +51,7 @@
                    'KAT_ROLL', 'KAT_DRAG', 'KAT_PAD', 'KAT_SHED', 'KAT_FALL');
 
     // the capsules this file adds, the rest of CAPS being the game's own
-    const POW_KEYS = ['K', 'L', 'T', 'N', 'I', 'C', 'A', '?'];
+    const POW_KEYS = ['K', 'L', 'T', 'I', 'C', 'A', 'U', '?'];
 
     let katLoose = [];      // what fell off, falling
     let katOn = new Set();  // the heads carrying anything
@@ -291,8 +291,9 @@
     function powUpdate(dt) {
         CAPS.K.secs = KAT_SECS;
         CAPS.T.secs = PT_SECS;
-        CAPS.N.secs = MG_SECS; CAPS.I.secs = MR_SECS; CAPS.C.secs = CR_SECS;
+        CAPS.I.secs = MR_SECS; CAPS.C.secs = CR_SECS;
         CAPS.A.secs = MD_SECS;
+        CAPS.U.secs = LK_SECS;
 
         // a new stage: nothing carries over
         if (bricks !== katField) { katField = bricks; katLoose = []; katOn.clear(); }
@@ -311,7 +312,6 @@
         katLoose = katLoose.filter(p => p.y - p.w < LH);
 
         lzUpdate(dt);
-        mgUpdate(dt);
         mdUpdate(dt);
         wdUpdate();
         crUpdate(dt);
@@ -462,21 +462,13 @@
         ctx.globalAlpha = 1;
     }
 
-    // ==== MAGNET, MIRROR and CROWD ==================================================
-    // N  MAGNET (N for magNet, M being MULTI's): a head coming down near him is
-    //    bent toward him. It helps you catch and never catches for you.
+    // ==== MIRROR and CROWD ==========================================================
     // I  MIRROR (I for mIrror): a copy of him on the ceiling, upside down,
     //    moving opposite to you. A head that reaches it comes back down at an
     //    angle set by where it hit, the way he sends them up.
     // C  CROWD: every brick broken while it is on drops a small brandon who
     //    runs along the floor. Each one bounces a head that reaches him, once.
 
-    let MG_SECS  = 10;
-    let MG_RANGE = 300;     // px above him a head starts to feel it
-    let MG_TURN  = 1.8;     // rad/s it can bend a head at, at its strongest
-    let MG_LINES = 5;       // field lines over him
-    let MG_FLOW  = 45;      // px/s the dashes run along them
-    let MG_BULGE = 0.6;     // how far the lines bulge out past his ends, as a share of their height
     let MR_SECS  = 10;
     let MR_Y     = 12;      // px from the top to his middle
     let MR_SCALE = 0.75;    // his size, as a share of yours
@@ -485,8 +477,7 @@
     let CR_SIZE  = 36;      // px tall
     let CR_SPEED = 90;      // px/s they run at
     let CR_LIFE  = 9;       // seconds each one lasts
-    LAB_KNOBS.push('MG_SECS', 'MG_RANGE', 'MG_TURN', 'MG_LINES', 'MG_FLOW', 'MG_BULGE',
-                   'MR_SECS', 'MR_Y', 'MR_SCALE',
+    LAB_KNOBS.push('MR_SECS', 'MR_Y', 'MR_SCALE',
                    'CR_SECS', 'CR_MAX', 'CR_SIZE', 'CR_SPEED', 'CR_LIFE');
 
     // A head's real ellipse against one of him lying at cx, cy, turned upside
@@ -514,56 +505,6 @@
         ctx.translate(cx, cy);
         ctx.rotate(rot + PADDLE_LEVEL);
         ctx.drawImage(paddleImg, -artW / 2 - ART_OFF_X * artW, -artH / 2 - ART_OFF_Y * artH, artW, artH);
-        ctx.restore();
-    }
-
-    // ---- magnet
-    function mgUpdate(dt) {
-        if (!(fx.N > 0) || phase !== 'play') return;
-        const tx = paddle.x, ty = padY();
-        for (const b of balls) {
-            if (b.stuck || b.vy <= 0 || b.y > ty) continue;
-            const d = ty - b.y;
-            if (d > MG_RANGE) continue;
-            const k = 1 - d / MG_RANGE;                    // stronger the nearer he is
-            const want = Math.atan2(ty - b.y, tx - b.x), now = Math.atan2(b.vy, b.vx);
-            const turn = Math.atan2(Math.sin(want - now), Math.cos(want - now));
-            const step = Math.max(-1, Math.min(1, turn / (MG_TURN * k * dt + 1e-9))) * MG_TURN * k * dt;
-            const sp = Math.hypot(b.vx, b.vy), a = now + step;
-            b.vx = Math.cos(a) * sp; b.vy = Math.sin(a) * sp;
-        }
-    }
-    // A magnet's field, drawn as one: lines out of one end of him that arc
-    // up over him and come back down into the other, bulging out past his
-    // ends as a bar magnet's do, nested out to MG_RANGE. Dashes run along them from one end
-    // to the other, so the field reads as doing something rather than as a
-    // decoration, and the lines a pulled head is inside of brighten.
-    function mgDraw() {
-        if (!(fx.N > 0)) return;
-        const fade = Math.min(1, fx.N / 0.6), cx = paddle.x, cy = padY(), hw = halfSpan();
-        let pull = 0;
-        for (const b of balls) {
-            if (b.stuck || b.vy <= 0 || b.y > cy || cy - b.y > MG_RANGE) continue;
-            pull = Math.max(pull, 1 - (cy - b.y) / MG_RANGE);
-        }
-        ctx.save();
-        ctx.strokeStyle = CAPS.N.color;
-        ctx.lineCap = 'round';
-        ctx.setLineDash([7, 9]);
-        ctx.lineDashOffset = -clock * MG_FLOW;
-        const n = Math.max(1, Math.round(MG_LINES));
-        for (let i = 1; i <= n; i++) {
-            const H = MG_RANGE * (i / n) ** 1.2, W = H * MG_BULGE;
-            ctx.globalAlpha = fade * (0.55 - 0.35 * (i - 1) / n + 0.35 * pull);
-            ctx.lineWidth = 1.6 + pull;
-            ctx.beginPath();
-            for (let k = 0; k <= 40; k++) {
-                const th = Math.PI * (k / 40), sn = Math.sin(th);
-                const x = cx - Math.cos(th) * (hw * 0.9 + W * sn), y = cy - H * sn;
-                if (k) ctx.lineTo(x, y); else ctx.moveTo(x, y);
-            }
-            ctx.stroke();
-        }
         ctx.restore();
     }
 
@@ -748,6 +689,19 @@
         ctx.restore();
     }
 
+    // ==== LUCKY ===================================================================
+    // U  LUCKY BRANDON (U for lUcky, L being LASER's): while it is on, a
+    //    broken brick is LK_MUL times as likely to drop a capsule. Still only
+    //    one falling at a time -- that rule is what keeps capsules readable,
+    //    so LUCKY fills the gaps between them rather than stacking them up.
+    //    It does nothing on a boss, whose capsules come by hits, not chance.
+    let LK_SECS = 13;
+    let LK_MUL  = 2;
+    LAB_KNOBS.push('LK_SECS', 'LK_MUL');
+
+    // what CAP_CHANCE is multiplied by, in maybeDropCapsule
+    function powCapMul() { return fx.U > 0 ? LK_MUL : 1; }
+
     // ==== WILD ====================================================================
     // ? WILD BRANDON: a capsule that will not settle. Falling, it turns into
     //   each of the others in turn, WD_RATE a second, and is whichever one it
@@ -800,7 +754,6 @@
     }
 
     function powDrawLoose() {
-        mgDraw();
         mrDraw();
         for (const p of katLoose) {
             ctx.globalAlpha = Math.max(0, 1 - p.t / 1.2);

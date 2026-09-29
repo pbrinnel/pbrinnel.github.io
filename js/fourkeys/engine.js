@@ -914,21 +914,21 @@
         // your last hit pushed the head, so it is yours to steer: send the head
         // back the other way and ENGLISH comes round after it, at ENG_ACCEL.
         E: { name: 'ENGLISH BRANDON',   short: 'ENGLISH', color: '#cf6b4e', secs: 9 },
-        // the sequel's eight, which live in powers.js. Letters that were
-        // taken went to one inside the name: T for porTal, N for magNet, I
-        // for mIrror, A for Au. WILD is never caught as itself -- it turns
-        // into each of the others as it falls (see wdUpdate). Each timed
-        // one's secs is kept in step with its own let in powers.js.
+        // the sequel's, which live in powers.js. Letters that were taken went
+        // to one inside the name: T for porTal, I for mIrror, A for Au, U for
+        // lUcky. WILD is never caught as itself -- it turns into each of the
+        // others as it falls (see wdUpdate). Each timed one's secs is kept in
+        // step with its own let in powers.js.
         K: { name: 'KATAMARI BRANDON',  short: 'KATAMARI', color: '#a8c64e', secs: 6, noBoss: true },
         L: { name: 'LASER BRANDON',     short: 'LASER',   color: '#ff5f6d', secs: 6 },
         T: { name: 'PORTAL BRANDON',    short: 'PORTAL',  color: '#ff9a3c', secs: 10 },
-        N: { name: 'MAGNET BRANDON',    short: 'MAGNET',  color: '#6c8cff', secs: 10 },
         I: { name: 'MIRROR BRANDON',    short: 'MIRROR',  color: '#7fe3e0', secs: 10 },
         C: { name: 'CROWD BRANDON',     short: 'CROWD',   color: '#f5a0c0', secs: 20 },
         A: { name: 'MIDAS BRANDON',     short: 'MIDAS',   color: '#efb920', secs: 8, noBoss: true },
+        U: { name: 'LUCKY BRANDON',     short: 'LUCKY',   color: '#5fbf6a', secs: 13, noBoss: true },
         '?': { name: 'WILD BRANDON',    short: 'WILD',    color: '#f2efe9', secs: 0 }
     };
-    const TIMED = ['B', 'D', 'S', 'R', 'P', 'W', 'E', 'K', 'L', 'T', 'N', 'I', 'C', 'A'];     // M and WILD are not
+    const TIMED = ['B', 'D', 'S', 'R', 'P', 'W', 'E', 'K', 'L', 'T', 'I', 'C', 'A', 'U'];     // M and WILD are not
     const CAP_KEYS = Object.keys(CAPS);
     // the four brick colours, for the gauntlet's army to wear
     const TIER_KEYS = ['R', 'O', 'G', 'Y'];
@@ -939,7 +939,8 @@
     // through, which is a straight downgrade during the only fight where being
     // hit costs you something. Neither needs a special case in the collision
     // code -- they just never drop on his stage. KATAMARI and MIDAS sit it out
-    // too, having no bricks there to work on.
+    // too, having no bricks there to work on, and LUCKY, since his capsules
+    // come by hits rather than chance.
     function capsulePool() {
         return LEVELS[stage].boss ? CAP_KEYS.filter(k => !CAPS[k].noBoss) : CAP_KEYS;
     }
@@ -1412,7 +1413,7 @@
     }
 
     function clearEffects() {
-        fx = { B: 0, D: 0, S: 0, R: 0, P: 0, W: 0, E: 0, K: 0, L: 0, T: 0, N: 0, I: 0, C: 0, A: 0 };
+        fx = { B: 0, D: 0, S: 0, R: 0, P: 0, W: 0, E: 0, K: 0, L: 0, T: 0, I: 0, C: 0, A: 0, U: 0 };
         dragT = 0; stunT = 0;
         padLag = 0;                       // a reset, so there is nothing to unwind
         padTrail = [];
@@ -1810,7 +1811,7 @@
     // entry per segment, because under DOUBLE a knock lands on one of the two.
     paddle = { x: LW / 2, tx: LW / 2, prevX: LW / 2, vx: 0, w: PADDLE_W,
                jt: [0, 0, 0, 0], tilt: [0, 0, 0, 0], dip: [0, 0, 0, 0] };
-    fx = { B: 0, D: 0, S: 0, R: 0, P: 0, W: 0, E: 0, K: 0, L: 0, T: 0, N: 0, I: 0, C: 0, A: 0 };
+    fx = { B: 0, D: 0, S: 0, R: 0, P: 0, W: 0, E: 0, K: 0, L: 0, T: 0, I: 0, C: 0, A: 0, U: 0 };
     best = 0;                     // the town sets it, level by level
     fetchBoard();                 // async; the game never waits on it
     newGame();
@@ -2361,7 +2362,7 @@
     // ---- capsules ----------------------------------------------------------
     function maybeDropCapsule(x, y) {
         if (capsule) return;                       // only one falling at a time
-        if (Math.random() > CAP_CHANCE) return;
+        if (Math.random() > CAP_CHANCE * powCapMul()) return;    // LUCKY raises it
         const pool = capsulePool();
         capsule = { x, y, kind: pool[(Math.random() * pool.length) | 0] };
     }
