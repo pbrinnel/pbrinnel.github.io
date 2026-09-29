@@ -1017,6 +1017,10 @@
     const canvas = document.getElementById('stage');
     const ctx = canvas.getContext('2d');
 
+    // a phone held upright, which fourkeys.html gives the thumb pad. the same
+    // query is written out in its css, and the two must match.
+    const PORTRAIT_PAD = matchMedia('(max-width: 700px) and (orientation: portrait)');
+
     // The line under the field. It changes when the game does -- what he is
     // steering stops being a paddle. Declared up here because newGame() runs
     // during setup and would hit the dead zone of anything defined lower down.
@@ -1822,13 +1826,18 @@
         return !!(document.fullscreenElement || document.webkitFullscreenElement);
     }
 
-    // the field wants landscape, and a phone will give it -- but ONLY from
-    // inside fullscreen. Asking before the request settles is asking too early
-    // and just gets refused, which is what used to happen here.
-    function lockLandscape() {
+    // Held the way it was when play began, so a tilt mid-rally cannot swap the
+    // layout under you: upright on a phone is the thumb pad, and anything else
+    // is the field wanting landscape. A phone will only lock from inside
+    // fullscreen. Asking before the request settles is asking too early and
+    // just gets refused, which is what used to happen here.
+    function lockOrientation() {
         const so = screen.orientation;
         if (!so || !so.lock) return;
-        try { const p = so.lock('landscape'); if (p && p.catch) p.catch(() => {}); }
+        try {
+            const p = so.lock(PORTRAIT_PAD.matches ? 'portrait' : 'landscape');
+            if (p && p.catch) p.catch(() => {});
+        }
         catch (e) { /* desktop, or a phone that will not. no matter. */ }
     }
 
@@ -1836,8 +1845,8 @@
         if (!rawFS || fsOn()) return;
         try {
             const p = rawFS.call(root, { navigationUI: 'hide' });
-            if (p && p.then) p.then(lockLandscape, () => {});
-            else setTimeout(lockLandscape, 60);        // old webkit, no promise
+            if (p && p.then) p.then(lockOrientation, () => {});
+            else setTimeout(lockOrientation, 60);      // old webkit, no promise
         } catch (e) { /* refused. the game plays in a tab, just smaller. */ }
     }
 
@@ -1924,6 +1933,36 @@
     // when you hold the thing. Touching there used to do nothing at all. The
     // whole screen steers him now; update() clamps him to the field either way.
     const onUI = e => e.target && e.target.closest && e.target.closest('#debug');
+
+    // ---- the thumb pad -------------------------------------------------------
+    // Upright, a phone shows the field across its whole width, and the pad
+    // fills the screen under it. Nothing listens to the pad: a finger under the
+    // field is already a finger at that x on it, through the handlers below, so
+    // swipe spin and the tap to serve work exactly as they do anywhere else.
+    // The pad only SHOWS that. Its knob stands under whoever you are steering,
+    // so the first touch says what all the others do.
+    const padEl = document.getElementById('pad');
+    const padKnob = padEl && padEl.firstElementChild;
+    let padAt = null;
+
+    function padShow() {
+        if (!padKnob || !PORTRAIT_PAD.matches) return;
+        const x = king && (phase === 'gauntlet' || phase === 'absorb' || phase === 'fall')
+                ? king.x : paddle.x;
+        // from the field's own box, since the finger is read against it too
+        const f = canvas.getBoundingClientRect(), p = padEl.getBoundingClientRect();
+        const at = Math.round(f.left - p.left + x / LW * f.width);
+        if (at === padAt) return;
+        padAt = at;
+        padKnob.style.transform = 'translateX(' + at + 'px)';
+    }
+
+    if (padEl) {
+        const down = on => padEl.classList.toggle('down', on);
+        addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse' && !onUI(e)) down(true); });
+        addEventListener('pointerup', () => down(false));
+        addEventListener('pointercancel', () => down(false));
+    }
 
     // ---- the mouse, captured -------------------------------------------------
     // A mouse used to steer by where the pointer WAS, with the pointer hidden.
@@ -5755,6 +5794,8 @@
         const gap = parseFloat(cs.rowGap) || 0;
         // offsetParent is null exactly when it is display:none
         const hintH = hintEl.offsetParent ? hintEl.offsetHeight + gap : 0;
+        // the pad grows into whatever the field leaves, so hold back its least
+        const padH = PORTRAIT_PAD.matches ? parseFloat(getComputedStyle(padEl).minHeight) + gap : 0;
 
         // The body box is 100svh, which is the stable number; the visible
         // viewport is what a retracted address bar or an overlay has actually
@@ -5763,7 +5804,7 @@
         // see -- which is the two ways it used to go wrong.
         const box = document.body;
         const availW = Math.min(box.clientWidth, seenW()) - px;
-        const availH = Math.min(box.clientHeight, seenH()) - py - hintH;
+        const availH = Math.min(box.clientHeight, seenH()) - py - hintH - padH;
 
         // fit BOTH ways -- on a phone in landscape the height is what runs out
         // first, and fitting only the width would push the paddle off-screen
@@ -5823,5 +5864,6 @@
         if (!paused) update(dt);
         draw();
         if (paused) drawPaused();
+        padShow();
         requestAnimationFrame(frame);
     })(last);
