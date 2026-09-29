@@ -462,7 +462,8 @@
 
     // ball.webp baked once, at twice its own size so a big head stays as sharp
     // as it can: 'flat' in one colour (hit flashes), 'grey' with the colour out
-    // of it (coming apart), 'stone' carved (the IDOL)
+    // of it (coming apart), 'stone' carved (the IDOL), 'wash' his face under a
+    // coat of one colour, as the town's are (the FARM's leaves)
     function headSprite2(kind, color) {
         const k = 'head2-' + kind + (color || '');
         if (spriteCache.has(k)) return spriteCache.get(k);
@@ -472,8 +473,16 @@
         c.width = w; c.height = h;
         const g = c.getContext('2d');
         if (kind === 'grey') g.filter = 'grayscale(1) brightness(0.94)';
+        if (kind === 'wash') g.filter = 'grayscale(1) contrast(1.1) brightness(1.95)';
         g.drawImage(ballImg, 0, 0, w, h);
         g.filter = 'none';
+        if (kind === 'wash') {
+            g.globalCompositeOperation = 'source-atop';
+            g.globalAlpha = 0.8;
+            g.fillStyle = color;
+            g.fillRect(0, 0, w, h);
+            g.globalAlpha = 1;
+        }
         if (kind === 'flat' || kind === 'stone') {
             g.globalCompositeOperation = 'source-in';
             g.fillStyle = kind === 'stone' ? STONE : color;

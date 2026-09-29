@@ -16,8 +16,8 @@
     //          you are SLUGGISH
     //   BEAM   the hand hangs over you, the little ones in it close in and
     //          spin up, and it fires straight down: in it and you are
-    //          SLUGGISH. Knock all three of its little ones away first and it
-    //          never fires
+    //          STUNNED, then SLUGGISH. Knock all three of its little ones
+    //          away first and it never fires
     //   TREE   HIS tree, stolen and gone bad: it grows down out of the hand,
     //          a wall of branches, and birds sit in it that come down at you
     //   CAGE   a ring of bone turning round his head
@@ -131,7 +131,8 @@
     let LU_BEAM_TRACK = 150;    // px/s it follows you while it gathers
     let LU_BEAM_SECS  = 0.8;    // seconds it fires
     let LU_BEAM_W     = 26;     // px across
-    let LU_BEAM_DRAG  = 2.5;    // SLUGGISH it leaves on you
+    let LU_BEAM_STUN  = 1.5;    // seconds it holds you still, STUNNED...
+    let LU_BEAM_DRAG  = 2.5;    // ...and the SLUGGISH it leaves on you after
     let LU_BEAM_LOOK12 = 0.55;  // how bright a hand's beam is next to the last part's, so that one lands
     let LU_TREE_Y     = 150;    // the line a hand hangs on to grow the tree down from
     let LU_TREE_OUT   = 170;    // px out from his middle it hangs, on its own side
@@ -201,7 +202,7 @@
                    'LU_CLAP_REACH', 'LU_WING_SECS', 'LU_REGROW',
                    'LU_SWOOP_X', 'LU_SWOOP_DEPTH', 'LU_SWOOP_WIND', 'LU_SWOOP_SECS', 'LU_SWOOP_HOME',
                    'LU_SWOOP_REST', 'LU_SWOOPS', 'LU_SPIKE', 'LU_BEAM_Y', 'LU_BEAM_CHARGE', 'LU_BEAM_TRACK',
-                   'LU_BEAM_SECS', 'LU_BEAM_W', 'LU_BEAM_DRAG', 'LU_BEAM_LOOK12', 'LU_TREE_Y', 'LU_TREE_OUT', 'LU_TREE_LEN',
+                   'LU_BEAM_SECS', 'LU_BEAM_W', 'LU_BEAM_STUN', 'LU_BEAM_DRAG', 'LU_BEAM_LOOK12', 'LU_TREE_Y', 'LU_TREE_OUT', 'LU_TREE_LEN',
                    'LU_TREE_GROW', 'LU_TREE_SECS', 'LU_BIRD_WAIT', 'LU_BIRD_Y', 'LU_BIRD_AIM', 'LU_BIRD_SPEED',
                    'LU_BIRD_DRAG', 'LU_BREAK', 'LU_DRAIN_SECS', 'LU_CORRUPT_SECS', 'LU_WITHER', 'LU_SLUMP',
                    'LU_HEAD_SIZE', 'LU_HEAD_GROW_SECS', 'LU_RING_GROW_SECS', 'LU_WING_GROW_SECS', 'LU_WING_LEAD',
@@ -1188,6 +1189,8 @@
                 if (!bm.hit && Math.abs(paddle.x - luBeamAt(bm, padY())) < halfSpan() + LU_BEAM_W / 2) {
                     bm.hit = true;
                     luSlug(LU_BEAM_DRAG);
+                    // the boss lab runs brandon.html's engine, which has no stun
+                    if (typeof stunPad === 'function') stunPad(LU_BEAM_STUN);
                 }
                 if (bm.t >= LU_BEAM_SECS) { bm.st = 'fade'; bm.t = 0; }
             } else if (bm.st === 'fade' && bm.t >= 0.3) bm.st = 'gone';
@@ -1874,6 +1877,7 @@
         // every capsule off, the wiggle easing out as it always does
         for (const k of Object.keys(fx)) fx[k] = k === 'W' ? Math.min(fx.W, WIG_EASE) : 0;
         dragT = 0;
+        if (typeof stunPad === 'function') stunPad(0);
         capsule = null;
         lu.end = { x: paddle.x };
         lu.stage = 'end'; lu.stT = 0;

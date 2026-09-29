@@ -50,8 +50,12 @@
         if (introSince < 0 && splash.hidden) introSince = performance.now();
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, LW, LH);
-        if (INTRO_CARDS[introAt] === 'wins') introWins(u);
-        else text(INTRO_LATER, LW / 2, LH / 2 + 14, INTRO_LATER_PX * u, '#f2efe9', 'center');
+        const since = introSince < 0 ? -1 : (performance.now() - introSince) / 1000 - INTRO_WAIT;
+        if (INTRO_CARDS[introAt] === 'wins') menuTapPrompt(since, introWins(u));
+        else {
+            text(INTRO_LATER, LW / 2, LH / 2 + 14, INTRO_LATER_PX * u, '#f2efe9', 'center');
+            menuTapPrompt(since);
+        }
         return true;
     }
 
@@ -74,7 +78,8 @@
     }
 
     // drawVictor's last frame, the army under him, and drawBonus's title at
-    // the size and place a reign's two rows and total would give it
+    // the size and place a reign's two rows and total would give it. Returns
+    // where drawBonus would put its line about tapping, over the army.
     function introWins(u) {
         const h = G_SHIP_W / SHAPE_ASPECT;
         // back rank first, so the ones nearer you end up on top
@@ -101,4 +106,5 @@
         ctx.fillStyle = '#f2efe9';
         ctx.fillText('BRANDON WINS', LW / 2, top + pitch * EOR_TITLE_U);
         ctx.restore();
+        return top + pitch * units;
     }

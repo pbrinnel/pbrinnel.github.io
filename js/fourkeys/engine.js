@@ -227,6 +227,9 @@
         { key: 'heads',    label: HEADS_AT + ' HEADS', pts: 600 },
         { key: 'grit',     label: 'NEVER GIVE UP',   pts: 400 },
         { key: 'hunter',   label: 'HUNTER',          pts: 300, many: true },
+        // the most bricks one head carried at once on KATAMARI this round
+        // (powBrickGone), paid a brick at a time
+        { key: 'cosmos',   label: 'COSMOS KING',     pts: 100, many: true },
         // a level's mini-boss beaten, not outlasted (see labMiniDown). It pays
         // by the share of him beaten, so two MOLEs are half of it each and the
         // one who gets away takes his half with him.
@@ -921,7 +924,7 @@
         T: { name: 'PORTAL BRANDON',    short: 'PORTAL',  color: '#ff9a3c', secs: 10 },
         N: { name: 'MAGNET BRANDON',    short: 'MAGNET',  color: '#6c8cff', secs: 10 },
         I: { name: 'MIRROR BRANDON',    short: 'MIRROR',  color: '#7fe3e0', secs: 10 },
-        C: { name: 'CROWD BRANDON',     short: 'CROWD',   color: '#f5a0c0', secs: 10 },
+        C: { name: 'CROWD BRANDON',     short: 'CROWD',   color: '#f5a0c0', secs: 20 },
         A: { name: 'MIDAS BRANDON',     short: 'MIDAS',   color: '#efb920', secs: 8, noBoss: true },
         '?': { name: 'WILD BRANDON',    short: 'WILD',    color: '#f2efe9', secs: 0 }
     };
@@ -1059,6 +1062,7 @@
     let round = null;             // what this round has done so far -- see EOR_ROWS
     let eor = null;               // ...and the screen it becomes once the round is over
     let dragT = 0;                // seconds of sluggish left on him
+    let stunT = 0;                // seconds he is held where he stands -- see stunPad
     let padLag = 0;               // the lag actually on him -- see dragLag
     let padTrail = [];            // recent positions, for the ghosted tail
 
@@ -1307,6 +1311,16 @@
         return padLag;
     }
 
+    // STUNNED: he cannot move at all until it runs out, and any SLUGGISH put
+    // on him with it waits, so it is felt after the stun rather than under it.
+    // Zero lets him go at once.
+    const STUN_SHORT = 'STUNNED';
+    const STUN_TINT  = '#e0283c';
+    function stunPad(secs) {
+        stunT = secs > 0 ? Math.max(stunT, secs) : 0;
+        for (const sg of segs()) paddle.jt[sg.i] = 1;
+    }
+
     function addDrag(sg, fromX) {
         dragT = Math.min(DRAG_CAP, dragT + DRAG_SECS);
         paddle.jt[sg.i] = 1;                  // he wears it like any other knock
@@ -1399,7 +1413,7 @@
 
     function clearEffects() {
         fx = { B: 0, D: 0, S: 0, R: 0, P: 0, W: 0, E: 0, K: 0, L: 0, T: 0, N: 0, I: 0, C: 0, A: 0 };
-        dragT = 0;
+        dragT = 0; stunT = 0;
         padLag = 0;                       // a reset, so there is nothing to unwind
         padTrail = [];
         paddle.tx = paddle.x;             // no lag left to catch up on
@@ -1441,7 +1455,7 @@
         shoutT = -1;            // ...and leaves no yell of the boss's still waiting
         // a round's tally starts here and nowhere else -- a lost life and a
         // continue both happen inside one, and neither may wipe it
-        round = { lost: false, fast: false, heads: false, grit: false, hunter: 0, peak: 1, mini: 0 };
+        round = { lost: false, fast: false, heads: false, grit: false, hunter: 0, peak: 1, mini: 0, cosmos: 0 };
         eor = null;
 
         if (lvl.boss) {
@@ -1552,7 +1566,7 @@
         bossTwo = true;
         siphon = { t: 0, hp0: b.hp, acc: 0, said: {} };
         phase = 'siphon';
-        capsule = null; phantoms = []; dragT = 0;
+        capsule = null; phantoms = []; dragT = 0; stunT = 0;
         shout = null; yell = null; motes = [];
         tilt = null; lunge = null;
     }
@@ -2528,6 +2542,7 @@
             heads:    round.heads ? 1 : 0,
             grit:     round.grit ? 1 : 0,
             hunter:   round.hunter,
+            cosmos:   round.cosmos,
             mini:     round.mini
         };
         for (const r of EOR_ROWS) {
@@ -2618,7 +2633,7 @@
     function clearStage() {
         eor = endOfRound();
         capsule = null;
-        dragT = 0;                  // nothing of his hangs on you past the kill
+        dragT = 0; stunT = 0;       // nothing of his hangs on you past the kill
         if (LEVELS[stage].boss) {
             // you do not get to just win. he comes apart where he stands --
             // the same way you will when your turn comes -- and your brandon
@@ -2737,7 +2752,7 @@
             climb = 0;          // the choices sit on the original line; so does he
             // he follows the pointer on that screen, and a lag on him there
             // would only read as the screen being slow
-            dragT = 0; phantoms = [];
+            dragT = 0; stunT = 0; phantoms = [];
             overPress = null; overHover = null; overKeys = false;
             // the one screen besides the initials with something to click
             freeMouse();
@@ -3372,7 +3387,8 @@
         // vx falls out of where he ACTUALLY got to, so a dragged brandon also
         // puts less swipe on the ball. That is not a second penalty bolted on,
         // it is the same one seen from the ball's side.
-        if (phase === 'siphon') paddle.tx = paddle.x;   // he is not yours to move while it happens
+        // he is not yours to move while it happens, or while he is stunned
+        if (phase === 'siphon' || stunT > 0) paddle.tx = paddle.x;
         const padFrom = paddle.x;                      // where the physics below starts him
         const hs = halfSpan();
         paddle.tx = Math.max(hs, Math.min(LW - hs, paddle.tx));
@@ -3384,7 +3400,8 @@
         paddle.vx = (paddle.x - paddle.prevX) / Math.max(dt, 1e-4);
         paddle.prevX = paddle.x;
 
-        if (dragT > 0) dragT = Math.max(0, dragT - dt);
+        if (stunT > 0) stunT = Math.max(0, stunT - dt);
+        else if (dragT > 0) dragT = Math.max(0, dragT - dt);
         if (bossIF > 0) bossIF = Math.max(0, bossIF - dt);
         // growing back only counts while you are playing, or waiting to serve
         // would hand you your size back for free
@@ -5651,7 +5668,11 @@
             text(label, x, by, 12 * u, CAPS[k].color);
             x += ctx.measureText(label).width + 14 * u;
         }
-        if (dragT > 0) {
+        if (stunT > 0) {
+            const label = STUN_SHORT + ' ' + Math.ceil(stunT);
+            text(label, x, by, 12 * u, STUN_TINT);
+            x += ctx.measureText(label).width + 14 * u;
+        } else if (dragT > 0) {
             const label = DRAG_SHORT + ' ' + Math.ceil(dragT);
             text(label, x, by, 12 * u, DRAG_TINT);
             x += ctx.measureText(label).width + 14 * u;

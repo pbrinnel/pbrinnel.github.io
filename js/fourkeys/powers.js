@@ -141,6 +141,7 @@
                      w: bw * KAT_SCALE, h: bh * KAT_SCALE, sw: bw, sh: bh,
                      kind: multi ? 'S2' : br.kind });
         katOn.add(b);
+        if (round) round.cosmos = Math.max(round.cosmos, b.kat.length);     // COSMOS KING
     }
 
     // everything on this head comes off, flying outward, and hits nothing
@@ -479,7 +480,7 @@
     let MR_SECS  = 10;
     let MR_Y     = 12;      // px from the top to his middle
     let MR_SCALE = 0.75;    // his size, as a share of yours
-    let CR_SECS  = 10;
+    let CR_SECS  = 20;
     let CR_MAX   = 8;       // most on the floor at once
     let CR_SIZE  = 36;      // px tall
     let CR_SPEED = 90;      // px/s they run at

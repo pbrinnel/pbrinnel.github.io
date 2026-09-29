@@ -275,10 +275,11 @@
 
     // ---- the town -------------------------------------------------------------------
     // He walks up from y 542, so the near pair is a short walk and the far one
-    // is a long one. Their x spans never overlap and each is a lane straight up
-    // to one building: 25-161 is the FARM's, 187-305 the RUINS', 306-494 goes
-    // all the way up the middle to the CASTLE, and the right is the mirror --
-    // except hard against either wall, which is the lane of a corner (M_SIDES).
+    // is a long one. Where he goes is whatever his middle is under, nearest
+    // first, walls and all: 25-161 is the FARM's, 187-305 the RUINS', 306-494
+    // goes all the way up the middle to the CASTLE, and the right is the
+    // mirror. Anything with something nearer across its whole lane -- the
+    // corners behind the FARM and the VOLCANO -- is walked round to.
     //
     // The five stand 26px apart all the way across, between the two gates at
     // 0-24 and 776-800. Evenly spaced is the whole of the arrangement: the
@@ -317,9 +318,8 @@
     const M_SIDE_IN = 10;
 
     // More that are not levels. MEMORIES and the boards take the top corners,
-    // and a corner's lane is the wall itself: walk up hard against the left or
-    // right edge and that is where you arrive, past the FARM or the VOLCANO
-    // rather than into it. MEMORIES is not built until there is a memory to
+    // behind the FARM and the VOLCANO: walk up the gap beside one, and once
+    // you are above its roof, across and on up. MEMORIES is not built until there is a memory to
     // keep in it, nor the boards until you have a score to put on one
     // (menuStands). SETTINGS is the least of them, a small sign up and to the
     // right of MEMORIES, and its lane is the gap between the FARM and the
@@ -339,7 +339,6 @@
           at: { x: 626, y: 44, w: 80, h: 28, lane: [614, 638] } }
     ];
     const M_RUSH = 'rush';           // BOSS RUSH's name in menu.run and menu.best
-    const M_WALL = 3;                // px off his clamp that still counts as against the wall
 
     function menuBuild() {
         menuLoad();
@@ -357,27 +356,21 @@
             .concat(M_SIDES.map(s => Object.assign({ level: s }, s.at)));
     }
 
-    // which wall he is walking up against, if either
-    function menuWall() {
-        const hs = halfSpan();
-        return paddle.x <= hs + M_WALL ? -1 : paddle.x >= LW - hs - M_WALL ? 1 : 0;
-    }
-
-    // whether he is lined up with this one: a corner's lane is its wall, and
-    // against a wall only the corner is lined up. A lane is the width of what
-    // is drawn unless the card says otherwise.
+    // whether he is lined up with this one: his middle under it. A lane is
+    // the width of what is drawn unless the card says otherwise.
     function menuLane(c) {
-        const wall = menuWall();
-        if (c.level.side) return wall === c.level.side;
         const [l, r] = menuLaneOf(c);
-        return !wall && paddle.x >= l && paddle.x <= r;
+        return paddle.x >= l && paddle.x <= r;
     }
     function menuLaneOf(c) { return c.lane || [c.x - c.w / 2, c.x + c.w / 2]; }
 
-    // lined up with it and nothing nearer in the way, which is what lights it:
-    // straight up from under the VOID, the CASTLE is not where he would get to
+    // lined up with it and nothing nearer still ahead of him, which is what
+    // lights it: straight up from under the VOID, the CASTLE is not where he
+    // would get to, but past the FARM's roof MEMORIES is
     function menuAimed(c) {
-        return menuLane(c) && !menu.cards.some(o => o !== c && o.y > c.y && menuStands(o) && menuLane(o));
+        const top = padY() - padH() / 2;
+        return menuLane(c) && !menu.cards.some(o => o !== c && o.y > c.y && menuStands(o) && menuLane(o)
+                                                   && top > o.y - o.h / 2);
     }
 
     function menuSay(t) { menu.say = t; menu.sayT = 2.6; }
@@ -428,7 +421,7 @@
         const over = c ? (c.y + c.h / 2) - (padY() - padH() / 2) : 0;
         // back out the side he came in by, which is where he was last frame: a
         // hand can carry him most of the way across in one
-        if (c && !c.level.side && over > M_SIDE_IN) {
+        if (c && over > M_SIDE_IN) {
             const [l, r] = menuLaneOf(c);
             paddle.x = menu.lastX < (l + r) / 2 ? l - 0.5 : r + 0.5;
             c = null;
@@ -957,7 +950,8 @@
         const s = menu.shows[0];
         const done = s.mem ? typeof memoryDone === 'function' && memoryDone(s.mem, menu.showT)
                    : s.credits ? menu.showT >= menuCreditsSecs() : false;
-        if (done) { menu.shows.shift(); menu.showT = 0; }
+        if (done) menuShowNext();
+        else if (menuCutUp()) menuCutStep(dt);
     }
 
     // The debug menu's win button. The screen you are on counts as beaten: a
@@ -1052,6 +1046,7 @@
             menu.screen.t += dt;
             menu.march = false;
             menuDashStep(dt);
+            if (menu.screen.kind === 'memory') menuCutStep(dt);
             // the pick may have been BACK, and the screen gone with it
             if (menu.screen && menu.screen.kind === 'memory' && over(menu.screen.n, menu.screen.t)) menuShow('memories');
             return;
@@ -1499,13 +1494,16 @@
         const mode = ink === M_EMPTY ? 'flat' : 'wash';
         const b = menuBody(ink, mode), h = menuHead(ink, mode);
         switch (n) {
-            case 1: {   // WINDMILL: one of its flowers, his head on five petals, on a stem
+            case 1: {   // WINDMILL: one of its flowers, his head on five petals, on a stem, a head for its leaf
                 const hw = s * 0.3, R0 = hw * 0.45, L = s * 0.4;
-                ctx.strokeStyle = mode === 'flat' ? ink : menuMix(ink, '#1c2a14', 0.35);
-                ctx.fillStyle = ctx.strokeStyle;
+                const stem = mode === 'flat' ? ink : menuMix(ink, '#1c2a14', 0.35);
+                ctx.strokeStyle = stem;
                 ctx.lineWidth = Math.max(1.2, s * 0.045);
                 ctx.beginPath(); ctx.moveTo(x + s * 0.2, y - s * 0.62); ctx.quadraticCurveTo(x + s * 0.36, y - s * 0.25, x, y); ctx.stroke();
-                ctx.beginPath(); ctx.ellipse(x + s * 0.31, y - s * 0.38, s * 0.09, s * 0.035, -0.5, 0, Math.PI * 2); ctx.fill();
+                // the leaf, its crown pointing up and away off the stem
+                ctx.save(); ctx.translate(x + s * 0.34, y - s * 0.38); ctx.rotate(-0.5 + Math.PI / 2);
+                menuPutHead(menuHead(stem, mode), 0, 0, s * 0.11);
+                ctx.restore();
                 for (let i = 0; i < 5; i++) {
                     const a = turn + i * 2 * Math.PI / 5 - Math.PI / 2;
                     menuLay(b, x + Math.cos(a) * (R0 + L / 2), y + Math.sin(a) * (R0 + L / 2), L, a, false, i % 2);
@@ -2409,25 +2407,27 @@
     // up in the town, or over the VOID's fight while its memory plays
     function menuUnlockUp() { return !!(menu && menu.shows.length && (menuUp() || menu.fightShow)); }
 
-    // a tap: true if it was the unlock screen's to take
+    // a tap: true if it was the unlock screen's to take. A memory or the
+    // credits are not tapped away but held (menuCutPress).
     function menuUnlockNext() {
         if (!menuUnlockUp()) return false;
-        const s = menu.shows[0];
-        const t = s.mem ? menuMemoryTap(s.mem, menu.showT)
-                : s.credits ? menuCreditsTap(menu.showT)
-                : menu.showT >= UNLOCK_WAIT ? -1 : menu.showT;
-        if (t < 0) { menu.shows.shift(); menu.showT = 0; } else menu.showT = t;
-        if (!menu.shows.length) menu.fightShow = false;
+        if (menu.showT >= UNLOCK_WAIT) menuShowNext();
         return true;
+    }
+    function menuShowNext() {
+        menu.shows.shift();
+        menu.showT = 0;
+        menu.skipT = -1;
+        if (!menu.shows.length) menu.fightShow = false;
     }
 
     function menuUnlockDraw() {
         if (!menuUnlockUp()) return false;
         const show = menu.shows[0];
-        if (show.mem) { menuMemoryCard(show.mem, menu.showT); return true; }
-        if (show.memCard) { menuMemoryUnlocked(show.memCard, menu.showT); return true; }
-        if (show.credits) { menuCreditsDraw(menu.showT); return true; }
-        if (show.rushCard) { menuRushUnlocked(menu.showT); return true; }
+        if (show.mem) { menuMemoryCard(show.mem, menu.showT); menuSkipDraw(); return true; }
+        if (show.credits) { menuCreditsDraw(menu.showT); menuSkipDraw(); return true; }
+        if (show.memCard) { menuMemoryUnlocked(show.memCard, menu.showT); menuTapPrompt(menu.showT - UNLOCK_WAIT); return true; }
+        if (show.rushCard) { menuRushUnlocked(menu.showT); menuTapPrompt(menu.showT - UNLOCK_WAIT); return true; }
         const key = show.pad, p = LAB_PAD[key];
         const ink = (p && (p.ink || p.rim)) || '#8d877d';
         ctx.fillStyle = '#000';
@@ -2444,6 +2444,7 @@
         if (p && p.blurb) text(p.blurb, LW / 2, 470, 15, '#c9c4ba', 'center');
         if (p && p.lore) menuLore(p.lore, LW / 2, 500, UNLOCK_LORE_PX, UNLOCK_LORE_W);
         ctx.globalAlpha = 1;
+        menuTapPrompt(menu.showT - UNLOCK_WAIT);
         return true;
     }
 
@@ -2553,11 +2554,6 @@
     const CREDITS_IN = 0.8, CREDITS_HOLD = 2.2, CREDITS_OUT = 0.8;
     const creditsCard = () => CREDITS_IN + CREDITS_HOLD + CREDITS_OUT;
     function menuCreditsSecs() { return CREDITS_LEAD + CREDITS.length * creditsCard() + 0.6; }
-    // a tap moves on to the next card, and past the last one closes them
-    function menuCreditsTap(t) {
-        const i = Math.floor((t - CREDITS_LEAD) / creditsCard()) + 1;
-        return i >= CREDITS.length ? -1 : CREDITS_LEAD + i * creditsCard();
-    }
     function menuCreditsDraw(t) {
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, LW, LH);
@@ -2589,16 +2585,60 @@
     }
     const menuYear = y => (y < 0 ? '\u2212' + -y : '' + y);
 
-    // What a tap does to a memory that has been up t seconds: the time to put
-    // it at, or -1 to close it. A tap on its title card skips to what comes
-    // after, and that then has to be up as long as anything else before a tap
-    // takes it away, so the tap that skipped cannot close it too.
-    function menuMemoryTap(n, t) {
-        const card = typeof memoryCardSecs === 'function' ? memoryCardSecs(n) : 0;
-        if (t < UNLOCK_WAIT) return t;
-        if (t < card) return card;
-        if (t < card + UNLOCK_WAIT) return t;
-        return -1;
+    // ---- held to skip, and tapped to go on -----------------------------------------
+    // A memory and the credits play by themselves, and a tap does not end
+    // them: one landing by accident, or meant for the card before, would
+    // throw away a scene there is no getting back to straight away. A press
+    // puts HOLD TO SKIP up, and held SKIP_HOLD it skips. Whatever instead
+    // waits on a tap says so at the foot of the field (menuTapPrompt).
+    const SKIP_HOLD = 2;             // seconds held to skip
+    const SKIP_LINGER = 1.6;         // seconds the words stay up after a press lets go
+    const SKIP_FADE = 0.3;           // ...and take to come and go
+    const PROMPT_UP = 26;            // px up off the field's foot for the line
+    const PROMPT_INK = '#9a958c';
+
+    // a memory or the credits, the things that are held rather than tapped
+    function menuCutUp() {
+        if (menuUnlockUp()) return !!(menu.shows[0].mem || menu.shows[0].credits);
+        return menuScreenUp() && menu.screen.kind === 'memory';
+    }
+    // a press going down or letting go: true if a cutscene took it
+    function menuCutPress(down) {
+        if (!menuCutUp()) return false;
+        if (down) menu.skipT = 0;
+        else if (menu.skipT >= 0) { menu.skipT = -1; menu.skipShow = SKIP_LINGER; }
+        return true;
+    }
+    function menuCutStep(dt) {
+        if (!(menu.skipT >= 0)) { menu.skipShow = Math.max(0, (menu.skipShow || 0) - dt); return; }
+        menu.skipShow = SKIP_LINGER;
+        if ((menu.skipT += dt) < SKIP_HOLD) return;
+        menu.skipT = -1;
+        menu.skipShow = 0;
+        if (menuUnlockUp()) menuShowNext(); else menuShow('memories');
+    }
+    function menuSkipDraw() {
+        const held = menu.skipT >= 0;
+        const a = held ? 1 : Math.min(1, (menu.skipShow || 0) / SKIP_FADE);
+        if (a <= 0) return;
+        const u = uiScale;
+        ctx.globalAlpha = a;
+        text('hold to skip', LW / 2, LH - PROMPT_UP, 15 * u, PROMPT_INK, 'center');
+        const w = 90 * u, y = LH - PROMPT_UP + 8 * u;
+        ctx.fillStyle = 'rgba(242,239,233,0.14)';
+        ctx.fillRect(LW / 2 - w / 2, y, w, 2);
+        ctx.fillStyle = '#f2efe9';
+        ctx.fillRect(LW / 2 - w / 2, y, w * (held ? Math.min(1, menu.skipT / SKIP_HOLD) : 0), 2);
+        ctx.globalAlpha = 1;
+    }
+    // "click/tap to continue", coming up `since` seconds after a tap would
+    // take the screen (nothing while it is still negative), at the foot of
+    // the field unless `y` says where. intro.js's cards use it too.
+    function menuTapPrompt(since, y) {
+        if (since < 0) return;
+        ctx.globalAlpha = Math.min(1, since / SKIP_FADE);
+        text('click/tap to continue', LW / 2, y === undefined ? LH - PROMPT_UP : y, 15 * uiScale, PROMPT_INK, 'center');
+        ctx.globalAlpha = 1;
     }
 
     // ---- inside: SETTINGS and the MEMORIES room --------------------------------------
@@ -2673,7 +2713,7 @@
         menu.press = null;
         const s = M_SCREENS[kind];
         if (s) paddle.x = paddle.tx = menuChoices().find(c => c.id === s.home).cx;
-        setHint(kind === 'memory' ? 'click/tap or space to go back'
+        setHint(kind === 'memory' ? 'hold to skip'
                                   : 'move to choose · click/tap or space to pick');
     }
     // out the way he went in: the choosing moved him, and letting him walk
@@ -2945,7 +2985,7 @@
     function menuScreenDraw() {
         if (!menuScreenUp()) return false;
         const sc = menu.screen;
-        if (sc.kind === 'memory') { menuMemoryCard(sc.n, sc.t); return true; }
+        if (sc.kind === 'memory') { menuMemoryCard(sc.n, sc.t); menuSkipDraw(); return true; }
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, LW, LH);
         const s = M_SCREENS[sc.kind];
@@ -3022,12 +3062,7 @@
     // and sliding off before letting go takes it back.
     function menuScreenPress(e, down) {
         if (!menuScreenUp()) return false;
-        if (menu.screen.kind === 'memory') {
-            if (!down) return true;
-            const t = menuMemoryTap(menu.screen.n, menu.screen.t);
-            if (t < 0) menuShow('memories'); else menu.screen.t = t;
-            return true;
-        }
+        if (menu.screen.kind === 'memory') return true;     // held, not tapped: menuCutPress
         if (menu.screen.dash) return true;  // he is already on his way to one
         const c = menuChoiceAt(menuAimOf(e));
         if (down) menu.press = c.act ? c.id : null;
@@ -3095,6 +3130,7 @@
     const menuHeld = (down, e) => {
         if (phase === 'initials' || phase === 'scores') return;     // the engine's screens (menuBoardAsk)
         if (down && introHas()) return;
+        if (menu && menuCutPress(down)) return;
         if (down && menuUnlockNext()) return;
         if (menuScreenPress(e, down)) { menu.march = false; return; }
         if (menu && (!down || menuUp())) menu.march = down;

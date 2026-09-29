@@ -345,9 +345,11 @@
     }
 
     // a stem from the top of the screen down to the back of the head, bowed
-    // a little the way it sways, with a leaf off it. The leaf grows from the
+    // a little the way it sways, with a leaf off it: one of his heads, in the
+    // stem's green, its crown pointing away. The leaf grows from the
     // stem's own midpoint and turns with it there -- the curve's control point
     // is off the stem, so a leaf hung on that drifts away from it on a sway.
+    const WM_LEAF = 22;       // px across the head that is the leaf
     function wmDrawStem(f) {
         const top = f.u * LW;
         const mx = (top + f.cx) / 2 + (f.cx - top) * 0.6, my = f.cy * 0.45;
@@ -360,12 +362,15 @@
         const lx = (top + 2 * mx + f.cx) / 4, ly = (2 * my + f.cy) / 4;
         const along = Math.atan2(f.cy, f.cx - top);            // the stem's heading there
         const out = along - Math.PI / 2 * f.dir;               // square off it, to one side
-        ctx.fillStyle = WM_STEM;
-        ctx.beginPath();
-        ctx.ellipse(lx + Math.cos(out) * 10, ly + Math.sin(out) * 10, 12, 5,
-                    out - 0.5 * f.dir, 0, Math.PI * 2);
-        ctx.fill();
         ctx.lineWidth = 1;
+        const leaf = headSprite2('wash', WM_STEM);
+        if (!leaf) return;
+        const lh = WM_LEAF * (BALL_RY / BALL_RX), reach = lh / 2 - 2;
+        ctx.save();
+        ctx.translate(lx + Math.cos(out) * reach, ly + Math.sin(out) * reach);
+        ctx.rotate(out - 0.5 * f.dir + Math.PI / 2);
+        ctx.drawImage(leaf, -WM_LEAF / 2, -lh / 2, WM_LEAF, lh);
+        ctx.restore();
     }
 
     function wmDraw(b) {
