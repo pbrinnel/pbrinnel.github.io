@@ -323,14 +323,7 @@
                 const d = Math.hypot(k.x - ball.x, k.y - ball.y);
                 if (d < bd) { bd = d; best = k; }
             }
-            if (!best) return true;
-            const s = Math.hypot(ball.vx, ball.vy);
-            const now = Math.atan2(ball.vy, ball.vx);
-            let turn = glAngle(Math.atan2(best.y - ball.y, best.x - ball.x) - now) * GL_STONE_STEER;
-            // never so far that it points back into the stone
-            for (let i = 0; i < 6 && Math.cos(now + turn) * n.nx + Math.sin(now + turn) * n.ny < 0.15; i++) turn *= 0.5;
-            ball.vx = Math.cos(now + turn) * s;
-            ball.vy = Math.sin(now + turn) * s;
+            if (best) labSteer(ball, n, best.x, best.y, GL_STONE_STEER);
             return true;
         },
         // his body cannot be hurt while a head is on it, and it says so; nor can

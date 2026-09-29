@@ -486,13 +486,32 @@
         const dot = b.vx * nx + b.vy * ny;
         if (dot < 0) { b.vx -= 2 * dot * nx; b.vy -= 2 * dot * ny; }
         b.x += nx * 4; b.y += ny * 4;
-        if (Math.abs(b.vy) < s * 0.16) {
-            b.vy = (b.vy < 0 ? -1 : 1) * s * 0.16;
-            const q = Math.hypot(b.vx, b.vy) || 1;
-            b.vx = b.vx / q * s; b.vy = b.vy / q * s;
-        }
+        labUnflat(b, s);
         bumpSpeed(BRICK_BUMP);
         return { nx, ny };
+    }
+
+    // never so near level that the head skates wall to wall and never comes
+    // down: at least LAB_FLAT of its speed up or down, as stepBall keeps it
+    const LAB_FLAT = 0.16;
+    function labUnflat(b, s) {
+        if (Math.abs(b.vy) >= s * LAB_FLAT) return;
+        b.vy = (b.vy < 0 ? -1 : 1) * s * LAB_FLAT;
+        const q = Math.hypot(b.vx, b.vy) || 1;
+        b.vx = b.vx / q * s; b.vy = b.vy / q * s;
+    }
+
+    // A head just bounced off (n, from labBounce) turned `share` of the way
+    // toward (tx, ty) -- never so far that it goes back into what it left,
+    // and never so near level that it skates.
+    function labSteer(b, n, tx, ty, share) {
+        const s = Math.hypot(b.vx, b.vy), now = Math.atan2(b.vy, b.vx);
+        const to = Math.atan2(ty - b.y, tx - b.x);
+        let turn = Math.atan2(Math.sin(to - now), Math.cos(to - now)) * share;
+        for (let i = 0; i < 6 && Math.cos(now + turn) * n.nx + Math.sin(now + turn) * n.ny < 0.15; i++) turn *= 0.5;
+        b.vx = Math.cos(now + turn) * s;
+        b.vy = Math.sin(now + turn) * s;
+        labUnflat(b, s);
     }
 
     // x folded back off the side walls, where a head's middle can reach
