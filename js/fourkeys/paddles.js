@@ -908,7 +908,7 @@
     };
 
     // CHELL: white over orange, with white boots, and PORTAL's edges lit
-    // for as long as he is in hand, the town included.
+    // for as long as he is in hand, outside the town.
     LAB_PAD.chell = {
         name: 'CHELL',
         ink: CHELL_LEGS, rim: CHELL_RIM,

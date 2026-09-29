@@ -1258,22 +1258,30 @@
         const want = w * (0.5 + (1 + DBL_GAP) * (spread() / 2 + k4));
         return w * Math.min(1, LW * SPAN4_MAX / 2 / want);
     }
+    // ...and under PORTAL a copy of any of them that is through a wall,
+    // on the far side of the field (ptSegs), so he is hit and drawn there too
     function segs() {
         const w = segW();
         const k = spread();
-        if (k < 0.001) return [{ cx: paddle.x, w, i: 0 }];
+        if (k < 0.001) return ptSegs([{ cx: paddle.x, w, i: 0 }]);
         const pitch = w + w * DBL_GAP;
         const off = pitch / 2 * k;
         const two = [{ cx: paddle.x - off, w, i: 0 },
                      { cx: paddle.x + off, w, i: 1 }];
         const k4 = spread4();
-        if (k4 < 0.001) return two;
-        return two.concat([{ cx: paddle.x - off - pitch * k4, w, i: 2 },
-                           { cx: paddle.x + off + pitch * k4, w, i: 3 }]);
+        if (k4 < 0.001) return ptSegs(two);
+        return ptSegs(two.concat([{ cx: paddle.x - off - pitch * k4, w, i: 2 },
+                                  { cx: paddle.x + off + pitch * k4, w, i: 3 }]));
     }
     function halfSpan() {
         const w = segW();
         return w / 2 + (w + w * DBL_GAP) * (spread() / 2 + spread4());
+    }
+    // where his middle may go: inside the field, or as far through a wall
+    // as PORTAL lets him (ptReach)
+    function padLimit(x) {
+        const hs = halfSpan(), r = ptReach();
+        return Math.max(hs - r, Math.min(LW - hs + r, x));
     }
 
     // ---- the wiggle ---------------------------------------------------------
@@ -2070,8 +2078,7 @@
             king.tx = Math.max(edge, Math.min(LW - edge, king.tx + dx));
             return;
         }
-        const hs = halfSpan();
-        paddle.tx = Math.max(hs, Math.min(LW - hs, paddle.tx + dx));
+        paddle.tx = padLimit(paddle.tx + dx);
     }
     addEventListener('mousemove', e => {
         if (!locked() || paused) return;
@@ -2092,7 +2099,7 @@
             if (!gReady) king.tx = x;         // ...once you have thrown the first one
             return;
         }
-        paddle.tx = x;
+        paddle.tx = ptAim(x);
     };
     // a pointer event in field coordinates
     const fieldAt = e => {
@@ -3393,14 +3400,18 @@
         // it is the same one seen from the ball's side.
         // he is not yours to move while it happens, or while he is stunned
         if (phase === 'siphon' || stunT > 0) paddle.tx = paddle.x;
-        const padFrom = paddle.x;                      // where the physics below starts him
-        const hs = halfSpan();
-        paddle.tx = Math.max(hs, Math.min(LW - hs, paddle.tx));
+        let padFrom = paddle.x;                        // where the physics below starts him
+        paddle.tx = padLimit(paddle.tx);
         const lag = dragLag(dt);
         paddle.x = lag > 0
             ? paddle.x + (paddle.tx - paddle.x) * (1 - Math.exp(-dt / lag))
             : paddle.tx;
-        paddle.x = Math.max(hs, Math.min(LW - hs, paddle.x));
+        const unclamped = paddle.x;
+        paddle.x = padLimit(paddle.x);
+        // Only a limit that has just closed in on him moves him here: PORTAL
+        // wearing off with him through a wall. He snaps back in, and a snap
+        // is neither a swipe nor a sweep across whatever he snapped past.
+        if (paddle.x !== unclamped) padFrom = paddle.prevX = paddle.x;
         paddle.vx = (paddle.x - paddle.prevX) / Math.max(dt, 1e-4);
         paddle.prevX = paddle.x;
 

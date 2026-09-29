@@ -452,8 +452,41 @@
         return true;
     }
 
+    // His share that may go through a wall while PORTAL is on: that much of
+    // him sticks out of the other side, and hits and catches there.
+    let PT_THROUGH = 0.75;
+    LAB_KNOBS.push('PT_THROUGH');
+
+    // how far past a wall his middle may go (padLimit). Never in the town,
+    // where leaning on a wall is how a paddle is changed.
+    function ptReach() {
+        return ptOn() && !(typeof menuUp === 'function' && menuUp()) ? PT_THROUGH * 2 * halfSpan() : 0;
+    }
+    // An absolute pointer stops at the field's edge, which only puts his
+    // middle on the wall. So within half his span of a wall it carries him
+    // faster, and at the very edge he is as far through as ptReach allows.
+    function ptAim(x) {
+        const r = ptReach();
+        if (!r) return x;
+        const hs = halfSpan();
+        if (x < hs) return hs - (hs - x) * r / hs;
+        if (x > LW - hs) return LW - hs + (x - (LW - hs)) * r / hs;
+        return x;
+    }
+    // segs() plus a copy, on the far side, of any of him that is through a wall
+    function ptSegs(list) {
+        if (!ptReach()) return list;
+        const out = list.slice();
+        for (const sg of list) {
+            if (sg.cx - sg.w / 2 < 0) out.push({ cx: sg.cx + LW, w: sg.w, i: sg.i });
+            else if (sg.cx + sg.w / 2 > LW) out.push({ cx: sg.cx - LW, w: sg.w, i: sg.i });
+        }
+        return out;
+    }
+
+    // not in the town, where there is no head to go through them
     function ptDraw() {
-        if (!ptOn()) return;
+        if (!ptOn() || (typeof menuUp === 'function' && menuUp())) return;
         const a = (fx.T > 0 ? Math.min(1, fx.T / 0.6) : 1) * (0.75 + 0.25 * Math.sin(clock * 5));
         for (const [x0, ink, dir] of [[0, PT_IN, 1], [LW, PT_OUT, -1]]) {
             const g = ctx.createLinearGradient(x0, 0, x0 + dir * PT_GLOW, 0);
