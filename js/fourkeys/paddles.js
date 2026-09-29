@@ -63,8 +63,7 @@
     let MULTI_POP  = 2.5;    // MULTI: seconds between one pair of heads flying off him and the next
     let MULTI_SLIP = 4;      // MULTI: px each of his two misprints is out of register, at the game's size...
     let MULTI_PRINT = 0.45;  // ...and how strongly each shows
-    let PRINCE_PICK = 1.4;   // PRINCE: bits of wall a second rolling in to him
-    LAB_KNOBS.push('PAD_FAVOUR', 'MULTI_POP', 'MULTI_SLIP', 'MULTI_PRINT', 'PRINCE_PICK');
+    LAB_KNOBS.push('PAD_FAVOUR', 'MULTI_POP', 'MULTI_SLIP', 'MULTI_PRINT');
     LAB_KNOBS.push('GILT_LEN', 'GILT_CAPS', 'GILT_SHINE', 'STAT_LEN', 'STAT_ANGLE', 'STAT_SPIN',
                    'STAT_DIP', 'FROST_LEN', 'FROST_EDGE', 'FROST_SWIPE', 'FROST_DECK', 'FROST_FLAKES', 'FROST_BIG', 'ICE_SECS', 'ICE_RAMP', 'ICE_TURN',
                    'EMB_LEN', 'EMB_CATCH', 'EMB_SPREAD', 'EMB_SPREAD_AT', 'EMB_GLOW', 'EMB_SPARKS', 'PAIR_LEN', 'PAIR_QUAD', 'PAD_MARK', 'V2_GLOSS', 'V2_GLINT', 'V2_SWEEP');
@@ -176,7 +175,7 @@
         for (const b of padBits) {
             const a = Math.max(0, 1 - b.t / b.life) * b.a * (b.fadeIn ? Math.min(1, b.t / b.fadeIn) : 1);
             const baked = b.kind === 'bigflake' ? padFlakeSprite(b.ink) : b.kind === 'head' ? padHeadSprite(b.ink)
-                        : b.kind === 'face' ? padFaceSprite(b.ink) : b.kind === 'brick' ? padBrickSprite(b.ink) : null;
+                        : b.kind === 'face' ? padFaceSprite(b.ink) : null;
             if (baked) {
                 // s is half its width, as a flake's is
                 const w = b.s * 2, h = w * baked.height / baked.width;
@@ -188,7 +187,7 @@
                 ctx.restore();
                 continue;
             }
-            if (b.kind === 'head' || b.kind === 'face' || b.kind === 'brick') continue;     // his art is not in yet
+            if (b.kind === 'head' || b.kind === 'face') continue;     // his art is not in yet
             // a big flake whose sprite is not ready yet is drawn as a small one
             if (b.kind === 'flake' || b.kind === 'bigflake') {
                 // a six-armed speck of ice, turning as it goes
@@ -303,8 +302,6 @@
             return true;
         });
     }
-    // one of the wall, small, in a brick's colour: what PRINCE rolls up
-    const padBrickSprite = ink => shapeSprite('padBit' + ink, ink, PAD_SPECK_BAKE, PAD_SPECK_BAKE / SHAPE_ASPECT, false);
 
     // one speck of whatever he is shedding
     // (null when there are too many already)
@@ -896,8 +893,7 @@
         }
     };
 
-    // PRINCE: green over purple, and bits of wall in its own four colours
-    // rolling in to him from all round and gone into him as they arrive.
+    // PRINCE: green over purple, and nothing more.
     LAB_PAD.prince = {
         name: 'PRINCE',
         ink: PRINCE_TOP, rim: PRINCE_RIM,
@@ -908,16 +904,7 @@
         lore: 'The smallest Brandon there ever was, sent down by an enormous father ' +
               'to roll up whatever had been left lying around. He is rolling still.',
         under() { padRim('padRimP', PRINCE_RIM, 2.5, 0.5); },
-        skin(sg, o) { padLay(sg, o, this.dress(), this.dressA); },
-        step(dt) {
-            if (Math.random() >= dt * PRINCE_PICK) return;
-            const p = padSomewhere(0.6);
-            const a = -Math.PI * (0.1 + Math.random() * 0.8), d = 90 + Math.random() * 60, life = 0.9 + Math.random() * 0.4;
-            const fills = Object.values(TIERS).map(t => t.fill);
-            const b = padBit(p.x - Math.cos(a) * d, padY() + Math.sin(a) * d, fills[(Math.random() * fills.length) | 0], life,
-                             Math.cos(a) * d / life, -Math.sin(a) * d / life, 0, 8 + Math.random() * 3, 0.9, 'brick');
-            if (b) { b.turn = (Math.random() < 0.5 ? -1 : 1) * 4; b.fadeIn = 0.25; }
-        }
+        skin(sg, o) { padLay(sg, o, this.dress(), this.dressA); }
     };
 
     // CHELL: white over orange, with white boots, and PORTAL's edges lit
