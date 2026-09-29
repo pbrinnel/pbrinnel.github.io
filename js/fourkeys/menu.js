@@ -1223,7 +1223,13 @@
         ctx.stroke();
     }
 
-    const M_DARK = '#14110e';        // every building's own shape
+    // The town's contrast (CRISP): its shapes a deep dark on a dark ground, so
+    // they stand on it rather than sinking into a haze; a rim at rest only
+    // M_RIM_REST of the way to the dark, and words at rest bright enough to read.
+    const M_DARK = '#14110e';        // what a colour dims toward
+    const M_FILL = '#090806';        // every building's, sign's and gate's own shape
+    const M_RIM_REST = 0.3;          // how far a rim is toward the dark while he is elsewhere
+    const M_WORD_REST = '#c3bfb8';   // a name or a best while he is elsewhere
     const M_SLATE = '#6b665d';       // where a colour goes while he is elsewhere
     const M_EMPTY = '#3a362f';       // a key not won yet
     const M_RISE_IN = 3, M_RISE_OUT = 2;   // per second a building lights as he lines up, and goes back
@@ -1394,8 +1400,8 @@
     // in it. `shape` is a smaller card to draw in its place (the boards' plate).
     function menuSilhouette(c, st, shape = c) {
         menuOutline(shape);
-        ctx.fillStyle = M_DARK; ctx.fill();
-        ctx.strokeStyle = menuMix(st.ink, M_DARK, 0.55 * (1 - st.rise));
+        ctx.fillStyle = M_FILL; ctx.fill();
+        ctx.strokeStyle = menuMix(st.ink, M_DARK, M_RIM_REST * (1 - st.rise));
         ctx.lineWidth = 1 + st.rise;
         ctx.stroke();
         const k = menuDoorK(c);
@@ -1615,10 +1621,11 @@
     // over him.
     const M_HORIZON = 60;            // the far edge of the town, where it arrives from
     const M_SKY_LINE = '#211d19';    // the horizon's line, the faintest there is
-    const M_GROUND = '#100e0c';      // the ground under it, a shade off the sky
+    const M_GROUND = '#0a0807';      // the ground under it, a shade off the black sky
     const M_BAND_NEAR = 40;          // px, the ground's band at his feet...
     const M_BAND_FAR = 6;            // ...and at the horizon, easing between
-    const M_BAND_TONE = 0.11;        // the lighter bands, this far from the dark toward slate
+    const M_BAND_TONE = 0.14;        // the lighter bands, this far from the ground toward slate
+    const M_WARM = 0.22;             // the warm light's strength, in the sky only
     const M_FAR_SIZE = 0.62;         // his size at the far row
     const M_ARMY = 40, M_ARMY_PACE = 9, M_ARMY_STEP = 5.5;   // the distant army: how many, px a second, steps a second
     const M_ARMY_INK = '#29241f';
@@ -1653,8 +1660,9 @@
         // a warm light low over the far end of the town, the DAYBREAK the town was built from
         layer(M_NEAR_SKY, () => {
             const g = ctx.createRadialGradient(LW / 2, 60, 10, LW / 2, 60, 420);
-            g.addColorStop(0, 'rgba(74,50,34,0.35)'); g.addColorStop(1, 'rgba(74,50,34,0)');
-            ctx.fillStyle = g; ctx.fillRect(0, 0, LW, LH);
+            g.addColorStop(0, 'rgba(74,50,34,' + M_WARM + ')'); g.addColorStop(1, 'rgba(74,50,34,0)');
+            // the sky only: on the ground it lifts the dark to the buildings' own and they sink into it
+            ctx.fillStyle = g; ctx.fillRect(-LW, -LH, LW * 3, LH + M_HORIZON);
         });
         // the ground, and the line where it meets the sky
         layer(M_NEAR_SKY, () => {
@@ -1667,7 +1675,7 @@
         layer(0.2, () => {
             const zs = menuBandDepths(), d = menuArriveBack(k);
             const yOf = z => z + d <= 0 ? LH + 100 : Math.min(LH + 100, M_HORIZON + 1 / (z + d));
-            ctx.fillStyle = menuMix('#0b0a09', '#4a433a', M_BAND_TONE);
+            ctx.fillStyle = menuMix(M_GROUND, '#4a433a', M_BAND_TONE);
             for (let i = 0; i + 1 < zs.length; i += 2) {
                 const bot = yOf(zs[i]), top = Math.max(M_HORIZON, yOf(zs[i + 1]));
                 if (bot > M_HORIZON && top < LH) ctx.fillRect(-LW, top, LW * 3, bot - top);
@@ -1724,13 +1732,13 @@
         const got = st.best > 0;
         const nameY = y + c.h * 0.4, ky = y + c.h * (got ? (big ? 0.66 : 0.64) : 0.72);
         const lit = menu.keys[l.n] ? (st.aimed ? '#fff' : menuMix(st.ink, '#f2efe9', 0.35))
-                  : st.shut ? '#6a655c' : st.aimed ? '#f2efe9' : '#a39d93';
+                  : st.shut ? '#6a655c' : st.aimed ? '#f2efe9' : M_WORD_REST;
         text(l.name, c.x, nameY, big ? 19 : 20, lit, 'center');
         const ink = o => menu.keys[o.n] ? (st.aimed ? menuMix(o.ink, '#ffffff', 0.2) : o.ink) : M_EMPTY;
         const turn = c.turn || 0;
         if (big) MENU_LEVELS.forEach((o, i) => menuSigil(o.n, c.x - 45 + i * 30, ky, M_KEY_SMALL, ink(o), turn));
         else menuSigil(l.n, c.x, ky, M_KEY, ink(l), turn);
-        if (got) text('BEST ' + st.best, c.x, y + c.h * 0.9, 11, st.aimed ? '#f2efe9' : '#a39d93', 'center');
+        if (got) text('BEST ' + st.best, c.x, y + c.h * 0.9, 11, st.aimed ? '#f2efe9' : M_WORD_REST, 'center');
     }
     const M_KEY = 40, M_KEY_SMALL = 24;   // a sigil's size on its own level, and in the CASTLE's row
 
@@ -1765,8 +1773,8 @@
                 ctx.beginPath();
                 ctx.moveTo(tx - 15, foot); ctx.lineTo(tx - 9, hubY + 4); ctx.lineTo(tx + 9, hubY + 4); ctx.lineTo(tx + 15, foot);
                 ctx.closePath();
-                ctx.fillStyle = M_DARK; ctx.fill();
-                ctx.strokeStyle = menuMix(st.ink, M_DARK, 0.55 * (1 - st.rise)); ctx.lineWidth = 1; ctx.stroke();
+                ctx.fillStyle = M_FILL; ctx.fill();
+                ctx.strokeStyle = menuMix(st.ink, M_DARK, M_RIM_REST * (1 - st.rise)); ctx.lineWidth = 1; ctx.stroke();
                 menuPutHead(menuHead(st.rise > 0.5 ? st.ink : menuMix(st.ink, M_DARK, 0.6), 'wash'), tx, hubY + 22, 7);
             },
             front(c, st) {
@@ -1806,8 +1814,8 @@
                 [[0.15, 24, 50], [0.45, 30, 88], [0.85, 24, 64]].forEach(([u, w, h], ti) => {
                     const tx = x0 + u * c.w, top = base - h;
                     ctx.beginPath(); ctx.rect(tx - w / 2, top, w, h);
-                    ctx.fillStyle = M_DARK; ctx.fill();
-                    ctx.strokeStyle = menuMix(st.ink, M_DARK, 0.55 * (1 - st.rise)); ctx.lineWidth = 1; ctx.stroke();
+                    ctx.fillStyle = M_FILL; ctx.fill();
+                    ctx.strokeStyle = menuMix(st.ink, M_DARK, M_RIM_REST * (1 - st.rise)); ctx.lineWidth = 1; ctx.stroke();
                     const cols = Math.floor(w / 9), rows = Math.floor((h - 6) / 12);
                     for (let r = 0; r < rows; r++) {
                         const ink = (r + 1) / rows <= st.rise ? st.ink : menuMix(st.ink, M_DARK, 0.6);
@@ -1931,8 +1939,8 @@
     // arrow pointing into the town. The crow circles MEMORIES.
     const M_SIGN_WING = 22;          // the board's wings, smaller than a level's things would be
     const M_SIGN_SWAY = 0.01, M_SIGN_SWAY_LIT = 0.035;   // radians a board swings, and the more it swings lit
-    const menuSignLine = st => menuMix(st.ink, M_SLATE, 0.55 * (1 - st.rise));
-    const menuSignInk = st => st.aimed ? menuMix(st.ink, '#ffffff', 0.25) : '#a39d93';
+    const menuSignLine = st => menuMix(st.ink, M_SLATE, M_RIM_REST * (1 - st.rise));
+    const menuSignInk = st => st.aimed ? menuMix(st.ink, '#ffffff', 0.25) : M_WORD_REST;
 
     // where a sign's board hangs
     function menuHang(c) {
@@ -1992,7 +2000,7 @@
         const link = menuHead(line, 'flat');
         for (const cx of [c.x - G.bw * 0.35, c.x + G.bw * 0.35]) for (let i = 0; i < (G.small ? 1 : 3); i++) menuPutHead(link, cx, G.armY + 2 + i * 4, 3);
         const shape = () => menuBoardPath(c, G.left, G.top, G.bw, G.bh);
-        shape(); ctx.fillStyle = M_DARK; ctx.fill();
+        shape(); ctx.fillStyle = M_FILL; ctx.fill();
         // stood in the doorway, the board fills from the floor up
         const k = menuDoorK(c);
         if (k) {
@@ -2058,7 +2066,7 @@
     // the building under its cover: its shape, dark, a faint rim of its colour
     function menuCovered(c) {
         menuOutline(c);
-        ctx.fillStyle = M_DARK; ctx.fill();
+        ctx.fillStyle = M_FILL; ctx.fill();
         ctx.strokeStyle = menuMix(c.level.ink, M_DARK, 0.75); ctx.lineWidth = 1; ctx.stroke();
     }
     const menuBand = (k, from, to) => menuClamp((k - from) / (to - from));
@@ -2322,7 +2330,7 @@
         const col = on ? ink : menuMix(ink, M_DARK, 0.55 * (1 - near));
         const y0 = M_GATE_TOP, y1 = M_GATE.y + M_GATE.h, cx = side < 0 ? M_GATE.w / 2 : LW - M_GATE.w / 2;
         menuTabPath(side, y0, y1);
-        ctx.fillStyle = M_DARK; ctx.fill();
+        ctx.fillStyle = M_FILL; ctx.fill();
         // the lean, filling the tab from the floor up
         const k = on ? Math.min(1, menu.hold / SWAP_HOLD) : 0;
         if (k > 0) {
@@ -2345,7 +2353,7 @@
         ctx.translate(cx, M_GATE_NAME_Y);
         ctx.rotate(side < 0 ? -Math.PI / 2 : Math.PI / 2);
         ctx.textBaseline = 'middle';
-        text(p.name, 0, 0, 11, on ? '#f2efe9' : '#a39d93', 'center');
+        text(p.name, 0, 0, 11, on ? '#f2efe9' : M_WORD_REST, 'center');
         ctx.restore();
         ctx.textBaseline = 'alphabetic';
     }
