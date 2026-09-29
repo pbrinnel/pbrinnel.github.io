@@ -61,8 +61,10 @@
     let V2_SWEEP   = 0.9;    // ...and how long a glint takes to cross him
     let PAD_FAVOUR = 0.5;    // MULTI, PRINCE: this share of capsules is his, before the usual roll
     let MULTI_POP  = 2.5;    // MULTI: seconds between one pair of heads flying off him and the next
+    let MULTI_SLIP = 4;      // MULTI: px each of his two misprints is out of register, at the game's size...
+    let MULTI_PRINT = 0.45;  // ...and how strongly each shows
     let PRINCE_PICK = 1.4;   // PRINCE: bits of wall a second rolling in to him
-    LAB_KNOBS.push('PAD_FAVOUR', 'MULTI_POP', 'PRINCE_PICK');
+    LAB_KNOBS.push('PAD_FAVOUR', 'MULTI_POP', 'MULTI_SLIP', 'MULTI_PRINT', 'PRINCE_PICK');
     LAB_KNOBS.push('GILT_LEN', 'GILT_CAPS', 'GILT_SHINE', 'STAT_LEN', 'STAT_ANGLE', 'STAT_SPIN',
                    'STAT_DIP', 'FROST_LEN', 'FROST_EDGE', 'FROST_SWIPE', 'FROST_DECK', 'FROST_FLAKES', 'FROST_BIG', 'ICE_SECS', 'ICE_RAMP', 'ICE_TURN',
                    'EMB_LEN', 'EMB_CATCH', 'EMB_SPREAD', 'EMB_SPREAD_AT', 'EMB_GLOW', 'EMB_SPARKS', 'PAIR_LEN', 'PAIR_QUAD', 'PAD_MARK', 'V2_GLOSS', 'V2_GLINT', 'V2_SWEEP');
@@ -73,7 +75,8 @@
     const FROST_INK = '#8fe3f2', FROST_RIM = '#dff6ff';
     const EMB_INK   = '#e2683a', EMB_RIM = '#ffb072';
     const PAIR_INK  = '#8f7fc4';      // DOUBLE's own colour, since he is two of him
-    const MULTI_INK = '#e0c060', MULTI_RIM = '#fff0b8';     // MULTI's own colour, as PAIR has DOUBLE's
+    // MULTI's own colour, as PAIR has DOUBLE's, and a blue to print against it
+    const MULTI_INK = '#e0c060', MULTI_BLUE = '#5b8cc4';
     // PRINCE and CHELL are dressed rather than washed (padDress): a colour
     // for his shirt and one for his jeans, after who each is named for
     const PRINCE_TOP = '#a8c64e', PRINCE_LEGS = '#8a4fb0', PRINCE_RIM = '#d7ee8c';
@@ -512,11 +515,11 @@
         const p = LAB_PAD[key];
         if (!p) return;
         const a0 = fade === undefined ? 1 : fade;
-        const lay = (sprite, a, dx, ww) => {
+        const lay = (sprite, a, dx, ww, dy) => {
             if (!sprite) return;
             const hh = ww / SHAPE_ASPECT;
             ctx.globalAlpha = a * a0;
-            ctx.drawImage(sprite, x + dx - ww / 2, y - hh / 2, ww, hh);
+            ctx.drawImage(sprite, x + dx - ww / 2, y + (dy || 0) - hh / 2, ww, hh);
             ctx.globalAlpha = 1;
         };
         // the game's own colours are asked for here rather than held on the
@@ -530,11 +533,18 @@
                 continue;
             }
             if (rim) lay(padFlat('padRimI' + rim, rim), 0.5, dx, ww * 1.06);
+            if (p.prints) {
+                // out of register by as much of him as they are in play
+                const slip = MULTI_SLIP * ww / PADDLE_W;
+                ctx.globalCompositeOperation = 'lighter';
+                for (const [ink, ux, uy] of p.prints) lay(padFlat('padPrint' + ink, ink), MULTI_PRINT, dx + ux * slip, ww, uy * slip);
+                ctx.globalCompositeOperation = 'source-over';
+            }
             if (p.stone) lay(shapeSprite('padStone', STONE, PAD_BAKE, PAD_BAKE / SHAPE_ASPECT, 'statue'), 1, dx, ww);
             else {
                 lay(shapeSprite('padIcon', null, PAD_BAKE, PAD_BAKE / SHAPE_ASPECT, false), 1, dx, ww);
                 if (p.dress) lay(p.dress(), p.dressA, dx, ww);
-                else if (p.ink) lay(padTint('padTint' + p.ink, p.ink), 0.8, dx, ww);
+                else if (p.ink && !p.prints) lay(padTint('padTint' + p.ink, p.ink), 0.8, dx, ww);
             }
         }
     }
@@ -840,18 +850,39 @@
         return c;
     }
 
-    // MULTI: in MULTI's colour, and every MULTI_POP two heads fly up off him
-    // on the fan MULTI sends new heads out on, so he says what he is for.
+    // MULTI: his photograph as it is, over two more prints of him out of
+    // register, gold up and left and blue down and right, so there is more
+    // than one of him without anything washed over him (a gold wash read as
+    // GILT). Every MULTI_POP two heads fly up off him on the fan MULTI sends
+    // new heads out on, so he says what he is for. `ink` is only for his card.
     LAB_PAD.multi = {
         name: 'MULTI',
-        ink: MULTI_INK, rim: MULTI_RIM,
+        ink: MULTI_INK,
+        prints: [[MULTI_INK, -1, -0.5], [MULTI_BLUE, 1, 0.5]],     // colour, and which way it slips
         favour: 'M',
         blurb: 'half of power-ups are MULTI',
         lore: 'Nobody agrees on how many of him there were. ' +
               'Everybody agrees it was more than one.',
         popT: 0,
-        under() { padRim('padRimM', MULTI_RIM, 2.5, 0.5); },
-        skin(sg, o) { padLay(sg, o, padTint('padMulti', MULTI_INK), 0.72); },
+        under() {
+            ctx.globalCompositeOperation = 'lighter';
+            for (const [ink, ux, uy] of this.prints) {
+                const sp = padFlat('padPrint' + ink, ink);
+                if (!sp) continue;
+                for (const sg of segs()) {
+                    const o = paddle.jt[sg.i] > 0 ? wobble(paddle.jt[sg.i]) : 0;
+                    const tw = sg.w, th = tw / SHAPE_ASPECT;
+                    ctx.save();
+                    ctx.translate(sg.cx + ux * MULTI_SLIP, padY() + o * JIG_PADDLE + uy * MULTI_SLIP);
+                    ctx.rotate(segWig(sg.i) + paddle.dip[sg.i]);
+                    ctx.globalAlpha = padK * MULTI_PRINT;
+                    ctx.drawImage(sp, -tw / 2, -th / 2, tw, th);
+                    ctx.restore();
+                }
+            }
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = padK;
+        },
         step(dt) {
             if ((this.popT += dt) < MULTI_POP) return;
             this.popT = 0;
