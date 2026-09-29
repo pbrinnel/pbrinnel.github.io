@@ -10,7 +10,9 @@
     //   four keys open the CASTLE
     //   finish a level without using a continue and you keep the paddle it guarded
     //   win any level at all and CLASSIC, the first game's paddle, is yours
-    //   every boss beaten counts, and the count buys MULTI, PRINCE and CHELL
+    //   every boss beaten counts, and the count buys MULTI, PRINCE and CHELL --
+    //   or finish the FARM, the RUINS or the CITY without losing a head or a
+    //   continue and it hands over its one of them
     //   each stage gives the next memory the first time you win it with one left to give
     //   win the CASTLE and the VOID stands in the way to it: its memory comes
     //   halfway through the fight, and its end is the credits
@@ -58,9 +60,12 @@
     // exactly as the paddle you started with, so there is nothing in him to
     // earn -- he is a souvenir, and the first one a player picks up.
     const MENU_SOUVENIR = 'classic';
-    // Paddles no level guards, bought with bosses beaten: every one counts,
-    // in any stage or BOSS RUSH, clean or not, over every run (menuSlew).
+    // Paddles bought with bosses beaten: every one counts, in any stage or
+    // BOSS RUSH, clean or not, over every run (menuSlew)...
     const MENU_SLAIN_PADS = [[5, 'multi'], [10, 'prince'], [15, 'chell']];
+    // ...or, sooner, each one with a flawless win of its level: not a head
+    // lost and no continue (menuBeatSlew)
+    const MENU_FLAWLESS_PADS = { 1: 'multi', 2: 'prince', 3: 'chell' };
     // Who a level hands you is whoever the level sliders say, so moving a boss
     // in his own tab moves him in the town too. No second copy of the roster to
     // fall out of step with the first.
@@ -829,7 +834,11 @@
 
     // A head went off the bottom. True means it cost nothing: there is nothing
     // to lose in the hub.
-    function menuLost() { return menuUp(); }
+    // A run that loses one is no longer flawless (MENU_FLAWLESS_PADS).
+    function menuLost() {
+        if (menu && menu.run) menu.run.lost = true;
+        return menuUp();
+    }
 
     // END RUN in a level, or the CONTINUE clock running out: back to the town
     // with nothing but the score, which the town may ask your initials for
@@ -1027,23 +1036,28 @@
         const keys = MENU_ALL.filter(l => menu.keys[l.n]).length;
         menu.slain = Math.max(menu.slain || 0, keys) + 1;
         let got = null;
-        for (const [at, pad] of MENU_SLAIN_PADS) {
-            if (menu.slain < at || menu.pads[pad]) continue;
-            menu.pads[pad] = true;
-            menu.shows.push({ pad });
-            got = pad;
-        }
+        for (const [at, pad] of MENU_SLAIN_PADS) if (menu.slain >= at && menuGive(pad)) got = pad;
         menuSave();
         return got;
     }
-    // A run's end, won. Its last screen's boss counts after menuBeat and
-    // after `end` (the VOID's credits), so a paddle he buys is shown last,
-    // and is only put in your hands if the level gave you none.
+    // a paddle handed over with its PADDLE UNLOCKED card, or false if already had
+    function menuGive(pad) {
+        if (menu.pads[pad]) return false;
+        menu.pads[pad] = true;
+        menu.shows.push({ pad });
+        return true;
+    }
+    // A run's end, won. A flawless win's paddle and whatever its last boss
+    // buys come after menuBeat and after `end` (the VOID's credits), so they
+    // are shown last, and put in your hands only if the level gave you none.
     function menuBeatSlew(run, boss, end) {
         const was = LAB.pad;
         menuBeat(!run.cont, run.n);
         if (end) menu.shows.push(...end);
-        const got = boss ? menuSlew() : null;
+        let got = null;
+        const flawless = MENU_FLAWLESS_PADS[run.n];
+        if (flawless && !run.cont && !run.lost && menuGive(flawless)) { got = flawless; menuSave(); }
+        if (boss) got = menuSlew() || got;
         if (got && LAB.pad === was && LAB_PAD[got]) LAB.usePad(got);
     }
 

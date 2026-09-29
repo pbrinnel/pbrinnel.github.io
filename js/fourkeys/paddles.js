@@ -59,7 +59,7 @@
     let V2_GLOSS   = 0.22;   // MODERN: how bright the gloss along his top is...
     let V2_GLINT   = 5;      // ...seconds between one glint and the next...
     let V2_SWEEP   = 0.9;    // ...and how long a glint takes to cross him
-    let PAD_FAVOUR = 0.33;   // MULTI, PRINCE: this share of capsules is his, before the usual roll
+    let PAD_FAVOUR = 0.5;    // MULTI, PRINCE: this share of capsules is his, before the usual roll
     let MULTI_POP  = 2.5;    // MULTI: seconds between one pair of heads flying off him and the next
     let PRINCE_PICK = 1.4;   // PRINCE: bits of wall a second rolling in to him
     LAB_KNOBS.push('PAD_FAVOUR', 'MULTI_POP', 'PRINCE_PICK');
@@ -805,8 +805,9 @@
     };
 
     // ---- the ones bosses buy --------------------------------------------------------
-    // No level guards these three: they come with bosses beaten, counted
-    // over every run (MENU_SLAIN_PADS in menu.js). Each plays as MODERN does
+    // These three come with bosses beaten, counted over every run
+    // (MENU_SLAIN_PADS in menu.js), or each with a flawless win of the FARM,
+    // the RUINS or the CITY (MENU_FLAWLESS_PADS). Each plays as MODERN does
     // and leans on the capsules instead: MULTI and PRINCE get PAD_FAVOUR of
     // capsules as their own before the usual roll (the falling capsule in
     // engine.js), and CHELL has PORTAL on all the time (ptOn in powers.js).
@@ -845,7 +846,7 @@
         name: 'MULTI',
         ink: MULTI_INK, rim: MULTI_RIM,
         favour: 'M',
-        blurb: 'a third of power-ups are MULTI',
+        blurb: 'half of power-ups are MULTI',
         lore: 'Nobody agrees on how many of him there were. ' +
               'Everybody agrees it was more than one.',
         popT: 0,
@@ -872,7 +873,7 @@
         favour: 'K',
         dress: () => padDress('padPrince', PRINCE_TOP, PRINCE_LEGS, false),
         dressA: 0.85,
-        blurb: 'a third of power-ups are KATAMARI, where they can be',
+        blurb: 'half of power-ups are KATAMARI, where they can be',
         lore: 'The smallest Brandon there ever was, sent down by an enormous father ' +
               'to roll up whatever had been left lying around. He is rolling still.',
         under() { padRim('padRimP', PRINCE_RIM, 2.5, 0.5); },
