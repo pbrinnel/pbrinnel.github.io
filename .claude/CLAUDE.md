@@ -50,13 +50,14 @@ touches it.
   the worker and redeploying it in the dashboard.
 - Its code is in `js/fourkeys/`: `engine.js` (brandon.html's game, forked 22 Sep 2026 and
   edited here from now on), `runtime.js` (the seam the bosses plug into), a file per boss,
-  mini-boss and paddle, `levels.js` (each level's three screens: a wall, a second
+  mini-boss and paddle, `powers.js` (the sequel's eight capsules, KATAMARI to WILD),
+  `levels.js` (each level's three screens: a wall, a second
   wall a mini-boss makes an entrance on, then the boss), `menu.js` (the town), `debug.js` (what the konami code and
   `?debug` open: the keys, the paddles, and a hold to forget it all), `intro.js` (the
   BRANDON WINS and 2000 YEARS LATER cards before the town), `memory.js` (the cutscene a
   level's first win plays and MEMORIES replays), and `start.js`, which is where the game
   begins.
-- The boss lab builds from these files but not from `intro.js`, `debug.js` or `levels.js`, and it runs
+- The boss lab builds from these files but not from `intro.js`, `debug.js`, `levels.js` or `powers.js`, and it runs
   brandon.html's engine. It does build `memory.js`, for the VOID's end (Odin, and his
   voice). So a module that calls something only fourkeys has must check it with `typeof`
   first, and a new top-level name must not already be used in
@@ -73,6 +74,9 @@ touches it.
   `memory.js`).
 - Brick screens use brandon.html's brick size: seven across, every screen. An exception needs
   a specific reason (Paul, 27 Sep 2026). The layout rules are in `levels.js`'s header.
+- The capsules are tuned in the powerup lab, `.claude/powerlab/` (git-ignored, on Paul's Mac):
+  `node .claude/powerlab/powerlab-build.js` builds `.claude/fourkeys-powerlab.html` from these same
+  files, with a slider tab per capsule. Rebuild it after changing `powers.js` or its hooks in `engine.js`.
 - **Save files (`.brandon`) are specified in `_ref/BRANDON-SAVE.md`.** Read it before you
   touch saved progress in any way: a new unlock, paddle, memory, stage or anything kept in
   `menu`. Every new thing needs a pinned save token, and the doc changes in the same

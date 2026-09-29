@@ -910,9 +910,22 @@
         // own on top of whatever the head already has. It turns whichever way
         // your last hit pushed the head, so it is yours to steer: send the head
         // back the other way and ENGLISH comes round after it, at ENG_ACCEL.
-        E: { name: 'ENGLISH BRANDON',   short: 'ENGLISH', color: '#cf6b4e', secs: 9 }
+        E: { name: 'ENGLISH BRANDON',   short: 'ENGLISH', color: '#cf6b4e', secs: 9 },
+        // the sequel's eight, which live in powers.js. Letters that were
+        // taken went to one inside the name: T for porTal, N for magNet, I
+        // for mIrror, A for Au. WILD is never caught as itself -- it turns
+        // into each of the others as it falls (see wdUpdate). Each timed
+        // one's secs is kept in step with its own let in powers.js.
+        K: { name: 'KATAMARI BRANDON',  short: 'KATAMARI', color: '#a8c64e', secs: 6, noBoss: true },
+        L: { name: 'LASER BRANDON',     short: 'LASER',   color: '#ff5f6d', secs: 6 },
+        T: { name: 'PORTAL BRANDON',    short: 'PORTAL',  color: '#ff9a3c', secs: 10 },
+        N: { name: 'MAGNET BRANDON',    short: 'MAGNET',  color: '#6c8cff', secs: 10 },
+        I: { name: 'MIRROR BRANDON',    short: 'MIRROR',  color: '#7fe3e0', secs: 10 },
+        C: { name: 'CROWD BRANDON',     short: 'CROWD',   color: '#f5a0c0', secs: 10 },
+        A: { name: 'MIDAS BRANDON',     short: 'MIDAS',   color: '#efb920', secs: 8, noBoss: true },
+        '?': { name: 'WILD BRANDON',    short: 'WILD',    color: '#f2efe9', secs: 0 }
     };
-    const TIMED = ['B', 'D', 'S', 'R', 'P', 'W', 'E'];     // M is instant
+    const TIMED = ['B', 'D', 'S', 'R', 'P', 'W', 'E', 'K', 'L', 'T', 'N', 'I', 'C', 'A'];     // M and WILD are not
     const CAP_KEYS = Object.keys(CAPS);
     // the four brick colours, for the gauntlet's army to wear
     const TIER_KEYS = ['R', 'O', 'G', 'Y'];
@@ -922,7 +935,8 @@
     // catch his phantoms on and a hole down the middle to lose the ball
     // through, which is a straight downgrade during the only fight where being
     // hit costs you something. Neither needs a special case in the collision
-    // code -- they just never drop on his stage.
+    // code -- they just never drop on his stage. KATAMARI and MIDAS sit it out
+    // too, having no bricks there to work on.
     function capsulePool() {
         return LEVELS[stage].boss ? CAP_KEYS.filter(k => !CAPS[k].noBoss) : CAP_KEYS;
     }
@@ -1380,7 +1394,7 @@
     }
 
     function clearEffects() {
-        fx = { B: 0, D: 0, S: 0, R: 0, P: 0, W: 0, E: 0 };
+        fx = { B: 0, D: 0, S: 0, R: 0, P: 0, W: 0, E: 0, K: 0, L: 0, T: 0, N: 0, I: 0, C: 0, A: 0 };
         dragT = 0;
         padLag = 0;                       // a reset, so there is nothing to unwind
         padTrail = [];
@@ -1778,7 +1792,7 @@
     // entry per segment, because under DOUBLE a knock lands on one of the two.
     paddle = { x: LW / 2, tx: LW / 2, prevX: LW / 2, vx: 0, w: PADDLE_W,
                jt: [0, 0, 0, 0], tilt: [0, 0, 0, 0], dip: [0, 0, 0, 0] };
-    fx = { B: 0, D: 0, S: 0, R: 0, P: 0, W: 0, E: 0 };
+    fx = { B: 0, D: 0, S: 0, R: 0, P: 0, W: 0, E: 0, K: 0, L: 0, T: 0, N: 0, I: 0, C: 0, A: 0 };
     best = 0;                     // the town sets it, level by level
     fetchBoard();                 // async; the game never waits on it
     newGame();
@@ -2378,6 +2392,7 @@
         // give it, or the game is telling you to keep swinging at something
         // that will never break.
         if (labHit(b, cx, cy)) return;
+        if (powHit(b)) return;         // MIDAS turned it to gold instead
         if (b.kind === 'X') return;
         // he still BOUNCES it -- that happens in the physics, before this --
         // he just cannot be wounded twice inside half a second
@@ -2423,13 +2438,15 @@
             if (--b.hp > 0) { labBrickHeld(b); return; }
             b.alive = false;
             shockwave(b);
-            award(25 * b.maxHp, b.x + bw / 2, b.y);
+            award(b.midas ? MD_PAY : 25 * b.maxHp, b.x + bw / 2, b.y);
             labBrickGone(b);
+            powBrickGone(b);      // KATAMARI keeps it, CROWD drops one
         } else {
             b.alive = false;
             shockwave(b);
             award(TIERS[b.kind].pts, b.x + bw / 2, b.y);
             labBrickGone(b);
+            powBrickGone(b);      // KATAMARI keeps it, CROWD drops one
             if (!tierSeen[b.kind] && (b.kind === 'O' || b.kind === 'R')) {
                 tierSeen[b.kind] = true;
                 bumpSpeed(1.1);
@@ -3073,8 +3090,10 @@
         // little spin off and leave the rest turning the way it was -- one that
         // reversed it would undo whatever the last hit built, half the time
         const rx = extX(b), ry = extY(b);
-        if (b.x - rx < 0)  { b.x = rx;      b.vx =  Math.abs(b.vx); b.spin *= SPIN_WALL; }
-        if (b.x + rx > LW) { b.x = LW - rx; b.vx = -Math.abs(b.vx); b.spin *= SPIN_WALL; }
+        if (!powWrap(b)) {       // PORTAL takes the side walls away
+            if (b.x - rx < 0)  { b.x = rx;      b.vx =  Math.abs(b.vx); b.spin *= SPIN_WALL; }
+            if (b.x + rx > LW) { b.x = LW - rx; b.vx = -Math.abs(b.vx); b.spin *= SPIN_WALL; }
+        }
         if (b.y - ry < 0)  { b.y = ry;      b.vy =  Math.abs(b.vy); b.spin *= SPIN_WALL; labCeiling(b); }
         if (b.y - ry > LH) return false;
 
@@ -3159,6 +3178,7 @@
         // and either of which may have an end dipped (see DIP_MAX). each is
         // met in his own frame, where he lies level -- see bodyAt.
         labBallStep(b);
+        powBallStep(b);      // KATAMARI's lump, MIRROR, the CROWD
         const py = padY();
         if (b.vy > 0) {
             for (const sg of segs()) {
@@ -3367,6 +3387,7 @@
         // ball meets them where they have got to
         stepFlee(dt);
         labUpdate(dt);
+        powUpdate(dt);
         // and the boss, turned to meet a ball -- see TILT_ODDS
         if (tilt && bricks[0]) bricks[0].wigA += tilt.a * tilt.k * tilt.k * (3 - 2 * tilt.k);
 
@@ -4408,9 +4429,10 @@
         // silver and gold wear how many hits they have left, stepping down the
         // same ladder the gauntlet's army does: gold for three, silver for two,
         // a struck silver's slate blue for the last. each rung is its own tint,
-        // never a dark wash over the top of him
+        // never a dark wash over the top of him. One MIDAS turned stays gold to
+        // the end, whatever it has left.
         const multi = b.kind === 'S' || b.kind === 'A';
-        const kind = !multi ? b.kind : b.hp >= 3 ? 'A' : b.hp === 2 ? 'S' : 'S2';
+        const kind = !multi ? b.kind : b.midas || b.hp >= 3 ? 'A' : b.hp === 2 ? 'S' : 'S2';
         const statue = kind === 'X';
         const sprite = statue ? statueSprite() : shapeSprite(kind, brickColor(kind), bw, bh, false);
         if (!sprite) return;
@@ -4421,6 +4443,7 @@
         ctx.translate(b.x + b.jnx * o + bw / 2, b.y + b.jny * o + bh / 2);
         if (b.wigA) ctx.rotate(b.wigA);
         ctx.drawImage(sprite, -bw / 2 - m, -bh / 2 - m, bw + 2 * m, bh + 2 * m);
+        powGlint(b, kind);           // gold's gloss and glimmer
         if (b.flash > 0) {
             ctx.globalAlpha = Math.min(1, b.flash) * 0.75;
             ctx.drawImage(shapeSprite('flash', '#f2efe9', bw, bh, true), -bw / 2, -bh / 2, bw, bh);
@@ -5460,6 +5483,7 @@
         labDrawMini();
         if (phase === 'ascend') { drawBossFall(); drawImpact(); }
         drawRings();
+        powDrawLoose();
         drawCapsule();
         drawOverChoices(false);   // boxes under him
         drawPaddle();
@@ -5471,11 +5495,13 @@
         labDrawBursts();
         drawYell();
         drawTalk();
+        powDrawOver();
 
         // no ball once the fight is settled, the takeover included
         if (phase === 'ready' || phase === 'play' || phase === 'cleared') {
             for (const b of balls) {
                 if (labSkipBall(b)) continue;
+                powDrawBall(b);          // what KATAMARI has stuck on, under the face
                 drawBall(b.x, b.y, labBallR(b), b.angle);
                 labPadBall(b, labBallR(b));
             }
