@@ -319,11 +319,12 @@
             #debug button { width: 170px; padding: 5px 0; font-size: 0.8rem; }
         }
 
-        /* A phone held upright. The field is 4:3, so it runs the full width
-           with half the screen or more left over, and the space under it is
-           the thumb pad: a finger there steers him from under the field instead
-           of covering it. Input is on the window already, so the pad listens to
-           nothing; it only shows where he is (padShow in engine.js).
+        /* A phone held upright. The field is 4:3, so it runs the full width,
+           pinned to the top, and everything under it is the thumb pad: a finger
+           there steers him from under the field instead of covering it, and
+           the field up top keeps the hand holding the phone clear of it.
+           Input is on the window already, so the pad listens to nothing; it
+           only shows where he is (padShow in engine.js).
            700px is the phone/tablet line: an iPad in portrait shows the field
            at nearly full size and has no need of a pad. The same query is
            PORTRAIT_PAD in engine.js, and the two must match. */
@@ -337,10 +338,6 @@
                 padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
                          env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
             }
-            /* The height the field leaves is split evenly, above it and the
-               pad below, which sits the field a little above the middle and
-               him close over the rail, near the knob that shows where he is */
-            body::before { content: ''; flex: 1; }
             #stage { border-color: transparent; border-radius: 0; }
             /* it talks about a mouse */
             .hint { display: none; }
@@ -356,14 +353,13 @@
                 -webkit-tap-highlight-color: transparent;
             }
 
-            /* the rail, across the middle of the pad: low on the screen, where
-               a thumb rests holding the phone */
+            /* the rail, low down where a thumb rests holding the phone */
             #pad::before {
                 content: '';
                 position: absolute;
                 left: 24px;
                 right: 24px;
-                bottom: 50%;
+                bottom: 28%;
                 height: 1px;
                 background: #2e2a24;
             }
@@ -372,7 +368,7 @@
             #pad i {
                 position: absolute;
                 left: -30px;
-                bottom: calc(50% - 17px);
+                bottom: calc(28% - 17px);
                 width: 60px;
                 height: 34px;
                 border: 1px solid #4a453e;
