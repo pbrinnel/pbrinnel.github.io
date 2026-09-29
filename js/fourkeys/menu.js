@@ -1046,8 +1046,9 @@
             menu.screen.t += dt;
             menu.march = false;
             menuDashStep(dt);
-            if (menu.screen.kind === 'memory') menuCutStep(dt);
             // the pick may have been BACK, and the screen gone with it
+            if (!menu.screen) return;
+            if (menu.screen.kind === 'memory') menuCutStep(dt);
             if (menu.screen && menu.screen.kind === 'memory' && over(menu.screen.n, menu.screen.t)) menuShow('memories');
             return;
         }
