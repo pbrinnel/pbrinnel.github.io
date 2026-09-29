@@ -373,7 +373,7 @@
         { key: 'rush', lines: ['BOSS RUSH'], ink: '#e0a040', small: true,
           at: { x: 626, y: 44, w: 80, h: 28, lane: [614, 638] } },
         { key: 'paddles', lines: ['BRANDONS'], ink: '#6cb8a8', small: true,
-          at: { x: 262, y: 72, w: 96, h: 26, lane: [187, 305] } }
+          at: { x: 270, y: 76, w: 92, h: 26, lane: [187, 305] } }
     ];
     const M_RUSH = 'rush';           // BOSS RUSH's name in menu.run and menu.best
 
