@@ -8,27 +8,42 @@
     // second wind drank the life out of you, and the lamp catches as it
     // arrives. Every lamp lit takes its share of him, and he only gets a
     // share back when its lamp has gone all the way out. With every lamp lit
-    // there is no fire left in him: he is only brandon, and open. Hits land
-    // until the first lamp goes out and a share of the fire comes home. Three
-    // clocks and one target, and the head can only be in one place: top up the
-    // one that is fading, or take the shot while the window is open. They
-    // drift slowly up and down where they stand, each on its own beat, so the
-    // shot that lit one a moment ago is not the shot that lights it now.
+    // there is no fire left in him: he is only brandon, and open. They drift
+    // slowly up and down where they stand, each on its own beat.
     //
-    // Under LAMP_BLOW_AT of his health he fights back: every LAMP_BLOW_EVERY
-    // seconds there is a LAMP_BLOW_ODDS chance he swells up, turned to one
-    // lamp that is lit, and blows it out -- the gust visible all the way
-    // across, and the swell before it the warning.
+    // His fire is his weapon. He drips embers, and every so often flares and
+    // flings a few at you, as many as the fire left in him (lamp.heat) will
+    // make: each one that lands is a helping of SLUGGISH. So lighting lamps
+    // disarms him as well as opening him, and the fight is hottest when you
+    // have the least of it.
+    //
+    // A ball can't be aimed at the one cold lamp, so the lit ones point the
+    // way: a ball off a lit lamp tops it up and is turned LAMP_STEER of the
+    // way toward the nearest cold one -- or toward him, once none is cold,
+    // and then it tops nothing up: a window lasts as long as its first lamp.
+    // A lit lamp burns plainly, a flame over its head that shrinks as its
+    // time runs; the stone only creeps back over it in its last LAMP_WARN.
+    //
+    // Open, he has nothing left to burn and sinks LAMP_SINK toward the
+    // lamps, so reaching him is a shot rather than the luck of where the ball
+    // was when the last lamp caught. Below LAMP_BLOW_AT of his health he
+    // answers a window: LAMP_BLOW_DELAY into it he swells up, turned to the
+    // lamp with the least time left, and blows it out. The swell is the tell
+    // and the chance -- hit him during it and he chokes on it, and the window
+    // runs its course.
     let LAMP_LVL    = 4;
-    let LAMP_HP     = 16;     // hits to finish him, once you can reach him
+    let LAMP_HP     = 26;     // hits to finish him, once you can reach him
     let LAMP_N      = 3;      // how many lamps there are
-    let LAMP_SECS   = 10.9;   // how long a hit keeps one lit
+    let LAMP_SECS   = 13;     // how long a hit keeps one lit
+    let LAMP_WARN   = 2.5;    // ...and the last of that, over which the stone creeps back
     let LAMP_W      = 143;    // how long a lamp is
     let LAMP_Y      = 250;    // the line they drift about
     let LAMP_BOB    = 40;     // px either side of it they drift
     let LAMP_BOB_RATE = 0.4;  // rad/s of that drift
+    let LAMP_STEER  = 0.8;    // share of the way a ball off a lit lamp is turned toward a cold one
     let LAMP_BOSS_W = 420;    // how long he is
     let LAMP_BOSS_Y = 80;     // ...and where he hangs, as high as he goes and still all on screen
+    let LAMP_SINK   = 55;     // px he sinks while he is open
     let LAMP_SPARKS = 22;     // sparks a second off a lit lamp, or off him burning
     let LAMP_COOL   = 0.6;    // seconds his fire takes to go out, or to come back
     let LAMP_STEAL  = 0.9;    // seconds the stream of his fire runs into a lamp being lit
@@ -36,14 +51,22 @@
     let LAMP_MOTE_SECS = 0.7; // ...each one's trip across
     let LAMP_SWEEP  = 0.4;    // rad/s of his patrol
     let LAMP_CLIMB  = 0.6;    // how much of the original's climb this fight has
-    let LAMP_BLOW_AT    = 0.6;  // share of his health under which he blows lamps out
-    let LAMP_BLOW_EVERY = 7;    // seconds between his chances to
-    let LAMP_BLOW_ODDS  = 0.3;  // ...and the chance he takes one
-    let LAMP_BLOW_WIND  = 0.8;  // seconds he swells up first, which is the tell
+    let LAMP_DRIP   = 0.7;    // embers a second he drips, with all his fire in him
+    let LAMP_FLING_MIN = 5;   // seconds between his flings, at least...
+    let LAMP_FLING_MAX = 8;   // ...and at most
+    let LAMP_FLING  = 3;      // embers in a fling, with all his fire in him
+    let LAMP_FLARE  = 0.7;    // seconds he flares up before he flings, which is the tell
+    let LAMP_EMBER_G = 260;   // px/s² an ember falls at
+    let LAMP_EMBER_SIZE = 0.4; // ...and how big it is, of a head
+    let LAMP_BLOW_AT    = 0.75; // share of his health under which he blows lamps out
+    let LAMP_BLOW_DELAY = 2;    // seconds into a window before he swells
+    let LAMP_BLOW_WIND  = 1.4;  // seconds he swells, which is the tell and the time to choke him
     let LAMP_BLOW_GUST  = 0.5;  // ...and the gust's trip across to the lamp
-    LAB_KNOBS.push('LAMP_LVL', 'LAMP_HP', 'LAMP_N', 'LAMP_SECS', 'LAMP_W', 'LAMP_Y',
-                   'LAMP_BOSS_W', 'LAMP_BOSS_Y', 'LAMP_SWEEP', 'LAMP_CLIMB', 'LAMP_BOB', 'LAMP_BOB_RATE', 'LAMP_SPARKS', 'LAMP_COOL', 'LAMP_STEAL', 'LAMP_MOTES', 'LAMP_MOTE_SECS',
-                   'LAMP_BLOW_AT', 'LAMP_BLOW_EVERY', 'LAMP_BLOW_ODDS', 'LAMP_BLOW_WIND', 'LAMP_BLOW_GUST');
+    LAB_KNOBS.push('LAMP_LVL', 'LAMP_HP', 'LAMP_N', 'LAMP_SECS', 'LAMP_WARN', 'LAMP_W', 'LAMP_Y', 'LAMP_STEER',
+                   'LAMP_BOSS_W', 'LAMP_BOSS_Y', 'LAMP_SINK', 'LAMP_SWEEP', 'LAMP_CLIMB', 'LAMP_BOB', 'LAMP_BOB_RATE',
+                   'LAMP_SPARKS', 'LAMP_COOL', 'LAMP_STEAL', 'LAMP_MOTES', 'LAMP_MOTE_SECS',
+                   'LAMP_DRIP', 'LAMP_FLING_MIN', 'LAMP_FLING_MAX', 'LAMP_FLING', 'LAMP_FLARE', 'LAMP_EMBER_G', 'LAMP_EMBER_SIZE',
+                   'LAMP_BLOW_AT', 'LAMP_BLOW_DELAY', 'LAMP_BLOW_WIND', 'LAMP_BLOW_GUST');
 
     const LAMP_UP = -Math.PI / 2;     // stood on end, head at the top
 
@@ -58,7 +81,8 @@
             lamp = { t: 0, x: LW / 2, y: -LAMP_BOSS_W, pend: null, lit: 0, windows: 0, wasOpen: false, heat: 1, sparks: [],
                      lamps: Array.from({ length: n }, (_, i) => ({ u: (i + 0.5) / n, on: 0, y: LAMP_Y,
                                                                   ph: i * 2.3, lit: 99, acc: 0 })),
-                     motes: [], blowT: LAMP_BLOW_EVERY, blow: null, gust: [], blown: 0 };
+                     motes: [], blowAt: -1, blow: null, gust: [], blown: 0, choked: 0, puffs: [],
+                     sink: 0, embers: [], drip: 0, flingT: LAMP_FLING_MIN, flare: -1, flung: 0, landed: 0 };
             lampBox(b);
         },
         reset() { lamp = null; },
@@ -71,9 +95,19 @@
             const k = phase === 'entrance' ? enterK() : 1;
             const e = k * k * (3 - 2 * k);
             lamp.x = LW / 2 + Math.sin(lamp.t * LAMP_SWEEP) * Math.max(0, (LW - LAMP_BOSS_W) / 2);
-            lamp.y = -LAMP_BOSS_W + (LAMP_BOSS_Y + LAMP_BOSS_W) * e;
             const open = lampOpen();
-            if (open && !lamp.wasOpen) lamp.windows++;
+            // Open, he has nothing left to burn and sinks toward the lamps. He
+            // cannot rise back through a head over him: it would be pinned
+            // between him and the ceiling.
+            const over = balls.some(q => q.y < lamp.y && Math.abs(q.x - lamp.x) < LAMP_BOSS_W / 2 + BALL_RX * 2);
+            const sinkTo = (open && phase === 'play') || (over && lamp.sink > 0) ? 1 : 0;
+            lamp.sink += Math.max(-dt * 1.5, Math.min(dt * 1.5, sinkTo - lamp.sink));
+            lamp.y = -LAMP_BOSS_W + (LAMP_BOSS_Y + LAMP_BOSS_W) * e + LAMP_SINK * lamp.sink * lamp.sink * (3 - 2 * lamp.sink);
+            if (open && !lamp.wasOpen) {
+                lamp.windows++;
+                lamp.blowAt = b.hp < b.maxHp * LAMP_BLOW_AT ? LAMP_BLOW_DELAY : -1;
+            }
+            if (!open) lamp.blowAt = -1;
             lamp.wasOpen = open;
             // his fire: a share of it gone into every lamp that holds it, as
             // fast as the stream carries it off, and back only once that lamp
@@ -81,6 +115,7 @@
             const want = 1 - lamp.lamps.reduce((s, l) => s + lampHeld(l), 0) / lamp.lamps.length;
             lamp.heat += Math.max(-dt / LAMP_COOL, Math.min(dt / LAMP_COOL, want - lamp.heat));
             lampBlowStep(b, dt);
+            lampEmberStep(dt);
             lampStealStep(dt);
             lampSparkStep(b, dt);
             lampBox(b);
@@ -94,6 +129,32 @@
             lamp.pend = null;
             const h = LAMP_BOSS_W / SHAPE_ASPECT;
             return maskContact(ball, lamp.x, lamp.y, 0, LAMP_BOSS_W, h, MASK, false);
+        },
+        // Off a lit lamp the bounce is the fight's: turned toward the nearest
+        // cold one, or toward him once none is. It tops the lamp up only while
+        // another is cold -- with all of them lit the window burns down, or
+        // the ball, steered at him, would keep it open for good. A cold one
+        // goes on to be lit the ordinary way.
+        touch(br, ball, hit) {
+            const l = lamp.pend;
+            // a head on top of him rolls off his nearer end rather than
+            // rattling between him and the ceiling
+            if (!l && ball.y < lamp.y) {
+                if (lampOpen()) return false;
+                const n = labBounce(ball, hit);
+                rings.push({ x: hit.cx, y: hit.cy, t: 1 });
+                const end = ball.x < lamp.x ? -1 : 1;
+                labSteer(ball, n, lamp.x + end * (LAMP_BOSS_W / 2 + 80), lamp.y, 0.6);
+                return true;
+            }
+            if (!l || l.on <= 0) return false;
+            lamp.pend = null;
+            if (!lampOpen()) l.on = LAMP_SECS;
+            const n = labBounce(ball, hit);
+            const cold = lamp.lamps.filter(o => o.on <= 0)
+                             .sort((p, q) => Math.hypot(p.u * LW - ball.x, p.y - ball.y) - Math.hypot(q.u * LW - ball.x, q.y - ball.y))[0];
+            labSteer(ball, n, cold ? cold.u * LW : lamp.x, cold ? cold.y : lamp.y, LAMP_STEER);
+            return true;
         },
         // A lamp never takes a wound, but lighting it is not nothing, so it
         // gets no ring: the stone going is the answer. He rings while any of
@@ -114,9 +175,17 @@
             bossIF = BOSS_IF;
             b.hp = Math.max(0, b.hp - 1);
             bossHits++;
+            // struck while he swells, he chokes on it and the lamp stays lit
+            if (lamp.blow && !lamp.blow.gone) {
+                lamp.blow = null;
+                lamp.choked++;
+                const h = LAMP_BOSS_W / SHAPE_ASPECT;
+                lamp.puffs.push({ x: lamp.x + LAMP_BOSS_W * 0.36, y: lamp.y - h * 0.1, t: 0 });
+            }
             const done = b.hp <= 1e-6;
             award(BOSS_PTS * (done ? 5 : 1), cx, cy);
             if (done) {
+                lamp.embers = [];
                 b.alive = false;
                 clearStage();
                 bossFall = shatter(lamp.x, lamp.y, LAMP_BOSS_W, A_DIE_T);
@@ -150,16 +219,19 @@
                      line: on + ' of ' + lamp.lamps.length + ' lit' +
                            (on === lamp.lamps.length ? ' · he is open, ' + soon.toFixed(1) + ' s left'
                             : ' · he cannot be touched') + ' · ' + lamp.windows + ' windows · blown out ' +
-                           lamp.blown + (lamp.blow ? ' · blowing' : '') };
+                           lamp.blown + ' · choked ' + lamp.choked + (lamp.blow ? ' · blowing' : '') +
+                           ' · embers ' + lamp.embers.length + ' (' + lamp.landed + ' landed)' };
         }
     };
 
     function lampOpen() { return lamp.lamps.every(l => l.on > 0); }
 
-    // his answer, once he is hurt enough: a roll every LAMP_BLOW_EVERY, a
-    // swell toward one lit lamp, and the gust that puts it out
+    // His answer to a window, once he is hurt enough: LAMP_BLOW_DELAY into
+    // it he swells toward the lamp with the least time left, and the gust
+    // puts it out -- unless a hit chokes him first (see hit).
     function lampBlowStep(b, dt) {
         lamp.gust = lamp.gust.filter(g => (g.t += dt) < LAMP_BLOW_GUST * 1.4);
+        lamp.puffs = lamp.puffs.filter(p => (p.t += dt) < 0.8);
         if (phase !== 'play') { lamp.blow = null; return; }
         const bl = lamp.blow;
         if (bl) {
@@ -179,12 +251,88 @@
             }
             return;
         }
-        if (b.hp >= b.maxHp * LAMP_BLOW_AT) return;
-        if ((lamp.blowT -= dt) > 0) return;
-        lamp.blowT = LAMP_BLOW_EVERY;
-        const lit = lamp.lamps.filter(l => l.on > 0);
-        if (!lit.length || Math.random() >= LAMP_BLOW_ODDS) return;
-        lamp.blow = { l: lit[(Math.random() * lit.length) | 0], t: 0, gone: false };
+        if (lamp.blowAt < 0 || (lamp.blowAt -= dt) > 0) return;
+        lamp.blowAt = -1;
+        const lit = lamp.lamps.filter(l => l.on > 0).sort((p, q) => p.on - q.on);
+        if (lit.length) lamp.blow = { l: lit[0], t: 0, gone: false };
+    }
+
+    // His embers: a drip as steady as the fire left in him, and now and then
+    // a flare and a fling of a few toward you. They fall, and one that comes
+    // down on you is a helping of SLUGGISH.
+    function lampEmberStep(dt) {
+        const h = LAMP_BOSS_W / SHAPE_ASPECT, r = BALL_RX * 2 * LAMP_EMBER_SIZE;
+        if (phase === 'play') {
+            const drop = (x, y, vx, vy) => lamp.embers.push({ x, y, vx, vy, rot: Math.random() * 6.28, spin: (Math.random() - 0.5) * 5 });
+            for (lamp.drip += dt * LAMP_DRIP * lamp.heat; lamp.drip >= 1; lamp.drip--) {
+                drop(lamp.x + (Math.random() - 0.5) * LAMP_BOSS_W * 0.8, lamp.y + h * 0.3, (Math.random() - 0.5) * 40, 20);
+            }
+            if (lamp.flare >= 0) {
+                if ((lamp.flare += dt) >= LAMP_FLARE) {
+                    lamp.flare = -1;
+                    const n = Math.round(LAMP_FLING * lamp.heat), sx = lamp.x, sy = lamp.y + h * 0.3;
+                    const px = segs()[0].cx, py = padY();
+                    for (let i = 0; i < n; i++) {
+                        // aimed to land about you, spread either side of you
+                        const tx = px + (i - (n - 1) / 2) * 110, T = 1.4;
+                        drop(sx, sy, (tx - sx) / T, (py - sy - 0.5 * LAMP_EMBER_G * T * T) / T);
+                        lamp.flung++;
+                    }
+                }
+            } else if ((lamp.flingT -= dt) <= 0) {
+                lamp.flingT = LAMP_FLING_MIN + Math.random() * (LAMP_FLING_MAX - LAMP_FLING_MIN);
+                if (Math.round(LAMP_FLING * lamp.heat) > 0) lamp.flare = 0;
+            }
+        } else lamp.flare = -1;
+        for (let i = lamp.embers.length - 1; i >= 0; i--) {
+            const m = lamp.embers[i];
+            if (phase === 'play') {
+                m.vy += LAMP_EMBER_G * dt;
+                m.x += m.vx * dt;
+                m.y += m.vy * dt;
+                m.rot += m.spin * dt;
+            }
+            if (m.y > padY() - padH() / 2 - r && m.y < padY() + padH() / 2) {
+                const sg = segs().find(s => Math.abs(m.x - s.cx) < s.w / 2 + r);
+                if (sg) { addDrag(sg, m.x); lamp.landed++; lamp.embers.splice(i, 1); continue; }
+            }
+            if (m.y > LH + r || m.x < -r || m.x > LW + r) lamp.embers.splice(i, 1);
+        }
+    }
+
+    // the flare before a fling: 0 to 1 over LAMP_FLARE, a swell of his glow
+    function lampFlare() { return lamp.flare >= 0 ? Math.min(1, lamp.flare / LAMP_FLARE) : 0; }
+
+    function lampDrawEmbers() {
+        const r = BALL_RX * 2 * LAMP_EMBER_SIZE, rh = r * (BALL_RY / BALL_RX);
+        const tint = headSprite2('flat', EMB_INK);
+        for (const m of lamp.embers) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.globalAlpha = 0.5;
+            ctx.drawImage(padGlow(EMB_INK), m.x - r * 1.6, m.y - r * 1.6, r * 3.2, r * 3.2);
+            ctx.restore();
+            ctx.save();
+            ctx.translate(m.x, m.y);
+            ctx.rotate(m.rot);
+            ctx.drawImage(ballImg, -r / 2, -rh / 2, r, rh);
+            ctx.globalAlpha = 0.6;
+            ctx.drawImage(tint, -r / 2, -rh / 2, r, rh);
+            ctx.restore();
+        }
+        // his choking: grey puffs off his mouth, swelling and fading
+        for (const p of lamp.puffs) {
+            const k = p.t / 0.8;
+            ctx.save();
+            ctx.globalAlpha = 0.35 * (1 - k);
+            ctx.fillStyle = '#b9b4ac';
+            for (let i = 0; i < 3; i++) {
+                ctx.beginPath();
+                ctx.arc(p.x + i * 14 * (1 + k), p.y - i * 6 - 20 * k, 8 + 14 * k, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
+        }
     }
 
     // how swollen he is: up over the wind-up, and out again with the gust
@@ -224,8 +372,11 @@
         bh = Math.max(lamp.y + h / 2, LAMP_Y + LAMP_BOB + LAMP_W / 2) - b.y;
     }
 
-    // how lit a lamp is, 1 just struck to 0 stone cold
-    function lampWarm(l) { return l.on > 0 ? Math.min(1, l.on / LAMP_SECS) * lampCaught(l) : 0; }
+    // how lit a lamp is: 1 all the while it burns, down to 0 over its last
+    // LAMP_WARN, so lit and cold never look alike
+    function lampWarm(l) { return l.on > 0 ? Math.min(1, l.on / Math.max(0.01, LAMP_WARN)) * lampCaught(l) : 0; }
+    // ...and how much of its time is left, which the flame over it shows
+    function lampLeft(l) { return l.on > 0 ? Math.min(1, l.on / LAMP_SECS) * lampCaught(l) : 0; }
 
     // how much of its fire a lamp being lit has taken off him: the stream's share
     function lampHeld(l) { return l.on > 0 ? Math.min(1, l.lit / LAMP_STEAL) : 0; }
@@ -339,6 +490,26 @@
         ctx.restore();
     }
 
+    // A flame stood on (x, y): a teardrop of EMBER's colours, `k` of its
+    // full height, flickering in its shape rather than in its brightness.
+    // `lit` 0 draws the dim wick a cold lamp keeps.
+    function lampFlame(x, y, k, lit) {
+        const tall = lit ? 10 + 42 * k : 7, wide = lit ? 9 + 7 * k : 5;
+        const fl = 1 + 0.08 * Math.sin(clock * 9 + x);
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = lit ? 0.9 : 0.35;
+        const g = ctx.createRadialGradient(x, y - tall * 0.3, 1, x, y - tall * 0.3, tall * 0.7);
+        g.addColorStop(0, '#fff1d6');
+        g.addColorStop(0.35, EMB_RIM);
+        g.addColorStop(1, 'rgba(226,104,58,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.ellipse(x, y - tall * 0.35 * fl, wide, tall * 0.55 * fl, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+
     function lampDraw(b) {
         const lw = LAMP_W, lh = lw / SHAPE_ASPECT;
         const raw = shapeSprite('lampRaw', null, lw, lh, false);
@@ -349,15 +520,18 @@
             const x = l.u * LW, warm = lampWarm(l);
             // lit, he burns; the stone comes back over him as his time runs
             // out, so the clock is the picture rather than a number
-            lampGlow(x, l.y, lw * 0.7, warm);
+            lampGlow(x, l.y, lw * 0.9, warm * 1.4);
             lampLay(raw, x, l.y, lw, lh, LAMP_UP, 1);
             lampLay(ember, x, l.y, lw, lh, LAMP_UP, 0.72);
             lampLay(stone, x, l.y, lw, lh, LAMP_UP, 1 - warm);
+            // a flame over his head for the time he has left, and a cold one
+            // a small dim wick, so the one to go for is plain at a glance
+            lampFlame(x, l.y - lw / 2 - 4, lampLeft(l), l.on > 0 ? 1 : 0);
         }
         const h = LAMP_BOSS_W / SHAPE_ASPECT;
         const body = shapeSprite('boss', null, BOSS_W0, BOSS_H, false);
         if (body) {
-            lampGlow(lamp.x, lamp.y, LAMP_BOSS_W * 0.6, lamp.heat);
+            lampGlow(lamp.x, lamp.y, LAMP_BOSS_W * 0.6, lamp.heat * (1 + 0.8 * lampFlare()));
             // swelling to blow, he leans a little toward the lamp he means
             const sw = lampSwell(), side = lamp.blow ? Math.sign(lamp.blow.l.u * LW - lamp.x) : 0;
             ctx.save();
@@ -376,6 +550,7 @@
             ctx.restore();
         }
         lampDrawGust();
+        lampDrawEmbers();
         lampDrawSparks();
         lampDrawMotes();
         const grow = phase === 'entrance' ? enterK() : 1;
