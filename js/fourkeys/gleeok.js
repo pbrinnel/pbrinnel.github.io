@@ -150,10 +150,10 @@
     let GL_THRASH_HZ   = 0.6; // ...times a second
     let GL_THRASH_DRIFT = 1.4; // ...his drift, times GL_DRIFT
     let GL_THRASH_PACE = 2.5; // ...and times as fast
-    // Looks being tried out in the boss lab, each on its own switch, all off
-    // here, so the game draws him as he has been until one is picked.
+    // Extra looks, each on its own switch in the boss lab: the wings are his,
+    // the rest are off here until one is picked.
     let GL_LOOK_GLOW   = 0;      // fire light round his collar and under each head
-    let GL_LOOK_WINGS  = 0;      // little wings on his shoulders, see-through, fluttering
+    let GL_LOOK_WINGS  = 1;      // little wings on his shoulders, see-through, fluttering
     let GL_LOOK_HYDRA  = 0;      // each head its own colour, the one it throws in
     let GL_LOOK_BREATH = 0;      // fire at the mouth as a head swells, and a jet as it fires
     let GL_LOOK_SKY    = 0;      // the top of the field burning, ash drifting up through it
