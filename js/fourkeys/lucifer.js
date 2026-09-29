@@ -1813,8 +1813,7 @@
         const ends = lu.stage === 1 ? LU_HP2 + LU_DRAIN_LEFT : lu.stage === 2 ? LU_DRAIN_LEFT : 0;
         if (b.hp <= ends + 1e-6) { luNext(b); return; }
         if (bossHits % BOSS_CAP === 0 && !capsule) {
-            const pool = capsulePool();
-            capsule = { x: cx, y: cy, kind: pool[(Math.random() * pool.length) | 0] };
+            capsule = { x: cx, y: cy, kind: labCapKind() };
         }
         if (++hits === 4 || hits === 12) bumpSpeed(1.12);
     }

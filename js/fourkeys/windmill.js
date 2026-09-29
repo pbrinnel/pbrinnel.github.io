@@ -171,8 +171,7 @@
             award(BOSS_PTS * (done ? 3 : 1), cx, cy);
             if (done) { wmWilt(b, f); return; }
             if (bossHits % BOSS_CAP === 0 && !capsule) {
-                const pool = capsulePool();
-                capsule = { x: f.cx, y: f.cy, kind: pool[(Math.random() * pool.length) | 0] };
+                capsule = { x: f.cx, y: f.cy, kind: labCapKind() };
             }
             if (++hits === 4 || hits === 12) bumpSpeed(1.12);
         },

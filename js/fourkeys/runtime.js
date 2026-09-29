@@ -241,6 +241,38 @@
     // how long this boss takes to arrive: his own, or the original's
     function labEnterSecs() { return labB && labB.enterSecs ? labB.enterSecs() : ENTER_SECS; }
 
+    // Which capsule drops, for the engine and every boss alike. A shuffle bag:
+    // each capsule the screen allows comes round once, in a random order,
+    // before any comes round again, so none is starved for a whole run. A plain
+    // roll over the list repeated far more often than it felt fair. On top of
+    // the bag, CAP_AGAIN of drops are just the last one again, because a double
+    // now and then is fun. A boss screen allows fewer, so it takes what it can
+    // from the bag and deals a fresh one when none are left. The paddle's lean
+    // (PAD_FAVOUR) is a roll of its own, after this one.
+    let CAP_AGAIN = 0.1;
+    LAB_KNOBS.push('CAP_AGAIN');
+    let labCapBag = [], labCapLast = null;
+    function labCapKind() {
+        const pool = capsulePool();
+        if (pool.includes(labCapLast) && Math.random() < CAP_AGAIN) return labCapLast;
+        let i = labCapBag.findIndex(k => pool.includes(k));
+        if (i < 0) {
+            labCapBag = pool.slice();
+            for (let j = labCapBag.length - 1; j > 0; j--) {
+                const r = (Math.random() * (j + 1)) | 0;
+                [labCapBag[j], labCapBag[r]] = [labCapBag[r], labCapBag[j]];
+            }
+            // a new bag must not open on the one the old bag closed on, or it
+            // repeats behind CAP_AGAIN's back
+            if (labCapBag.length > 1 && labCapBag[0] === labCapLast) {
+                const r = 1 + ((Math.random() * (labCapBag.length - 1)) | 0);
+                [labCapBag[0], labCapBag[r]] = [labCapBag[r], labCapBag[0]];
+            }
+            i = 0;
+        }
+        return labCapLast = labCapBag.splice(i, 1)[0];
+    }
+
     // Bubbles from anyone, as many at once as there are shouters -- the
     // engine only has room for the one. Each is drawn by the engine's own
     // drawShout, lent the slot for a moment, so they look exactly like his.

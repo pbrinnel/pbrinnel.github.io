@@ -249,8 +249,7 @@
         labMiniDown(1 / Math.max(1, moles.length));
         if (b.flee) round.hunter++;
         if (!capsule) {
-            const pool = capsulePool();
-            capsule = { x: b.x + bw / 2, y: b.y + bh / 2, kind: pool[(Math.random() * pool.length) | 0] };
+            capsule = { x: b.x + bw / 2, y: b.y + bh / 2, kind: labCapKind() };
         }
         if (++hits === 4 || hits === 12) bumpSpeed(1.12);
         const left = bricks.filter(x => x.alive && x.kind !== 'X');

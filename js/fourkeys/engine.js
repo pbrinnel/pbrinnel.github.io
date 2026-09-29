@@ -178,7 +178,7 @@
     // arkanoid, 1986. bricks drop a capsule you catch with the paddle, and only
     // one may be falling at a time -- that one-at-a-time rule was a deliberate
     // constraint in the original, and it keeps this readable too.
-    const CAP_CHANCE = 0.16;   // per brick destroyed, if none is already falling
+    const CAP_CHANCE = 0.24;   // per brick destroyed, if none is already falling
     const CAP_FALL   = 130;    // px per second
     const CAP_W      = 58;
     const CAP_H      = CAP_W / SHAPE_ASPECT;
@@ -2369,8 +2369,7 @@
     function maybeDropCapsule(x, y) {
         if (capsule) return;                       // only one falling at a time
         if (Math.random() > CAP_CHANCE * powCapMul()) return;    // LUCKY raises it
-        const pool = capsulePool();
-        capsule = { x, y, kind: pool[(Math.random() * pool.length) | 0] };
+        capsule = { x, y, kind: labCapKind() };
     }
 
     function splitBalls() {
@@ -2485,9 +2484,7 @@
             // counted in HITS rather than off his health, which no longer
             // steps by one.
             if (bossHits % BOSS_CAP === 0 && !capsule) {
-                const pool = capsulePool();
-                capsule = { x: b.x + bw / 2, y: b.y + bh / 2,
-                            kind: pool[(Math.random() * pool.length) | 0] };
+                capsule = { x: b.x + bw / 2, y: b.y + bh / 2, kind: labCapKind() };
             }
             if (++hits === 4 || hits === 12) bumpSpeed(1.12);
             return;

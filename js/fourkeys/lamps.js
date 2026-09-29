@@ -124,8 +124,7 @@
                 return;
             }
             if (bossHits % BOSS_CAP === 0 && !capsule) {
-                const pool = capsulePool();
-                capsule = { x: lamp.x, y: lamp.y, kind: pool[(Math.random() * pool.length) | 0] };
+                capsule = { x: lamp.x, y: lamp.y, kind: labCapKind() };
             }
             if (++hits === 4 || hits === 12) bumpSpeed(1.12);
         },

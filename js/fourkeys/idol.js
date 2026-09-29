@@ -171,8 +171,7 @@
             award(BOSS_PTS * (done ? 5 : 1), cx, cy);
             if (done) { idolDie(b); return; }
             if (bossHits % BOSS_CAP === 0 && !capsule) {
-                const pool = capsulePool();
-                capsule = { x: cx, y: cy, kind: pool[(Math.random() * pool.length) | 0] };
+                capsule = { x: cx, y: cy, kind: labCapKind() };
             }
             if (++hits === 4 || hits === 12) bumpSpeed(1.12);
         },
