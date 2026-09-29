@@ -280,47 +280,78 @@
             }
         }
 
-        /* the field is 4:3, which leaves a portrait phone showing a postage
-           stamp -- ask for landscape instead of shipping something unplayable.
-           820px used to be the cut, which caught tablets too; an iPad in
-           portrait renders the field at nearly full size and was being turned
-           away from a screen it fits perfectly well. 700px is the real line:
-           above it is a tablet, below it a phone. */
-        #rotate { display: none; }
+        /* A phone held upright. The field is 4:3, so it runs the full width
+           with half the screen or more left over, and the space under it is
+           the thumb pad: a finger there steers him from under the field instead
+           of covering it. Input is on the window already, so the pad listens to
+           nothing; it only shows where he is (padShow in the script).
+           700px is the phone/tablet line: an iPad in portrait shows the field
+           at nearly full size and has no need of a pad. The same query is
+           PORTRAIT_PAD in the script, and the two must match. */
+        #pad { display: none; }
 
         @media (max-width: 700px) and (orientation: portrait) {
-            #stage, .hint { display: none; }
+            body {
+                justify-content: flex-start;
+                gap: 0;
+                /* the field edge to edge: width is the binding side here */
+                padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
+                         env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+            }
+            /* The height the field leaves is split evenly, above it and the
+               pad below, which sits the field a little above the middle and
+               him close over the rail, near the knob that shows where he is */
+            body::before { content: ''; flex: 1; }
+            #stage { border-color: transparent; border-radius: 0; }
+            /* it talks about a mouse */
+            .hint { display: none; }
 
-            #rotate {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                gap: 18px;
-                padding: 0 32px;
-                text-align: center;
-                color: #9a958c;
-                font-size: 1rem;
-                font-style: italic;
-                line-height: 1.5;
+            #pad {
+                display: block;
+                position: relative;
+                flex: 1;
+                align-self: stretch;
+                /* resize() keeps this much clear below the field */
+                min-height: 150px;
+                touch-action: none;
+                -webkit-tap-highlight-color: transparent;
             }
 
-            #rotate b {
-                font-size: 2.4rem;
-                font-style: normal;
-                letter-spacing: -0.02em;
-                color: #f2efe9;
+            /* the rail, across the middle of the pad: low on the screen, where
+               a thumb rests holding the phone */
+            #pad::before {
+                content: '';
+                position: absolute;
+                left: 24px;
+                right: 24px;
+                bottom: 50%;
+                height: 1px;
+                background: #2e2a24;
             }
+
+            /* stands under whoever you are steering */
+            #pad i {
+                position: absolute;
+                left: -30px;
+                bottom: calc(50% - 17px);
+                width: 60px;
+                height: 34px;
+                border: 1px solid #4a453e;
+                border-radius: 17px;
+                background: #090908;
+                transition: border-color 0.12s, background-color 0.12s;
+            }
+            #pad.down i { border-color: #9a958c; background: #1a1815; }
         }
     </style>
 </head>
 <body>
     <div id="splash"><span>BRANDON</span></div>
 
-    <div id="rotate"><b>BRANDON</b>turn your phone sideways</div>
-
     <div id="debug" hidden><h2>STAGE SELECT</h2></div>
 
     <canvas id="stage"></canvas>
+    <div id="pad" aria-hidden="true"><i></i></div>
     <p class="hint">move to slide brandon &middot; click or space to serve</p>
 
 <script>
@@ -1296,6 +1327,10 @@
     const canvas = document.getElementById('stage');
     const ctx = canvas.getContext('2d');
 
+    // a phone held upright, which the css gives the thumb pad. the same query
+    // is written out there, and the two must match.
+    const PORTRAIT_PAD = matchMedia('(max-width: 700px) and (orientation: portrait)');
+
     // The line under the field. It changes when the game does -- what he is
     // steering stops being a paddle. Declared up here because newGame() runs
     // during setup and would hit the dead zone of anything defined lower down.
@@ -1997,13 +2032,18 @@
         return !!(document.fullscreenElement || document.webkitFullscreenElement);
     }
 
-    // the field wants landscape, and a phone will give it -- but ONLY from
-    // inside fullscreen. Asking before the request settles is asking too early
-    // and just gets refused, which is what used to happen here.
-    function lockLandscape() {
+    // Held the way it was when play began, so a tilt mid-rally cannot swap the
+    // layout under you: upright on a phone is the thumb pad, and anything else
+    // is the field wanting landscape. A phone will only lock from inside
+    // fullscreen. Asking before the request settles is asking too early and
+    // just gets refused, which is what used to happen here.
+    function lockOrientation() {
         const so = screen.orientation;
         if (!so || !so.lock) return;
-        try { const p = so.lock('landscape'); if (p && p.catch) p.catch(() => {}); }
+        try {
+            const p = so.lock(PORTRAIT_PAD.matches ? 'portrait' : 'landscape');
+            if (p && p.catch) p.catch(() => {});
+        }
         catch (e) { /* desktop, or a phone that will not. no matter. */ }
     }
 
@@ -2011,8 +2051,8 @@
         if (!rawFS || fsOn()) return;
         try {
             const p = rawFS.call(root, { navigationUI: 'hide' });
-            if (p && p.then) p.then(lockLandscape, () => {});
-            else setTimeout(lockLandscape, 60);        // old webkit, no promise
+            if (p && p.then) p.then(lockOrientation, () => {});
+            else setTimeout(lockOrientation, 60);      // old webkit, no promise
         } catch (e) { /* refused. the game plays in a tab, just smaller. */ }
     }
 
@@ -2099,6 +2139,36 @@
     // when you hold the thing. Touching there used to do nothing at all. The
     // whole screen steers him now; update() clamps him to the field either way.
     const onUI = e => e.target && e.target.closest && e.target.closest('#debug');
+
+    // ---- the thumb pad -------------------------------------------------------
+    // Upright, a phone shows the field across its whole width, and the pad
+    // fills the screen under it. Nothing listens to the pad: a finger under the
+    // field is already a finger at that x on it, through the handlers below, so
+    // swipe spin and the tap to serve work exactly as they do anywhere else.
+    // The pad only SHOWS that. Its knob stands under whoever you are steering,
+    // so the first touch says what all the others do.
+    const padEl = document.getElementById('pad');
+    const padKnob = padEl.firstElementChild;
+    let padAt = null;
+
+    function padShow() {
+        if (!PORTRAIT_PAD.matches) return;
+        const x = king && (phase === 'gauntlet' || phase === 'absorb' || phase === 'fall')
+                ? king.x : paddle.x;
+        // from the field's own box, since the finger is read against it too
+        const f = canvas.getBoundingClientRect(), p = padEl.getBoundingClientRect();
+        const at = Math.round(f.left - p.left + x / LW * f.width);
+        if (at === padAt) return;
+        padAt = at;
+        padKnob.style.transform = 'translateX(' + at + 'px)';
+    }
+
+    {
+        const down = on => padEl.classList.toggle('down', on);
+        addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse' && !onUI(e)) down(true); });
+        addEventListener('pointerup', () => down(false));
+        addEventListener('pointercancel', () => down(false));
+    }
 
     // ---- the mouse, captured -------------------------------------------------
     // A mouse used to steer by where the pointer WAS, with the pointer hidden.
@@ -5905,6 +5975,8 @@
         const gap = parseFloat(cs.rowGap) || 0;
         // offsetParent is null exactly when it is display:none
         const hintH = hintEl.offsetParent ? hintEl.offsetHeight + gap : 0;
+        // the pad grows into whatever the field leaves, so hold back its least
+        const padH = PORTRAIT_PAD.matches ? parseFloat(getComputedStyle(padEl).minHeight) + gap : 0;
 
         // The body box is 100svh, which is the stable number; the visible
         // viewport is what a retracted address bar or an overlay has actually
@@ -5913,7 +5985,7 @@
         // see -- which is the two ways it used to go wrong.
         const box = document.body;
         const availW = Math.min(box.clientWidth, seenW()) - px;
-        const availH = Math.min(box.clientHeight, seenH()) - py - hintH;
+        const availH = Math.min(box.clientHeight, seenH()) - py - hintH - padH;
 
         // fit BOTH ways -- on a phone in landscape the height is what runs out
         // first, and fitting only the width would push the paddle off-screen
@@ -5973,6 +6045,7 @@
         if (!paused) update(dt);
         draw();
         if (paused) drawPaused();
+        padShow();
         requestAnimationFrame(frame);
     })(last);
 })();

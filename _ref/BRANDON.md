@@ -1,11 +1,11 @@
 # brandon.html: the map
 
-How to get oriented in a 5,594-line single file without reading it end to end.
+How to get oriented in a 6,054-line single file without reading it end to end.
 
-**Current as of `ef3b094`, 19 Sep 2026.** Before trusting anything below, run:
+**Current as of `97c9281`, 28 Sep 2026.** Before trusting anything below, run:
 
 ```bash
-git log --oneline ef3b094..HEAD -- brandon.html
+git log --oneline 97c9281..HEAD -- brandon.html
 ```
 
 Nothing listed means this file is still true. A short list means read those commit
@@ -29,7 +29,7 @@ split across several files can reach a returning player half-updated. See CLAUDE
 
 ## Where things are
 
-The map is in the file, not in this document. 43 sections, in reading order:
+The map is in the file, not in this document. 44 sections, in reading order:
 
 ```bash
 grep -n "// ---- " brandon.html
@@ -87,11 +87,12 @@ repeated verbatim, which is the "are we in the gauntlet" test.
 The loop at the bottom of the file:
 
 ```
-dt clamped to 0.05   →  release a stray pointer lock  →  update(dt)  →  draw()
+dt clamped to 0.05   →  release a stray pointer lock  →  update(dt)  →  draw()  →  padShow()
 ```
 
 `dt` is clamped so a tab-out does not teleport the ball. `paused` freezes `update`
-but not `draw` — the picture keeps painting while the world stands still.
+but not `draw` — the picture keeps painting while the world stands still. `padShow()`
+moves the thumb pad's knob under him on an upright phone and does nothing anywhere else.
 
 `update()` forks immediately: if the throne is yours it calls `updateGauntlet()` and
 returns. **The gauntlet is a separate game** — no ball, no paddle, no wall, no
