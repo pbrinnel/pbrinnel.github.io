@@ -25,7 +25,8 @@ GAVE FARM
 VISITED FARM
 BEST FARM 4321
 BEST BOSS RUSH 77
-SEAL f3087754
+BOSSES 9
+SEAL ff3cacb0
 ```
 
 ## Layout
@@ -40,7 +41,7 @@ SEAL f3087754
   ANOTHER GAME". A file whose first line doesn't have that shape at all is rejected with
   "THAT IS NOT A BRANDON SAVE".
 - **The last line** is `SEAL <8 lowercase hex>` (see *The seal* below).
-- **Every line in between** is `<WORD> <TOKEN>`, or `BEST <TOKEN> <score>`. A word is
+- **Every line in between** is `<WORD> <TOKEN>`, `BEST <TOKEN> <score>`, or `BOSSES <n>`. A word is
   everything before the first space, and the token is the rest of the line. A stage
   token can contain a space (`BOSS RUSH`), so a `BEST` line's score is whatever follows
   the *last* space.
@@ -57,6 +58,7 @@ SEAL f3087754
 | `GAVE` | this stage has already handed out its memory | `menu.memFrom` | stage |
 | `VISITED` | this building's dust has been wiped off | `menu.seen` | stage |
 | `BEST <stage> <n>` | the player's best score on this stage, a whole number above 0 | `menu.best` | stage |
+| `BOSSES <n>` | how many bosses the player has beaten, over every run, a whole number above 0 | `menu.slain` | none |
 
 A save lists only what the player has. The writer never writes a "no" line, and the
 reader has no way to read one.
@@ -64,6 +66,11 @@ reader has no way to read one.
 - The starting paddle (`standard`) is never written, and every load gives it back.
 - The year-0 memory (`now`, marked `always`) is never written either, because everyone
   has it.
+- `BOSSES` is written once, and only when the count is above 0. The count is what buys
+  the paddles no level guards (`MENU_SLAIN_PADS`), but a save lists those paddles on
+  `PADDLE` lines like any other, so a paddle never depends on the count to load. Progress
+  from before the count existed starts it at the number of keys held, the next time a
+  boss is beaten.
 
 ## Tokens
 
@@ -76,7 +83,7 @@ paddle can't break old saves.
 |---|---|---|
 | stage | `FARM` `RUINS` `CITY` `VOLCANO` `CASTLE` `VOID` | 1 2 3 4 5 6 |
 | stage | `BOSS RUSH` | `rush` |
-| paddle | `GILT` `STATUE` `FROST` `EMBER` `PAIR` `CLASSIC` | same id, lowercase |
+| paddle | `GILT` `STATUE` `FROST` `EMBER` `PAIR` `CLASSIC` `MULTI` `PRINCE` `CHELL` | same id, lowercase |
 | memory | `EXHORTATION` `SALVATION` `CYCLE` `COUNSEL` `FALL` `CONSOLIDATION` | same id, lowercase |
 
 ## The seal
@@ -114,8 +121,8 @@ These rules are why a save written in any version of the game loads in any other
    from a newer game still loads everything this game understands. A file is never
    rejected for its contents, only for a bad first line, another game's id, a bad seal,
    or a newer version.
-3. **When the same thing is listed twice, the reader treats it as once.** For `BEST`,
-   the higher score wins.
+3. **When the same thing is listed twice, the reader treats it as once.** For `BEST`
+   and `BOSSES`, the higher number wins.
 4. **Adding something new never bumps the version.** A new paddle, stage or memory needs
    a new token in the right table. A new kind of thing to save needs a new word, added to
    `M_SAVE_SETS`, or its own branch if it carries a value like `BEST` does. In both cases,
@@ -143,3 +150,5 @@ the IMPORT screen shows a summary and needs its own press to go ahead.
 
 - **v1** (27 Sep 2026): the first format, game id `BRANDON2`. Words: `KEY`, `PADDLE`, `MEMORY`, `GAVE`,
   `VISITED`, `BEST`.
+- **v1** (29 Sep 2026): the word `BOSSES`, and the paddle tokens `MULTI`, `PRINCE` and
+  `CHELL`. No version bump: an older reader skips them (rule 2).

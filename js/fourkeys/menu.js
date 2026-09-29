@@ -10,6 +10,7 @@
     //   four keys open the CASTLE
     //   finish a level without using a continue and you keep the paddle it guarded
     //   win any level at all and CLASSIC, the first game's paddle, is yours
+    //   every boss beaten counts, and the count buys MULTI, PRINCE and CHELL
     //   each stage gives the next memory the first time you win it with one left to give
     //   win the CASTLE and the VOID stands in the way to it: its memory comes
     //   halfway through the fight, and its end is the credits
@@ -57,6 +58,9 @@
     // exactly as the paddle you started with, so there is nothing in him to
     // earn -- he is a souvenir, and the first one a player picks up.
     const MENU_SOUVENIR = 'classic';
+    // Paddles no level guards, bought with bosses beaten: every one counts,
+    // in any stage or BOSS RUSH, clean or not, over every run (menuSlew).
+    const MENU_SLAIN_PADS = [[5, 'multi'], [10, 'prince'], [15, 'chell']];
     // Who a level hands you is whoever the level sliders say, so moving a boss
     // in his own tab moves him in the town too. No second copy of the roster to
     // fall out of step with the first.
@@ -75,7 +79,8 @@
     const M_HINT = 'move to slide brandon · hold to walk him';
     // the rack, in the order the gates walk through it: the one you start with,
     // then the one each level is guarding, then the souvenir
-    const MENU_PADS = ['standard'].concat(MENU_LEVELS.map(l => l.pad), MENU_LAST.pad, MENU_SOUVENIR);
+    const MENU_PADS = ['standard'].concat(MENU_LEVELS.map(l => l.pad), MENU_LAST.pad, MENU_SOUVENIR,
+                                          MENU_SLAIN_PADS.map(s => s[1]));
 
     let menu = null;                 // the hub outlives a stage: see menuWatch
 
@@ -108,7 +113,7 @@
             wipe() {
                 menuLoad();
                 menu.keys = {}; menu.pads = { standard: true }; menu.best = {}; menu.seen = {}; menu.mems = {};
-                menu.memFrom = {};
+                menu.memFrom = {}; menu.slain = 0;
                 menuSave();
                 LAB.usePad('standard');
                 return true;
@@ -123,6 +128,7 @@
         menu = { keys: (saved && saved.keys) || {}, pads: (saved && saved.pads) || { standard: true },
                  best: (saved && saved.best) || {}, seen: (saved && saved.seen) || {},
                  mems: (saved && saved.mems) || {}, memFrom: (saved && saved.memFrom) || {},
+                 slain: (saved && saved.slain) || 0,
                  dusting: null, sel: 1, say: null, sayT: 0,
                  cards: [], run: null, side: 0, hold: 0, sw: null,
                  march: false, lift: 0, lastX: 0, into: null, walk: 0, gait: 0, arriveT: -1,
@@ -148,7 +154,7 @@
         try {
             localStorage.setItem(MENU_KEY, JSON.stringify({ keys: menu.keys, pads: menu.pads, best: menu.best,
                                                             seen: menu.seen, mems: menu.mems,
-                                                            memFrom: menu.memFrom }));
+                                                            memFrom: menu.memFrom, slain: menu.slain }));
         } catch (e) { /* a private window just will not remember */ }
     }
 
@@ -877,6 +883,7 @@
         // next one's entrance
         if (stage < LEVELS.length - 1) {
             if (phase !== 'ascend' || !menuPerished(run, dt)) return;
+            menuSlew();
             run.out = 0;
             impact = null;
             bossFall = null;
@@ -888,7 +895,7 @@
         if (phase === 'ascend' ? !menuPerished(run, dt) : (run.out += dt) < M_OUT) return;
         menu.run = null;
         menuBoardPost(run);
-        menuBeat(!run.cont, run.n);
+        menuBeatSlew(run, phase === 'ascend');
         menuOpen();
     }
 
@@ -916,11 +923,8 @@
     function menuWon() {
         const run = menu && menu.run;
         const rush = !!(menu && menu.keys[MENU_VOID.n]);
-        if (run) { menuBoardPost(run); menuBeat(!run.cont, run.n); }
-        if (run && run.n === MENU_VOID.n) {
-            menu.shows.push({ credits: true });
-            if (!rush) menu.shows.push({ rushCard: true });
-        }
+        const end = run && run.n === MENU_VOID.n ? [{ credits: true }].concat(rush ? [] : [{ rushCard: true }]) : [];
+        if (run) { menuBoardPost(run); menuBeatSlew(run, true, end); }
         menuOpen();
     }
 
@@ -963,6 +967,7 @@
         menu.run.over = false;
         showCursor(false);
         if (stage >= LEVELS.length - 1) { menuWon(); return true; }
+        if (LEVELS[stage].boss) menuSlew();
         stage++;
         buildStage(stage);
         banner = '';
@@ -1012,6 +1017,34 @@
         if (take && LAB_PAD[take]) LAB.usePad(take);
         menuSave();
         return true;
+    }
+
+    // A boss beaten, anywhere: counted, and any paddle the count has come to
+    // handed over. Progress from before bosses were counted had at least a
+    // boss for each key, so the count starts from there. Returns the last
+    // paddle it handed over, or null.
+    function menuSlew() {
+        const keys = MENU_ALL.filter(l => menu.keys[l.n]).length;
+        menu.slain = Math.max(menu.slain || 0, keys) + 1;
+        let got = null;
+        for (const [at, pad] of MENU_SLAIN_PADS) {
+            if (menu.slain < at || menu.pads[pad]) continue;
+            menu.pads[pad] = true;
+            menu.shows.push({ pad });
+            got = pad;
+        }
+        menuSave();
+        return got;
+    }
+    // A run's end, won. Its last screen's boss counts after menuBeat and
+    // after `end` (the VOID's credits), so a paddle he buys is shown last,
+    // and is only put in your hands if the level gave you none.
+    function menuBeatSlew(run, boss, end) {
+        const was = LAB.pad;
+        menuBeat(!run.cont, run.n);
+        if (end) menu.shows.push(...end);
+        const got = boss ? menuSlew() : null;
+        if (got && LAB.pad === was && LAB_PAD[got]) LAB.usePad(got);
     }
 
     // back to the hub: an empty field with the town on it
@@ -2801,7 +2834,7 @@
     const M_SAVE_STAGES = { 1: 'FARM', 2: 'RUINS', 3: 'CITY', 4: 'VOLCANO', 5: 'CASTLE', 6: 'VOID',
                             rush: 'BOSS RUSH' };
     const M_SAVE_PADS = { gilt: 'GILT', statue: 'STATUE', frost: 'FROST', ember: 'EMBER', pair: 'PAIR',
-                          classic: 'CLASSIC' };
+                          classic: 'CLASSIC', multi: 'MULTI', prince: 'PRINCE', chell: 'CHELL' };
     const M_SAVE_MEMS = { exhortation: 'EXHORTATION', salvation: 'SALVATION', cycle: 'CYCLE',
                           counsel: 'COUNSEL', fall: 'FALL', consolidation: 'CONSOLIDATION' };
     // each kind of line, and which of `menu`'s tables it fills from which tokens
@@ -2836,6 +2869,7 @@
         for (const k of Object.keys(menu.best)) {
             if (menu.best[k] > 0 && had('best', k, M_SAVE_STAGES)) lines.push('BEST ' + M_SAVE_STAGES[k] + ' ' + menu.best[k]);
         }
+        if (menu.slain > 0) lines.push('BOSSES ' + menu.slain);
         const body = lines.join('\n');
         return body + '\nSEAL ' + menuSeal(body) + '\n';
     }
@@ -2849,7 +2883,7 @@
         const last = lines.pop();
         if (last !== 'SEAL ' + menuSeal(lines.join('\n'))) return 'THAT SAVE WILL NOT LOAD';
         if (Number(head[2]) > M_SAVE_VER) return 'THAT SAVE IS FROM A NEWER GAME';
-        const got = { keys: {}, pads: { standard: true }, mems: {}, memFrom: {}, seen: {}, best: {} };
+        const got = { keys: {}, pads: { standard: true }, mems: {}, memFrom: {}, seen: {}, best: {}, slain: 0 };
         for (const line of lines.slice(1)) {
             const sp = line.indexOf(' '), word = line.slice(0, sp), rest = line.slice(sp + 1);
             const set = M_SAVE_SETS.find(s => s[0] === word);
@@ -2860,6 +2894,9 @@
                 const at = rest.lastIndexOf(' '), k = menuTokenOf(M_SAVE_STAGES, rest.slice(0, at));
                 const v = Number(rest.slice(at + 1));
                 if (k !== undefined && Number.isInteger(v) && v > 0) got.best[k] = Math.max(got.best[k] || 0, v);
+            } else if (word === 'BOSSES') {
+                const v = Number(rest);
+                if (Number.isInteger(v) && v > 0) got.slain = Math.max(got.slain, v);
             }
         }
         return got;

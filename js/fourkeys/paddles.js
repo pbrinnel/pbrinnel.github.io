@@ -12,6 +12,7 @@
     //   deck   how wide his flat middle is, so how much of him is a curve
     //   caps   how long a capsule lasts him
     //   split  two of him, with a hole down the middle
+    //   favour a capsule he is partial to     portal  PORTAL on for as long as he is
     //
     // Nothing here touches how fast he answers the pointer: on a phone the
     // finger IS the paddle, and a paddle that lagged would read as the game
@@ -58,6 +59,10 @@
     let V2_GLOSS   = 0.22;   // MODERN: how bright the gloss along his top is...
     let V2_GLINT   = 5;      // ...seconds between one glint and the next...
     let V2_SWEEP   = 0.9;    // ...and how long a glint takes to cross him
+    let PAD_FAVOUR = 0.33;   // MULTI, PRINCE: this share of capsules is his, before the usual roll
+    let MULTI_POP  = 2.5;    // MULTI: seconds between one pair of heads flying off him and the next
+    let PRINCE_PICK = 1.4;   // PRINCE: bits of wall a second rolling in to him
+    LAB_KNOBS.push('PAD_FAVOUR', 'MULTI_POP', 'PRINCE_PICK');
     LAB_KNOBS.push('GILT_LEN', 'GILT_CAPS', 'GILT_SHINE', 'STAT_LEN', 'STAT_ANGLE', 'STAT_SPIN',
                    'STAT_DIP', 'FROST_LEN', 'FROST_EDGE', 'FROST_SWIPE', 'FROST_DECK', 'FROST_FLAKES', 'FROST_BIG', 'ICE_SECS', 'ICE_RAMP', 'ICE_TURN',
                    'EMB_LEN', 'EMB_CATCH', 'EMB_SPREAD', 'EMB_SPREAD_AT', 'EMB_GLOW', 'EMB_SPARKS', 'PAIR_LEN', 'PAIR_QUAD', 'PAD_MARK', 'V2_GLOSS', 'V2_GLINT', 'V2_SWEEP');
@@ -68,6 +73,11 @@
     const FROST_INK = '#8fe3f2', FROST_RIM = '#dff6ff';
     const EMB_INK   = '#e2683a', EMB_RIM = '#ffb072';
     const PAIR_INK  = '#8f7fc4';      // DOUBLE's own colour, since he is two of him
+    const MULTI_INK = '#e0c060', MULTI_RIM = '#fff0b8';     // MULTI's own colour, as PAIR has DOUBLE's
+    // PRINCE and CHELL are dressed rather than washed (padDress): a colour
+    // for his shirt and one for his jeans, after who each is named for
+    const PRINCE_TOP = '#a8c64e', PRINCE_LEGS = '#8a4fb0', PRINCE_RIM = '#d7ee8c';
+    const CHELL_TOP = '#f4f1ea', CHELL_LEGS = '#e0692c', CHELL_RIM = '#ff9a3c';
 
     // ---- what the game asks -------------------------------------------------------
     function labPadUse(key) {
@@ -99,6 +109,8 @@
     const labPadDeck  = () => labP && labP.deck ? labP.deck() : 1;
     const labPadCaps  = () => labP && labP.caps ? labP.caps() : 1;
     const labPadSplit = () => !!(labP && labP.split);
+    const labPadFavour = () => (labP && labP.favour) || null;
+    const labPadPortal = () => !!(labP && labP.portal);
     const padQuadOf = v => v && v.quad ? v.quad() : 1;
     const labPadQuad  = () => labPFrom ? padQuadOf(labPFrom) + (padQuadOf(labP) - padQuadOf(labPFrom)) * labPadFadeK() : padQuadOf(labP);
 
@@ -114,6 +126,8 @@
         if (labPadDip() !== 1) say.push('lean ×' + labPadDip().toFixed(2));
         if (labPadCaps() !== 1) say.push('capsules ×' + labPadCaps().toFixed(2));
         if (labPadSplit()) say.push('two of him');
+        if (labPadFavour()) say.push(Math.round(PAD_FAVOUR * 100) + '% ' + labPadFavour());
+        if (labPadPortal()) say.push('PORTAL always');
         return { name: (labP && labP.name) || LAB_PAD.standard.name, line: say.join(' · ') || 'as the game has him' };
     }
 
@@ -157,20 +171,21 @@
     function labPadOver() {
         padBoth('over', []);
         for (const b of padBits) {
-            const a = Math.max(0, 1 - b.t / b.life) * b.a;
-            const baked = b.kind === 'bigflake' ? padFlakeSprite(b.ink) : b.kind === 'head' ? padHeadSprite(b.ink) : null;
+            const a = Math.max(0, 1 - b.t / b.life) * b.a * (b.fadeIn ? Math.min(1, b.t / b.fadeIn) : 1);
+            const baked = b.kind === 'bigflake' ? padFlakeSprite(b.ink) : b.kind === 'head' ? padHeadSprite(b.ink)
+                        : b.kind === 'face' ? padFaceSprite(b.ink) : b.kind === 'brick' ? padBrickSprite(b.ink) : null;
             if (baked) {
                 // s is half its width, as a flake's is
                 const w = b.s * 2, h = w * baked.height / baked.width;
                 ctx.save();
                 ctx.globalAlpha = a;
                 ctx.translate(b.x, b.y);
-                ctx.rotate(b.ph + b.t * (b.kind === 'head' ? 0.6 : 0.8));
+                ctx.rotate(b.ph + b.t * (b.turn !== undefined ? b.turn : b.kind === 'head' ? 0.6 : 0.8));
                 ctx.drawImage(baked, -w / 2, -h / 2, w, h);
                 ctx.restore();
                 continue;
             }
-            if (b.kind === 'head') continue;          // his art is not in yet
+            if (b.kind === 'head' || b.kind === 'face' || b.kind === 'brick') continue;     // his art is not in yet
             // a big flake whose sprite is not ready yet is drawn as a small one
             if (b.kind === 'flake' || b.kind === 'bigflake') {
                 // a six-armed speck of ice, turning as it goes
@@ -275,12 +290,28 @@
         });
     }
 
+    // his head as it is, with only a little of `ink` over it: MULTI's heads
+    // are the heads in play, and have to look like them
+    function padFaceSprite(ink) {
+        const w = PAD_SPECK_BAKE, h = Math.round(w * BALL_RY / BALL_RX);
+        return padBakeSpeck('face' + ink, w, h, ink, 0.3, g => {
+            if (!ready(ballImg)) return false;
+            g.drawImage(ballImg, 0, 0, w, h);
+            return true;
+        });
+    }
+    // one of the wall, small, in a brick's colour: what PRINCE rolls up
+    const padBrickSprite = ink => shapeSprite('padBit' + ink, ink, PAD_SPECK_BAKE, PAD_SPECK_BAKE / SHAPE_ASPECT, false);
+
     // one speck of whatever he is shedding
+    // (null when there are too many already)
     function padBit(x, y, ink, life, vx, vy, g, s, a, kind, sway) {
-        if (padBits.length > 220) return;
-        padBits.push({ x, y, ink, t: 0, life, vx: vx || 0, vy: vy || 0, g: g === undefined ? 90 : g,
-                       s: s || 2 + Math.random() * 2, a: a === undefined ? 0.9 : a,
-                       kind: kind || 'speck', sway: sway || 0, ph: Math.random() * 6.28 });
+        if (padBits.length > 220) return null;
+        const b = { x, y, ink, t: 0, life, vx: vx || 0, vy: vy || 0, g: g === undefined ? 90 : g,
+                    s: s || 2 + Math.random() * 2, a: a === undefined ? 0.9 : a,
+                    kind: kind || 'speck', sway: sway || 0, ph: Math.random() * 6.28 };
+        padBits.push(b);
+        return b;
     }
 
     // ---- the mark he leaves on a head ----------------------------------------------
@@ -502,7 +533,8 @@
             if (p.stone) lay(shapeSprite('padStone', STONE, PAD_BAKE, PAD_BAKE / SHAPE_ASPECT, 'statue'), 1, dx, ww);
             else {
                 lay(shapeSprite('padIcon', null, PAD_BAKE, PAD_BAKE / SHAPE_ASPECT, false), 1, dx, ww);
-                if (p.ink) lay(padTint('padTint' + p.ink, p.ink), 0.8, dx, ww);
+                if (p.dress) lay(p.dress(), p.dressA, dx, ww);
+                else if (p.ink) lay(padTint('padTint' + p.ink, p.ink), 0.8, dx, ww);
             }
         }
     }
@@ -770,4 +802,103 @@
             }
         },
         skin(sg, o) { padLay(sg, o, padTint('padPair', PAIR_INK), 0.62); }
+    };
+
+    // ---- the ones bosses buy --------------------------------------------------------
+    // No level guards these three: they come with bosses beaten, counted
+    // over every run (MENU_SLAIN_PADS in menu.js). Each plays as MODERN does
+    // and leans on the capsules instead: MULTI and PRINCE get PAD_FAVOUR of
+    // capsules as their own before the usual roll (the falling capsule in
+    // engine.js), and CHELL has PORTAL on all the time (ptOn in powers.js).
+
+    // Him in two colours, cut where the photograph is: his shirt and head
+    // run from PAD_BELT to his right end and take `top`, his jeans take
+    // `legs`, and `boots` puts his boots, left of PAD_BOOTS, back in `top`.
+    const PAD_BELT  = [0.5, 0.6];     // across him, where his jeans give way to his shirt
+    const PAD_BOOTS = [0.1, 0.17];    // ...and where his boots give way to his jeans
+    const padDresses = new Map();
+    function padDress(key, top, legs, boots) {
+        if (padDresses.has(key)) return padDresses.get(key);
+        const a = padTint(key + 'Top', top), b = padTint(key + 'Legs', legs);
+        if (!a || !b) return null;
+        const c = document.createElement('canvas');
+        c.width = a.width; c.height = a.height;
+        const g = c.getContext('2d');
+        g.drawImage(b, 0, 0);
+        g.globalCompositeOperation = 'destination-in';
+        const cut = g.createLinearGradient(0, 0, c.width, 0);
+        cut.addColorStop(0, boots ? 'rgba(0,0,0,0)' : '#000');
+        if (boots) { cut.addColorStop(PAD_BOOTS[0], 'rgba(0,0,0,0)'); cut.addColorStop(PAD_BOOTS[1], '#000'); }
+        cut.addColorStop(PAD_BELT[0], '#000');
+        cut.addColorStop(PAD_BELT[1], 'rgba(0,0,0,0)');
+        g.fillStyle = cut;
+        g.fillRect(0, 0, c.width, c.height);
+        g.globalCompositeOperation = 'destination-over';
+        g.drawImage(a, 0, 0);
+        padDresses.set(key, c);
+        return c;
+    }
+
+    // MULTI: in MULTI's colour, and every MULTI_POP two heads fly up off him
+    // on the fan MULTI sends new heads out on, so he says what he is for.
+    LAB_PAD.multi = {
+        name: 'MULTI',
+        ink: MULTI_INK, rim: MULTI_RIM,
+        favour: 'M',
+        blurb: 'a third of power-ups are MULTI',
+        lore: 'Nobody agrees on how many of him there were. ' +
+              'Everybody agrees it was more than one.',
+        popT: 0,
+        under() { padRim('padRimM', MULTI_RIM, 2.5, 0.5); },
+        skin(sg, o) { padLay(sg, o, padTint('padMulti', MULTI_INK), 0.72); },
+        step(dt) {
+            if ((this.popT += dt) < MULTI_POP) return;
+            this.popT = 0;
+            const p = padSomewhere(0.3);
+            for (const side of [-1, 1]) {
+                const a = -Math.PI / 2 + side * 0.42, v = 150;
+                const b = padBit(p.x, padY() - padH() * 0.3, MULTI_INK, 1.1, Math.cos(a) * v, Math.sin(a) * v,
+                                 110, 9, 0.9, 'face');
+                if (b) { b.turn = side * 2; b.fadeIn = 0.12; }
+            }
+        }
+    };
+
+    // PRINCE: green over purple, and bits of wall in its own four colours
+    // rolling in to him from all round and gone into him as they arrive.
+    LAB_PAD.prince = {
+        name: 'PRINCE',
+        ink: PRINCE_TOP, rim: PRINCE_RIM,
+        favour: 'K',
+        dress: () => padDress('padPrince', PRINCE_TOP, PRINCE_LEGS, false),
+        dressA: 0.85,
+        blurb: 'a third of power-ups are KATAMARI, where they can be',
+        lore: 'The smallest Brandon there ever was, sent down by an enormous father ' +
+              'to roll up whatever had been left lying around. He is rolling still.',
+        under() { padRim('padRimP', PRINCE_RIM, 2.5, 0.5); },
+        skin(sg, o) { padLay(sg, o, this.dress(), this.dressA); },
+        step(dt) {
+            if (Math.random() >= dt * PRINCE_PICK) return;
+            const p = padSomewhere(0.6);
+            const a = -Math.PI * (0.1 + Math.random() * 0.8), d = 90 + Math.random() * 60, life = 0.9 + Math.random() * 0.4;
+            const fills = Object.values(TIERS).map(t => t.fill);
+            const b = padBit(p.x - Math.cos(a) * d, padY() + Math.sin(a) * d, fills[(Math.random() * fills.length) | 0], life,
+                             Math.cos(a) * d / life, -Math.sin(a) * d / life, 0, 8 + Math.random() * 3, 0.9, 'brick');
+            if (b) { b.turn = (Math.random() < 0.5 ? -1 : 1) * 4; b.fadeIn = 0.25; }
+        }
+    };
+
+    // CHELL: white over orange, with white boots, and PORTAL's edges lit
+    // for as long as he is in hand, the town included.
+    LAB_PAD.chell = {
+        name: 'CHELL',
+        ink: CHELL_LEGS, rim: CHELL_RIM,
+        portal: true,
+        dress: () => padDress('padChell', CHELL_TOP, CHELL_LEGS, true),
+        dressA: 0.8,
+        blurb: 'PORTAL, always',
+        lore: 'Woke in a room with no way out but through the walls, and has never taken ' +
+              'a wall seriously since. Has never said a word about it, either.',
+        under() { padRim('padRimC', CHELL_RIM, 2.5, 0.5); },
+        skin(sg, o) { padLay(sg, o, this.dress(), this.dressA); }
     };

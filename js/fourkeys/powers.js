@@ -201,7 +201,7 @@
 
         let x0 = Infinity, x1 = -Infinity, y0 = Infinity;
         katEach(b, (x, y) => { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); });
-        if (!(fx.T > 0)) {       // PORTAL takes the side walls away from the lump as well
+        if (!ptOn()) {           // PORTAL takes the side walls away from the lump as well
             if (x0 < 0)  { b.x -= x0;      if (b.vx < 0) { b.vx = -b.vx; b.spin *= SPIN_WALL; } }
             if (x1 > LW) { b.x -= x1 - LW; if (b.vx > 0) { b.vx = -b.vx; b.spin *= SPIN_WALL; } }
         }
@@ -440,17 +440,21 @@
     const PT_IN  = '#ff9a3c';   // the left edge's colour, and the right's
     const PT_OUT = '#3ca0ff';
 
+    // On while the capsule lasts, and all the time in CHELL's hands -- but
+    // not where the capsule never drops (CAPS.T.noBoss), whoever is holding it
+    const ptOn = () => fx.T > 0 || (labPadPortal() && !(LEVELS[stage].boss && CAPS.T.noBoss));
+
     // stepBall's side walls: true when PORTAL has taken them
     function powWrap(b) {
-        if (!(fx.T > 0)) return false;
+        if (!ptOn()) return false;
         if (b.x < 0) b.x += LW;
         else if (b.x > LW) b.x -= LW;
         return true;
     }
 
     function ptDraw() {
-        if (!(fx.T > 0)) return;
-        const a = Math.min(1, fx.T / 0.6) * (0.75 + 0.25 * Math.sin(clock * 5));
+        if (!ptOn()) return;
+        const a = (fx.T > 0 ? Math.min(1, fx.T / 0.6) : 1) * (0.75 + 0.25 * Math.sin(clock * 5));
         for (const [x0, ink, dir] of [[0, PT_IN, 1], [LW, PT_OUT, -1]]) {
             const g = ctx.createLinearGradient(x0, 0, x0 + dir * PT_GLOW, 0);
             g.addColorStop(0, ink);
@@ -744,7 +748,7 @@
 
     // under the head, so its face stays on top of what it has picked up
     function powDrawBall(b) {
-        if (fx.T > 0) {
+        if (ptOn()) {
             const r = bMAX();
             if (b.x < r) drawBall(b.x + LW, b.y, labBallR(b), b.angle);
             if (b.x > LW - r) drawBall(b.x - LW, b.y, labBallR(b), b.angle);

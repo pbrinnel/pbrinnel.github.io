@@ -944,8 +944,11 @@
     // than chance. PORTAL would let a head wrap round a boss who walls you off
     // (the IDOL down on the floor), MIRROR's copy lies along the ceiling right
     // where the bosses hang, and WIGGLY has no wall to sway, only you.
+    // PORTAL never drops for a paddle that has it on already (CHELL): it
+    // would be a capsule that does nothing.
     function capsulePool() {
-        return LEVELS[stage].boss ? CAP_KEYS.filter(k => !CAPS[k].noBoss) : CAP_KEYS;
+        return (LEVELS[stage].boss ? CAP_KEYS.filter(k => !CAPS[k].noBoss) : CAP_KEYS)
+            .filter(k => k !== 'T' || !labPadPortal());
     }
     const CALLOUT_SECS = 1.15;
 
@@ -3525,6 +3528,14 @@
 
         // the falling capsule
         if (capsule) {
+            // A paddle partial to one (MULTI, PRINCE) turns PAD_FAVOUR of them
+            // into it, the first frame each is here -- so whichever wall or
+            // boss dropped it, and before anything draws it.
+            if (!capsule.rolled) {
+                capsule.rolled = true;
+                const f = labPadFavour();
+                if (f && capsulePool().includes(f) && Math.random() < PAD_FAVOUR) capsule.kind = f;
+            }
             capsule.y += CAP_FALL * dt;
             const halfH2 = padH() / 2, py2 = padY();
             let caught = false;
