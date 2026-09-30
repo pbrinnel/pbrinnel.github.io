@@ -20,7 +20,7 @@
     let MOLE_ODDS   = 1;       // chance he sees one coming
     let MOLE_DIAG   = 1;       // 1: corner to corner counts as beside him
     let MOLE_PTS    = 100;     // a hit; the one that finishes him pays five of these
-    let MOLE_RUN    = 6;       // seconds his run takes, once he is the last one
+    let MOLE_RUN    = 6;       // seconds his run takes per half a screen, once he is the last one
     let MOLE_REACH  = 2.5;     // spaces he will hop, with nothing next to him
     let MOLE_FAR    = 3;       // ...and with nothing that close either, the nearest this many anywhere
     let MOLE_COUNT  = 2;       // how many come up
@@ -203,10 +203,12 @@
         const m = mole.brick;
         if (mole.fade < 1) { mole.fade = Math.min(1, mole.fade + dt / MOLE_FADE); return; }
         if (!m.alive) {
-            // off the edge with health left: he got away
+            // off the edge with health left: he got away -- or they did, if
+            // another has already or is on his way
             if (m.hp > 0 && !mole.gone) {
                 mole.gone = true;
-                callout = { text: 'HE GOT AWAY', color: '#f2efe9', life: CALLOUT_SECS * 1.6 };
+                const more = moles.some(o => o !== mole && (o.gone || (o.brick.alive && o.brick.flee)));
+                callout = { text: more ? 'THEY GOT AWAY' : 'HE GOT AWAY', color: '#f2efe9', life: CALLOUT_SECS * 1.6 };
             }
             return;
         }
@@ -269,7 +271,7 @@
         for (const mole of off) {
             mole.brick.slide = null;
             mole.ran = true;
-            walkOff(mole.brick, FLEE_WAIT, MOLE_RUN);
+            walkOff(mole.brick, FLEE_WAIT, MOLE_RUN, true);
         }
         return off.length > 0;
     }

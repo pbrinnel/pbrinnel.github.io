@@ -268,7 +268,7 @@
         }
         if ((f.yellT -= dt) <= 0) {
             f.yellT = WM_WILT_YELL;
-            labShout(f.cx, f.cy + WM_HUB * 0.8);
+            labShout(f.cx, f.cy + WM_HUB * 0.8, null, null, () => ({ x: f.cx, y: f.cy + WM_HUB * 0.8 }));
         }
         if (f.hp <= 1e-6) wmWilt(b, f);
     }

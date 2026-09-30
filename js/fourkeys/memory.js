@@ -1636,7 +1636,7 @@
     // where the five stand, left to right, and which level's boss each becomes:
     // spread the width of the hall and staggered in height, so that grown
     // they overlap only at their edges
-    const MC_RING = [[110, 540, 1], [255, 330, 2], [400, 575, 3], [560, 330, 4], [700, 455, 5]];
+    const MC_RING = [[165, 540, 1], [255, 330, 2], [400, 575, 3], [560, 330, 4], [700, 455, 5]];
     // ...and how big each is grown, of the size his fight has him: a little
     // under, so the five fit the hall together
     const MC_SCALE = 0.8;
@@ -1810,14 +1810,18 @@
 
     // Each boss in outline, built from what he is built from, centred on
     // (0, 0) at the size his fight has him, read off his own knobs: WINDMILL
-    // a head on a stem with brandons for petals, IDOL one enormous head,
-    // TWINS a big one and a small one facing each other, LAMPS one hung over
-    // a campfire of them at either end, and GLEEOK the headless body upended with three
-    // heads on its necks. MC_REACH is roughly how far each reaches from its
+    // his garden, each flower a head on a stem with brandons for petals, the
+    // middle one hung lower -- drawn closer together and smaller than the
+    // field has them (MC_GARDEN), or the garden would fill the hall; IDOL one
+    // enormous head, TWINS a big one and a small one facing each other, LAMPS
+    // one hung over a campfire of them at either end, and GLEEOK the headless
+    // body leant up off his collar with three heads on its necks and a wing
+    // on either shoulder. MC_REACH is roughly how far each reaches from its
     // middle, MC_MID where that middle is, and MC_TOP its top, for the
     // lightning and the shout.
     // MC_DEPTH is the order they are laid down in, back to front.
-    const MC_REACH = { 1: 150, 2: 200, 3: 230, 4: 280, 5: 240 };
+    const MC_REACH = { 1: 185, 2: 200, 3: 230, 4: 280, 5: 240 };
+    const MC_GARDEN = [100, 0.62];     // px between WINDMILL's flowers, and their size of his
     const MC_MID = { 1: -150, 2: -90, 3: -40, 4: -90, 5: -90 };
     const MC_TOP = { 1: -300, 2: -300, 3: -140, 4: -220, 5: -330 };
     const MC_DEPTH = [5, 2, 4, 3, 1];
@@ -1836,14 +1840,18 @@
     };
     const MC_BOSSES = {
         1: (g, s) => {                               // WINDMILL
+            const n = Math.max(1, Math.round(WM_FLOWERS)), petals = Math.max(1, Math.round(WM_SAILS));
+            const [gap, k] = MC_GARDEN;
             g.fillStyle = '#000';
-            g.fillRect(-2, -900, 4, 900 + MC_MID[1]);
-            const n = Math.max(1, Math.round(WM_SAILS));
-            for (let p = 0; p < n; p++) {
-                const a = s * 0.6 + p * Math.PI * 2 / n, r = WM_R0 + WM_SAIL / 2;
-                memMcBody(g, Math.cos(a) * r, MC_MID[1] + Math.sin(a) * r, WM_SAIL, a, false);
+            for (let i = 0; i < n; i++) {
+                const fx = (i - (n - 1) / 2) * gap, fy = MC_MID[1] + (i % 2 ? WM_STAGGER * k : 0), dir = i % 2 ? -1 : 1;
+                g.fillRect(fx - 1.5, -900, 3, 900 + fy);
+                for (let p = 0; p < petals; p++) {
+                    const a = dir * s * 0.6 + i * 0.9 + p * Math.PI * 2 / petals, r = (WM_R0 + WM_SAIL / 2) * k;
+                    memMcBody(g, fx + Math.cos(a) * r, fy + Math.sin(a) * r, WM_SAIL * k, a, false);
+                }
+                memMcHead(g, fx, fy, WM_HUB * k);
             }
-            memMcHead(g, 0, MC_MID[1], WM_HUB);
         },
         2: (g) => memMcHead(g, 0, -90, IDOL_W),      // IDOL
         3: (g) => {                                  // TWINS
@@ -1857,22 +1865,38 @@
             }
         },
         5: (g, s) => {                               // GLEEOK
-            const L = GL_W, T = L / SHAPE_ASPECT, collar = -60;
+            const L = GL_W, T = L / SHAPE_ASPECT, collar = -60, o = glOrigin();
+            const hw = GL_HEAD_W * (GL_STYLE ? GL_STYLE_HEAD : 1), neck = GL_NECK * (GL_STYLE ? GL_STYLE_NECK : 1);
             g.save();
-            g.translate(0, collar - L / 2);
-            g.rotate(Math.PI / 2);
-            g.drawImage(memHeadless(), -L / 2, -T / 2, L, T);
+            g.translate(0, collar);
+            g.rotate(GL_TILT);
+            g.drawImage(memHeadless(), o.x, o.y, L, T);
             g.restore();
+            // a wing on each shoulder, beating slowly
+            if (GL_LOOK_WINGS) {
+                const flap = Math.sin(s * GL_WING_HZ * Math.PI * 2) * 0.28;
+                for (const side of [-1, 1]) {
+                    g.save();
+                    g.translate(side * GL_HEAD_W * 0.55, collar - GL_HEAD_W * 0.3);
+                    g.scale(side, 1);
+                    g.rotate(-flap);
+                    for (const [a, k] of GL_WING_FAN) {
+                        const wl = GL_WING_SIZE * k;
+                        memMcBody(g, Math.cos(a) * wl / 2, Math.sin(a) * wl / 2, wl, a, false);
+                    }
+                    g.restore();
+                }
+            }
             g.strokeStyle = '#000';
             g.lineWidth = 12;
             [-1, 0, 1].forEach((k, ph) => {
                 const a = k * GL_FAN + Math.sin(s * 1.5 + ph * 2) * 0.08;
-                const hx = Math.sin(a) * GL_NECK, hy = collar + Math.cos(a) * GL_NECK;
+                const hx = Math.sin(a) * neck, hy = collar + Math.cos(a) * neck;
                 g.beginPath();
                 g.moveTo(0, collar);
-                g.quadraticCurveTo(hx * 0.3, collar + GL_NECK * 0.55, hx, hy);
+                g.quadraticCurveTo(hx * 0.3, collar + neck * 0.55, hx, hy);
                 g.stroke();
-                memMcHead(g, hx, hy + GL_HEAD_W * 0.35, GL_HEAD_W);
+                memMcHead(g, hx, hy + hw * 0.35, hw);
             });
         },
     };

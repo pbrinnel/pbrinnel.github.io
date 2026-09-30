@@ -7,8 +7,10 @@
     // out. Hit any of the others and the whole line turns round, its back
     // becoming its front -- so a shot that misses the leader is how you steer,
     // turning the line until its front comes round to where you can reach it.
-    // On an open field, or making a level's entrance, a line of them walks on
-    // from off one side instead, under whatever is left of the wall.
+    // Making a level's entrance, or on an open field, a line of them comes in
+    // from the top of the screen instead, filing down an aisle in the wall
+    // (congaAisle) and turning off along the bottom of it. With no aisle
+    // through to the top they walk on from off one side, under the wall.
     //
     // Stone is in the way, not a wall: the front of the line meeting it steps
     // a notch down (or up) and walks on the way it was going, so a block in
@@ -22,8 +24,8 @@
     // behind walks it CONGA_LINK body lengths after the one ahead. So it
     // turns square where the front turned, and never cuts a corner across a
     // lane or through the stone the front went round.
-    let CONGA_AT    = 7;       // bricks left when they get up
-    let CONGA_N     = 7;       // how many walk on to an open field, or onto a level
+    let CONGA_AT    = 6;       // bricks left when they get up
+    let CONGA_N     = 6;       // how many walk on to an open field, or onto a level
     let CONGA_SPEED = 80;      // px/s the front one walks at
     let CONGA_RUSH  = 0.12;    // ...and this share faster for every one knocked out
     let CONGA_DROP  = 46;      // px, a notch
@@ -43,7 +45,11 @@
         start(entering) {
             conga = { line: [], formed: false, forming: 0, dir: 1, vdir: 1, drop: 0, flip: false,
                       lost: 0, turns: 0, turnT: 0, trail: [] };
-            if (LAB.open || entering) congaWalkOn(Math.random() < 0.5 ? 1 : -1);
+            if (LAB.open || entering) {
+                const x = congaAisle();
+                if (x === null) congaWalkOn(Math.random() < 0.5 ? 1 : -1);
+                else congaDropIn(x);
+            }
             return true;
         },
         enter() {
@@ -131,6 +137,41 @@
         conga.dir = from < 0 ? 1 : -1;
         conga.formed = true;
         congaLay();
+        congaSync();
+    }
+
+    // The middle of a column with nothing in it from the top of the screen
+    // down to where the line will walk, picked at random, or null. Rows set
+    // half a brick over block the columns either side of them.
+    function congaAisle() {
+        const ceil = congaCeil(), step = bw + GAP;
+        const cols = Math.round((LW - 2 * MARGIN + GAP) / step), open = [];
+        for (let c = 0; c < cols; c++) {
+            const cx = MARGIN + c * step + bw / 2;
+            if (!bricks.some(b => b.alive && !b.conga && b.y < ceil && Math.abs(b.x + bw / 2 - cx) < bw * 0.9)) open.push(cx);
+        }
+        return open.length ? open[(Math.random() * open.length) | 0] : null;
+    }
+
+    // a line of them filing down from above the screen at x, the front one
+    // just out of sight, to the bottom of the wall -- where the path runs
+    // out, and he turns off toward whichever side has more room
+    function congaDropIn(x) {
+        const kinds = ['R', 'O', 'G', 'Y'];
+        const n = Math.max(1, Math.round(CONGA_N)), gap = bw * CONGA_LINK;
+        const ceil = congaCeil(), top = -bh / 2 - n * gap;
+        conga.trail = [{ x, y: top, d: 0 }, { x, y: ceil, d: ceil - top }];
+        for (let i = 0; i < n; i++) {
+            const b = newBrick(0, 0, kinds[i % kinds.length], 1);
+            congaJoin(b, x, 0);
+            b.pd = -bh / 2 - top - i * gap;
+            b.cy = congaAt(b.pd).y;
+            b.head = Math.PI / 2;
+            bricks.push(b);
+            conga.line.push(b);
+        }
+        conga.dir = x < LW / 2 ? 1 : -1;
+        conga.formed = true;
         congaSync();
     }
 
@@ -282,11 +323,13 @@
             if (cut > 0) tr.splice(0, cut);
             for (const b of line) b.step += dt * TODDLE_HZ * Math.PI * 2;
         }
-        // facing: the leader the way he is walking, everybody else along the path
+        // facing: the leader the way he is walking, everybody else -- and the
+        // leader too, while he is still on a path laid for him -- along the path
+        const end = conga.trail[conga.trail.length - 1].d;
         for (let i = 0; i < line.length; i++) {
             const b = line[i];
             let want = conga.dir > 0 ? 0 : Math.PI;
-            if (i > 0) {
+            if (i > 0 || b.pd < end - 0.5) {
                 const p = congaAt(b.pd + 4), q = congaAt(b.pd - 4);
                 if (Math.hypot(p.x - q.x, p.y - q.y) > 0.5) want = Math.atan2(p.y - q.y, p.x - q.x);
             }

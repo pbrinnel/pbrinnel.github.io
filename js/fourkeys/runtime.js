@@ -257,42 +257,45 @@
     let CAP_RAMP = 0.066;
     LAB_KNOBS.push('CAP_BASE', 'CAP_RAMP');
     let labCapDry = 0;            // bricks asked since the last drop
-    function labCapRoll(mul) {
-        if (Math.random() >= (CAP_BASE + CAP_RAMP * labCapDry++) * mul) return false;
+    // `sure` skips the roll: LUCKY's promised drop (powCapSure)
+    function labCapRoll(mul, sure) {
+        if (!sure && Math.random() >= (CAP_BASE + CAP_RAMP * labCapDry++) * mul) return false;
         labCapDry = 0;
         return true;
     }
 
-    // Which capsule drops, for the engine and every boss alike. A shuffle bag:
-    // each capsule the screen allows comes round once, in a random order,
-    // before any comes round again, so none is starved for a whole run. A plain
-    // roll over the list repeated far more often than it felt fair. On top of
-    // the bag, CAP_AGAIN of drops are just the last one again, because a double
-    // now and then is fun. A boss screen allows fewer, so it takes what it can
-    // from the bag and deals a fresh one when none are left. The paddle's lean
-    // (PAD_FAVOUR) is a roll of its own, after this one.
-    let CAP_AGAIN = 0.1;
-    LAB_KNOBS.push('CAP_AGAIN');
-    let labCapBag = [], labCapLast = null;
+    // Which capsule drops, for the engine and every boss alike. A plain random
+    // pick over whatever the screen allows, with a safety net under it: every
+    // capsule counts the picks since it last came up, and once one has gone
+    // CAP_PITY_AT picks without, each pick has a chance of handing it over
+    // instead -- CAP_PITY_STEP for the first pick past the mark, and that much
+    // more for each after. Two past the mark at once: the longest waiting,
+    // a tie settled at random. A shuffle bag was too predictable to be fun;
+    // true random has doubles and runs of its own, and the net only stops a
+    // capsule going missing for a whole run. The paddle's lean (PAD_FAVOUR)
+    // is a roll of its own, after this one.
+    // CAP_PITY_AT wants to be well past the number of capsules in the pool:
+    // near it, most picks are the net's, and every capsule comes round like
+    // clockwork, which is the shuffle bag again.
+    let CAP_PITY_AT = 25;
+    let CAP_PITY_STEP = 0.05;
+    LAB_KNOBS.push('CAP_PITY_AT', 'CAP_PITY_STEP');
+    const labCapWait = {};        // picks since each kind last came up
     function labCapKind() {
         const pool = capsulePool();
-        if (pool.includes(labCapLast) && Math.random() < CAP_AGAIN) return labCapLast;
-        let i = labCapBag.findIndex(k => pool.includes(k));
-        if (i < 0) {
-            labCapBag = pool.slice();
-            for (let j = labCapBag.length - 1; j > 0; j--) {
-                const r = (Math.random() * (j + 1)) | 0;
-                [labCapBag[j], labCapBag[r]] = [labCapBag[r], labCapBag[j]];
-            }
-            // a new bag must not open on the one the old bag closed on, or it
-            // repeats behind CAP_AGAIN's back
-            if (labCapBag.length > 1 && labCapBag[0] === labCapLast) {
-                const r = 1 + ((Math.random() * (labCapBag.length - 1)) | 0);
-                [labCapBag[0], labCapBag[r]] = [labCapBag[r], labCapBag[0]];
-            }
-            i = 0;
+        let late = [], most = -1;
+        for (const k of pool) {
+            const w = labCapWait[k] || 0;
+            if (w < CAP_PITY_AT) continue;
+            if (w > most) { most = w; late = [k]; }
+            else if (w === most) late.push(k);
         }
-        return labCapLast = labCapBag.splice(i, 1)[0];
+        const pick = late.length && Math.random() < (most - CAP_PITY_AT + 1) * CAP_PITY_STEP
+            ? late[(Math.random() * late.length) | 0]
+            : pool[(Math.random() * pool.length) | 0];
+        for (const k of pool) labCapWait[k] = (labCapWait[k] || 0) + 1;
+        labCapWait[pick] = 0;
+        return pick;
     }
 
     // Bubbles from anyone, as many at once as there are shouters -- the

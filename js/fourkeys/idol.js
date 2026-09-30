@@ -104,6 +104,15 @@
     let IDOL_STOMP_DOWN = 0.7;   // ...seconds each stays down
     let IDOL_STOMP_SHAKE = 0.6;  // ...the tremor before the second
     let IDOL_STOMP_TRACK = 320;  // ...and px/s he slides over you in it
+    // px he always keeps between his side and a wall, wandering or sliding
+    // over you. Let right up to one, a head could be shut in the corner under
+    // him when he came down there, with no way out past him.
+    let IDOL_WALL      = 75;
+    // How near his middle yours must be for a landing to pin you, as a share
+    // of his footprint's half-width. The whole footprint pinned you, which
+    // felt like being caught by a stomp you were only standing near; outside
+    // this he only shoves you aside.
+    let IDOL_PIN       = 0.55;
     // The act a run draws him from, 1 easy to 3 hard. Every attack of his is a
     // drop, and telegraphed, and at Paul's numbers a bite stays open
     // for several returns, so what he mostly asks for is aim.
@@ -124,7 +133,7 @@
                    'IDOL_WAIT_MAX', 'IDOL_DROP_MIN', 'IDOL_DROP_MAX', 'IDOL_SHAKE', 'IDOL_SHAKE_PX',
                    'IDOL_G', 'IDOL_DOWN', 'IDOL_RISE', 'IDOL_RISE_QUICK', 'IDOL_CLIMB',
                    'IDOL_HURT_AT', 'IDOL_HURT_PACE', 'IDOL_STOMP_FAST', 'IDOL_STOMP_DOWN',
-                   'IDOL_STOMP_SHAKE', 'IDOL_STOMP_TRACK', 'IDOL_RECOIL', 'IDOL_RECOIL_SECS',
+                   'IDOL_STOMP_SHAKE', 'IDOL_STOMP_TRACK', 'IDOL_WALL', 'IDOL_PIN', 'IDOL_RECOIL', 'IDOL_RECOIL_SECS',
                    'IDOL_DEBRIS', 'IDOL_DEBRIS_V', 'IDOL_DEBRIS_RUN', 'IDOL_CROWN', 'IDOL_HOLD');
 
     // His two coats, each a heap of whole pieces (idolCoat). A piece is there
@@ -311,7 +320,7 @@
         switch (idol.stage) {
             case 'idle': {
                 if ((idol.wander -= dt) <= 0) {
-                    idol.tx = idolRand(bw / 2 + 20, LW - bw / 2 - 20);
+                    idol.tx = idolRand(bw / 2 + IDOL_WALL, LW - bw / 2 - IDOL_WALL);
                     idol.wander = idolRand(IDOL_WAIT_MIN, IDOL_WAIT_MAX);
                 }
                 // easing in to where he is going, so he settles rather than stops
@@ -332,7 +341,7 @@
                 // the second of a double: short, and sliding over to you
                 const second = idol.dbl === 1;
                 if (second) {
-                    const d = Math.max(bw / 2, Math.min(LW - bw / 2, paddle.x)) - idol.x;
+                    const d = Math.max(bw / 2 + IDOL_WALL, Math.min(LW - bw / 2 - IDOL_WALL, paddle.x)) - idol.x;
                     idol.x += Math.sign(d) * Math.min(Math.abs(d), IDOL_STOMP_TRACK * dt);
                 }
                 // a tremor that builds, not a strobe: he moves, nothing flashes
@@ -351,14 +360,14 @@
                 idol.vy += IDOL_G * (idol.dbl ? IDOL_STOMP_FAST * IDOL_STOMP_FAST : 1) * dt;
                 idol.cy += idol.vy * dt;
                 const floor = padY() + padH() / 2 + 6;
-                // Your middle under where he will land: he stops where he met
-                // you, and you are his until he rises. Anything less is a
+                // Your middle well under where he will land (IDOL_PIN): he stops
+                // where he met you, and you are his until he rises. Anything less is a
                 // graze, and he shoves you out to the side you were on
                 // (idolFence) on his way down. Judged on his footprint on the
                 // floor, because the slice of him at your height starts at
                 // nothing and grows, and a middle is never under it at first.
                 const c = idolChord();
-                if (c && Math.abs(paddle.x - idol.x) < idolChord(floor - h / 2)) {
+                if (c && Math.abs(paddle.x - idol.x) < idolChord(floor - h / 2) * IDOL_PIN) {
                     idol.pin = { x: paddle.x };
                     idolLand();
                 } else if (c && idolOver() > 0 && !idol.side) {

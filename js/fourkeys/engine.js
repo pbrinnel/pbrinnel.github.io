@@ -222,7 +222,9 @@
         { key: 'peak',     label: 'MAX BONUS',       pts: 100, mul: true },
         { key: 'flawless', label: 'FLAWLESS',        pts: 1000 },
         { key: 'multi',    label: 'MULTI-FINISH',    pts: 300 },
-        { key: 'spare',    label: 'SPARE BALL',      pts: 800, many: true },
+        // the heads still in the corner when a level's boss goes down, which
+        // is the only screen that pays it (see endOfRound)
+        { key: 'spare',    label: "DIDN'T NEED EM",  pts: 500, many: true },
         { key: 'fast',     label: 'GOTTA GO FAST',   pts: 300 },
         { key: 'heads',    label: HEADS_AT + ' HEADS', pts: 600 },
         { key: 'grit',     label: 'NEVER GIVE UP',   pts: 400 },
@@ -233,7 +235,15 @@
         // a level's mini-boss beaten, not outlasted (see labMiniDown). It pays
         // by the share of him beaten, so two MOLEs are half of it each and the
         // one who gets away takes his half with him.
-        { key: 'mini',     label: 'MINI BOSS CLEAR', pts: 500 }
+        { key: 'mini',     label: 'MINI BOSS CLEAR', pts: 500 },
+        // the round's last brick taken by a LASER bolt (see lzStep)
+        { key: 'sniper',   label: 'SNIPER',          pts: 200 },
+        // every gold brick broken, born gold or turned by MIDAS
+        { key: 'golden',   label: 'GOLDEN',          pts: 50, many: true },
+        // every one of FROST's icy bricks struck again, broken or not
+        { key: 'shattered', label: 'SHATTERED',      pts: 10, many: true },
+        // not one capsule caught all round
+        { key: 'powerless', label: 'POWERLESS',      pts: 1000 }
     ];
 
     // The reveal. The score does not move until the last line has landed --
@@ -492,7 +502,7 @@
     const FLEE_ODDS   = 0.5;     // each one's chance, every time they decide
     const FLEE_REROLL = 5;       // seconds before the ones still there decide again
     const FLEE_WAIT   = 1.0;     // seconds one spends saying it before he goes
-    const FLEE_SECS   = 8;       // ...then getting all the way off the screen, at a dawdle
+    const FLEE_SECS   = 8;       // ...then half the screen's width, at a dawdle -- see walkOff
     const FLEE_RAMP   = 0.8;     // seconds of that spent getting up to pace
     // Any wall, not only the hat's, will not hold you at its last few for
     // ever: once STALL_AT or fewer are left and STALL_SECS go by without a
@@ -962,7 +972,7 @@
     };
     // all mid-tone. nothing here darkens his face -- a damaged brick changes
     // hue rather than getting a black wash over it
-    const GOLD       = '#efb920';   // three hits, then it steps down -- see drawBrick
+    const GOLD       = '#efb920';   // three hits, cracking as it goes -- see drawBrick
     const GOLD_HP    = 3;
     const SILVER     = '#b9bcc4';
     const SILVER_HIT = '#7a8cb4';   // slate blue: still metal, and nothing like the stone
@@ -1047,6 +1057,33 @@
     const ballImg   = Object.assign(new Image(), { src: 'images/brandon/ball.webp' });
     const ready = img => img.complete && img.naturalWidth > 0;
 
+    // WIGGLY sways every brandon on the screen, not only him and the wall:
+    // the crowd, the mirror, the capsules, the mini-bosses, the bosses --
+    // anything drawn from his photograph (brandonArt: the photo itself and
+    // every tinted copy shapeSprite makes). The bricks and he already lean by
+    // their own wiggle, which their hitboxes follow, so while either is being
+    // drawn (wigOwn) this leaves them be. Everything else only looks it: what
+    // it bumps into stays level. Each sways about its own middle, off a phase
+    // taken from where on the screen it is, so no two keep time.
+    const brandonArt = new WeakSet([paddleImg]);
+    let wigOwn = 0;
+    const drawImage0 = ctx.drawImage.bind(ctx);
+    ctx.drawImage = function (img, ...a) {
+        const amp = wigOwn || !brandonArt.has(img) ? 0 : wigAmp();
+        if (!amp || menuUp()) return drawImage0(img, ...a);
+        const d = a.length >= 8 ? a.slice(4) : a;
+        const w = d.length >= 4 ? d[2] : img.width, h = d.length >= 4 ? d[3] : img.height;
+        const cx = d[0] + w / 2, cy = d[1] + h / 2;
+        const m = ctx.getTransform();
+        const wx = m.a * cx + m.c * cy + m.e, wy = m.b * cx + m.d * cy + m.f;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(Math.sin(clock * WIG_FREQ + wx * 0.013 + wy * 0.021) * amp);
+        ctx.translate(-cx, -cy);
+        drawImage0(img, ...a);
+        ctx.restore();
+    };
+
     // ---- state -------------------------------------------------------------
     let bricks, stage, score, best, lives, combo, phase, banner;
     let paddle, balls, popups, hits, tierSeen, bw, bh;
@@ -1070,6 +1107,7 @@
     let stallT = 0;               // seconds the last few have gone without a hit -- see STALL_AT
     let round = null;             // what this round has done so far -- see EOR_ROWS
     let eor = null;               // ...and the screen it becomes once the round is over
+    let eorHeld = false;          // a level's boss's screen, put up by the town after his perish (eorHold)
     let dragT = 0;                // seconds of sluggish left on him
     let stunT = 0;                // seconds he is held where he stands -- see stunPad
     let padLag = 0;               // the lag actually on him -- see dragLag
@@ -1338,6 +1376,25 @@
     // stun, and a boss standing on him. Let go at no lag, he would jump to the
     // hand the frame it ended.
     function padHold() { padLag = Math.max(padLag, STUN_LAG); }
+
+    // Pushing against a stun: he strains the way you are pushing and shakes
+    // where he stands, so it reads as him held, not as your input gone dead.
+    // STRAIN_* are how far and how fast; it dies away over 1/STRAIN_FADE s
+    // once you stop pushing.
+    const STRAIN_SHAKE = 3.5;   // px either way
+    const STRAIN_LEAN  = 3;     // px toward where you are pushing
+    const STRAIN_HZ    = 7;
+    const STRAIN_FADE  = 5;
+    let strain = 0, strainDir = 0, strainTx = null;
+    function stepStrain(dt) {
+        const pushed = stunT > 0 && strainTx !== null && Math.abs(paddle.tx - strainTx) > 0.5;
+        if (pushed) { strain = 1; strainDir = Math.sign(paddle.tx - paddle.x) || strainDir; }
+        else strain = Math.max(0, strain - dt * STRAIN_FADE);
+        strainTx = paddle.tx;
+    }
+    function strainX() {
+        return strain ? (Math.sin(clock * STRAIN_HZ * Math.PI * 2) * STRAIN_SHAKE + strainDir * STRAIN_LEAN) * strain : 0;
+    }
     function stunPad(secs) {
         stunT = secs > 0 ? Math.max(stunT, secs) : 0;
         for (const sg of segs()) paddle.jt[sg.i] = 1;
@@ -1469,6 +1526,7 @@
     function buildStage(n) {
         const lvl = LEVELS[n];
         labStageReset();
+        eorHeld = false;
         hits = 0;
         tierSeen = {};
         talk = []; fleeRoll = -1;          // -1: nobody has started deciding yet
@@ -1477,7 +1535,8 @@
         shoutT = -1;            // ...and leaves no yell of the boss's still waiting
         // a round's tally starts here and nowhere else -- a lost life and a
         // continue both happen inside one, and neither may wipe it
-        round = { lost: false, fast: false, heads: false, grit: false, hunter: 0, peak: 1, mini: 0, cosmos: 0 };
+        round = { lost: false, fast: false, heads: false, grit: false, hunter: 0, peak: 1, mini: 0, cosmos: 0,
+                  sniper: false, golden: 0, shattered: 0, powered: false };
         eor = null;
 
         if (lvl.boss) {
@@ -2201,6 +2260,54 @@
     });
 
     // the ball rides the paddle until you serve it
+    function serve() {
+        serveWait = 0;
+        releaseStuck();
+        phase = 'play';
+        // he yells at the first ball you put up at him, every fight, once
+        // SHOUT_WAIT has gone by. Not left to SHOUT_ODDS the way the yells
+        // after it are.
+        if (LEVELS[stage].boss && !bossServed) {
+            bossServed = true;
+            shoutT = SHOUT_WAIT;
+        }
+    }
+
+    // The serve after a lost head happens in whatever state the field is in,
+    // and a boss's attacks do not all stop for it: IDOL can be down on top of
+    // you, a hand low over you. A head served into something solid a few px
+    // off the paddle goes straight into it and back into you, or gets stuck
+    // inside it. So the serve looks up its line first, SERVE_CLEAR px, and
+    // if anything of a boss is there it waits -- WAIT in the band -- and goes
+    // by itself the moment the line is clear, or after SERVE_WAIT_MAX
+    // whatever, so nothing can hold it for ever. (Stun and SLUGGISH are
+    // already gone: a fresh head clears every effect -- see clearEffects.)
+    const SERVE_CLEAR = 130;
+    const SERVE_WAIT_MAX = 4;
+    let serveWait = 0;               // seconds a serve has been waiting, or 0
+    function serveBlocked() {
+        for (const b of balls) {
+            if (!b.stuck) continue;
+            const probe = newBall(b.x, b.y);
+            aim(probe, Math.max(-1, Math.min(1, b.off / (padW() / 2))) * MAX_ANGLE * 0.8);
+            const n = Math.hypot(probe.vx, probe.vy) || 1;
+            for (let d = 0; d <= SERVE_CLEAR; d += 10) {
+                probe.x = b.x + probe.vx / n * d;
+                probe.y = b.y + probe.vy / n * d;
+                for (const br of bricks) {
+                    if (br.alive && (br.kind === 'Z' || br.lab) && labContact(br, probe)) return true;
+                }
+            }
+        }
+        return false;
+    }
+    function stepServe(dt) {
+        if (phase !== 'ready') { serveWait = 0; return; }
+        if (!serveWait) return;
+        serveWait += dt;
+        if (serveWait >= SERVE_WAIT_MAX || !serveBlocked()) serve();
+    }
+
     function releaseStuck() {
         for (const b of balls) {
             if (!b.stuck) continue;
@@ -2336,18 +2443,18 @@
             }
             return;
         }
+        if (phase === 'ascend' && eorHeld) {
+            if (!bonusRead()) { finishBonus(); return; }
+            eorHeld = false;
+            menuBonusRead();
+            return;
+        }
         if (phase === 'ascend' || phase === 'entrance' || phase === 'initials') return;
         if (phase === 'scores') { newGame(); return; }
         if (phase === 'ready') {
-            releaseStuck();
-            phase = 'play';
-            // he yells at the first ball you put up at him, every fight, once
-            // SHOUT_WAIT has gone by. Not left to SHOUT_ODDS the way the yells
-            // after it are.
-            if (LEVELS[stage].boss && !bossServed) {
-                bossServed = true;
-                shoutT = SHOUT_WAIT;
-            }
+            // a boss in the way: the serve waits for him, and goes by itself
+            if (serveBlocked()) { serveWait = serveWait || 1e-6; return; }
+            serve();
         } else if (phase === 'cleared') {
             if (!bonusRead()) { finishBonus(); return; }
             stage++;
@@ -2382,7 +2489,7 @@
     // ---- capsules ----------------------------------------------------------
     function maybeDropCapsule(x, y) {
         if (capsule) return;                       // only one falling at a time
-        if (!labCapRoll(powCapMul())) return;      // LUCKY raises it
+        if (!labCapRoll(powCapMul(), powCapSure())) return;      // LUCKY raises it, and promises one
         capsule = { x, y, kind: labCapKind() };
     }
 
@@ -2412,6 +2519,7 @@
         if (score > best) { best = score; saveBest(); }
         popups.push({ x: paddle.x, y: padY() - 40, text: '+' + CAP_SCORE, color: cap.color, life: 1 });
         callout = { text: cap.name, color: cap.color, life: CALLOUT_SECS };
+        round.powered = true;             // there goes POWERLESS
 
         if (kind === 'M') { splitBalls(); return; }
         fx[kind] = cap.secs * labPadCaps();
@@ -2450,10 +2558,10 @@
         for (const b of bricks) if (!b.flee) yield b;
     }
 
-    // his BRANDON!, left hanging just under him where he said it. The same
-    // for the one your first ball gets and the ones a hit rolls for.
+    // his BRANDON!, just under him, riding along with him while it lasts.
+    // The same for the one your first ball gets and the ones a hit rolls for.
     function bossShout(b) {
-        shout = { x: b.x + bw * 0.88, y: b.y + bh + 8, life: SHOUT_SECS };
+        shout = { life: SHOUT_SECS, at: () => ({ x: b.x + bw * 0.88, y: b.y + bh + 8 }) };
     }
 
     // cx, cy are where the ball actually touched, which only the boss needs --
@@ -2509,6 +2617,7 @@
             if (--b.hp > 0) { labBrickHeld(b); return; }
             b.alive = false;
             shockwave(b);
+            if (b.kind === 'A') { round.golden++; goldBurst(b); }
             award(b.midas ? MD_PAY : 25 * b.maxHp, b.x + bw / 2, b.y);
             labBrickGone(b);
             powBrickGone(b);      // KATAMARI keeps it, CROWD drops one
@@ -2561,7 +2670,11 @@
             grit:     round.grit ? 1 : 0,
             hunter:   round.hunter,
             cosmos:   round.cosmos,
-            mini:     round.mini
+            mini:     round.mini,
+            sniper:   round.sniper ? 1 : 0,
+            golden:   round.golden,
+            shattered: round.shattered,
+            powerless: round.powered ? 0 : 1
         };
         for (const r of EOR_ROWS) {
             const n = met[r.key];
@@ -2603,7 +2716,7 @@
     // disagree about when it is showing.
     function eorShowing() {
         return !!eor && (phase === 'cleared'
-            || (phase === 'ascend' && ascendT >= A_TITLE)
+            || (phase === 'ascend' && (ascendT >= A_TITLE || eorHeld))
             || (phase === 'fall' && fallT >= F_TITLE));
     }
 
@@ -2632,11 +2745,20 @@
     // is the one place nothing is waiting for a tap; a stage clear and the end
     // of a reign both hold at 1 until you move on.
     function eorOut() {
-        if (!eor || phase !== 'ascend') return 1;
+        if (!eor || phase !== 'ascend' || eorHeld) return 1;
         const gone = (eor.t - eorTotalAt(eor) - EOR_FADE - EOR_LINGER) / EOR_OUT;
         return Math.max(0, Math.min(1, 1 - gone));
     }
     function bonusGone() { return eorOut() <= 0; }
+
+    // The town's levels never reach the takeover's title, where the screen
+    // used to go up on a boss (menuHoldsTakeover). So once he has finished
+    // coming apart the town puts it up here instead, and waits for a tap on
+    // it as a stage clear does -- which is what pays DIDN'T NEED EM.
+    function eorHold() {
+        eorHeld = true;
+        if (eor) eor.t = 0;
+    }
 
     function payBonus() {
         if (!eor || eor.paid) return;
@@ -2696,18 +2818,24 @@
         }
     }
 
-    // he says his piece, then heads for whichever edge is nearer, and all the
-    // way off it
+    // he says his piece, then heads for whichever edge is further, and all
+    // the way off it
     function startFlee(b) {
         say(b);
-        walkOff(b, FLEE_WAIT, FLEE_SECS);
+        walkOff(b, FLEE_WAIT, FLEE_SECS, true);
     }
 
-    // `wait` seconds where he stands, then `secs` to get all the way off the
-    // nearer edge, however far that is -- see stepFlee
-    function walkOff(b, wait, secs) {
-        const dir = b.x + bw / 2 < LW / 2 ? -1 : 1;
-        b.flee = { t: 0, x0: b.x, y0: b.y, dir, dist: dir < 0 ? b.x + bw : LW - b.x, wait, secs };
+    // `wait` seconds where he stands, then off the nearer edge in `secs`,
+    // however far that is -- see stepFlee. A runner (`far`) goes for the
+    // FURTHER edge instead, at the pace that crosses half the screen in
+    // `secs`, so the trip takes longer the further it is. Off the nearer
+    // edge, one at the end of a row was gone before you could turn round;
+    // this way he has the longest walk of anyone.
+    function walkOff(b, wait, secs, far) {
+        const left = b.x + bw / 2 < LW / 2;
+        const dir = left === !!far ? 1 : -1;
+        const dist = dir < 0 ? b.x + bw : LW - b.x;
+        b.flee = { t: 0, x0: b.x, y0: b.y, dir, dist, wait, secs: far ? secs * dist / (LW / 2) : secs };
     }
 
     // only while a ball is in play: a lost life or a pause holds everybody
@@ -2726,7 +2854,7 @@
             if (!last.length || last.length > STALL_AT) stallT = 0;
             else if ((stallT += dt) >= STALL_SECS) {
                 stallT = 0;
-                for (const b of last) walkOff(b, FLEE_WAIT, FLEE_SECS);    // no bubbles: they just go
+                for (const b of last) walkOff(b, FLEE_WAIT, FLEE_SECS, true);    // no bubbles: they just go
             }
         }
         let gone = false;
@@ -3159,7 +3287,8 @@
 
     // returns false if this ball drained off the bottom
     function stepBall(b, dt) {
-        const s = effSpeed() * (b.boost || 1);    // one he handed back on a fake goes slower
+        let s = effSpeed() * (b.boost || 1);    // one he handed back on a fake goes slower
+        s *= powSlow(b, s);                      // PORTAL eases a head down as it nears a side
 
         // hold the shared speed, so SLOW and the ramps apply to every ball
         const m = Math.hypot(b.vx, b.vy);
@@ -3408,6 +3537,7 @@
         rings = rings.filter(r => (r.t -= dt * 2.6) > 0);
 
         stepBonus(dt);           // the end-of-round screen, if one is up
+        stepServe(dt);           // a serve waiting on a boss in its way
 
         // the takeover. when it finishes, the banner finally lands.
         // the takeover used to end the game. now it hands over.
@@ -3436,6 +3566,7 @@
         if (phase === 'siphon') paddle.tx = paddle.x;
         let padFrom = paddle.x;                        // where the physics below starts him
         paddle.tx = padLimit(paddle.tx);
+        stepStrain(dt);
         const lag = dragLag(dt);
         // Stunned, he stays put while the hand goes on without him, and comes
         // out of it on at least STUN_LAG, unwinding from there like SLUGGISH
@@ -4416,6 +4547,7 @@
 
         g.globalCompositeOperation = 'source-over';
         spriteCache.set(k, c);
+        if (flat !== 'statue') brandonArt.add(c);       // stone never sways
         return c;
     }
 
@@ -4540,16 +4672,21 @@
         ctx.restore();
     }
 
+    // a brick leans by its own wiggle already (see brandonArt) -- all but
+    // CONGA's dancers, who are drawn upright and take the general sway
     function drawBrick(b) {
+        const own = b.conga ? 0 : 1;
+        wigOwn += own;
+        try { drawBrick0(b); } finally { wigOwn -= own; }
+    }
+    function drawBrick0(b) {
         if (b.kind === 'Z') { drawBoss(b); return; }
         if (labDrawBrick(b)) return;
-        // silver and gold wear how many hits they have left, stepping down the
-        // same ladder the gauntlet's army does: gold for three, silver for two,
-        // a struck silver's slate blue for the last. each rung is its own tint,
-        // never a dark wash over the top of him. One MIDAS turned stays gold to
-        // the end, whatever it has left.
+        // silver wears how many hits it has left in its tint: silver for two,
+        // a struck silver's slate blue for the last, never a dark wash over
+        // him. Gold stays gold to the end and cracks instead (powCracks).
         const multi = b.kind === 'S' || b.kind === 'A';
-        const kind = !multi ? b.kind : b.midas || b.hp >= 3 ? 'A' : b.hp === 2 ? 'S' : 'S2';
+        const kind = !multi ? b.kind : b.kind === 'A' ? 'A' : b.hp >= 2 ? 'S' : 'S2';
         const statue = kind === 'X';
         const sprite = statue ? statueSprite() : shapeSprite(kind, brickColor(kind), bw, bh, false);
         if (!sprite) return;
@@ -4561,6 +4698,7 @@
         if (b.wigA) ctx.rotate(b.wigA);
         ctx.drawImage(sprite, -bw / 2 - m, -bh / 2 - m, bw + 2 * m, bh + 2 * m);
         powGlint(b, kind);           // gold's gloss and glimmer
+        powCracks(b, kind);          // ...and what it has left
         if (b.flash > 0) {
             ctx.globalAlpha = Math.min(1, b.flash) * 0.75;
             ctx.drawImage(shapeSprite('flash', '#f2efe9', bw, bh, true), -bw / 2, -bh / 2, bw, bh);
@@ -4599,7 +4737,14 @@
         return Math.min(1, Math.max(0, (ascendT - A_RISE) / DRAIN_SECS));
     }
 
+    // ...and so does he
     function drawPaddle() {
+        wigOwn++;
+        const sx = strainX();
+        if (sx) { ctx.save(); ctx.translate(sx, 0); }
+        try { drawPaddle0(); } finally { wigOwn--; if (sx) ctx.restore(); }
+    }
+    function drawPaddle0() {
         if (menuPadHidden()) return;          // going into a building: the town draws him
         // the recoil is his own: under DOUBLE only the one the ball landed on
         // shakes, and he shakes for as long as his own knock lasts
@@ -4821,8 +4966,11 @@
         ctx.globalAlpha = 1;
     }
 
+    // Every bubble rides on whoever said it: `at`, if the shout has one, is
+    // asked each frame where they are now.
     function drawShout() {
         if (!shout) return;
+        if (shout.at) Object.assign(shout, shout.at());
         const txt = shout.text || 'BRANDON!';
         const size = 22;
         ctx.font = 'bold ' + size + 'px "Fira Sans", "Trebuchet MS", sans-serif';
@@ -5080,7 +5228,7 @@
         // what a tap does now, once a tap does anything. the takeover gets no
         // line: nothing there is waiting on you. the fall keeps its own rule
         // about when you may leave -- see F_AGAIN.
-        const hint = phase === 'cleared' ? 'click/tap to continue'
+        const hint = phase === 'cleared' || (phase === 'ascend' && eorHeld) ? 'click/tap to continue'
                    : phase === 'fall' && fallT > F_AGAIN ? 'click/tap to end the run' : '';
         if (hint && bonusRead()) {
             cut(hint, LW / 2, top + h, Math.min(15 * u, pitch * 0.55), '#9a958c', 'center');
@@ -5827,7 +5975,7 @@
             ctx.fillStyle = 'rgba(0,0,0,0.72)';
             ctx.fillRect(0, my - bandH / 2, LW, bandH);
 
-            const msg = phase === 'ready' ? (stage === 0 && lives === 3 && score === 0
+            const msg = phase === 'ready' ? (serveWait ? 'WAIT' : stage === 0 && lives === 3 && score === 0
                             ? 'BRANDON' : 'READY')
                       : banner;
             text(msg, LW / 2, my - 4 * u, 32 * u, '#f2efe9', 'center');
@@ -5837,7 +5985,7 @@
             const sub = phase === 'over' ? 'final score ' + score
                             + '   ·   click/tap a choice   ·   '
                             + Math.ceil(overT)
-                      : phase === 'ready' ? 'click/tap or space to serve'
+                      : phase === 'ready' ? (serveWait ? 'it goes as soon as the way is clear' : 'click/tap or space to serve')
                       : phase === 'ascend' ? ''
                       : 'click/tap to continue';
             if (sub) text(sub, LW / 2, my + 26 * u, 15 * u, '#9a958c', 'center');
@@ -5925,10 +6073,31 @@
     resize();
 
     // the READY screen's own band, saying the one thing you need to know
+    // Every head in play glows while the world is held, so you know where
+    // each one is before you take it back -- even one behind the band, which
+    // it is drawn over. The words go over the glow, not under it.
     function drawPaused() {
         const u = uiScale, my = 424, bandH = 104 * u;
         ctx.fillStyle = 'rgba(0,0,0,0.72)';
         ctx.fillRect(0, my - bandH / 2, LW, bandH);
+        const pulse = 0.8 + 0.2 * Math.sin(performance.now() / 1000 * Math.PI * 2 * 0.6);
+        for (const b of balls || []) {
+            const r = labBallR(b), R = r * 3.2;
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.globalAlpha = 0.75 * pulse;
+            ctx.drawImage(padGlow('#ffe6a8'), b.x - R, b.y - R * BALL_RY / BALL_RX, R * 2, R * 2 * BALL_RY / BALL_RX);
+            ctx.restore();
+            drawBall(b.x, b.y, r, b.angle);
+            ctx.save();
+            ctx.globalAlpha = 0.9 * pulse;
+            ctx.strokeStyle = '#ffe6a8';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.ellipse(b.x, b.y, r + 5, r * BALL_RY / BALL_RX + 5, b.angle, 0, 7);
+            ctx.stroke();
+            ctx.restore();
+        }
         text('PAUSED', LW / 2, my - 4 * u, 32 * u, '#f2efe9', 'center');
         text('click to resume', LW / 2, my + 26 * u, 15 * u, '#9a958c', 'center');
     }

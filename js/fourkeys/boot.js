@@ -25,14 +25,21 @@
     let BOOT_AWAY0 = 0.4, BOOT_AWAY1 = 1.2;   // ...and is gone, off the top
     let BOOT_ARRIVE = 1.1;    // seconds it takes to come down into view, near enough
     let BOOT_LEAVE = 950;     // px/s it goes back up and out at
+    // px it always keeps off either side wall. Let right up to one, a head
+    // got wedged between it and the wall and rattled there, with you sat
+    // under the pair of them. It still stamps on you there: its reach is
+    // wider than this.
+    let BOOT_EDGE  = 70;
     // The act a run draws it from, 1 easy to 3 hard. It is the only one of
     // them that takes a life off you outright, and it asks for a hit on the
     // sole every few seconds while you are keeping a head alive.
     let BOOT_LVL   = 4;
     LAB_KNOBS.push('BOOT_LVL', 'BOOT_HP', 'BOOT_W', 'BOOT_SINK', 'BOOT_KNOCK', 'BOOT_TRACK',
                    'BOOT_TOP', 'BOOT_LIFT', 'BOOT_PTS', 'BOOT_STAY0', 'BOOT_STAY1', 'BOOT_AWAY0',
-                   'BOOT_AWAY1', 'BOOT_ARRIVE', 'BOOT_LEAVE');
+                   'BOOT_AWAY1', 'BOOT_ARRIVE', 'BOOT_LEAVE', 'BOOT_EDGE');
     const bootRoll = (a, b) => a + Math.random() * (b - a);
+    // where along the field its middle may be
+    const bootClampX = x => Math.max(BOOT_W / 2 + BOOT_EDGE, Math.min(LW - BOOT_W / 2 - BOOT_EDGE, x));
 
     // Read off the levelled art: the toe and heel of his sole in his own box
     // (u along him from the boot, v down), and what is kept of him -- the boot
@@ -49,7 +56,7 @@
 
     LAB_MINI.boot = {
         start() {
-            boot = { x: Math.max(BOOT_W / 2, Math.min(LW - BOOT_W / 2, paddle.x)), sole: -BOOT_W * 2,
+            boot = { x: bootClampX(paddle.x), sole: -BOOT_W * 2,
                      hp: BOOT_HP, maxHp: BOOT_HP, flash: 0, iframes: 0,
                      lift: 0, stamps: 0, caught: 0, arriving: true,
                      stay: bootRoll(BOOT_STAY0, BOOT_STAY1), away: 0, leaving: false };
@@ -149,7 +156,7 @@
             if (!bricks.some(b => b.alive && b.kind !== 'X')) boot.away = Math.min(boot.away, 1.2);
             if ((boot.away -= dt) > 0) return;
             boot.away = 0;
-            boot.x = Math.max(BOOT_W / 2, Math.min(LW - BOOT_W / 2, paddle.x));
+            boot.x = bootClampX(paddle.x);
             boot.arriving = true;
             boot.stay = bootRoll(BOOT_STAY0, BOOT_STAY1);
             labShout(boot.x, 40, 'BRANDON!', SHOUT_SECS * 1.6, () => ({ x: boot.x, y: Math.max(40, boot.sole + 30) }));
@@ -172,7 +179,7 @@
         }
         boot.sole += BOOT_SINK * dt;
         boot.x += Math.max(-BOOT_TRACK * dt, Math.min(BOOT_TRACK * dt, paddle.x - boot.x));
-        boot.x = Math.max(BOOT_W / 2, Math.min(LW - BOOT_W / 2, boot.x));
+        boot.x = bootClampX(boot.x);
         // all the way down: the stamp
         const floor = padY() - padH() / 2;
         if (boot.sole >= floor) {

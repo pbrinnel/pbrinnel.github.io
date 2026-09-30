@@ -312,6 +312,7 @@
         katLoose = katLoose.filter(p => p.y - p.w < LH);
 
         lzUpdate(dt);
+        lkUpdate();
         mdUpdate(dt);
         wdUpdate();
         crUpdate(dt);
@@ -381,7 +382,12 @@
                     if (!hit) continue;
                     if (labGlances(br, hit)) rings.push({ x: hit.cx, y: hit.cy, t: 1 });
                     else kick(br, 0, -1, 1);
+                    // SNIPER, if this is the shot that ends the round: set
+                    // before the hit, since the hit is what adds the round up
+                    const last = bricks.filter(o => o.alive && o.kind !== 'X');
+                    round.sniper = last.length === 1 && last[0] === br;
                     hitBrick(br, hit.cx, hit.cy);
+                    if (phase === 'play') round.sniper = false;
                     lzBolts.splice(i, 1);
                     break;
                 }
@@ -440,10 +446,28 @@
     const PT_IN  = '#ff9a3c';   // the left edge's colour, and the right's
     const PT_OUT = '#3ca0ff';
 
+    // The last PT_NEAR px before either edge, a head is eased down toward
+    // PT_CATCH px/s, and back up as it comes away from the other. Only its
+    // speed: the line it is on never changes. At full speed a head through a
+    // portal came out too fast to read, let alone get under; this gives a
+    // player time to see where it went. 0 PT_NEAR turns it off.
+    let PT_NEAR  = 140;
+    let PT_CATCH = 360;
+    LAB_KNOBS.push('PT_NEAR', 'PT_CATCH');
+
     // On while the capsule lasts, and all the time in CHELL's hands -- bosses
     // included: the capsule never drops on a boss (CAPS.T.noBoss), but it is
     // her paddle's own, not a capsule
     const ptOn = () => fx.T > 0 || labPadPortal();
+
+    // what stepBall multiplies this head's speed by, near a portal
+    function powSlow(b, s) {
+        if (!ptOn() || PT_NEAR <= 0 || s <= PT_CATCH) return 1;
+        const d = Math.min(Math.max(0, b.x), Math.max(0, LW - b.x));
+        if (d >= PT_NEAR) return 1;
+        const k = 1 - d / PT_NEAR, e = k * k * (3 - 2 * k);
+        return 1 + (PT_CATCH / s - 1) * e;
+    }
 
     // stepBall's side walls: true when PORTAL has taken them
     function powWrap(b) {
@@ -502,7 +526,7 @@
 
     // ==== MIRROR and CROWD ==========================================================
     // I  MIRROR (I for mIrror): a copy of him on the ceiling, upside down,
-    //    moving opposite to you. A head that reaches it comes back down at an
+    //    right above you and moving as you move, as a reflection does. A head that reaches it comes back down at an
     //    angle set by where it hit, the way he sends them up.
     // C  CROWD: every brick broken while it is on drops a small brandon who
     //    runs along the floor. Each one bounces a head that reaches him, once.
@@ -514,7 +538,7 @@
     let CR_MAX   = 8;       // most on the floor at once
     let CR_SIZE  = 36;      // px tall
     let CR_SPEED = 90;      // px/s they run at
-    let CR_LIFE  = 9;       // seconds each one lasts
+    let CR_LIFE  = 30;      // seconds each one lasts
     LAB_KNOBS.push('MR_SECS', 'MR_Y', 'MR_SCALE',
                    'CR_SECS', 'CR_MAX', 'CR_SIZE', 'CR_SPEED', 'CR_LIFE');
 
@@ -548,7 +572,7 @@
 
     // ---- mirror
     function mrSegs() {
-        return segs().map(sg => ({ cx: LW - sg.cx, cy: MR_Y, hw: sg.w / 2 * MR_SCALE, sg }));
+        return segs().map(sg => ({ cx: sg.cx, cy: MR_Y, hw: sg.w / 2 * MR_SCALE, sg }));
     }
     function mrStep(b) {
         if (!(fx.I > 0) || b.vy >= 0) return;
@@ -660,15 +684,101 @@
     }
     function mdUpdate(dt) {
         for (const p of mdBits) { p.t += dt; p.vy += 260 * dt; p.x += p.vx * dt; p.y += p.vy * dt; }
-        mdBits = mdBits.filter(p => p.t < 0.6);
+        mdBits = mdBits.filter(p => p.t < (p.life || 0.6));
+        for (const r of mdRings) r.t += dt;
+        mdRings = mdRings.filter(r => r.t < GB_RING);
     }
     function mdDraw() {
-        ctx.fillStyle = GOLD;
+        for (const r of mdRings) {
+            const k = r.t / GB_RING;
+            ctx.globalAlpha = 1 - k;
+            ctx.strokeStyle = GOLD;
+            ctx.lineWidth = 3 * (1 - k) + 1;
+            ctx.beginPath();
+            ctx.ellipse(r.x, r.y, bw * (0.3 + k * 0.9), bh * (0.5 + k * 1.4), 0, 0, 7);
+            ctx.stroke();
+        }
         for (const p of mdBits) {
-            ctx.globalAlpha = 1 - p.t / 0.6;
-            ctx.fillRect(p.x - 1.5, p.y - 1.5, 3, 3);
+            ctx.globalAlpha = 1 - p.t / (p.life || 0.6);
+            ctx.fillStyle = p.ink || GOLD;
+            const z = p.size || 3;
+            ctx.fillRect(p.x - z / 2, p.y - z / 2, z, z);
         }
         ctx.globalAlpha = 1;
+    }
+
+    // ---- gold going ----------------------------------------------------------------
+    // Every gold brick, MIDAS's or born, goes out in a little fanfare: a ring
+    // of gold thrown off it and a fountain of coins and glints, so breaking
+    // one always feels like a payout. hitBrick calls it.
+    let GB_BITS = 34;       // pieces thrown
+    let GB_RING = 0.45;     // seconds the ring takes to spread and fade
+    LAB_KNOBS.push('GB_BITS', 'GB_RING');
+    let mdRings = [];
+    function goldBurst(b) {
+        const x = b.x + bw / 2, y = b.y + bh / 2;
+        mdRings.push({ x, y, t: 0 });
+        for (let n = 0; n < GB_BITS; n++) {
+            const a = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.6, v = 90 + Math.random() * 190;
+            mdBits.push({ x: x + (Math.random() - 0.5) * bw * 0.7, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v,
+                          t: 0, life: 0.7 + Math.random() * 0.5, size: 2 + Math.random() * 3,
+                          ink: Math.random() < 0.3 ? '#fff6d8' : GOLD });
+        }
+    }
+
+    // ---- gold's cracks -------------------------------------------------------------
+    // Gold takes several hits and stays gold to the last, so what it has left
+    // is shown as cracks: one set for each third of it gone. Baked once per
+    // set, cut to his silhouette, and flipped on half the bricks so a row of
+    // them does not crack alike. Drawn inside drawBrick, like the glint.
+    const GC_SETS = 3;
+    function gcSprite(level) {
+        const k = 'goldCrack' + level + '@' + Math.round(bw);
+        if (spriteCache.has(k)) return spriteCache.get(k);
+        const sil = shapeSprite('glint', '#fff6d8', bw, bh, true);
+        if (!sil) return null;
+        const c = document.createElement('canvas');
+        c.width = sil.width; c.height = sil.height;
+        const g = c.getContext('2d');
+        g.scale(c.width / bw, c.height / bh);
+        let seed = 7 + level * 31;
+        const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+        // from one struck point, jagged lines running out, more and longer each set
+        const ox = bw * 0.42, oy = bh * 0.45;
+        const lines = 2 + level * 2;
+        for (let pass = 0; pass < 2; pass++) {
+            g.strokeStyle = pass ? 'rgba(80, 50, 4, 1)' : 'rgba(255, 244, 200, 0.75)';
+            g.lineWidth = pass ? 2 : 3;
+            let s0 = seed;
+            for (let n = 0; n < lines; n++) {
+                let a = (n / lines) * Math.PI * 2 + rnd() * 0.6, x = ox, y = oy;
+                const len = bw * (0.16 + 0.12 * level) * (0.6 + rnd() * 0.6);
+                g.beginPath();
+                g.moveTo(x + (pass ? 0 : 0.8), y + (pass ? 0 : 0.8));
+                for (let st = 0; st < 5; st++) {
+                    a += (rnd() - 0.5) * 0.9;
+                    x += Math.cos(a) * len / 5; y += Math.sin(a) * len / 5 * 0.6;
+                    g.lineTo(x + (pass ? 0 : 0.8), y + (pass ? 0 : 0.8));
+                }
+                g.stroke();
+            }
+            if (!pass) seed = s0;           // the dark pass follows the light one exactly
+        }
+        g.setTransform(1, 0, 0, 1, 0, 0);
+        g.globalCompositeOperation = 'destination-in';
+        g.drawImage(sil, 0, 0);
+        spriteCache.set(k, c);
+        return c;
+    }
+    function powCracks(b, kind) {
+        if (kind !== 'A' || !(b.maxHp > 1) || b.hp >= b.maxHp) return;
+        const level = Math.max(1, Math.min(GC_SETS, Math.ceil((1 - b.hp / b.maxHp) * GC_SETS)));
+        const sp = gcSprite(level);
+        if (!sp) return;
+        ctx.save();
+        if ((b.wigP || 0) > Math.PI) ctx.scale(-1, 1);
+        ctx.drawImage(sp, -bw / 2, -bh / 2, bw, bh);
+        ctx.restore();
     }
 
     // ---- gold's glimmer ----------------------------------------------------------
@@ -733,12 +843,27 @@
     //    one falling at a time -- that rule is what keeps capsules readable,
     //    so LUCKY fills the gaps between them rather than stacking them up.
     //    It does nothing on a boss, whose capsules come by hits, not chance.
+    //    Whatever the rolls do, it pays at least one: the first brick broken
+    //    after catching it with nothing falling drops one for certain.
     let LK_SECS = 13;
     let LK_MUL  = 2;
     LAB_KNOBS.push('LK_SECS', 'LK_MUL');
+    let lkOwed = false, lkWas = 0;
 
     // what a brick's chance of a capsule is multiplied by, in labCapRoll
     function powCapMul() { return fx.U > 0 ? LK_MUL : 1; }
+    // ...and whether this one is LUCKY's promised drop, which it spends
+    function powCapSure() {
+        if (!lkOwed) return false;
+        lkOwed = false;
+        return true;
+    }
+    // once a frame, so a capsule that runs out before any brick breaks still owes
+    function lkUpdate() {
+        const now = Math.max(0, fx.U || 0);
+        if (now > lkWas + 1e-6) lkOwed = true;         // a capsule just caught
+        lkWas = now;
+    }
 
     // ==== WILD ====================================================================
     // ? WILD BRANDON: a capsule that will not settle. Falling, it turns into

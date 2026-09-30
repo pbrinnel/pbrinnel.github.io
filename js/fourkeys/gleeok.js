@@ -432,6 +432,13 @@
             else drawCrumble(c, 0, tilt, true);
             glDrawBooms();
         },
+        // Styled, he fades where he stands over A_DIE and never draws the
+        // crumble, so the town is not kept waiting on its pieces: he is gone
+        // once he has faded and his last heads have finished going off.
+        perished() {
+            if (!GL_STYLE || !gl) return undefined;
+            return ascendT >= A_DIE && !gl.booms.some(o => clock - o.t0 < GL_BOOM_SECS);
+        },
         climb() { return GL_CLIMB; },
         finish(b) {
             // every small head gone, the body empty, and the big head loose

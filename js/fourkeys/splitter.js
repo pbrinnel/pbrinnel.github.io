@@ -13,7 +13,10 @@
     let SPLIT_SPEED  = 70;     // px/s the first one drifts at
     let SPLIT_FASTER = 1.5;    // ...and each size down drifts this much faster
     let SPLIT_FLOOR  = 330;    // the lowest any of them comes, down from the top
-    let SPLIT_GRACE  = 0.35;   // seconds a new half is see-through, and cannot be hit
+    // Seconds a new half flickers and cannot be hit. On top of it, neither
+    // half can be hit by the head that split it until that head has come
+    // clear of it: at 0.35 s both were being hit again the moment they were born.
+    let SPLIT_GRACE  = 0.7;
     let SPLIT_PTS    = 60;     // a split; a pop pays three of these
     // The act a run draws him from, 1 easy to 3 hard. None of them can touch
     // you either; they only crowd the air and make the returns harder to read.
@@ -94,14 +97,15 @@
         for (const p of splitter.pieces) {
             if (p.grace > 0) continue;
             const hit = maskContact(b, p.x, p.y, 0, p.w, p.h, MASK, p.mir);
+            if (p.born === b) { if (!hit) p.born = null; continue; }
             if (!hit) continue;
             labBounce(b, hit);
-            splitHit(p, hit);
+            splitHit(p, hit, b);
             return;
         }
     }
 
-    function splitHit(p, hit) {
+    function splitHit(p, hit, b) {
         const all = splitter.pieces;
         all.splice(all.indexOf(p), 1);
         if (p.lvl < Math.round(SPLIT_LEVELS) - 1) {
@@ -110,6 +114,7 @@
                 const q = splitPiece(p.x + dir * p.w / 4, p.y, p.lvl + 1, dir);
                 q.vy = -Math.abs(q.vy);
                 q.grace = SPLIT_GRACE;
+                q.born = b;
                 all.push(q);
             }
             splitter.splits++;
@@ -129,7 +134,7 @@
             const sp = shapeSprite('sp' + kind, brickColor(kind), p.w, p.h, false);
             if (!sp) continue;
             ctx.save();
-            ctx.globalAlpha = (p.grace > 0 ? 0.5 : 1) * splitter.enter;
+            ctx.globalAlpha = (p.grace > 0 ? 0.45 + 0.15 * Math.sin(clock * 12) : 1) * splitter.enter;
             ctx.translate(p.x, p.y);
             if (p.mir) ctx.scale(-1, 1);
             ctx.drawImage(sp, -p.w / 2, -p.h / 2, p.w, p.h);

@@ -185,6 +185,17 @@
         if (c.level.key === 'paddles') return menuOwned().length >= MENU_RACK_AT;
         return !c.level.after || !!menu.keys[c.level.after];
     }
+    // what of the town stands now, for telling what a run put up (menuOpen)
+    function menuStanding() { return (menu.cards || []).filter(menuStands).map(c => c.level); }
+    // the ones whose going up has a card of its own already
+    const M_OWN_CARD = ['rush', 'paddles'];
+    // ...and what the rest's card says under the name
+    const M_BUILD_LINES = {
+        memories: 'every memory you have won, to watch again',
+        board: 'the best runs on every stage, and yours among them',
+        6: 'where it ends'
+    };
+
     // the paddles you have, in the gates' order
     function menuOwned() { return MENU_PADS.filter(k => menu.pads[k]); }
     // Every paddle comes in through here, so the one that makes MENU_RACK_AT
@@ -621,7 +632,7 @@
     }
 
     // Each building's doorway is its own, like its cover: the FARM's barn doors,
-    // the RUINS' broken arch, the CITY's glass doors, the VOLCANO's cave mouth,
+    // the RUINS' cave of stalactites, the CITY's glass doors, the VOLCANO's cave mouth,
     // the CASTLE's pointed gate, a portal in the VOID's eye; the signs keep a
     // plain arch. A doorway that `grows` opens out of the floor (or, the VOID's,
     // out of its middle); the rest are there at once and something in them
@@ -635,6 +646,11 @@
         return { cx: c.x, bot: c.y + c.h / 2, w: Math.max(18, c.w * 0.26), h, cap,
                  grows: cap !== 'gable' && cap !== 'skyline' && cap !== 'crown' };
     }
+    // The RUINS' cave mouth, across its top and back along its floor: each
+    // [across, reach] -- how far across the doorway, and how far down from
+    // the top (stalactites) or up from the floor (stalagmites), as shares of it.
+    const M_RUIN_DRIPS = [[0.28, 0.22], [0.35, 0.03], [0.46, 0.32], [0.55, 0.04], [0.63, 0.18], [0.71, 0.02], [0.8, 0]];
+    const M_RUIN_MITES = [[0.92, 0], [0.84, 0.2], [0.76, 0], [0.26, 0], [0.18, 0.26], [0.1, 0]];
     // the doorway's outline at `s` of its size, added to the path open (a new one if `fresh`)
     function menuDoorPath(d, s = 1, fresh = true) {
         const w = d.w * s, h = d.h * s, x0 = d.cx - w / 2, x1 = d.cx + w / 2, b = d.bot, cx = d.cx;
@@ -647,12 +663,14 @@
             case 'skyline':     // glass doors: tall and sharp
                 ctx.moveTo(x0, b); ctx.lineTo(x0, b - h); ctx.lineTo(x1, b - h); ctx.lineTo(x1, b);
                 break;
-            case 'broken':      // an arch with its keystone gone
+            case 'broken': {    // a cave in the old stone: stalactites down from the top, stalagmites up from the floor
                 ctx.moveTo(x0, b); ctx.lineTo(x0, b - h * 0.6);
-                ctx.quadraticCurveTo(x0, b - h * 0.96, cx - w * 0.12, b - h);
-                ctx.lineTo(cx - w * 0.03, b - h * 0.86); ctx.lineTo(cx + w * 0.06, b - h * 0.93); ctx.lineTo(cx + w * 0.12, b - h * 0.99);
-                ctx.quadraticCurveTo(x1, b - h * 0.96, x1, b - h * 0.6); ctx.lineTo(x1, b);
+                ctx.quadraticCurveTo(x0, b - h * 0.97, x0 + w * 0.2, b - h);
+                for (const [u, d] of M_RUIN_DRIPS) ctx.lineTo(x0 + w * u, b - h + h * d);
+                ctx.quadraticCurveTo(x1, b - h * 0.97, x1, b - h * 0.6); ctx.lineTo(x1, b);
+                for (const [u, d] of M_RUIN_MITES) ctx.lineTo(x0 + w * u, b - h * d);
                 break;
+            }
             case 'cone':        // a cave mouth
                 ctx.moveTo(x0 + w * 0.02, b);
                 ctx.bezierCurveTo(x0 - w * 0.12, b - h * 0.7, cx - w * 0.36, b - h * 1.04, cx - w * 0.04, b - h);
@@ -827,6 +845,7 @@
         menu.cameFrom = level;      // the door he comes back out of (menuOpen)
         menu.arriveT = -1;          // walked in before the town finished arriving
         menu.run = { n: level.n, over: false, cont: false, out: 0 };
+        menu.stood = menuStanding();
         best = menu.best[level.n] || 0;
         menuBoardRun();
         menu.sel = level.n;
@@ -848,6 +867,7 @@
         if (typeof levelsRush !== 'function' || !whos.length) { menuSay('BOSS RUSH · not in here'); return; }
         menu.arriveT = -1;
         menu.run = { n: M_RUSH, over: false, cont: false, out: 0 };
+        menu.stood = menuStanding();
         best = menu.best[M_RUSH] || 0;
         menuBoardRun();
         menu.march = false;
@@ -889,7 +909,9 @@
     function menuPerished(run, dt) {
         run.perish = (run.perish || 0) + dt;
         const c = bossFall;
-        const gone = !c || !c.pieces || c.pieces.every(p => p.age >= F_GONE);
+        // a boss who does not come apart in pieces says when he is gone himself
+        const own = labB && labB.perished ? labB.perished() : undefined;
+        const gone = own !== undefined ? own : !c || !c.pieces || c.pieces.every(p => p.age >= F_GONE);
         if (!gone && run.perish < M_PERISH_MAX) return false;
         if ((run.out += dt) < M_BEAT) return false;
         run.perish = 0;
@@ -898,6 +920,21 @@
     // the first game's takeover -- you rising into his place -- is not this
     // game's: in a level, the fight's end holds on him coming apart
     function menuHoldsTakeover() { return !!(menu && menu.run); }
+
+    // A boss down: his perish, then his end of round bonus (fourkeys' engine
+    // only, eorHold), read and tapped away. True once all of that is done.
+    // The boss lab's engine has no such screen, so it goes on at once.
+    function menuBossPaid(run, dt) {
+        if (run.bonus === 'read') return true;
+        if (run.bonus) return false;
+        if (!menuPerished(run, dt)) return false;
+        if (typeof eorHold !== 'function') return true;
+        run.bonus = 'up';
+        eorHold();
+        return false;
+    }
+    // ...the tap that takes it away
+    function menuBonusRead() { if (menu && menu.run) menu.run.bonus = 'read'; }
 
     function menuWatch(dt) {
         if (!menu || !menu.run) return;
@@ -913,13 +950,15 @@
             else { menuQuit(); return; }
         }
         if (phase !== 'ascend' && phase !== 'cleared') return;
+        if (phase === 'ascend' && !menuBossPaid(run, dt)) return;
         // any screen but a level's last is cleared on the way to the next --
         // except a boss in BOSS RUSH, whose takeover leads straight into the
         // next one's entrance
         if (stage < LEVELS.length - 1) {
-            if (phase !== 'ascend' || !menuPerished(run, dt)) return;
+            if (phase !== 'ascend') return;
             menuSlew();
             run.out = 0;
+            run.bonus = null;
             impact = null;
             bossFall = null;
             stage++;
@@ -927,7 +966,7 @@
             banner = '';
             return;
         }
-        if (phase === 'ascend' ? !menuPerished(run, dt) : (run.out += dt) < M_OUT) return;
+        if (phase !== 'ascend' && (run.out += dt) < M_OUT) return;
         menu.run = null;
         menuBoardPost(run);
         menuBeatSlew(run, phase === 'ascend');
@@ -963,7 +1002,7 @@
         menuOpen();
     }
 
-    // The VOID's memory, earned between its second part and its third and
+    // The VOID's memory, earned between its first part and its second and
     // played over the fight (lucifer.js steps it and draws it). True if
     // there was one still to earn.
     function menuVoidMemory() {
@@ -1106,6 +1145,14 @@
     function menuOpen() {
         menuLoad();
         menu.run = null;
+        // whatever the run put up in the town gets its card, last of all
+        if (menu.stood) {
+            for (const c of menu.cards || []) {
+                if (M_OWN_CARD.includes(c.level.key) || menu.stood.includes(c.level) || !menuStands(c)) continue;
+                menu.shows.push({ buildCard: c.level });
+            }
+            menu.stood = null;
+        }
         if (typeof levelsUse === 'function') levelsUse();    // the town stands on the engine's own
         LAB.boss = null;
         LAB.mini = 'menu';
@@ -1578,6 +1625,29 @@
         tongue(1, M_FIRE, 0.75); tongue(0.66, '#f2a93e', 0.8); tongue(0.36, '#fff1d6', 0.7);
         ctx.globalCompositeOperation = 'source-over'; menuAlpha(1);
     }
+    // LAMPS's key: his two campfires side by side, walls outward, as his
+    // fight has them -- each three stone brandons, one stood against the
+    // wall, one leaned in on it, one across their feet.
+    const M_CAMP_FOOT = 0.19;        // a fire's feet either side of its middle, of a log
+    const M_CAMP_LEAN = 0.45;        // rad the leaning log leans in by
+    const M_CAMP_BASE = [0.56, 0.52];   // the log across their feet: of a log, and rad its inner end is raised
+    // one fire, its feet on `foot`, `wall` the side its upright log is on
+    function menuCampfire(fx, foot, L, wall, b, mode, t) {
+        const F = L * M_CAMP_FOOT;
+        const logs = [{ x: fx + wall * F, y: foot - L / 2, a: -Math.PI / 2 },
+                      { x: fx - wall * (F - L / 2 * Math.sin(M_CAMP_LEAN)), y: foot - L / 2 * Math.cos(M_CAMP_LEAN),
+                        a: -Math.PI / 2 + wall * M_CAMP_LEAN }];
+        if (mode !== 'flat') menuFlame(fx, foot - L * 0.05, L * 0.16, L * 0.62, t);
+        for (const g of logs) menuLay(b, g.x, g.y, L, g.a, false, false);
+        const [bl, tilt] = M_CAMP_BASE;
+        menuLay(b, fx, foot - L * 0.04, L * bl, wall * tilt * 0.35, false, false);
+        if (mode !== 'flat') menuFlame(fx - wall * F * 0.3, foot - L * 0.08, L * 0.1, L * 0.4, t + 0.8);
+    }
+    function menuVolcanoKey(x, y, s, b, mode) {
+        const t = menuNow(), foot = y + s * 0.46;
+        for (const side of [-1, 1]) menuCampfire(x + side * s * 0.25, foot, s * 0.56, side, b, mode, t + side * 1.7);
+    }
+
     // level n's sigil, `s` px across, in `ink` (M_EMPTY for one not won); `turn` spins the flower
     function menuSigil(n, x, y, s, ink, turn) {
         const mode = ink === M_EMPTY ? 'flat' : 'wash';
@@ -1609,20 +1679,8 @@
                 menuPutHead(h, x - s * 0.17, y - s * 0.03, s * 0.4);
                 menuPutHead(h, x + s * 0.23, y + s * 0.09, s * 0.28);
                 break;
-            case 4:     // LAMPS: three torches, each of him stood on end, burning
-                [-1, 0, 1].forEach(i => {
-                    const L = s * (i ? 0.56 : 0.7), bx = x + i * s * 0.3, foot = y + s * 0.46, t = menuNow() + i * 1.7;
-                    if (mode !== 'flat') {
-                        // the fire round his outline: him, flat in flame, a little out all round
-                        ctx.globalCompositeOperation = 'lighter';
-                        menuAlpha(0.35 + 0.08 * Math.sin(t * 2.3));
-                        const d = Math.max(1, s * 0.035);
-                        for (let k = 0; k < 8; k++) menuLay(menuBody(M_FIRE, 'flat'), bx + Math.cos(k * Math.PI / 4) * d, foot - L / 2 + Math.sin(k * Math.PI / 4) * d, L, 0, true);
-                        ctx.globalCompositeOperation = 'source-over'; menuAlpha(1);
-                    }
-                    menuLay(b, bx, foot - L / 2, L, 0, true);
-                    if (mode !== 'flat') menuFlame(bx, foot - L + s * 0.02, s * 0.1, s * 0.28, t);
-                });
+            case 4:     // LAMPS: his two campfires
+                menuVolcanoKey(x, y, s, b, mode);
                 break;
             case 5: {   // GLEEOK: three heads on three short necks out of one collar
                 const cy = y + s * 0.46;
@@ -2534,6 +2592,7 @@
         if (show.memCard) { menuMemoryUnlocked(show.memCard, menu.showT); menuTapPrompt(menu.showT - UNLOCK_WAIT); return true; }
         if (show.rushCard) { menuRushUnlocked(menu.showT); menuTapPrompt(menu.showT - UNLOCK_WAIT); return true; }
         if (show.rackCard) { menuRackUnlocked(menu.showT); menuTapPrompt(menu.showT - UNLOCK_WAIT); return true; }
+        if (show.buildCard) { menuBuildUnlocked(show.buildCard, menu.showT); menuTapPrompt(menu.showT - UNLOCK_WAIT); return true; }
         const key = show.pad, p = LAB_PAD[key];
         const ink = (p && (p.ink || p.rim)) || '#8d877d';
         ctx.fillStyle = '#000';
@@ -2650,6 +2709,25 @@
         ctx.globalAlpha = e;
         text('BOSS RUSH', LW / 2, 320 + (1 - e) * 30, 54, ink, 'center');
         text('every boss, back to back, for a best of its own', LW / 2, 368 + (1 - e) * 30, 15, '#c9c4ba', 'center');
+        ctx.globalAlpha = 1;
+    }
+
+    // MEMORIES, the LEADERBOARD and the VOID UNLOCKED: the BOSS RUSH card
+    // again, for any building a run puts up that has no card of its own
+    function menuBuildUnlocked(level, t) {
+        const ink = level.ink || '#f2efe9';
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, LW, LH);
+        ctx.globalAlpha = UNLOCK_BACK;
+        ctx.fillStyle = ink;
+        ctx.fillRect(0, 0, LW, LH);
+        const e = 1 - Math.pow(1 - Math.min(1, t / UNLOCK_IN), 3);
+        ctx.globalAlpha = 1;
+        text('UNLOCKED', LW / 2, 200, 34, '#f2efe9', 'center');
+        ctx.globalAlpha = e;
+        text(level.lines ? level.lines.join(' ') : level.name, LW / 2, 320 + (1 - e) * 30, 54, ink, 'center');
+        const line = M_BUILD_LINES[level.key || level.n];
+        if (line) text(line, LW / 2, 368 + (1 - e) * 30, 15, '#c9c4ba', 'center');
         ctx.globalAlpha = 1;
     }
 
@@ -2834,7 +2912,7 @@
         // a table, not a question: the title and line go up out of its way and
         // the choices are the smaller tabs along the bottom (menuBoardTabs)
         board: { title: 'LEADERBOARD', ink: '#c9a94e', home: 'total', table: true,
-                 line: sc => sc.view === BOARD_TOTAL ? 'everyone\'s best on every stage but BOSS RUSH, added up'
+                 line: sc => sc.view === BOARD_TOTAL ? 'everyone\'s best on every stage (excluding BOSS RUSH), added up'
                                                      : 'the ten best runs',
                  choices: menuBoardTabs }
     };

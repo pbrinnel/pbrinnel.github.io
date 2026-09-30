@@ -209,8 +209,7 @@
         // and at last he has something to yell with
         if (!hl.said || Math.random() < HL_YELL) {
             hl.said = true;
-            const p = hlPoint(br, HL_HEAD_U, 1);
-            shout = { x: p.x, y: br.y + bh + 8, life: SHOUT_SECS };
+            shout = { life: SHOUT_SECS, at: () => ({ x: hlPoint(br, HL_HEAD_U, 1).x, y: br.y + bh + 8 }) };
         }
         return true;
     }

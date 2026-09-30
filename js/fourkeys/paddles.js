@@ -45,8 +45,8 @@
     let ICE_RAMP   = 0.15;   // ...getting there over this, and coming back down over twice it
     let ICE_TURN   = 0.35;   // ...turned this far (rad) the way it is spinning, at the most spin
     let EMB_LEN    = 0.7;    // ember: much shorter...
-    let EMB_CATCH  = 0.1;    // ...but a brick a head of his breaks has this chance of going up in embers
-    let EMB_SPREAD = 0.25;   // ...a burning brick this chance of catching each one beside it
+    let EMB_CATCH  = 0.3;    // ...but a brick a head of his breaks has this chance of going up in embers
+    let EMB_SPREAD = 0.45;   // ...a burning brick this chance of catching each one beside it
     let EMB_SPREAD_AT = 1;   // ...seconds into burning that it does
     let EMB_GLOW   = 0.45;   // how much light he gives off
     let EMB_SPARKS = 17;     // sparks a second rising off him
@@ -149,6 +149,8 @@
             if (b.sway) b.x += Math.sin(b.t * 3 + b.ph) * b.sway * dt;
         }
         padBits = padBits.filter(b => b.t < b.life);
+        for (const x of embBlasts) x.t += dt;
+        embBlasts = embBlasts.filter(x => x.t < EMB_BLAST);
     }
 
     // A boss may fade all of you (padAlpha, set here and put back at the end of
@@ -172,6 +174,20 @@
     }
     function labPadOver() {
         padBoth('over', []);
+        for (const x of embBlasts) {
+            const k = x.t / EMB_BLAST, r = x.r * (0.3 + 0.7 * Math.sqrt(k));
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.globalAlpha = (1 - k) * 0.8;
+            ctx.drawImage(padGlow(EMB_INK), x.x - r * 1.2, x.y - r * 1.2, r * 2.4, r * 2.4);
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = 1 - k;
+            ctx.strokeStyle = EMB_RIM;
+            ctx.lineWidth = 4 * (1 - k) + 1;
+            ctx.beginPath();
+            ctx.arc(x.x, x.y, r, 0, 7);
+            ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
         for (const b of padBits) {
             const a = Math.max(0, 1 - b.t / b.life) * b.a * (b.fadeIn ? Math.min(1, b.t / b.fadeIn) : 1);
             const baked = b.kind === 'bigflake' ? padFlakeSprite(b.ink) : b.kind === 'head' ? padHeadSprite(b.ink)
@@ -306,7 +322,7 @@
     // one speck of whatever he is shedding
     // (null when there are too many already)
     function padBit(x, y, ink, life, vx, vy, g, s, a, kind, sway) {
-        if (padBits.length > 220) return null;
+        if (padBits.length > 400) return null;
         const b = { x, y, ink, t: 0, life, vx: vx || 0, vy: vy || 0, g: g === undefined ? 90 : g,
                     s: s || 2 + Math.random() * 2, a: a === undefined ? 0.9 : a,
                     kind: kind || 'speck', sway: sway || 0, ph: Math.random() * 6.28 };
@@ -373,10 +389,18 @@
     function padIgnite(o) { o.burn = { t: PAD_MARK, spread: EMB_SPREAD_AT, rolled: false }; }
 
     // a brick has just been broken, by whatever labHitBy says
+    // Going up is a blast you cannot miss -- a flash, a ring of heat thrown
+    // out over the bricks it lights, and a spray of embers -- and a brick
+    // burning out goes with a smaller one, so each link of a vein shows.
+    let embBlasts = [];
+    const EMB_BLAST = 0.4;           // seconds a blast takes to spread and fade
+    function embBlast(x, y, big) { embBlasts.push({ x, y, t: 0, r: (bw + GAP) * (big ? 1.5 : 0.8) }); }
+
     function labBrickGone(b) {
         const ball = labHitBy;
         if (!ball || !ball.mark || ball.mark.key !== 'ember' || Math.random() >= EMB_CATCH) return;
-        for (let n = 0; n < 26; n++) {
+        embBlast(b.x + bw / 2, b.y + bh / 2, true);
+        for (let n = 0; n < 40; n++) {
             const a = Math.random() * Math.PI * 2, v = 60 + Math.random() * 160;
             padBit(b.x + bw / 2, b.y + bh / 2, Math.random() < 0.4 ? EMB_RIM : EMB_INK, 0.5 + Math.random() * 0.6,
                    Math.cos(a) * v, Math.sin(a) * v - 40, 60, 2 + Math.random() * 2.5, 0.95, 'glow');
@@ -397,10 +421,13 @@
                 for (const o of padBeside(b)) if (padBurnable(o) && Math.random() < EMB_SPREAD) padIgnite(o);
             }
             const k = Math.max(0, f.t / PAD_MARK);
-            if (Math.random() < dt * 30 * (0.4 + 0.6 * k)) shed(b.x + Math.random() * bw, b.y + Math.random() * bh, k);
+            if (Math.random() < dt * 45) shed(b.x + Math.random() * bw, b.y + Math.random() * bh, Math.max(0.6, k));
             if (f.t <= 0) {
                 b.burn = null;
-                if (b.alive) hitBrick(b, b.x + bw / 2, b.y + bh / 2);
+                if (b.alive) {
+                    embBlast(b.x + bw / 2, b.y + bh / 2, false);
+                    hitBrick(b, b.x + bw / 2, b.y + bh / 2);
+                }
             }
         }
     }
@@ -411,11 +438,15 @@
     // sent it, goes off it at MAX_SPEED for ICE_SECS, turned a little the way
     // it is spinning -- and the ice is spent, unless that head is FROST's
     // too and the brick still stands.
+    // Any strike on an icy brick shatters its ice (SHATTERED), a LASER bolt's
+    // too; only a head is sent off by it.
     function labBrickStruck(b) {
         const ball = labHitBy;
+        if (b.icy && !ball) { b.icy = false; if (round) round.shattered++; }
         if (!ball) return;
         if (b.icy) {
             b.icy = false;
+            if (round) round.shattered++;
             const a = ICE_TURN * Math.max(-1, Math.min(1, ball.spin / SPIN_MAX));
             const c = Math.cos(a), sn = Math.sin(a);
             [ball.vx, ball.vy] = [ball.vx * c - ball.vy * sn, ball.vx * sn + ball.vy * c];
@@ -460,7 +491,7 @@
         if (!f) return;
         const sp = shapeSprite('burnEmber', EMB_INK, bw, bh, true);
         if (!sp) return;
-        ctx.globalAlpha = 0.25 + 0.4 * Math.max(0, 1 - f.t / PAD_MARK) + 0.08 * Math.sin(clock * 9 + b.x);
+        ctx.globalAlpha = 0.5 + 0.35 * Math.max(0, 1 - f.t / PAD_MARK) + 0.12 * Math.sin(clock * 9 + b.x);
         ctx.drawImage(sp, -bw / 2, -bh / 2, bw, bh);
         ctx.globalAlpha = 1;
     }
