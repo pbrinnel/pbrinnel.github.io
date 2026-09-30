@@ -12,7 +12,8 @@
     //
     //   The lunges. Every GL_LUNGE_MIN..GL_LUNGE_MAX, the head nearest you
     //   draws back, shaking, with a mark on your line that follows you, and
-    //   snaps down its neck at you: under it and you are SLUGGISH. Then it
+    //   snaps down its neck at you: under it and you are SLUGGISH. It holds
+    //   the snap, still rearing, while a ball is in its way (glInPath). Then it
     //   hangs low and dazed for GL_LUNGE_DAZE, near the ball and worth
     //   GL_LUNGE_DMG a hit. It is on the heads' own clock rather than on
     //   where you stand, since the ball decides where you stand.
@@ -136,6 +137,8 @@
     let GL_LUNGE_MAX   = 12;  // ...and at most
     let GL_LUNGE_REAR  = 0.6; // seconds it draws back and shakes, its eye on you -- the tell
     let GL_LUNGE_BITE  = 0.22; // seconds from there down to your line
+    let GL_LUNGE_HOLD  = 1.2; // seconds at most it holds its bite, still rearing, for a ball in its way (glInPath)
+    let GL_LUNGE_DODGE = 0.5; // radians above level a ball it bites down on anyway leaves its side at (glDodge)
     let GL_LUNGE_DAZE  = 1.6; // seconds it hangs low and dazed after
     let GL_LUNGE_LOW   = 140; // ...px over your line it hangs at
     let GL_LUNGE_BACK  = 0.7; // seconds it takes to get back up its neck
@@ -180,7 +183,7 @@
                    'GL_BIG', 'GL_BIG_HP', 'GL_BIG_CHARGE', 'GL_BIG_SHAKE',
                    'GL_BIG_ARC', 'GL_BIG_NECK', 'GL_BIG_BOB', 'GL_BIG_ROLL', 'GL_BIG_HZ', 'GL_BIG_STUN',
                    'GL_BIG_LOOSE_HP', 'GL_BIG_LOOSE', 'GL_BIG_KNOCK_IF', 'GL_SAG', 'GL_STUMP_MIN', 'GL_STUMP_MAX', 'GL_HEAD_IF',
-                   'GL_LUNGE_FIRST', 'GL_LUNGE_MIN', 'GL_LUNGE_MAX', 'GL_LUNGE_REAR', 'GL_LUNGE_BITE', 'GL_LUNGE_DAZE',
+                   'GL_LUNGE_FIRST', 'GL_LUNGE_MIN', 'GL_LUNGE_MAX', 'GL_LUNGE_REAR', 'GL_LUNGE_BITE', 'GL_LUNGE_HOLD', 'GL_LUNGE_DODGE', 'GL_LUNGE_DAZE',
                    'GL_LUNGE_LOW', 'GL_LUNGE_BACK', 'GL_LUNGE_DMG', 'GL_LUNGE_IF',
                    'GL_AMMO_SPEED', 'GL_AMMO_CONE', 'GL_AMMO_TURN', 'GL_AMMO_DMG', 'GL_AMMO_BODY',
                    'GL_THRASH', 'GL_THRASH_HZ', 'GL_THRASH_DRIFT', 'GL_THRASH_PACE',
@@ -324,6 +327,13 @@
             for (const k of gl.heads) {
                 // nothing to hit until it is whole, and a shot one is the ball's already
                 if (!k.alive || k.grow >= 0 || k.shot) continue;
+                if (k.lg && k.lg.st === 'bite' && !k.loose) {
+                    const rx = GL_HEAD_W * glSize(k) / 2, ry = rx * (BALL_RY / BALL_RX);
+                    if (Math.hypot((ball.x - k.x) / rx, (ball.y - k.y) / ry) < 1 || glHeadContact(ball, k)) {
+                        glDodge(ball, k); gl.pend = null; return null;
+                    }
+                    continue;
+                }
                 if (glEject(ball, k)) { gl.pend = null; return null; }
                 const hit = glHeadContact(ball, k);
                 if (hit) { gl.pend = k; return hit; }
@@ -451,7 +461,7 @@
                      line: on + ' on him · ' + loose + ' loose · ' +
                            (glOpen() ? 'body open ' + gl.body + '/' + GL_BODY_HP : 'body shut') +
                            (big ? ' · big head ' + (big.grow >= 0 ? 'growing' : big.loose ? 'loose' : big.hp + '/' + glBigHp()) : '') +
-                           (lg ? ' · lunge: ' + lg.lg.st : '') };
+                           (lg ? ' · lunge: ' + lg.lg.st + (lg.lg.hold ? ', held ' + lg.lg.hold.toFixed(1) + 's for a ball' : '') : '') };
         }
     };
 
@@ -767,6 +777,48 @@
         k.lg = { st: 'rear', t: 0, tx: k.bx, x0: k.bx, y0: k.by };
     }
 
+    // Whether a ball in play would meet the head on its bite, were it to go
+    // now: the two played forward together over GL_LUNGE_BITE, the head down
+    // its curve (glLunge) and the ball on its line, back up off your line as
+    // though you meet it, since under the bite is where you are. One on the
+    // paddle waiting to be served is going nowhere yet.
+    function glInPath(k, L) {
+        const rx = GL_HEAD_W * glSize(k) / 2, ry = rx * (BALL_RY / BALL_RX);
+        const floor = padY() - padH() / 2 - ry;
+        const N = 12;
+        return balls.some(q => {
+            if (q.stuck) return false;
+            const ax = rx + extX(q), ay = ry + extY(q), line = padY() - padH() / 2 - extY(q);
+            for (let i = 0; i <= N; i++) {
+                const t = i / N * GL_LUNGE_BITE, e = (i / N) * (i / N);
+                const hx = k.x + (L.tx - k.x) * e, hy = k.y + (floor - k.y) * e;
+                let y = q.y + q.vy * t;
+                if (y > line) y = 2 * line - y;
+                const dx = (q.x + q.vx * t - hx) / ax, dy = (y - hy) / ay;
+                if (dx * dx + dy * dy < 1) return true;
+            }
+            return false;
+        });
+    }
+
+    // A ball the head meets on its bite -- it held as long as GL_LUNGE_HOLD
+    // lets it, and went anyway -- is put out at its side at the ball's own
+    // height, clear of it, heading away and GL_LUNGE_DODGE up, rather than
+    // bounced and then overtaken and pushed out under it, straight down at
+    // you. Toward the side with room for the head's whole width.
+    function glDodge(ball, k) {
+        const rx = GL_HEAD_W * glSize(k) / 2, ry = rx * (BALL_RY / BALL_RX), ex = extX(ball);
+        const dy = Math.max(-ry, Math.min(ry, ball.y - k.y));
+        const out = rx * Math.sqrt(Math.max(0, 1 - (dy / ry) * (dy / ry))) + ex + 2;
+        let side = Math.sign(ball.x - k.x) || (Math.random() < 0.5 ? -1 : 1);
+        const room = sd => sd < 0 ? k.x - rx - 2 * ex - 2 >= 0 : k.x + rx + 2 * ex + 2 <= LW;
+        if (!room(side) && room(-side)) side = -side;
+        ball.x = k.x + side * out;
+        const sp = effSpeed() * (ball.boost || 1);
+        ball.vx = side * Math.cos(GL_LUNGE_DODGE) * sp;
+        ball.vy = -Math.sin(GL_LUNGE_DODGE) * sp;
+    }
+
     // A lunge, a stage at a time: it draws back up its neck and shakes, its
     // eye on you -- the mark on your line follows you until it goes -- then
     // snaps down to where you were, rises a little way, hangs there dazed,
@@ -780,7 +832,11 @@
             L.tx = Math.max(hw / 2, Math.min(LW - hw / 2, glNearSeg(k.bx).cx));
             k.x = k.ax + (k.bx - k.ax) * (1 - 0.25 * e) + Math.sin(clock * 52) * 4 * e;
             k.y = k.ay + (k.by - k.ay) * (1 - 0.25 * e);
-            if (L.t >= GL_LUNGE_REAR) { L.st = 'bite'; L.t = 0; L.x0 = k.x; L.y0 = k.y; }
+            if (L.t < GL_LUNGE_REAR) return;
+            // not while a ball is in its way: bitten down on, it came straight
+            // back down at you, and the big one's bite has you STUNNED for it
+            if (glInPath(k, L) && (L.hold = (L.hold || 0) + dt) < GL_LUNGE_HOLD) return;
+            L.st = 'bite'; L.t = 0; L.x0 = k.x; L.y0 = k.y;
             return;
         }
         if (L.st === 'bite') {
