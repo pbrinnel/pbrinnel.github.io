@@ -14,7 +14,7 @@
     //   draws back, shaking, with a mark on your line that follows you, and
     //   snaps down its neck at you: under it and you are SLUGGISH. It holds
     //   the snap, still rearing, while a ball is in its way (glInPath). Then it
-    //   hangs low and dazed for GL_LUNGE_DAZE, near the ball and worth
+    //   springs back up and hangs dazed for GL_LUNGE_DAZE, near the ball and worth
     //   GL_LUNGE_DMG a hit. It is on the heads' own clock rather than on
     //   where you stand, since the ball decides where you stand.
     //
@@ -136,11 +136,14 @@
     let GL_LUNGE_MIN   = 8;   // seconds between one lunge and the next, at least...
     let GL_LUNGE_MAX   = 12;  // ...and at most
     let GL_LUNGE_REAR  = 0.6; // seconds it draws back and shakes, its eye on you -- the tell
+    let GL_BIG_REAR    = 1.1; // ...and the big head's, whose bite STUNS: time to get out from under it
     let GL_LUNGE_BITE  = 0.22; // seconds from there down to your line
     let GL_LUNGE_HOLD  = 1.2; // seconds at most it holds its bite, still rearing, for a ball in its way (glInPath)
     let GL_LUNGE_DODGE = 0.5; // radians above level a ball it bites down on anyway leaves its side at (glDodge)
     let GL_LUNGE_DAZE  = 1.6; // seconds it hangs low and dazed after
-    let GL_LUNGE_LOW   = 140; // ...px over your line it hangs at
+    let GL_LUNGE_GAP   = 110; // ...px between its chin and your line where it hangs, so there is plainly room under it
+    let GL_LUNGE_SPRING = 2.2; // ...times a second it bounces as it springs back up there
+    let GL_LUNGE_DAMP  = 7;   // ...and how quickly that dies away
     let GL_LUNGE_BACK  = 0.7; // seconds it takes to get back up its neck
     let GL_LUNGE_DMG   = 2;   // what a hit on a dazed head is worth
     let GL_LUNGE_IF    = 0.3; // ...and how long before the next one can land
@@ -184,7 +187,7 @@
                    'GL_BIG_ARC', 'GL_BIG_NECK', 'GL_BIG_BOB', 'GL_BIG_ROLL', 'GL_BIG_HZ', 'GL_BIG_STUN',
                    'GL_BIG_LOOSE_HP', 'GL_BIG_LOOSE', 'GL_BIG_KNOCK_IF', 'GL_SAG', 'GL_STUMP_MIN', 'GL_STUMP_MAX', 'GL_HEAD_IF',
                    'GL_LUNGE_FIRST', 'GL_LUNGE_MIN', 'GL_LUNGE_MAX', 'GL_LUNGE_REAR', 'GL_LUNGE_BITE', 'GL_LUNGE_HOLD', 'GL_LUNGE_DODGE', 'GL_LUNGE_DAZE',
-                   'GL_LUNGE_LOW', 'GL_LUNGE_BACK', 'GL_LUNGE_DMG', 'GL_LUNGE_IF',
+                   'GL_BIG_REAR', 'GL_LUNGE_GAP', 'GL_LUNGE_SPRING', 'GL_LUNGE_DAMP', 'GL_LUNGE_BACK', 'GL_LUNGE_DMG', 'GL_LUNGE_IF',
                    'GL_AMMO_SPEED', 'GL_AMMO_CONE', 'GL_AMMO_TURN', 'GL_AMMO_DMG', 'GL_AMMO_BODY',
                    'GL_THRASH', 'GL_THRASH_HZ', 'GL_THRASH_DRIFT', 'GL_THRASH_PACE',
                    'GL_BODY_HP', 'GL_REGROW', 'GL_ENTER');
@@ -819,20 +822,24 @@
         ball.vy = -Math.sin(GL_LUNGE_DODGE) * sp;
     }
 
+    // how long a head draws back before it bites
+    const glRear = k => k.big ? GL_BIG_REAR : GL_LUNGE_REAR;
+
     // A lunge, a stage at a time: it draws back up its neck and shakes, its
     // eye on you -- the mark on your line follows you until it goes -- then
-    // snaps down to where you were, rises a little way, hangs there dazed,
-    // and goes back up its neck.
+    // snaps down to where you were, springs back up to GL_LUNGE_GAP over your
+    // line, hangs there dazed, and goes back up its neck. The spring is what
+    // says it is not a wall like the IDOL's: there is room to go under it.
     function glLunge(k, dt) {
         const L = k.lg, hw = GL_HEAD_W * glSize(k), hh = hw * (BALL_RY / BALL_RX);
-        const floor = padY() - padH() / 2 - hh / 2, low = padY() - GL_LUNGE_LOW;
+        const floor = padY() - padH() / 2 - hh / 2, low = floor - GL_LUNGE_GAP, rear = glRear(k);
         L.t += dt;
         if (L.st === 'rear') {
-            const e = Math.min(1, L.t / GL_LUNGE_REAR);
+            const e = Math.min(1, L.t / rear);
             L.tx = Math.max(hw / 2, Math.min(LW - hw / 2, glNearSeg(k.bx).cx));
             k.x = k.ax + (k.bx - k.ax) * (1 - 0.25 * e) + Math.sin(clock * 52) * 4 * e;
             k.y = k.ay + (k.by - k.ay) * (1 - 0.25 * e);
-            if (L.t < GL_LUNGE_REAR) return;
+            if (L.t < rear) return;
             // not while a ball is in its way: bitten down on, it came straight
             // back down at you, and the big one's bite has you STUNNED for it
             if (glInPath(k, L) && (L.hold = (L.hold || 0) + dt) < GL_LUNGE_HOLD) return;
@@ -847,7 +854,7 @@
             return;
         }
         if (L.st === 'daze') {
-            const e = Math.min(1, L.t / 0.25), s = e * e * (3 - 2 * e);
+            const s = 1 - Math.exp(-L.t * GL_LUNGE_DAMP) * Math.cos(L.t * GL_LUNGE_SPRING * Math.PI * 2);
             k.x = L.tx;
             k.y = floor + (low - floor) * s;
             k.roll = Math.sin(clock * Math.PI * 3) * 0.25;
@@ -1386,7 +1393,7 @@
         // steady, never blinking. The big one's is STUNNED's colour.
         for (const k of gl.heads) {
             if (!k.alive || !k.lg || (k.lg.st !== 'rear' && k.lg.st !== 'bite')) continue;
-            const e = k.lg.st === 'rear' ? Math.min(1, k.lg.t / GL_LUNGE_REAR) : 1;
+            const e = k.lg.st === 'rear' ? Math.min(1, k.lg.t / glRear(k)) : 1;
             const mw = GL_HEAD_W * glSize(k) * (0.5 + 0.5 * e), my = padY() - padH() / 2;
             ctx.save();
             ctx.globalAlpha = 0.18 + 0.3 * e;
