@@ -1019,14 +1019,19 @@
         return (glStoneBake = c);
     }
 
-    // the box the physics looks for him in: his body and wherever his heads are
+    // The box the physics looks for him in: his body and wherever his heads
+    // are, each by its own size and turned any way, since a loose one spins.
+    // One flat size for every head left the big one's chin out of it, and a
+    // ball was only found once it was deep in the head, where glEject put it
+    // back out without a hit.
     function glBox(b) {
-        const h = GL_W / SHAPE_ASPECT, r = GL_HEAD_W;
+        const h = GL_W / SHAPE_ASPECT;
         const a = glSpine(0), boot = glSpine(1), e = glPair() ? glBodyEll() : null;
         let x0 = e ? e.x - e.rx - 60 : Math.min(gl.cx, a.x, boot.x) - h / 2, x1 = e ? e.x + e.rx + 60 : Math.max(gl.cx, a.x, boot.x) + h / 2;
         let y0 = e ? e.y - e.ry : Math.min(gl.cy, a.y, boot.y) - h / 2, y1 = e ? gl.cy + 10 : Math.max(gl.cy, a.y, boot.y) + h / 2;
         for (const k of gl.heads) {
             if (!k.alive) continue;
+            const r = GL_HEAD_W * glSize(k) * (k.loose ? GL_LOOSE_SIZE : 1) / 2 * (BALL_RY / BALL_RX) + 4;
             x0 = Math.min(x0, k.x - r); x1 = Math.max(x1, k.x + r);
             y0 = Math.min(y0, k.y - r); y1 = Math.max(y1, k.y + r);
         }
