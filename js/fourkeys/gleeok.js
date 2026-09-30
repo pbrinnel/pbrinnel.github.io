@@ -34,7 +34,8 @@
     // otherwise be hurt every frame the two overlap.
     //
     // With no head left on a neck the body opens, and it is a race: the big
-    // head starts growing out of the collar at once, over GL_REGROW, and the
+    // head starts coming out of the collar at once, an egg of stone that
+    // hatches over GL_REGROW (glRvHatch), and the
     // body is open only until it is whole. Open, he sags GL_SAG into the
     // field and thrashes -- rocks GL_THRASH either side of GL_TILT, his
     // collar swinging wider -- and the stump of his neck spits a burst of its
@@ -456,6 +457,11 @@
             body(b) { LAB_BOSS.gleeok.start(b); glStrip(); gl.body = GL_BODY_HP; glBox(b); return true; },
             // the body emptied and the big head all but grown
             big(b) { LAB_BOSS.gleeok.start(b); glStrip(); glGrowBig().grow = GL_REGROW - 0.5; glBox(b); return true; },
+            // the race with GL_RV_LATE of it left, for watching the big head hatch
+            arrive(b) {
+                LAB_BOSS.gleeok.start(b); glStrip(); gl.body = GL_BODY_HP;
+                glGrowBig().grow = Math.max(0, GL_REGROW - GL_RV_LATE); glBox(b); return true;
+            },
             // the head nearest you goes for you now
             lunge() {
                 const pad = segs()[0].cx;
@@ -735,6 +741,7 @@
         k.poolFrom = k.hp;
         k.grow = 0;
         k.x = k.bx = gl.cx; k.y = k.by = gl.cy;
+        glRvStart();
         gl.heads.push(k);
         return k;
     }
@@ -748,6 +755,7 @@
             if (!k.alive || k.grow < 0 || (k.grow += dt) < GL_REGROW) continue;
             k.grow = -1;
             k.fire = GL_FIRE_MIN * 0.5;
+            glRvDone(k);
             const hh = GL_HEAD_W * glSize(k) * (BALL_RY / BALL_RX);
             labShout(k.x, k.y, 'BRANDON!', 2.4, () => ({ x: k.x, y: k.y + hh / 2 + 10 }));
         }
@@ -1204,6 +1212,136 @@
         ctx.restore();
     }
 
+    // ---- the big head hatching -------------------------------------------------
+    // The big head comes as an egg of his head in stone, pushed out of the
+    // collar on its neck over the race (GL_REGROW), the stone a shell of small
+    // stone heads packed close, so it breaks in his shape and never in
+    // squares. It sheds them slowly and then fast, his face showing through,
+    // and whole it blows the rest off. Only a look: the head still cannot be
+    // hit until it is whole.
+    let GL_RV_POP  = 0.6;     // seconds the light of its arrival lasts
+    let GL_RV_LATE = 3.5;     // seconds of the race the lab's jump to its arrival leaves
+    LAB_KNOBS.push('GL_RV_POP', 'GL_RV_LATE');
+    const GL_RV_PIECE = 0.24;                  // a piece of the shell, a stone head, of the egg's width
+    const GL_RV_STONE = '#8f8a9c';             // ...and its stone, the castle's cold grey
+    const GL_RV_KEEP  = 0.3;                   // ...the share of it that holds until it hatches, to blow off then
+    const GL_RV_SHED  = 0.9;                   // ...and how far through the race the rest has gone by
+
+    function glRvStart() {
+        const cells = [];
+        for (let row = 0, dv = -0.46; dv <= 0.46; row++, dv += 0.1) {
+            for (let du = -0.46 + (row % 2) * 0.07; du <= 0.46; du += 0.14) {
+                if (du * du * 4 + dv * dv * 4 > 1) continue;
+                // most of the shell holds until late, and then it goes fast
+                const at = Math.random() < GL_RV_KEEP ? Infinity : 0.12 + (GL_RV_SHED - 0.12) * Math.sqrt(Math.random());
+                cells.push({ du, dv, s: GL_RV_PIECE * (0.9 + Math.random() * 0.25), a: (Math.random() - 0.5) * 2.4,
+                             mir: Math.random() < 0.5, at, on: true });
+            }
+        }
+        gl.rv = { cells, bits: [], done: -1, shed: 0, last: clock };
+    }
+
+    // the grey head in the castle's stone, with a faint pass of his own
+    // shading so a face is in it
+    function glRvShell() {
+        const key = 'glRvShell';
+        if (spriteCache.has(key)) return spriteCache.get(key);
+        const flat = headSprite2('flat', GL_RV_STONE), grey = headSprite2('grey');
+        if (!flat || !grey) return null;
+        const c = document.createElement('canvas');
+        c.width = flat.width; c.height = flat.height;
+        const g = c.getContext('2d');
+        g.drawImage(flat, 0, 0);
+        g.globalCompositeOperation = 'source-atop';
+        g.globalAlpha = 0.35;
+        g.drawImage(grey, 0, 0);
+        spriteCache.set(key, c);
+        return c;
+    }
+
+    // The egg as it stands. The race stops while you wait to serve, so a lost
+    // ball does not cost you any of it, but the shell goes on shedding on the
+    // clock regardless: paused with the race, the egg sat half-shed with
+    // stones stuck on his face until you served. So what it has shed is
+    // however far the race has got, or further -- but never past what falls
+    // before it hatches, so the stones kept for then (GL_RV_KEEP) stay put.
+    function glRvHatch(k) {
+        const rv = gl.rv;
+        if (!rv) return;
+        const hw = GL_HEAD_W * glSize(k), e = Math.min(1, Math.max(0, k.grow) / GL_REGROW);
+        rv.shed = Math.max(e, Math.min(GL_RV_SHED, rv.shed + Math.max(0, clock - rv.last) / GL_REGROW));
+        rv.last = clock;
+        const w = hw * (0.55 + 0.45 * glGrown(k)), h = w * (BALL_RY / BALL_RX);
+        const shake = Math.max(0, (rv.shed - 0.6) / 0.4) * 3;
+        const x = k.x + Math.sin(clock * 50) * shake, y = k.y;
+        for (const c of rv.cells) if (c.on && rv.shed >= c.at) glRvChip(c, x, y, w, h, 0);
+        ctx.drawImage(ballImg, x - w / 2, y - h / 2, w, h);
+        const shell = glRvShell();
+        if (!shell) return;
+        for (const c of rv.cells) if (c.on) glRvPiece(shell, x + c.du * w, y + c.dv * h, c.s * w, c.a, c.mir);
+    }
+
+    function glRvPiece(shell, x, y, w, a, mir) {
+        const h = w * (BALL_RY / BALL_RX);
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(a);
+        if (mir) ctx.scale(-1, 1);
+        ctx.drawImage(shell, -w / 2, -h / 2, w, h);
+        ctx.restore();
+    }
+
+    // a piece of the shell off: falling, or thrown out from the middle at `blast`
+    function glRvChip(c, x, y, w, h, blast) {
+        c.on = false;
+        const px = x + c.du * w, py = y + c.dv * h;
+        const dx = px - x, dy = py - y, l = Math.hypot(dx, dy) || 1;
+        const s = blast * (0.6 + 0.6 * Math.random());
+        gl.rv.bits.push({ w: c.s * w, a: c.a, mir: c.mir, x0: px, y0: py,
+                          vx: blast ? dx / l * s : (Math.random() - 0.5) * 60, vy: blast ? dy / l * s - 80 : -20 - Math.random() * 40,
+                          va: (Math.random() - 0.5) * 8, t0: clock, life: 1.1 + Math.random() * 0.4 });
+    }
+
+    // whole: the rest of the shell blows off
+    function glRvDone(k) {
+        const rv = gl.rv;
+        if (!rv) return;
+        rv.done = clock;
+        rv.k = k;
+        const w = GL_HEAD_W * glSize(k), h = w * (BALL_RY / BALL_RX);     // as glRvHatch draws it, whole
+        for (const c of rv.cells) if (c.on) glRvChip(c, k.x, k.y, w, h, 340);
+    }
+
+    // What flew off, and the light of its arrival: his outline in pale light,
+    // added over what is there, swelling off him once and fading. A
+    // see-through copy of the photo spreads his hair about as a brown shadow.
+    function glRvDrawAfter() {
+        const rv = gl && gl.rv;
+        if (!rv) return;
+        const shell = glRvShell();
+        rv.bits = rv.bits.filter(b => clock - b.t0 < b.life);
+        if (shell) {
+            for (const b of rv.bits) {
+                const t = clock - b.t0;
+                ctx.globalAlpha = Math.max(0, 1 - t / b.life);
+                glRvPiece(shell, b.x0 + b.vx * t, b.y0 + b.vy * t + 500 * t * t, b.w, b.a + b.va * t, b.mir);
+            }
+            ctx.globalAlpha = 1;
+        }
+        const k = rv.k;
+        if (rv.done < 0 || !k || !k.alive) return;
+        const p = (clock - rv.done) / GL_RV_POP, pale = headSprite2('flat', '#f2efe9');
+        if (p >= 1 || !pale) return;
+        // starting a little bigger than him, so what lies over his face is thin
+        const hw = GL_HEAD_W * glSize(k), hh = hw * (BALL_RY / BALL_RX);
+        const w = hw * (1.15 + 0.8 * p), h = hh * (1.15 + 0.8 * p);
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = (1 - p) * (1 - p) * 0.18;
+        ctx.drawImage(pale, k.x - w / 2, k.y - h / 2, w, h);
+        ctx.restore();
+    }
+
     // ---- the two whole looks (GL_STYLE) ----------------------------------------------
     // Both made of nothing but the two photographs, as every character is:
     // his own body and heads, washed in a colour (the WINDMILL's gold), laid
@@ -1513,7 +1651,7 @@
         // lies over a neighbour
         if (GL_STYLE) {
             for (const k of gl.heads) {
-                if (!k.alive) continue;
+                if (!k.alive || k.grow >= 0) continue;
                 const w = GL_HEAD_W * glSize(k) * (k.loose ? GL_LOOSE_SIZE : 1), h = w * (BALL_RY / BALL_RX);
                 glStyleFrame(k, w, h, k.loose ? k.rot : k.roll || 0);
             }
@@ -1521,14 +1659,8 @@
         for (const k of gl.heads) {
             if (!k.alive) continue;
             const hw = GL_HEAD_W * glSize(k), hh = hw * (BALL_RY / BALL_RX);
-            // still growing: small, and see-through, since there is nothing to hit yet
-            if (k.grow >= 0) {
-                const gw = hw * (0.25 + 0.75 * glGrown(k)), gh = gw * (BALL_RY / BALL_RX);
-                ctx.globalAlpha = 0.6;
-                ctx.drawImage(ballImg, k.x - gw / 2, k.y - gh / 2, gw, gh);
-                ctx.globalAlpha = 1;
-                continue;
-            }
+            // still coming: an egg, and nothing to hit yet
+            if (k.grow >= 0) { glRvHatch(k); continue; }
             // the swell before a burst: green washing up over him and a glow
             // round him, rising once -- a tell, not a flash
             const sw = k.charge > 0 ? Math.min(1, k.charge / (k.big ? GL_BIG_CHARGE : GL_CHARGE)) : k.shots > 0 ? 1 : 0;
@@ -1599,6 +1731,7 @@
             const full = k.loose ? GL_LOOSE_HP : GL_HEAD_HP;
             if (!k.big && k.hp < full) labBar(k.x - hw * 0.35, k.y - hh / 2 - 7, hw * 0.7, k.hp / full, 3);
         }
+        glRvDrawAfter();
         gl.pops = gl.pops.filter(p => clock - p.t0 < GL_POP_SECS);
         for (const p of gl.pops) {
             const k = (clock - p.t0) / GL_POP_SECS, w = p.w * (1 + 0.6 * k), h = w * (BALL_RY / BALL_RX);
