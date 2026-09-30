@@ -1812,12 +1812,12 @@
     // (0, 0) at the size his fight has him, read off his own knobs: WINDMILL
     // a head on a stem with brandons for petals, IDOL one enormous head,
     // TWINS a big one and a small one facing each other, LAMPS one hung over
-    // three stood on end, and GLEEOK the headless body upended with three
+    // a campfire of them at either end, and GLEEOK the headless body upended with three
     // heads on its necks. MC_REACH is roughly how far each reaches from its
     // middle, MC_MID where that middle is, and MC_TOP its top, for the
     // lightning and the shout.
     // MC_DEPTH is the order they are laid down in, back to front.
-    const MC_REACH = { 1: 150, 2: 200, 3: 230, 4: 220, 5: 240 };
+    const MC_REACH = { 1: 150, 2: 200, 3: 230, 4: 280, 5: 240 };
     const MC_MID = { 1: -150, 2: -90, 3: -40, 4: -90, 5: -90 };
     const MC_TOP = { 1: -300, 2: -300, 3: -140, 4: -220, 5: -330 };
     const MC_DEPTH = [5, 2, 4, 3, 1];
@@ -1852,7 +1852,9 @@
         },
         4: (g, s) => {                               // LAMPS
             memMcBody(g, 0, -170 + Math.sin(s * 1.4) * 4, LAMP_BOSS_W, 0, false);
-            for (const lx of [-LAMP_W, 0, LAMP_W]) memMcBody(g, lx, 0 + Math.sin(s + lx) * 4, LAMP_W, -Math.PI / 2, false);
+            for (const lx of [-LAMP_BOSS_W * 0.48, LAMP_BOSS_W * 0.48]) {
+                for (const k of lampLogs(lx, Math.sin(s + lx) * 4)) memMcBody(g, k.x, k.y, k.w, k.a, false);
+            }
         },
         5: (g, s) => {                               // GLEEOK
             const L = GL_W, T = L / SHAPE_ASPECT, collar = -60;
