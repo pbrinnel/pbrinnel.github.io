@@ -1333,6 +1333,11 @@
     // Zero lets him go at once.
     const STUN_SHORT = 'STUNNED';
     const STUN_TINT  = '#e0283c';
+    const STUN_LAG   = 0.2;      // the lag he is let go on, stunned or pinned -- see padHold
+    // For anything that holds him where he is while the hand moves on: the
+    // stun, and a boss standing on him. Let go at no lag, he would jump to the
+    // hand the frame it ended.
+    function padHold() { padLag = Math.max(padLag, STUN_LAG); }
     function stunPad(secs) {
         stunT = secs > 0 ? Math.max(stunT, secs) : 0;
         for (const sg of segs()) paddle.jt[sg.i] = 1;
@@ -3427,12 +3432,16 @@
         // vx falls out of where he ACTUALLY got to, so a dragged brandon also
         // puts less swipe on the ball. That is not a second penalty bolted on,
         // it is the same one seen from the ball's side.
-        // he is not yours to move while it happens, or while he is stunned
-        if (phase === 'siphon' || stunT > 0) paddle.tx = paddle.x;
+        // he is not yours to move while it happens
+        if (phase === 'siphon') paddle.tx = paddle.x;
         let padFrom = paddle.x;                        // where the physics below starts him
         paddle.tx = padLimit(paddle.tx);
         const lag = dragLag(dt);
-        paddle.x = lag > 0
+        // Stunned, he stays put while the hand goes on without him, and comes
+        // out of it on at least STUN_LAG, unwinding from there like SLUGGISH
+        // (dragLag): he goes after the hand rather than jumping to it.
+        if (stunT > 0) padHold();
+        else paddle.x = lag > 0
             ? paddle.x + (paddle.tx - paddle.x) * (1 - Math.exp(-dt / lag))
             : paddle.tx;
         const unclamped = paddle.x;

@@ -526,7 +526,13 @@
                                      : Math.max(paddle.x, idol.x + c + hs);
             paddle.x = Math.max(hs, Math.min(LW - hs, paddle.x));
         }
-        if (paddle.x !== was) { paddle.prevX = paddle.x; paddle.vx = 0; }
+        if (paddle.x !== was) {
+            paddle.prevX = paddle.x;
+            paddle.vx = 0;
+            // so he goes after the hand once let go, rather than jumping to it
+            // (the boss lab's engine has no padHold)
+            if (typeof padHold === 'function') padHold();
+        }
     }
 
     // A coat: every piece of it, laid out once in the baked head's own pixels
