@@ -91,6 +91,14 @@
     // drop, and telegraphed, and at Paul's numbers a bite stays open
     // for several returns, so what he mostly asks for is aim.
     let IDOL_LVL       = 2;
+    // His death (idolDie): the stone still on him crumbles off from where the
+    // last blow landed, outward, while the colour goes, and he trembles harder
+    // and harder until the head under it bursts. Whatever stone is still on
+    // him then goes with the blast.
+    let IDOL_DIE_PEEL  = 1.2;    // seconds from the blow until the last of the stone lets go, if the blast has not had it
+    let IDOL_DIE_SHAKE = 4;      // px he trembles by, at most, just before he bursts
+    let IDOL_DIE_BLAST = 420;    // px/s the pieces of his head burst out at
+    LAB_KNOBS.push('IDOL_DIE_PEEL', 'IDOL_DIE_SHAKE', 'IDOL_DIE_BLAST');
     LAB_KNOBS.push('IDOL_LVL', 'IDOL_HP', 'IDOL_W', 'IDOL_Y', 'IDOL_BITE', 'IDOL_SPIN',
                    'IDOL_BRICK', 'IDOL_CRACK', 'IDOL_CRACK_MAX', 'IDOL_CRACK_W',
                    'IDOL_STREAK_GAP', 'IDOL_WALK', 'IDOL_WAIT_MIN',
@@ -199,14 +207,14 @@
             }
             const done = b.hp <= 1e-6;
             award(BOSS_PTS * (done ? 5 : 1), cx, cy);
-            if (done) { idolDie(b); return; }
+            if (done) { idolDie(b, cx, cy); return; }
             if (bossHits % BOSS_CAP === 0 && !capsule) {
                 capsule = { x: cx, y: cy, kind: labCapKind() };
             }
             if (++hits === 4 || hits === 12) bumpSpeed(1.12);
         },
         draw: idolDraw,
-        drawFall() { labHeadFall(idolDrawChips); },
+        drawFall() { idolDying(); labHeadFall(idolDrawChips); },
         climb() { return IDOL_CLIMB; },
         finish(b) {
             b.hp = Math.min(b.hp, 1);
@@ -552,16 +560,23 @@
         if (!n && near && nd < r * 2) idolFall(coat, b, near);
     }
 
-    // one piece off him: gone from the coat, and falling as itself
-    function idolFall(coat, b, pc) {
+    // one piece off him: gone from the coat, and falling as itself. `blast`,
+    // his head bursting under it, throws it out from his middle instead
+    function idolFall(coat, b, pc, blast = 0, cap = IDOL_CHIPS_MAX) {
         pc.on = false;
         coat.dirty = true;
-        if (idol.chips.length >= IDOL_CHIPS_MAX) return;
+        if (idol.chips.length >= cap) return;
         const m = idolPieceAt(coat, b, pc), k = bw / coat.W;
-        const out = Math.sign(m.x - (b.x + bw / 2)) || 1;
-        idol.chips.push({ coat, pc, x0: m.x, y0: m.y, w: pc.w * k, h: pc.h * k,
-                          vx: out * (30 + Math.random() * 90), vy: -60 - Math.random() * 90,
-                          va: (Math.random() - 0.5) * 8, t0: clock, life: 1.3 + Math.random() * 0.5 });
+        const ox = m.x - (b.x + bw / 2), oy = m.y - (b.y + bh / 2);
+        const out = Math.sign(ox) || 1;
+        let vx = out * (30 + Math.random() * 90), vy = -60 - Math.random() * 90;
+        if (blast) {
+            const l = Math.hypot(ox, oy) || 1, s = blast * (0.5 + 0.7 * Math.random());
+            vx = ox / l * s;
+            vy = oy / l * s - blast * 0.3;
+        }
+        idol.chips.push({ coat, pc, x0: m.x, y0: m.y, w: pc.w * k, h: pc.h * k, vx, vy,
+                          va: (Math.random() - 0.5) * (blast ? 16 : 8), t0: clock, life: 1.3 + Math.random() * 0.5 });
     }
 
     // a puff of grit, for what does not come off in pieces
@@ -623,29 +638,67 @@
         ctx.globalAlpha = 1;
     }
 
-    // He dies in whatever stone he still had on: the colour goes out of the
-    // bare face under it and he comes apart with the coats still on him.
-    function idolDie(b) {
+    // He dies in whatever stone he still had on, and it crumbles off him
+    // (idolDying) while the colour goes out of the face under it; then the
+    // bare grey head bursts, out from its middle, rather than peeling away
+    // chin first the way a body does.
+    const IDOL_DIE_STEP = 0.05;      // the stone lets go in clumps this far apart, so he is rebaked a few times, not every frame
+    const IDOL_DIE_CHIPS = 600;      // ...and all of it may be in the air at once
+    function idolDie(b, cx, cy) {
         b.alive = false;
         clearStage();
         labHeadDied(b.x + bw / 2, b.y + bh / 2, bw);
         bossFall.cover = (x, y, w, h) => { idolDrawCoat(idol.brick, x, y, w, h); idolDrawCoat(idol.stone, x, y, w, h); };
-        bossFall.crumble = idolDeadSprite();
+        // each piece still on him lets go when the wave out from the blow
+        // reaches it, the rubble a little after the stone over it
+        const far = Math.max(bw, bh);
+        for (const coat of [idol.stone, idol.brick]) {
+            for (const pc of coat.pieces) {
+                if (!pc.on) continue;
+                const m = idolPieceAt(coat, b, pc);
+                const go = IDOL_DIE_PEEL * (0.1 + 0.75 * Math.min(1, Math.hypot(m.x - cx, m.y - cy) / far) +
+                                            (coat === idol.brick ? 0.1 : 0) + 0.15 * Math.random());
+                pc.go = Math.round(go / IDOL_DIE_STEP) * IDOL_DIE_STEP;
+            }
+        }
+        for (const p of bossFall.pieces) {
+            const du = (p.u + 0.5) / HEAD_COLS - 0.5, dv = (p.v + 0.5) / HEAD_ROWS - 0.5;
+            const a = Math.random() * Math.PI * 2, s = IDOL_DIE_BLAST * (0.7 + 0.6 * Math.random());
+            p.vx = du * 2 * s + Math.cos(a) * s * 0.25;
+            p.vy = dv * 2 * s + Math.sin(a) * s * 0.25 - s * 0.2;
+            p.spin = (Math.random() - 0.5) * 7;
+            p.wait = Math.random() * 0.06;
+        }
+        idol.die = { x: bossFall.x, blown: false };
     }
 
-    // the grey head with both coats as they were, for coming apart
-    function idolDeadSprite() {
-        const grey = headSprite2('grey');
-        if (!grey) return null;
-        const c = document.createElement('canvas');
-        c.width = grey.width; c.height = grey.height;
-        const g = c.getContext('2d');
-        g.drawImage(grey, 0, 0);
-        for (const coat of [idol.brick, idol.stone]) {
-            const k = idolBake(coat);
-            if (k) g.drawImage(k, 0, 0, c.width, c.height);
+    // His death, frame by frame, in step with the takeover's clock: the stone
+    // letting go, the tremor building, and at A_DIE the burst, which takes
+    // what stone is left with it. Run from his drawFall, since nothing steps
+    // him once he is dead.
+    function idolDying() {
+        const c = bossFall, d = idol && idol.die;
+        if (!c || !c.head || !d) return;
+        const t = ascendT, blast = t >= A_DIE;
+        const wilt = Math.max(0, Math.min(1, t / A_DIE)), e = wilt * wilt * (3 - 2 * wilt);
+        const k = Math.max(0, Math.min(1, (t - A_DIE * 0.35) / (A_DIE * 0.65)));
+        c.x = d.x + (blast ? 0 : Math.sin(clock * 55) * IDOL_DIE_SHAKE * k * k);
+        // where labHeadFall is drawing him this frame, sag and tremor and all
+        const at = { x: c.x - bw / 2, y: c.y - bh / 2 + e * F_SAG };
+        for (const coat of [idol.stone, idol.brick]) {
+            for (const pc of coat.pieces) {
+                if (pc.on && (blast || t >= pc.go)) idolFall(coat, at, pc, blast ? IDOL_DIE_BLAST : 0, IDOL_DIE_CHIPS);
+            }
         }
-        return c;
+        if (blast && !d.blown) {
+            d.blown = true;
+            for (let i = 0; i < 40; i++) {
+                const a = Math.random() * Math.PI * 2, r = Math.random();
+                idolDust(c.x + Math.cos(a) * bw * 0.4 * r, c.y + F_SAG + Math.sin(a) * bh * 0.4 * r);
+            }
+        }
+        idol.chips = idol.chips.filter(q => clock - q.t0 < q.life);
+        idol.dust = idol.dust.filter(q => clock - q.t0 < q.life);
     }
 
     // The sprite one piece is drawn with: a Brandon carved the way the
