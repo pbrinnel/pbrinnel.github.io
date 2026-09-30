@@ -38,20 +38,20 @@
     // body is open only until it is whole. Open, he sags GL_SAG into the
     // field and thrashes -- rocks GL_THRASH either side of GL_TILT, his
     // collar swinging wider -- and the stump of his neck spits a burst of its
-    // own. Empty the body in time and he is done, the big head blowing up
-    // with him, grown or not. Once it is whole the stone is back; tear it
-    // loose and the body opens again with whatever it had left.
+    // own. From then on the body and the big head are one pool (glGrowBig),
+    // so a hit on either counts and the bar along the top is the truth. Once
+    // the head is whole the stone is back; when the pool is down to the
+    // head's loose hits it tears free and the body opens again.
     //
     // The big head is GL_BIG times the size. It fires three ways at once,
     // down its neck and out to both sides -- the way through is the diagonals
     // under it -- and its bite STUNS as well (GL_BIG_STUN), the one thing in
     // the fight that does, so it stays a surprise. Loose, it is the chase the
-    // fight ends on: GL_BIG_LOOSE_HP hits, faster than a small one, knocked
-    // across the field by every one of them, and it bounces off you rather
-    // than bursting. The last of him is whichever goes first: finish the big
-    // head and it is thrown into his body (GL_FINALE) and the two blow up
-    // together; empty the body and the big head goes up with it. The bar
-    // drops to nothing either way.
+    // fight ends on: the pool's last GL_BIG_LOOSE_HP hits, faster than a
+    // small one, knocked across the field by every one of them, and it
+    // bounces off you rather than bursting. The pool's last hit, on the head
+    // or the body, throws the head into his body (GL_FINALE) and the two
+    // blow up together, the bar at nothing.
     //
     // The one bar, along the top, is all of it: the small heads, loose hits
     // and all, the body, and the big head, which is counted from the start.
@@ -206,7 +206,7 @@
     // the big head's hits to tear loose
     const glBigHp = () => Math.max(1, Math.round(GL_BIG_HP));
     // what a head still has in it, loose hits and all
-    const glLeft = k => k.loose ? k.hp : k.hp + (k.big ? GL_BIG_LOOSE_HP : GL_LOOSE_HP);
+    const glLeft = k => k.loose || k.big ? k.hp : k.hp + GL_LOOSE_HP;
 
     let gl = null;
 
@@ -462,8 +462,8 @@
             const lg = gl.heads.find(k => k.lg);
             return { name: 'GLEEOK', hp: b.hp, max: b.maxHp, w: GL_W,
                      line: on + ' on him · ' + loose + ' loose · ' +
-                           (glOpen() ? 'body open ' + gl.body + '/' + GL_BODY_HP : 'body shut') +
-                           (big ? ' · big head ' + (big.grow >= 0 ? 'growing' : big.loose ? 'loose' : big.hp + '/' + glBigHp()) : '') +
+                           (glOpen() ? 'body open' + (big ? '' : ' ' + gl.body + '/' + GL_BODY_HP) : 'body shut') +
+                           (big ? ' · big head ' + (big.grow >= 0 ? 'growing' : big.loose ? 'loose' : 'on its neck') + ', pool ' + big.hp : '') +
                            (lg ? ' · lunge: ' + lg.lg.st + (lg.lg.hold ? ', held ' + lg.lg.hold.toFixed(1) + 's for a ball' : '') : '') };
         }
     };
@@ -579,16 +579,18 @@
         ball.vy = Math.cos(GL_CHIN) * s;
     }
 
-    // A head hurt, by the ball or by a head shot into it. On a neck, its last
-    // hit tears it loose; loose, the big one's last is the end of him.
+    // A head hurt, by the ball or by a head shot into it. On a neck, a small
+    // one's last hit tears it loose, and the big one tears loose when the
+    // pool (glGrowBig) is down to its last GL_BIG_LOOSE_HP. The pool empty,
+    // from the big head or the body, is the end of him.
     function glWound(k, n, cx, cy) {
         k.flash = 1;
         k.hp = Math.max(0, k.hp - n);
-        if (k.hp > 0) { award(BOSS_PTS * n, cx, cy); return; }
-        if (!k.loose) {
+        const tear = k.big ? k.hp > 0 && k.hp <= GL_BIG_LOOSE_HP && k.grow < 0 : k.hp <= 0;
+        if (!k.loose && tear) {
             // torn loose: still alive, and now it has the run of the field
             k.loose = true;
-            k.hp = k.big ? GL_BIG_LOOSE_HP : GL_LOOSE_HP;
+            if (!k.big) k.hp = GL_LOOSE_HP;
             k.charge = 0; k.shots = 0; k.jx = 0; k.lg = null; k.roll = 0; k.iF = 0;
             gl.torn++;
             const a = Math.PI * (0.15 + Math.random() * 0.7);
@@ -599,18 +601,23 @@
             maybeDropCapsule(cx, cy);
             return;
         }
+        if (k.hp > 0) { award(BOSS_PTS * n, cx, cy); return; }
         award(BOSS_PTS * (k.big ? 5 : 3), cx, cy);
         if (!k.big) { glPop(k); return; }
         // the big one finished: thrown into his body, and that is the end of both
         gl.finale = { k, t: 0, x0: k.x, y0: k.y };
     }
 
-    // The open body hurt. Emptied, he is done, and the big head -- whole,
-    // loose or still growing -- blows up with him.
+    // The open body hurt. With the big head out, that is the pool (glWound),
+    // and the head flashes with it; the last hit throws it into the body and
+    // the two blow up together, whichever of them took it. Without one -- the
+    // lab's jumps -- emptied, he is done.
     function glBodyWound(n, cx, cy) {
-        gl.body = Math.max(0, gl.body - n);
         gl.bodyFlash = 1;
         gl.bodyIF = BOSS_IF;
+        const big = gl.heads.find(k => k.alive && k.big);
+        if (big) { glWound(big, n, cx, cy); return; }
+        gl.body = Math.max(0, gl.body - n);
         award(BOSS_PTS * (gl.body <= 0 ? 5 : n), cx, cy);
         if (gl.body > 0) return;
         for (const k of gl.heads) if (k.alive && k.big) glBoom(k);
@@ -691,9 +698,12 @@
     }
 
     // The big head, out of the middle of the collar, once and for good.
+    // From here on the body and the big head are one pool, kept as the big
+    // head's hp: what the body had, its own hits, and its loose ones.
     function glGrowBig() {
         gl.bigUsed = true;
         const k = glHead(0, true);
+        k.hp = gl.body + glBigHp() + GL_BIG_LOOSE_HP;
         k.grow = 0;
         k.x = k.bx = gl.cx; k.y = k.by = gl.cy;
         gl.heads.push(k);
@@ -1044,8 +1054,8 @@
         }
         b.x = x0; b.y = y0; bw = x1 - x0; bh = y1 - y0;
         // everything left to hit, the big head from the start, so it only goes down
-        b.hp = gl.finale ? 0 : gl.heads.reduce((s, k) => s + (k.alive ? glLeft(k) : 0), 0) + gl.body +
-               (gl.bigUsed ? 0 : glBigHp() + GL_BIG_LOOSE_HP);
+        b.hp = gl.finale ? 0 : gl.heads.reduce((s, k) => s + (k.alive ? glLeft(k) : 0), 0) +
+               (gl.bigUsed ? 0 : gl.body + glBigHp() + GL_BIG_LOOSE_HP);
     }
 
     // ---- looks being tried out (the GL_LOOK_ switches) ---------------------------
@@ -1517,7 +1527,6 @@
                     ctx.drawImage(headSprite2('flat', '#f2efe9'), -lw / 2, -lh / 2, lw, lh);
                 }
                 ctx.restore();
-                if (k.big && k.hp < GL_BIG_LOOSE_HP) labBar(k.x - lw * 0.35, k.y - lh / 2 - 7, lw * 0.7, k.hp / GL_BIG_LOOSE_HP, 3);
                 continue;
             }
             ctx.save();
@@ -1546,8 +1555,9 @@
                 }
             }
             // what it has left, over it, the way the wall's bricks wear theirs
-            const full = k.loose ? GL_LOOSE_HP : k.big ? glBigHp() : GL_HEAD_HP;
-            if (k.hp < full) labBar(k.x - hw * 0.35, k.y - hh / 2 - 7, hw * 0.7, k.hp / full, 3);
+            // not the big head's: its pool is the bar along the top
+            const full = k.loose ? GL_LOOSE_HP : GL_HEAD_HP;
+            if (!k.big && k.hp < full) labBar(k.x - hw * 0.35, k.y - hh / 2 - 7, hw * 0.7, k.hp / full, 3);
         }
         gl.pops = gl.pops.filter(p => clock - p.t0 < GL_POP_SECS);
         for (const p of gl.pops) {
