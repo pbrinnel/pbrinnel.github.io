@@ -3157,7 +3157,8 @@
         // little spin off and leave the rest turning the way it was -- one that
         // reversed it would undo whatever the last hit built, half the time
         const rx = extX(b), ry = extY(b);
-        if (!powWrap(b)) {       // PORTAL takes the side walls away
+        const walled = !powWrap(b);      // PORTAL takes the side walls away
+        if (walled) {
             if (b.x - rx < 0)  { b.x = rx;      b.vx =  Math.abs(b.vx); b.spin *= SPIN_WALL; }
             if (b.x + rx > LW) { b.x = LW - rx; b.vx = -Math.abs(b.vx); b.spin *= SPIN_WALL; }
         }
@@ -3263,20 +3264,36 @@
                 // lands this is exactly its own radius, as it was off his top
                 const above = rest + lry - ly;
                 const out = Math.max(0, Math.abs(lx) - hw);
-                if (above <= 0 || above / lry < out / lrx) {
-                    const dir = lx < 0 ? -1 : 1;
+                const beside = above <= 0 || above / lry < out / lrx;
+                const dir = lx < 0 ? -1 : 1;
+                const nx = dir * (hw + lrx);
+                const bx = sg.cx + nx * ca - ly * sa;
+                // ...but only where there is room out there to fall into. An
+                // end turned UP near a wall leaves a gap narrower than a head:
+                // pushed out, which is up and into the wall, it met the wall,
+                // fell back onto his end and was pushed out again, every step,
+                // and hung there -- for good once the end could not turn away
+                // without taking it (see turnBites). With nowhere to fall it
+                // comes back off his end. An end turned down opens below itself,
+                // and 1e-3 is the dust an easing dip leaves on the way to level.
+                const wedged = beside && walled && dir * a < -1e-3 && (dir < 0 ? bx - rx <= 0 : bx + rx >= LW);
+                if (beside && !wedged) {
                     const push = Math.max(Math.abs(b.vx), s * 0.25, Math.min(s, dir * paddle.vx));
-                    const nx = dir * (hw + lrx);
-                    b.x = sg.cx + nx * ca - ly * sa;
+                    b.x = bx;
                     b.y = py + nx * sa + ly * ca;
                     b.vx = dir * push;
                     b.vy = Math.max(b.vy, push * 0.5);
                     break;
                 }
 
-                const ny = rest;                       // set down on the surface
-                b.x = sg.cx + lx * ca - ny * sa;
-                b.y = py + lx * sa + ny * ca;
+                // set down on the surface. a wedged head leaves from where it
+                // is: it has sunk past his top, and setting it down there
+                // would lift it a head or more in one step
+                if (!wedged) {
+                    const ny = rest;
+                    b.x = sg.cx + lx * ca - ny * sa;
+                    b.y = py + lx * sa + ny * ca;
+                }
 
                 // where it lands on him sets the angle, and if he is wiggling
                 // then the lean he happens to be at goes into the shot too. the
