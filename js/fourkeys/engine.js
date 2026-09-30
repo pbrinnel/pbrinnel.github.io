@@ -2792,14 +2792,14 @@
     // when the ball got away cannot pick anything by lifting, because it never
     // pressed anything on this screen.
     //
-    // The continue's price is not printed on it. You find out what it costs by
-    // paying it -- the score halves in the HUD on the way back in, which is the
-    // honest moment to learn it, and it keeps the choice a gamble rather than a
-    // sum you can do in advance.
+    // The continue's price is printed under it (Paul, 29 Sep 2026), as a
+    // percentage off rather than a new total so it reads as a one-time cut.
+    // Only the score's: what a continue costs a paddle is left for the win to tell.
     function overButtons() {
         const w = 300, h = 58, y = PADDLE_Y - h / 2;
         return [
-            { key: 'continue', label: 'CONTINUE', x: 56, y, w, h },
+            { key: 'continue', label: 'CONTINUE', x: 56, y, w, h,
+              note: 'Score −' + Math.round((1 - CONTINUE_KEEP) * 100) + '%' },
             { key: 'end',      label: 'END RUN',  x: LW - 56 - w, y, w, h }
         ];
     }
@@ -2849,7 +2849,8 @@
                 continue;
             }
             const size = fitSize(b.label, 17 * uiScale, b.w - 24);
-            const x = b.x + b.w / 2, y = b.y + b.h / 2 + size * 0.35;
+            // with a note under it, the label rides up to make room in the box
+            const x = b.x + b.w / 2, y = b.y + b.h * (b.note ? 0.4 : 0.5) + size * 0.35;
             ctx.font = size + 'px "Fira Sans", "Trebuchet MS", sans-serif';
             ctx.textAlign = 'center';
             ctx.lineWidth = 5;                       // knocked out of him
@@ -2857,6 +2858,15 @@
             ctx.strokeText(b.label, x, y);
             ctx.fillStyle = on ? '#f2efe9' : '#8d877d';
             ctx.fillText(b.label, x, y);
+            if (b.note) {
+                const ns = fitSize(b.note, 11 * uiScale, b.w - 24);
+                const ny = b.y + b.h * 0.8 + ns * 0.35;
+                ctx.font = ns + 'px "Fira Sans", "Trebuchet MS", sans-serif';
+                ctx.lineWidth = 4;
+                ctx.strokeText(b.note, x, ny);
+                ctx.fillStyle = '#6d685f';
+                ctx.fillText(b.note, x, ny);
+            }
         }
     }
 
