@@ -46,6 +46,12 @@
     // him straight back up, quickly (IDOL_RISE_QUICK), so you are never left
     // walled off from your own head.
     //
+    // He does not drop on a head under him: falling, he knocks it straight
+    // down ahead of him, a spike nobody could answer. At the end of his
+    // shake he holds, still shaking, until no head is under him or about to
+    // be (IDOL_CLEAR_LOOK), and drops anyway after IDOL_CLEAR_MAX so a
+    // rally under him cannot keep him up there.
+    //
     // Under IDOL_HURT_AT of his health he attacks IDOL_HURT_PACE times as
     // often, and every other attack is a double stomp: the same tell, then
     // two drops, each quicker than the single one -- he falls harder, stays
@@ -69,6 +75,8 @@
     let IDOL_DROP_MAX  = 13;     // ...and at most
     let IDOL_SHAKE     = 1.5;    // the shaking before a drop, which is the tell
     let IDOL_SHAKE_PX  = 5;      // ...and how hard
+    let IDOL_CLEAR_LOOK = 0.25;  // seconds ahead a head's path is read for whether it will be under him
+    let IDOL_CLEAR_MAX = 1.2;    // ...and seconds at most he holds for it
     let IDOL_G         = 2600;   // px/s^2 he falls at
     let IDOL_DOWN      = 3;      // seconds he stays down
     let IDOL_RISE      = 150;    // px/s he goes back up at
@@ -98,6 +106,7 @@
     let IDOL_DIE_PEEL  = 1.2;    // seconds from the blow until the last of the stone lets go, if the blast has not had it
     let IDOL_DIE_SHAKE = 4;      // px he trembles by, at most, just before he bursts
     let IDOL_DIE_BLAST = 420;    // px/s the pieces of his head burst out at
+    LAB_KNOBS.push('IDOL_CLEAR_LOOK', 'IDOL_CLEAR_MAX');
     LAB_KNOBS.push('IDOL_DIE_PEEL', 'IDOL_DIE_SHAKE', 'IDOL_DIE_BLAST');
     LAB_KNOBS.push('IDOL_LVL', 'IDOL_HP', 'IDOL_W', 'IDOL_Y', 'IDOL_BITE', 'IDOL_SPIN',
                    'IDOL_BRICK', 'IDOL_CRACK', 'IDOL_CRACK_MAX', 'IDOL_CRACK_W',
@@ -126,7 +135,7 @@
             b.y = -(bh + 40);
             idol = { stone: idolCoat(IDOL_STONE), brick: idolCoat(IDOL_BRICKS), chips: [], dust: [], t: 0, pend: null, bites: 0, streak: 0, lastHit: -99,
                      x: LW / 2, tx: LW / 2, wander: IDOL_WAIT_MIN, cy: IDOL_Y,
-                     stage: 'idle', st: 0, vy: 0, jx: 0, pin: null, side: 0, drops: 0,
+                     stage: 'idle', st: 0, vy: 0, jx: 0, pin: null, side: 0, drops: 0, balk: 0, balks: 0,
                      doubles: 0, dblNext: true, dbl: 0, debris: [], debrisHits: 0, recoils: 0, crownBites: 0,
                      next: IDOL_DROP_MIN + Math.random() * (IDOL_DROP_MAX - IDOL_DROP_MIN) };
         },
@@ -226,7 +235,7 @@
             const bare = gone(idol.brick);
             return { name: 'IDOL', hp: b.hp, max: b.maxHp, w: bw,
                      line: 'stone ' + gone(idol.stone) + '% off, rubble ' + bare + '% off · ' + idol.bites + ' bites · streak ' + idol.streak + ' · ' +
-                           idol.stage + (idol.pin ? ', pinning you' : '') + ' · ' + idol.drops + ' drops, ' +
+                           idol.stage + (idol.pin ? ', pinning you' : '') + ' · ' + idol.drops + ' drops (' + idol.balks + ' held for a head under him), ' +
                            idol.doubles + ' double stomps · ' + idol.recoils + ' knocked back · ' + idol.crownBites +
                            ' crown bites · debris ' + idol.debrisHits + ' on you' };
         }
@@ -303,7 +312,14 @@
                 }
                 // a tremor that builds, not a strobe: he moves, nothing flashes
                 idol.jx = Math.sin(idol.st * 55) * IDOL_SHAKE_PX * Math.min(1, idol.st / 0.6);
-                if (idol.st >= (second ? IDOL_STOMP_SHAKE : IDOL_SHAKE)) { idol.stage = 'fall'; idol.vy = 0; idol.drops++; }
+                if (idol.st < (second ? IDOL_STOMP_SHAKE : IDOL_SHAKE)) break;
+                // a head under him holds him up, shaking, until it is clear
+                if (idolHeadUnder() && (idol.balk += dt) < IDOL_CLEAR_MAX) {
+                    if (idol.balk <= dt) idol.balks++;
+                    break;
+                }
+                idol.balk = 0;
+                idol.stage = 'fall'; idol.vy = 0; idol.drops++;
                 break;
             }
             case 'fall': {
@@ -365,6 +381,16 @@
         const l = Math.hypot(nx, ny) || 1;
         const side = ball.x < idol.x ? -1 : 1;
         labSteer(ball, { nx: nx / l, ny: ny / l }, idol.x + side * (bw / 2 + 80), idol.cy, 0.6);
+    }
+
+    // Whether a head in play is below him and across his width, or will be
+    // within IDOL_CLEAR_LOOK on its way: one he would spike if he dropped.
+    // One on the paddle waiting to be served is going nowhere yet.
+    function idolHeadUnder() {
+        const reach = bw / 2 + BALL_RX;
+        return balls.some(q => !q.stuck && q.y > idol.cy &&
+                          Math.min(q.x, q.x + q.vx * IDOL_CLEAR_LOOK) < idol.x + reach &&
+                          Math.max(q.x, q.x + q.vx * IDOL_CLEAR_LOOK) > idol.x - reach);
     }
 
     // in his second phase: under IDOL_HURT_AT of his health
