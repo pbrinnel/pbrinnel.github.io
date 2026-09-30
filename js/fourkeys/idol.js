@@ -17,7 +17,9 @@
     // make a streak, and every bite in a streak after the first cracks the
     // coat it struck inward from where it landed, toward the middle of him --
     // IDOL_CRACK further for each hit in the streak. A long rally splits him
-    // open; a lost head or a pause of IDOL_STREAK_GAP starts it over.
+    // open; a lost head or a pause of IDOL_STREAK_GAP starts it over. A
+    // wound cracks him too, whatever the streak (idolWound), so a hit that
+    // hurts him looks like one rather than only costing him health.
     //
     // A spinning head takes a bigger
     // bite, so the SPIN rule under BONUS reads how much the next hit will
@@ -66,6 +68,12 @@
     let IDOL_CRACK     = 22;     // px a crack runs inward, per hit in the streak after the first
     let IDOL_CRACK_MAX = 200;    // ...and at most
     let IDOL_CRACK_W   = 13;     // px either side of its line a crack clears
+    let IDOL_WOUND_CRACKS = 3;   // cracks a hit on bare face sends toward his middle (idolWound)
+    let IDOL_WOUND_BLOCKS = 2;   // ...blocks each breaks
+    let IDOL_WOUND_CRACK = 160;  // ...and px each runs at most, looking for them
+    let IDOL_WOUND_FAN = 1.6;    // ...radians they fan across
+    let IDOL_WOUND_SPEED = 700;  // ...px/s they run at
+    let IDOL_WOUND_BLAST = 220;  // ...and px/s what they knock off is thrown at
     let IDOL_STREAK_GAP = 4;     // seconds between hits before the streak is lost
     let IDOL_SPIN      = 1;      // ...and this much bigger again at max-bonus spin
     let IDOL_WALK      = 45;     // px/s he wanders at
@@ -107,6 +115,7 @@
     let IDOL_DIE_PEEL  = 1.2;    // seconds from the blow until the last of the stone lets go, if the blast has not had it
     let IDOL_DIE_SHAKE = 4;      // px he trembles by, at most, just before he bursts
     let IDOL_DIE_BLAST = 420;    // px/s the pieces of his head burst out at
+    LAB_KNOBS.push('IDOL_WOUND_CRACKS', 'IDOL_WOUND_BLOCKS', 'IDOL_WOUND_CRACK', 'IDOL_WOUND_FAN', 'IDOL_WOUND_SPEED', 'IDOL_WOUND_BLAST');
     LAB_KNOBS.push('IDOL_CLEAR_LOOK', 'IDOL_CLEAR_MAX', 'IDOL_SQUIRT');
     LAB_KNOBS.push('IDOL_DIE_PEEL', 'IDOL_DIE_SHAKE', 'IDOL_DIE_BLAST');
     LAB_KNOBS.push('IDOL_LVL', 'IDOL_HP', 'IDOL_W', 'IDOL_Y', 'IDOL_BITE', 'IDOL_SPIN',
@@ -134,7 +143,7 @@
             b.hp = b.maxHp = IDOL_HP;
             b.x = (LW - bw) / 2;
             b.y = -(bh + 40);
-            idol = { stone: idolCoat(IDOL_STONE), brick: idolCoat(IDOL_BRICKS), chips: [], dust: [], t: 0, pend: null, bites: 0, streak: 0, lastHit: -99,
+            idol = { stone: idolCoat(IDOL_STONE), brick: idolCoat(IDOL_BRICKS), chips: [], dust: [], cracks: [], t: 0, pend: null, bites: 0, streak: 0, lastHit: -99,
                      x: LW / 2, tx: LW / 2, wander: IDOL_WAIT_MIN, cy: IDOL_Y,
                      stage: 'idle', st: 0, vy: 0, jx: 0, pin: null, side: 0, drops: 0, balk: 0, balks: 0,
                      doubles: 0, dblNext: true, dbl: 0, debris: [], debrisHits: 0, recoils: 0, crownBites: 0,
@@ -159,6 +168,7 @@
             b.x = idol.x + idol.jx - bw / 2;
             b.y = idol.cy - bh / 2;
             idolDebrisStep(dt);
+            idolCrackStep(b, dt);
             idol.chips = idol.chips.filter(c => clock - c.t0 < c.life);
             idol.dust = idol.dust.filter(c => clock - c.t0 < c.life);
         },
@@ -218,6 +228,7 @@
             const done = b.hp <= 1e-6;
             award(BOSS_PTS * (done ? 5 : 1), cx, cy);
             if (done) { idolDie(b, cx, cy); return; }
+            idolWound(b, cx, cy);
             if (bossHits % BOSS_CAP === 0 && !capsule) {
                 capsule = { x: cx, y: cy, kind: labCapKind() };
             }
@@ -660,6 +671,54 @@
                 if (Math.hypot(m.x - px, m.y - py) < IDOL_CRACK_W) idolFall(coat, b, pc);
             }
         }
+    }
+
+    // A wound shakes him: IDOL_WOUND_CRACKS cracks race out from it across
+    // IDOL_WOUND_FAN toward his middle, at IDOL_WOUND_SPEED, and grit puffs
+    // where it landed. Each runs until it has thrown IDOL_WOUND_BLOCKS blocks
+    // clear of him, or IDOL_WOUND_CRACK, so every wound breaks about as much
+    // as the first did, however much of him is gone. It goes through the
+    // stone, and through the rubble only where the stone is gone already,
+    // so his cover comes off from the outside in; each wound costs him about
+    // one ordinary bite's worth of it, which IDOL_WOUND_BLOCKS trades against.
+    function idolWound(b, x, y) {
+        const n = Math.max(0, Math.round(IDOL_WOUND_CRACKS));
+        const mid = Math.atan2(b.y + bh / 2 - y, b.x + bw / 2 - x);
+        for (let i = 0; i < n; i++) {
+            const turn = n > 1 ? IDOL_WOUND_FAN * (i / (n - 1) - 0.5) : 0;
+            idol.cracks.push({ u: x - b.x, v: y - b.y, ang: mid + turn, left: IDOL_WOUND_CRACK,
+                               blocks: IDOL_WOUND_BLOCKS, go: 0 });
+        }
+        for (let i = 0; i < 14; i++) idolDust(x, y);
+    }
+
+    // the wound's cracks, a step at a time, riding on him as he moves
+    function idolCrackStep(b, dt) {
+        const step = IDOL_CRACK_W * 0.6;
+        // every block of a coat it runs across, so it reads as one line
+        const under = (coat, px, py) => {
+            const k = bw / coat.W;
+            return coat.pieces.filter(pc => {
+                if (!pc.on) return false;
+                const m = idolPieceAt(coat, b, pc);
+                return Math.abs(m.x - px) < pc.w * k * 0.45 && Math.abs(m.y - py) < pc.h * k * 0.45;
+            });
+        };
+        for (const c of idol.cracks) {
+            c.go += IDOL_WOUND_SPEED * dt;
+            while (c.go >= step && c.left > 0 && c.blocks > 0) {
+                c.go -= step;
+                c.left -= step;
+                c.ang += (Math.random() - 0.5) * 0.5;
+                c.u += Math.cos(c.ang) * step;
+                c.v += Math.sin(c.ang) * step;
+                const px = b.x + c.u, py = b.y + c.v;
+                let coat = idol.stone, hit = under(coat, px, py);
+                if (!hit.length) { coat = idol.brick; hit = under(coat, px, py); }
+                for (const pc of hit) { idolFall(coat, b, pc, IDOL_WOUND_BLAST); c.blocks--; }
+            }
+        }
+        idol.cracks = idol.cracks.filter(c => c.left > 0 && c.blocks > 0);
     }
 
     function idolChip(b, coat, x, y, r) {
