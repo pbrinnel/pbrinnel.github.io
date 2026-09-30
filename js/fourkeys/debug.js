@@ -4,10 +4,11 @@
     // What the konami code opens, and fourkeys.html?debug on a phone. The town
     // is the whole of the game's progress, so this is the whole of the cheat
     // menu: hand yourself a key, a paddle or a memory, or put it all back --
-    // and, inside a level, skip the screen you are on.
+    // and, inside a level, skip the screen you are on or go straight to its boss.
     //
     // It reaches the town through menuLevels/menuPads/menuMemories/menuHas/
-    // menuSet/menuSkip/menuSkipName and nothing else, so it never has to know
+    // menuSet/menuSkip/menuSkipName/menuSkipBoss/menuCanSkipBoss and nothing
+    // else, so it never has to know
     // where any of it is kept.
     //
     // engine.js owns the panel itself -- the konami code, the escape key, the
@@ -42,6 +43,15 @@
             win.hidden = !name;
             win.textContent = 'win ' + (name || '');
         });
+
+        // and past both walls at once, on a level with a boss at the end
+        const boss = document.createElement('button');
+        boss.textContent = 'skip to boss';
+        boss.addEventListener('click', () => {
+            if (menuSkipBoss()) debugEl.hidden = true;
+        });
+        el.appendChild(boss);
+        dbgSync.push(() => { boss.hidden = !menuCanSkipBoss(); });
 
         // a column each, side by side: stacked they stood taller than a screen
         const cols = document.createElement('div');

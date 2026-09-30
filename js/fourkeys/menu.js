@@ -1009,6 +1009,24 @@
         return true;
     }
 
+    // The debug menu's skip to boss: straight to a level's last screen from
+    // either wall before it. Only the five town levels, whose last screen is
+    // always their boss; the walls passed over are not beaten, so nothing is
+    // counted for them.
+    function menuSkipBoss() {
+        if (!menuCanSkipBoss()) return false;
+        menu.run.over = false;
+        showCursor(false);
+        stage = LEVELS.length - 1;
+        buildStage(stage);
+        banner = '';
+        return true;
+    }
+    function menuCanSkipBoss() {
+        return !!(menu && menu.run && menu.run.n >= 1 && menu.run.n <= MENU_LAST.n
+                  && stage < LEVELS.length - 1);
+    }
+
     // what that button would beat, or null outside a level
     function menuSkipName() {
         if (!menu || !menu.run) return null;
