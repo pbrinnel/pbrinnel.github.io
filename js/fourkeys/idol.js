@@ -46,8 +46,8 @@
     // him straight back up, quickly (IDOL_RISE_QUICK), so you are never left
     // walled off from your own head.
     //
-    // He does not drop on a head under him: falling, he knocks it straight
-    // down ahead of him, a spike nobody could answer. At the end of his
+    // He does not drop on a head under him if he can help it: one he falls
+    // on is put out at his side (idolOut), which nobody lined up. At the end of his
     // shake he holds, still shaking, until no head is under him or about to
     // be (IDOL_CLEAR_LOOK), and drops anyway after IDOL_CLEAR_MAX so a
     // rally under him cannot keep him up there.
@@ -77,6 +77,7 @@
     let IDOL_SHAKE_PX  = 5;      // ...and how hard
     let IDOL_CLEAR_LOOK = 0.25;  // seconds ahead a head's path is read for whether it will be under him
     let IDOL_CLEAR_MAX = 1.2;    // ...and seconds at most he holds for it
+    let IDOL_SQUIRT    = 0.35;   // radians above level a head he falls on, or gets inside him, leaves at (idolOut)
     let IDOL_G         = 2600;   // px/s^2 he falls at
     let IDOL_DOWN      = 3;      // seconds he stays down
     let IDOL_RISE      = 150;    // px/s he goes back up at
@@ -106,7 +107,7 @@
     let IDOL_DIE_PEEL  = 1.2;    // seconds from the blow until the last of the stone lets go, if the blast has not had it
     let IDOL_DIE_SHAKE = 4;      // px he trembles by, at most, just before he bursts
     let IDOL_DIE_BLAST = 420;    // px/s the pieces of his head burst out at
-    LAB_KNOBS.push('IDOL_CLEAR_LOOK', 'IDOL_CLEAR_MAX');
+    LAB_KNOBS.push('IDOL_CLEAR_LOOK', 'IDOL_CLEAR_MAX', 'IDOL_SQUIRT');
     LAB_KNOBS.push('IDOL_DIE_PEEL', 'IDOL_DIE_SHAKE', 'IDOL_DIE_BLAST');
     LAB_KNOBS.push('IDOL_LVL', 'IDOL_HP', 'IDOL_W', 'IDOL_Y', 'IDOL_BITE', 'IDOL_SPIN',
                    'IDOL_BRICK', 'IDOL_CRACK', 'IDOL_CRACK_MAX', 'IDOL_CRACK_W',
@@ -171,12 +172,12 @@
             else idol.pend = { bare: true };
             return hit;
         },
-        // falling, he only knocks the ball down ahead of him: no chip, no wound
+        // falling, he only moves the ball out of his way: no chip, no wound
         touch(br, ball, hit) {
             idol.hitBall = ball;
             if (idol.stage !== 'fall') return false;
-            labBounce(ball, hit);
-            ball.vy = Math.abs(ball.vy);
+            if (ball.y > br.y + bh / 2) idolOut(br, ball);
+            else labBounce(ball, hit);
             idol.pend = null;
             return true;
         },
@@ -255,23 +256,36 @@
         }
     }
 
-    // A head whose middle has got inside him -- he fell past it faster than
-    // it was knocked ahead of him, or landed on it -- is shot back out of the
-    // top of his head, or out under his chin while his top is off the screen.
-    // Left in there it bounced off the inside of his outline and wounded him
-    // every BOSS_IF, which finished him in seconds. True if it moved one.
+    // A head he has come down on, or whose middle has got inside him anyway,
+    // is put out at his side at its own height, clear of his outline, and
+    // sent off away from him IDOL_SQUIRT above level: toward the wall with
+    // room for it, if one side has none. Falling he outruns any head, so one
+    // knocked down ahead of him was caught again every frame until it was
+    // deep in him; shot out of his top from there, it came down on his crown
+    // for a bite nobody aimed. Left inside, it bounced off the inside of his
+    // outline and wounded him every BOSS_IF, which finished him in seconds.
+    function idolOut(br, ball) {
+        const cx = br.x + bw / 2, cy = br.y + bh / 2, e = bh / 2, rx = extX(ball);
+        const dy = Math.max(-e, Math.min(e, ball.y - cy));
+        const out = bw / 2 * Math.sqrt(Math.max(0, 1 - (dy / e) * (dy / e))) + rx + 2;
+        let side = Math.sign(ball.x - cx) || (Math.random() < 0.5 ? -1 : 1);
+        // room for his whole width, not his width at its height: falling, he
+        // will be that wide there, and a head squeezed to a side that runs
+        // out of room would have to jump through him to the other
+        const room = sd => sd < 0 ? cx - bw / 2 - 2 * rx - 2 >= 0 : cx + bw / 2 + 2 * rx + 2 <= LW;
+        if (!room(side) && room(-side)) side = -side;
+        ball.x = cx + side * out;
+        const s = effSpeed() * (ball.boost || 1);
+        ball.vx = side * Math.cos(IDOL_SQUIRT) * s;
+        ball.vy = -Math.sin(IDOL_SQUIRT) * s;
+    }
+
+    // true, having put it out (idolOut), for a head whose middle is inside him
     const IDOL_INSIDE = 0.92;        // how deep, as a share of his outline, counts as inside
     function idolEject(br, ball) {
         const cx = br.x + bw / 2, cy = br.y + bh / 2;
-        const q = Math.hypot((ball.x - cx) / (bw / 2), (ball.y - cy) / (bh / 2));
-        if (q >= IDOL_INSIDE) return false;
-        const s = effSpeed() * (ball.boost || 1), ry = extY(ball);
-        const up = cy - bh / 2 - ry - 4 > ry;
-        ball.x = Math.max(extX(ball), Math.min(LW - extX(ball), ball.x));
-        ball.y = up ? cy - bh / 2 - ry - 4 : cy + bh / 2 + ry + 4;
-        const a = (Math.random() - 0.5) * 0.6;
-        ball.vx = Math.sin(a) * s;
-        ball.vy = (up ? -1 : 1) * Math.cos(a) * s;
+        if (Math.hypot((ball.x - cx) / (bw / 2), (ball.y - cy) / (bh / 2)) >= IDOL_INSIDE) return false;
+        idolOut(br, ball);
         return true;
     }
 
@@ -384,13 +398,19 @@
     }
 
     // Whether a head in play is below him and across his width, or will be
-    // within IDOL_CLEAR_LOOK on its way: one he would spike if he dropped.
+    // within IDOL_CLEAR_LOOK on its way: one he would land on if he dropped.
+    // Between him and a wall too close for a head to get out that way counts
+    // as under him, since idolOut could only put it out through him.
     // One on the paddle waiting to be served is going nowhere yet.
     function idolHeadUnder() {
-        const reach = bw / 2 + BALL_RX;
-        return balls.some(q => !q.stuck && q.y > idol.cy &&
-                          Math.min(q.x, q.x + q.vx * IDOL_CLEAR_LOOK) < idol.x + reach &&
-                          Math.max(q.x, q.x + q.vx * IDOL_CLEAR_LOOK) > idol.x - reach);
+        return balls.some(q => {
+            if (q.stuck || q.y <= idol.cy) return false;
+            const reach = bw / 2 + extX(q), shut = bw / 2 + 2 * extX(q) + 2;
+            const lo = idol.x - shut < 0 ? -Infinity : idol.x - reach;
+            const hi = idol.x + shut > LW ? Infinity : idol.x + reach;
+            return Math.min(q.x, q.x + q.vx * IDOL_CLEAR_LOOK) < hi &&
+                   Math.max(q.x, q.x + q.vx * IDOL_CLEAR_LOOK) > lo;
+        });
     }
 
     // in his second phase: under IDOL_HURT_AT of his health
