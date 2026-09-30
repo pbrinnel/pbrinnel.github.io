@@ -59,6 +59,7 @@
     let LAMP_LEAN_OUT = 0;    // ...and the one by the wall: upright, flat against it
     let LAMP_FOOT   = 31.5;   // px either side of a fire's middle their feet stand
     let LAMP_BASE   = 0.56;   // the log across their feet, as a share of a log (0: none -- but then a head can get up inside)
+    let LAMP_BASE_TILT = 0.52; // ...rad its inner end is raised by, so a head that comes up into it goes back out toward the middle, not straight down
     let LAMP_Y      = 225;    // the line they drift about: their feet no lower than LAMP_Y + LAMP_W / 2 * cos(LAMP_LEAN) + LAMP_BOB
     let LAMP_BOB    = 10;     // px either side of it they drift
     let LAMP_BOB_RATE = 0.4;  // rad/s of that drift
@@ -94,7 +95,7 @@
     let LAMP_DIE_FLARE   = 0.6; // seconds his fires blaze up as he dies...
     let LAMP_DIE_BURN    = 2.6; // ...then burn down through their logs, top to bottom...
     let LAMP_DIE_ASH     = 1.0; // ...and leave embers that die away
-    LAB_KNOBS.push('LAMP_LVL', 'LAMP_HP', 'LAMP_N', 'LAMP_EDGE', 'LAMP_SECS', 'LAMP_WARN', 'LAMP_W', 'LAMP_LEAN', 'LAMP_LEAN_OUT', 'LAMP_FOOT', 'LAMP_BASE', 'LAMP_Y', 'LAMP_STEER',
+    LAB_KNOBS.push('LAMP_LVL', 'LAMP_HP', 'LAMP_N', 'LAMP_EDGE', 'LAMP_SECS', 'LAMP_WARN', 'LAMP_W', 'LAMP_LEAN', 'LAMP_LEAN_OUT', 'LAMP_FOOT', 'LAMP_BASE', 'LAMP_BASE_TILT', 'LAMP_Y', 'LAMP_STEER',
                    'LAMP_BOSS_W', 'LAMP_BOSS_Y', 'LAMP_SINK', 'LAMP_SWEEP', 'LAMP_OVER', 'LAMP_SHAKE_PX', 'LAMP_SHAKE_SECS', 'LAMP_CLIMB', 'LAMP_BOB', 'LAMP_BOB_RATE',
                    'LAMP_SPARKS', 'LAMP_COOL', 'LAMP_STEAL', 'LAMP_MOTES', 'LAMP_MOTE_SECS',
                    'LAMP_MET_EVERY', 'LAMP_MET_KEEP', 'LAMP_MET_WIND', 'LAMP_MET_LOCK', 'LAMP_MET_FALL', 'LAMP_MET_SIZE',
@@ -156,7 +157,7 @@
             for (const l of lamp.lamps) {
                 for (const g of lampLogs(l.u * LW, l.y)) {
                     const hit = maskContact(ball, g.x, g.y, g.a, g.w, g.w / SHAPE_ASPECT, MASK, false);
-                    if (hit) { lamp.pend = l; return hit; }
+                    if (hit) { lamp.pend = l; return lampFace(ball, g, hit); }
                 }
             }
             lamp.pend = null;
@@ -254,6 +255,7 @@
         drawFall() {
             const c = bossFall;
             if (!c) return;
+            lampDark();
             lampDrawPyre();
             const wilt = Math.max(0, Math.min(1, ascendT / A_DIE));
             const e = wilt * wilt * (3 - 2 * wilt);
@@ -550,7 +552,8 @@
 
     // A fire's logs about its middle (cx, cy): the two stood with their feet
     // LAMP_FOOT either side, the inner one leaned LAMP_LEAN and the one by the
-    // wall LAMP_LEAN_OUT, and the one across their feet. Each is { x, y, a, w }, a brandon of length w
+    // wall LAMP_LEAN_OUT, and the one across their feet, its inner end raised
+    // LAMP_BASE_TILT. Each is { x, y, a, w }, a brandon of length w
     // centred on (x, y) and turned a -- what contact() and the drawing share.
     function lampLogs(cx, cy) {
         const L = LAMP_W, t = L / SHAPE_ASPECT;
@@ -560,7 +563,7 @@
             return { x: cx + side * (LAMP_FOOT - L / 2 * Math.sin(lean)), y: foot - L / 2 * Math.cos(lean),
                      a: LAMP_UP - side * lean, w: L };
         });
-        if (LAMP_BASE > 0) logs.push({ x: cx, y: foot - t * 0.3, a: 0, w: L * LAMP_BASE });
+        if (LAMP_BASE > 0) logs.push({ x: cx, y: foot - t * 0.3, a: wall * LAMP_BASE_TILT, w: L * LAMP_BASE });
         return logs;
     }
     // how far a fire reaches out from its middle, and up or down
@@ -571,6 +574,19 @@
     function lampHalfH() { return LAMP_W / 2 * Math.cos(LAMP_LEAN); }
     // ...and the top of one, where its heads cross
     function lampTop(l) { return l.y - lampHalfH(); }
+    // Where a head meets a log, for the bounce: along its length a log is
+    // met square to its face, so its angle is the angle the head comes off
+    // at -- read off the lumps of the outline, a tilt this small hardly
+    // turned anything. At its ends it is met where it was touched.
+    function lampFace(ball, g, hit) {
+        const ax = Math.cos(g.a), ay = Math.sin(g.a), dx = ball.x - g.x, dy = ball.y - g.y;
+        if (Math.abs(dx * ax + dy * ay) > g.w * 0.42) return hit;
+        let nx = -ay, ny = ax;
+        if (dx * nx + dy * ny < 0) { nx = -nx; ny = -ny; }
+        const d = Math.hypot(ball.x - hit.cx, ball.y - hit.cy) || 1;
+        return { cx: ball.x - nx * d, cy: ball.y - ny * d };
+    }
+
     // whether a head is anywhere near touching him
     function lampOverlaps(ball) {
         return Math.abs(ball.x - lamp.x) < LAMP_BOSS_W / 2 + BALL_RX * 2 &&
@@ -676,13 +692,18 @@
         ctx.restore();
     }
 
-    // Whatever gives off light is drawn through this: now, or, while
-    // lamp.emit is a list, put on it for whoever set it to draw over
-    // everything else once the rest is down (the boss lab's dark room).
+    // Whatever gives off light, or has to be read in the dark, is drawn
+    // through this: now, or, while lamp.emit is a list, put on it to be drawn
+    // over the dark room once the rest is down (dark.js). lampDark() starts
+    // the list each frame the room is dark.
     function lampLater(fn) {
         if (!lamp || !lamp.emit || lamp.emitNow) return false;
         lamp.emit.push(fn);
         return true;
+    }
+    function lampDark() {
+        const self = LAB_BOSS.lamps;
+        lamp.emit = self.dark && self.dark() ? [] : null;
     }
 
     // EMBER's light under a body: a steady glow with a slow breath in it
@@ -738,6 +759,7 @@
     }
 
     function lampDraw(b) {
+        lampDark();
         const lw = LAMP_W, lh = lw / SHAPE_ASPECT;
         const raw = shapeSprite('lampRaw', null, lw, lh, false);
         const stone = shapeSprite('lampStone', STONE, lw, lh, 'statue');
@@ -802,7 +824,8 @@
         const grow = phase === 'entrance' ? enterK() : 1;
         if (grow > 0.001) {
             const w = Math.min(LAMP_BOSS_W * 0.72, LW - 120) * grow;
-            labBar(Math.max(12, Math.min(LW - 12 - w, lamp.x - w / 2)),
-                   Math.max(10, lamp.y - h / 2 - 16), w, b.hp / b.maxHp);
+            const bar = () => labBar(Math.max(12, Math.min(LW - 12 - w, lamp.x - w / 2)),
+                                     Math.max(10, lamp.y - h / 2 - 16), w, b.hp / b.maxHp);
+            if (!lampLater(bar)) bar();
         }
     }

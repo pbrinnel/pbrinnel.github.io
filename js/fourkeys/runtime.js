@@ -232,6 +232,9 @@
     }
     function labDrawBrick(b) { return !!(b.lab && labM && labM.drawBrick && labM.drawBrick(b)); }
     function labDrawMini() { if (labM && labM.draw) labM.draw(); }
+    // after the field is drawn and before the popups and the HUD: a boss's
+    // pass over the whole of it (the VOLCANO's dark room, dark.js)
+    function labDrawLight() { if (labB && labB.dark && labB.dark()) labB.light(); }
     // the hub has no ball in it: he carries his head, and nothing is served
     function labSkipBall(b) { return menuUp() || !!(labB && labB.skipBall && labB.skipBall(b)); }
     function labBallR(b) { return labB && labB.ballR ? labB.ballR(b) : bRX(); }

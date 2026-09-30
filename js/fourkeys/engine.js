@@ -5624,6 +5624,7 @@
                 labPadBall(b, labBallR(b));
             }
         }
+        labDrawLight();
 
         for (const p of popups) {
             ctx.globalAlpha = Math.min(1, p.life);
