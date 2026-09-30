@@ -39,9 +39,10 @@
     // field and thrashes -- rocks GL_THRASH either side of GL_TILT, his
     // collar swinging wider -- and the stump of his neck spits a burst of its
     // own. From then on the body and the big head are one pool (glGrowBig),
-    // so a hit on either counts and the bar along the top is the truth. Once
-    // the head is whole the stone is back; when the pool is down to the
-    // head's loose hits it tears free and the body opens again.
+    // so a hit on either counts and the bar along the top is the truth, and
+    // the body stays open while the head is up. When the pool is down to its
+    // last GL_BIG_LOOSE_HP the head tears free and the body turns to stone,
+    // so those last hits are the head's.
     //
     // The big head is GL_BIG times the size. It fires three ways at once,
     // down its neck and out to both sides -- the way through is the diagonals
@@ -49,9 +50,9 @@
     // the fight that does, so it stays a surprise. Loose, it is the chase the
     // fight ends on: the pool's last GL_BIG_LOOSE_HP hits, faster than a
     // small one, knocked across the field by every one of them, and it
-    // bounces off you rather than bursting. The pool's last hit, on the head
-    // or the body, throws the head into his body (GL_FINALE) and the two
-    // blow up together, the bar at nothing.
+    // bounces off you rather than bursting. The pool's last hit throws the
+    // head into his stone body (GL_FINALE) and the two blow up together, the
+    // bar at nothing.
     //
     // The one bar, along the top, is all of it: the small heads, loose hits
     // and all, the body, and the big head, which is counted from the start.
@@ -100,6 +101,7 @@
     let GL_SEAT_V   = -17;    // px across him
     let GL_CLIMB    = 0.15;   // how much of the original's climb this fight has
     let GL_BODY_HP  = 8;      // hits on his body, once it has no head on a neck
+    let GL_GROW_QUAKE = 4;    // px he trembles by while the big head is coming
     let GL_REGROW   = 8;      // seconds the big head takes to grow, which is how long the body is open for
     let GL_SAG      = 100;    // px he sags into the field while he is open
     let GL_STUMP_MIN = 8;     // seconds between the stump's bursts while he is open, at least...
@@ -128,7 +130,7 @@
     let GL_BIG_ROLL = 0.07;   // ...rad it rolls...
     let GL_BIG_HZ   = 0.35;   // ...and how many times a second
     let GL_BIG_STUN = 1.0;    // seconds its bite holds you STUNNED, before the SLUGGISH
-    let GL_BIG_LOOSE_HP = 4;  // hits to finish it once it is loose
+    let GL_BIG_LOOSE_HP = 2;  // the pool's last hits, on the head alone, once it is loose and he is stone
     let GL_FINALE   = 0.45;   // seconds a finished big head takes to fly into his body
     let GL_BIG_LOOSE = 260;   // ...and px/s it flies at, and is knocked away at
     let GL_BIG_KNOCK_IF = 0.9; // ...and seconds it tumbles after a knock before it can be hit again
@@ -190,7 +192,7 @@
                    'GL_BIG_REAR', 'GL_LUNGE_GAP', 'GL_LUNGE_SPRING', 'GL_LUNGE_DAMP', 'GL_LUNGE_BACK', 'GL_LUNGE_DMG', 'GL_LUNGE_IF',
                    'GL_AMMO_SPEED', 'GL_AMMO_CONE', 'GL_AMMO_TURN', 'GL_AMMO_DMG', 'GL_AMMO_BODY',
                    'GL_THRASH', 'GL_THRASH_HZ', 'GL_THRASH_DRIFT', 'GL_THRASH_PACE',
-                   'GL_BODY_HP', 'GL_REGROW', 'GL_ENTER');
+                   'GL_BODY_HP', 'GL_REGROW', 'GL_ENTER', 'GL_GROW_QUAKE');
 
     const GL_BEADS = 9;       // the neck, in heads shrinking into his body, from the collar out -- at least
     // a burst: [column, row] for each phantom, the column -1 left to 1 right
@@ -249,10 +251,13 @@
                 // wider and quicker. With the big head gone as well he is spent
                 // and only sags, so the last of the body is not a long wait.
                 const open = glOpen(), spent = gl.bigUsed && !gl.heads.some(k => k.alive && k.big);
-                gl.sag += Math.max(-dt * 1.5, Math.min(dt * 1.5, (open ? 1 : 0) - gl.sag));
+                gl.sag += Math.max(-dt * 1.5, Math.min(dt * 1.5, (open && !gl.bigUsed ? 1 : 0) - gl.sag));
                 gl.thrash += Math.max(-dt * 1.5, Math.min(dt * 1.5, (open && !spent ? 1 : 0) - gl.thrash));
                 if (phase === 'play') gl.ph += dt * 0.25 * (1 + (GL_THRASH_PACE - 1) * gl.thrash);
                 gl.cx = LW / 2 + Math.sin(gl.ph) * GL_DRIFT * (1 + (GL_THRASH_DRIFT - 1) * gl.thrash);
+                // the whole of him trembling while the big head comes, harder as it does
+                const coming = gl.heads.find(k => k.alive && k.big && k.grow >= 0);
+                if (coming) gl.cx += Math.sin(clock * 47) * GL_GROW_QUAKE * glGrown(coming);
                 gl.cy = GL_Y + GL_SAG * gl.sag;
                 gl.spread = 1;
                 gl.tilt = GL_TILT + Math.sin(gl.t * GL_THRASH_HZ * Math.PI * 2) * GL_THRASH * gl.thrash;
@@ -267,7 +272,7 @@
                 glLungeClock(dt);
                 // the stump spits while he is open
                 gl.stump.x = gl.cx; gl.stump.y = gl.cy;
-                if (glOpen()) glFire(gl.stump, Math.PI / 2, dt, GL_STUMP_MIN, GL_STUMP_MAX);
+                if (glOpen() && !glBigUp()) glFire(gl.stump, Math.PI / 2, dt, GL_STUMP_MIN, GL_STUMP_MAX);
                 else { gl.stump.charge = 0; gl.stump.fire = Math.max(gl.stump.fire, 1.5); }
             }
             // the stone coat: on while he is shut, off while he is open
@@ -366,7 +371,7 @@
             rings.push({ x: hit.cx, y: hit.cy, t: 1 });
             let best = null, bd = Infinity;
             for (const k of gl.heads) {
-                if (!k.alive || k.loose || k.grow >= 0) continue;
+                if (!k.alive || (k.loose && !k.big) || k.grow >= 0) continue;
                 const d = Math.hypot(k.x - ball.x, k.y - ball.y);
                 if (d < bd) { bd = d; best = k; }
             }
@@ -528,7 +533,17 @@
 
     // Nothing on a neck that can be hit, and something left in the body: it
     // is open.
-    function glOpen() { return gl.body > 0 && !gl.heads.some(k => k.alive && !k.loose && k.grow < 0); }
+    // Shut while a small head is on its neck. With the big head out, open --
+    // a hit on the body counts toward the pool as much as one on the head --
+    // until the head tears loose for the pool's last hits: then he turns to
+    // stone, so the hits that throw the head into him are the head's own.
+    function glOpen() {
+        if (gl.heads.some(k => k.alive && !k.big && !k.loose && k.grow < 0)) return false;
+        const big = gl.heads.find(k => k.alive && k.big);
+        return big ? !big.loose : gl.body > 0;
+    }
+    // the big head, out and whole on its neck
+    const glBigUp = () => gl.heads.some(k => k.alive && k.big && !k.loose && k.grow < 0);
 
     // A head: the ellipse inscribed in it, turned by however far it has spun
     // loose. Met in its own frame and handed back in the field's.
@@ -599,6 +614,11 @@
             k.vy = Math.sin(a) * sp;
             award(BOSS_PTS * 2, cx, cy);
             maybeDropCapsule(cx, cy);
+            // the big one roars as it comes free, and he turns to stone behind it
+            if (k.big) {
+                const hh = GL_HEAD_W * glSize(k) * (BALL_RY / BALL_RX) / 2;
+                labShout(k.x, k.y, 'BRANDON!', 2.4, () => ({ x: k.x, y: k.y + hh + 10 }));
+            }
             return;
         }
         if (k.hp > 0) { award(BOSS_PTS * n, cx, cy); return; }
@@ -676,6 +696,7 @@
     // finish start from
     function glStrip() {
         for (const k of gl.heads) { k.alive = false; k.lg = null; }
+        gl.yelled = true;                 // and past the entrance's shout
         gl.body = 0;
         phantoms = [];
     }
@@ -704,11 +725,17 @@
         gl.bigUsed = true;
         const k = glHead(0, true);
         k.hp = gl.body + glBigHp() + GL_BIG_LOOSE_HP;
+        k.poolFrom = k.hp;
         k.grow = 0;
         k.x = k.bx = gl.cx; k.y = k.by = gl.cy;
         gl.heads.push(k);
         return k;
     }
+    // how far the pool has gone down to the big head's last hits, 0 fresh to
+    // 1 there: its mane grows with it, so it looks worse the more it is hurt
+    const glRage = k => !k.poolFrom ? 1 :
+        Math.max(0, Math.min(1, 1 - (k.hp - GL_BIG_LOOSE_HP) / Math.max(1, k.poolFrom - GL_BIG_LOOSE_HP)));
+
     function glGrow(dt) {
         for (const k of gl.heads) {
             if (!k.alive || k.grow < 0 || (k.grow += dt) < GL_REGROW) continue;
@@ -756,7 +783,10 @@
             if (!gl.yelled && t > 0.25) {
                 gl.yelled = true;
                 const hh = GL_HEAD_W * (BALL_RY / BALL_RX);
+                // only heads that are there to shout: the lab's jumps start him
+                // with the small ones gone and the big one still coming
                 for (const h of gl.heads) {
+                    if (!h.alive || h.grow >= 0) continue;
                     const drop = h.fan === 0 ? hh * 0.7 : 0;
                     labShout(h.x, h.y, 'BRANDON!', 2.4, () => ({ x: h.x, y: h.y + hh / 2 + 10 + drop }));
                 }
@@ -1198,7 +1228,8 @@
     let GL_MANE     = 0.4;       // a small head's mane, as a share of its locks at full length
     let GL_MANE_BIG = 0.56;      // ...and the big head's
     let GL_MANE_ALPHA = 0.55;    // ...and how solid either is
-    LAB_KNOBS.push('GL_MANE', 'GL_MANE_BIG', 'GL_MANE_ALPHA');
+    let GL_MANE_FRESH = 0.35;    // ...the big head's while the pool is full, as a share of it at the last
+    LAB_KNOBS.push('GL_MANE', 'GL_MANE_BIG', 'GL_MANE_ALPHA', 'GL_MANE_FRESH');
 
     // a canvas of `src` recoloured, cached under `key`: 'wash' lifts him to
     // near-white and washes `ink` over only his own pixels, so his shading
@@ -1373,7 +1404,9 @@
                 for (let i = 0; i < n; i++) {
                     // round from under one side of the chin, over the top, to the other
                     const a = Math.PI * 0.5 + GL_MANE_OPEN + (i + (layer ? 0.5 : 0) + (rnd() - 0.5) * 0.5) / n * (Math.PI * 2 - GL_MANE_OPEN * 2);
-                    const L = w * len * (k.big ? GL_MANE_BIG : GL_MANE) * (0.8 + rnd() * 0.35), T = L / SHAPE_ASPECT;
+                    // the big head's mane grows as the pool goes, from GL_MANE_FRESH of its size
+                    const grow = k.big ? GL_MANE_FRESH + (1 - GL_MANE_FRESH) * glRage(k) : 1;
+                    const L = w * len * (k.big ? GL_MANE_BIG : GL_MANE) * grow * (0.8 + rnd() * 0.35), T = L / SHAPE_ASPECT;
                     const r0 = w * 0.22, cx = Math.cos(a) * (r0 + L / 2), cy = Math.sin(a) * (r0 + L / 2) * 1.1;
                     ctx.save();
                     ctx.translate(cx, cy);
