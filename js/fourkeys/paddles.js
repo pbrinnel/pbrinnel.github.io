@@ -1238,14 +1238,19 @@
     // ---- BLUR's look: Sonic -------------------------------------------------------
     // Him, dressed as classic Sonic. Most of it is the photograph coloured
     // where it already is something: blue all over, peach where he is skin
-    // (found off the photo's own colours) and white on his hands, his boot
-    // red with a white strap and a white cuff. His face is placed by hand
-    // on the levelled box, in fractions of it: a white patch over both eyes
-    // and a peach muzzle, each with his own features multiplied back
-    // through, and the muzzle kept BLUR_HEAD_INSET inside his outline so the
-    // blue of his head goes all the way round it. Green eyes, Sonic's nose
-    // and a smirk were tried and dropped: at his size in play they read as
-    // smudges, where the white and the peach read.
+    // and white on his hands, his boot red with a white strap and a white
+    // cuff. On his face, a white patch over both eyes and a peach muzzle,
+    // each with his own features multiplied back through, and the muzzle
+    // kept inside his outline so the blue of his head goes all the way round
+    // it. Green eyes, Sonic's nose and a smirk were tried and dropped: at his
+    // size in play they read as smudges, where the white and the peach read.
+    //
+    // Which part of him each pixel is comes from BLUR_PARTS, measured off the
+    // photo once by .claude/blur-parts.py (on Paul's Mac, with the places it
+    // measures from) and kept here: each pixel's red is its part plus one, 0
+    // where he is not. The game never reads the photo's own pixels, because
+    // a page opened as a file may not, and he has to look the same opened
+    // from a file as online.
     //
     // The quills are the one thing drawn rather than found (blurQuills), and
     // they are only art: the ball meets his outline as it always has. So none
@@ -1254,15 +1259,8 @@
     // and down. The front one's top edge leaves his crown on its tangent, so
     // it reads as more of his head and squares off the round back of it.
     //
-    // Baked once, the first time he is drawn. It reads the photo's pixels,
-    // which a page opened from a file may not do, so if that throws he is
-    // drawn in BLUR_INK as before rather than not at all.
-    const BLUR_HEAD = { x: 0.855, y: 0.46 };          // his head lies right of and above these
-    const BLUR_EYES = [[0.9125, 0.216], [0.947, 0.282]];
-    const BLUR_EYE = [0.017, 0.024], BLUR_EYE_JOIN = [0.016, 0.017];    // round each, and between them, in box widths
-    const BLUR_MUZZLE = [0.912, 0.33, 0.05, 0.04];    // middle, then half across and half down his face
-    const BLUR_EYE_SKIN = [0.035, 0.022];             // ...and the peach round his eyes
-    const BLUR_HEAD_INSET = 0.014;
+    // Baked once, the first time he is drawn with both images in. Should it
+    // fail anyway, he is drawn in BLUR_INK as before rather than not at all.
     const BLUR_SHOW = 0.75, BLUR_MUZZLE_SHOW = 0.6;   // how much of his own eyes and face come back through
     const BLUR_WASH = 0.97;                           // how thickly the colours are laid over the photograph
     const BLUR_SOFT = 1.5;                            // px of feather between one colour and the next
@@ -1274,57 +1272,24 @@
     const BLUR_QUILL = 38;
     const BLUR_QUILL_IN = 0.75;                       // their bases, as a share of his outline: behind his head
     const BLUR_QUILL_PAD = 0.1;                       // of his length, the room round him they are drawn in
+    const BLUR_QUILL_INK = [66, 120, 201];            // the blue his head comes out as, so they are more of it
     // his outline round the middle of his head (BLUR_HEAD_MID), measured off
     // the photo: degrees as above, px of the levelled photo (SHAPE.bw wide)
     const BLUR_HEAD_MID = [0.93, 0.24];
     const BLUR_HEAD_R = [[-150, 50], [-135, 54], [-120, 59], [-105, 66], [-90, 71], [-75, 74], [-60, 75], [-45, 74],
                          [-30, 68], [-15, 61], [0, 55], [15, 50], [30, 47], [45, 47], [60, 52], [75, 62]];
 
-    // what each pixel of him is
-    const BL_BLUE = 0, BL_PEACH = 1, BL_GLOVE = 2, BL_SHOE = 3, BL_WHITE = 4, BL_EYE = 5, BL_FACE = 6;
-    function blurParts(raw) {
-        const W = raw.width, H = raw.height, d = raw.getContext('2d').getImageData(0, 0, W, H).data;
-        const part = new Int8Array(W * H).fill(-1);
-        const turn = PADDLE_LEVEL, cs = Math.cos(turn), sn = Math.sin(turn);
-        // an ellipse lying along his eyes, which is along the photo's own lean
-        const near = (x, y, cx, cy, a, b) => {
-            const dx = x - cx * W, dy = y - cy * H;
-            return ((dx * cs + dy * sn) / (a * W)) ** 2 + ((dy * cs - dx * sn) / (b * W)) ** 2 <= 1;
-        };
-        const solid = (x, y) => x >= 0 && y >= 0 && x < W && y < H && d[(y * W + x) * 4 + 3] > 128;
-        const inset = Math.round(BLUR_HEAD_INSET * W);
-        const inside = (x, y) => {
-            for (let k = 0; k < 16; k++) {
-                const a = k * Math.PI / 8;
-                if (!solid(Math.round(x + Math.cos(a) * inset), Math.round(y + Math.sin(a) * inset))) return false;
-            }
-            return true;
-        };
-        const [e0, e1] = BLUR_EYES, mid = [(e0[0] + e1[0]) / 2, (e0[1] + e1[1]) / 2];
-        for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-            const i = (y * W + x) * 4, r = d[i], g = d[i + 1], b = d[i + 2];
-            if (d[i + 3] < 10) continue;
-            const fx = x / W, fy = y / H;
-            const skin = r > 95 && r > g && g > b && r - b > 35 && r - g > 12;
-            let c = BL_BLUE;
-            if (fx < 0.125) {
-                c = BL_SHOE;
-                // the strap, across the middle of his foot
-                if (Math.abs((fx - 0.06) * W * -0.39 + (fy - 0.36) * H * -0.92) < 0.011 * W) c = BL_WHITE;
-            } else if (skin && fx > 0.6) c = BL_PEACH;
-            if (fx > BLUR_HEAD.x && fy < BLUR_HEAD.y) {
-                c = BL_BLUE;
-                const lum = 0.3 * r + 0.59 * g + 0.11 * b;
-                const [mx, my, ma, mb] = BLUR_MUZZLE;
-                const face = near(x, y, mx, my, ma, mb) || near(x, y, mid[0], mid[1], BLUR_EYE_SKIN[0], BLUR_EYE_SKIN[1]);
-                if (face && lum > 45 && inside(x, y)) c = BL_FACE;
-                for (const [ex, ey] of BLUR_EYES) if (near(x, y, ex, ey, BLUR_EYE[0], BLUR_EYE[1])) c = BL_EYE;
-                if (near(x, y, mid[0], mid[1], BLUR_EYE_JOIN[0], BLUR_EYE_JOIN[1])) c = BL_EYE;
-            }
-            if (skin && fx > 0.70 && fy > 0.74) c = BL_GLOVE;
-            if (fx > 0.112 && fx < 0.15) c = BL_WHITE;                // the cuff
-            part[y * W + x] = c;
-        }
+    // the parts, in the order blurDress colours them
+    const BL_WHITE = 4, BL_EYE = 5, BL_FACE = 6;
+    const BLUR_PARTS = 'data:image/png;base64,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';
+    const blurPartsImg = Object.assign(new Image(), { src: BLUR_PARTS });
+    function blurParts(W, H) {
+        const c = Object.assign(document.createElement('canvas'), { width: W, height: H });
+        const g = c.getContext('2d');
+        g.imageSmoothingEnabled = false;
+        g.drawImage(blurPartsImg, 0, 0, W, H);
+        const d = g.getImageData(0, 0, W, H).data, part = new Int8Array(W * H);
+        for (let i = 0; i < part.length; i++) part[i] = d[i * 4] - 1;
         return part;
     }
 
@@ -1334,7 +1299,7 @@
     // his own features multiplied back through.
     function blurDress() {
         const raw = shapeSprite('padBlurRaw', null, PAD_BAKE, PAD_BAKE / SHAPE_ASPECT, false);
-        const W = raw.width, H = raw.height, part = blurParts(raw);
+        const W = raw.width, H = raw.height, part = blurParts(W, H);
         const ink = [BLUR_BLUE, BLUR_PEACH, '#ffffff', BLUR_RED, '#ffffff', '#ffffff', BLUR_PEACH];
         const solid = { [BL_WHITE]: 0.7 };
         const show = { [BL_EYE]: BLUR_SHOW, [BL_FACE]: BLUR_MUZZLE_SHOW };
@@ -1384,17 +1349,12 @@
         }
         return BLUR_HEAD_R[BLUR_HEAD_R.length - 1][1];
     }
-    // the quills, on a canvas BLUR_QUILL_PAD bigger than him all round, in
-    // the blue his head comes out as
+    // the quills, on a canvas BLUR_QUILL_PAD bigger than him all round
     function blurQuills(dress) {
         const W = dress.width, H = dress.height, k = W / SHAPE.bw, p = Math.round(BLUR_QUILL_PAD * W);
         const q = Object.assign(document.createElement('canvas'), { width: W + 2 * p, height: H + 2 * p });
         const g = q.getContext('2d');
-        const d = dress.getContext('2d').getImageData(Math.round(0.95 * W), Math.round(0.06 * H), 12, 12).data;
-        const rgb = [0, 0, 0];
-        let n = 0;
-        for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 200) { rgb[0] += d[i]; rgb[1] += d[i + 1]; rgb[2] += d[i + 2]; n++; }
-        const shade = t => 'rgb(' + rgb.map(v => Math.round(Math.min(255, v / Math.max(1, n) * t))).join(',') + ')';
+        const shade = t => 'rgb(' + BLUR_QUILL_INK.map(v => Math.round(Math.min(255, v * t))).join(',') + ')';
         g.translate(p, p);
         const cx = BLUR_HEAD_MID[0] * W, cy = BLUR_HEAD_MID[1] * H;
         const at = (deg, r) => [cx + Math.cos(deg * Math.PI / 180) * r * k, cy + Math.sin(deg * Math.PI / 180) * r * k];
@@ -1430,10 +1390,11 @@
         return q;
     }
 
-    // null until his photo is in, false if it cannot be read
+    // null until his photo and BLUR_PARTS are in, false if he cannot be made
     let blurLook = null;
+    const blurIn = img => img.complete && img.naturalWidth;
     function blurSonic() {
-        if (blurLook !== null || !paddleImg.complete || !paddleImg.naturalWidth) return blurLook;
+        if (blurLook !== null || !blurIn(paddleImg) || !blurIn(blurPartsImg)) return blurLook;
         try {
             const dress = blurDress();
             blurLook = { dress, quills: blurQuills(dress) };
