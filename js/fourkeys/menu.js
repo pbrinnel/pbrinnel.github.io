@@ -46,7 +46,7 @@
     // (menuReturn) -- is always there; the rest are earned in MENU_MEM_ORDER.
     const MENU_MEMS = [
         { id: 'exhortation', year: -2701, title: 'Exhortation', ink: '#7fa85a' },
-        { id: 'salvation', year: -1701, title: 'Salvation', ink: '#b0a894' },
+        { id: 'reckoning', year: -1701, title: 'Reckoning', ink: '#b0a894' },
         { id: 'cycle', year: -1342, title: 'Cycle', ink: '#d2622f' },
         { id: 'counsel', year: -126, title: 'Counsel', ink: '#c9a94e' },
         { id: 'fall', year: -99, title: 'Fall', ink: '#9a7fc9' },
@@ -56,7 +56,7 @@
     // The order memories are earned in, one from each stage won (see
     // menuNextMemory), whichever stage it is. Not the timeline's order: the story is
     // told out of sequence, and the gaps it leaves are where the rest go.
-    const MENU_MEM_ORDER = ['exhortation', 'consolidation', 'cycle', 'salvation', 'counsel', 'fall'];
+    const MENU_MEM_ORDER = ['exhortation', 'consolidation', 'cycle', 'reckoning', 'counsel', 'fall'];
     // The first win anywhere, clean or not, also hands over CLASSIC. He plays
     // exactly as the paddle you started with, so there is nothing in him to
     // earn -- he is a souvenir, and the first one a player picks up.
@@ -2819,14 +2819,14 @@
     // them: one landing by accident, or meant for the card before, would
     // throw away a scene there is no getting back to straight away. Held
     // SKIP_HOLD it skips. HOLD TO SKIP is the line under the field for as
-    // long as the scene is up (a phone has no such line), and nothing is
-    // written over the scene until a press: then, on every machine, a panel
-    // at the foot of the field with a bar filling and the seconds left, so
-    // it is plain the press has been felt and how long is left. A colour
-    // change on the line alone was too easy to miss.
+    // long as the scene is up, and a press turns it into the seconds left
+    // over a bar filling under the words, so it is plain the press has been
+    // felt and how long is left -- all of it off the scene. A phone held
+    // upright has no such line, so there, and only there, it is a panel at
+    // the foot of the field.
     // Whatever instead waits on a tap says so at the foot of the field
     // (menuTapPrompt).
-    const SKIP_HOLD = 2;             // seconds held to skip
+    const SKIP_HOLD = 1.5;           // seconds held to skip
     const SKIP_LINGER = 1.6;         // seconds the words stay up after a press lets go
     const SKIP_FADE = 0.3;           // ...and take to come and go
     const PROMPT_UP = 26;            // px up off the field's foot for the line
@@ -2856,13 +2856,20 @@
     const SKIP_INK1 = '#f2efe9';     // ...and held all the way
     const SKIP_BAR_W = 240;          // the bar, px at full size
     const SKIP_BAR_H = 10;
+    const SKIP_LINE_BAR = 2;         // px, the bar under the words on the line under the field
     function menuSkipDraw() {
         const held = menu.skipT >= 0, k = held ? Math.min(1, menu.skipT / SKIP_HOLD) : 0;
+        const line = held ? 'skipping in ' + Math.max(0, SKIP_HOLD - menu.skipT).toFixed(1) + 's' : 'hold to skip';
         const el = document.querySelector('.hint');
         if (el && el.offsetParent) {
             if (menu.hintWas === undefined) menu.hintWas = el.textContent;
-            el.textContent = 'hold to skip';
+            el.textContent = line;
             el.style.color = menuMix(SKIP_INK0, SKIP_INK1, k);
+            el.style.background = k > 0
+                ? 'linear-gradient(' + SKIP_INK1 + ',' + SKIP_INK1 + ') left bottom / ' + (k * 100) + '% ' +
+                  SKIP_LINE_BAR + 'px no-repeat'
+                : '';
+            return;
         }
         const a = held ? 1 : Math.min(1, (menu.skipShow || 0) / SKIP_FADE);
         if (a <= 0) return;
@@ -2873,7 +2880,6 @@
         // a dark panel under it all, so it reads over any scene
         ctx.fillStyle = 'rgba(0,0,0,0.6)';
         ctx.beginPath(); ctx.roundRect(x - 16 * u, y - 30 * u, w + 32 * u, h + 42 * u, 8 * u); ctx.fill();
-        const line = held ? 'skipping in ' + Math.max(0, SKIP_HOLD - menu.skipT).toFixed(1) + 's' : 'hold to skip';
         text(line, LW / 2, y - 10 * u, 15 * u, held ? SKIP_INK1 : PROMPT_INK, 'center');
         ctx.fillStyle = 'rgba(242,239,233,0.18)';
         ctx.beginPath(); ctx.roundRect(x, y, w, h, h / 2); ctx.fill();
@@ -2890,6 +2896,7 @@
         const el = document.querySelector('.hint');
         if (el) {
             el.style.color = '';
+            el.style.background = '';
             if (restore) el.textContent = menu.hintWas;
         }
         menu.hintWas = undefined;
@@ -3042,7 +3049,7 @@
     const M_SAVE_PADS = { gilt: 'GILT', statue: 'STATUE', frost: 'FROST', ember: 'EMBER', pair: 'PAIR',
                           classic: 'CLASSIC', multi: 'MULTI', prince: 'PRINCE', chell: 'CHELL',
                           blur: 'BLUE BLUR' };      // his old name: shown as BLUR, saved as this
-    const M_SAVE_MEMS = { exhortation: 'EXHORTATION', salvation: 'SALVATION', cycle: 'CYCLE',
+    const M_SAVE_MEMS = { exhortation: 'EXHORTATION', reckoning: 'RECKONING', cycle: 'CYCLE',
                           counsel: 'COUNSEL', fall: 'FALL', consolidation: 'CONSOLIDATION' };
     // each kind of line, and which of `menu`'s tables it fills from which tokens
     const M_SAVE_SETS = [['KEY', 'keys', M_SAVE_STAGES], ['PADDLE', 'pads', M_SAVE_PADS],

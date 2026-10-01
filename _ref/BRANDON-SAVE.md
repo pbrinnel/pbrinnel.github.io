@@ -85,7 +85,7 @@ paddle can't break old saves.
 | stage | `BOSS RUSH` | `rush` |
 | paddle | `GILT` `STATUE` `FROST` `EMBER` `PAIR` `CLASSIC` `MULTI` `PRINCE` `CHELL` | same id, lowercase |
 | paddle | `BLUE BLUR` (shown as BLUR since 1 Oct 2026) | `blur` |
-| memory | `EXHORTATION` `SALVATION` `CYCLE` `COUNSEL` `FALL` `CONSOLIDATION` | same id, lowercase |
+| memory | `EXHORTATION` `RECKONING` `CYCLE` `COUNSEL` `FALL` `CONSOLIDATION` | same id, lowercase |
 
 ## The seal
 
@@ -158,3 +158,8 @@ the IMPORT screen shows a summary and needs its own press to go ahead.
 - **v1** (30 Sep 2026): the TEFLON paddle cut the same day. Its token is retired: the reader
   skips a `PADDLE TEFLON` line (rule 2), and `TEFLON` is never to be used for anything else
   (rule 7).
+- **v1** (1 Oct 2026): the memory token `SALVATION` became `RECKONING` (internal id
+  `salvation` became `reckoning`), with the memory's new title. This breaks rule 7, once,
+  on Paul's say-so: the only saves holding `SALVATION` were his own, and he deleted them.
+  A save that still says `SALVATION` loads without that memory (rule 2). `SALVATION` is
+  retired; never reuse it.

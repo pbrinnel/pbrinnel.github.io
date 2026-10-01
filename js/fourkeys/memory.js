@@ -389,12 +389,12 @@
 
     // Each memory's scene, by its id in MENU_MEMS...
     const MEM_SCENES = {
-        exhortation: s => memRally(s), salvation: s => memStand(s), cycle: s => memCycle(s),
+        exhortation: s => memRally(s), reckoning: s => memStand(s), cycle: s => memCycle(s),
         counsel: s => memCounsel(s), fall: s => memFall(s), consolidation: s => memCourt(s),
     };
     // ...and when each is over, in seconds into it: all of them end on black
     const MEM_ENDS = {
-        exhortation: () => MR_CUT, salvation: () => MS_CUT, cycle: () => MY_CUT,
+        exhortation: () => MR_CUT, reckoning: () => MS_CUT, cycle: () => MY_CUT,
         counsel: () => MQ_CUT, fall: () => MF_BLACK[1], consolidation: () => MC_CUT,
     };
     const MEM_AFTER = 2;             // seconds on the black before it goes back by itself
@@ -609,7 +609,27 @@
     // [words, whose face]: a Brandon he names is in that Brandon's face. It
     // wraps to fit the frame, each row centred over x and kept inside it, the
     // first row's baseline at y. `shake` px of tremble, for a scream.
+    // Every word sits on a thin dark edge and a soft shadow, the way film
+    // subtitles do, so a line in a Brandon's colour still reads over his own
+    // light or anything else as bright: the edges all go down before any
+    // word is filled, so one word's edge never cuts into the next.
     const MEM_LINE_PAD = 24;         // px a row keeps clear of each side of the frame
+    const MEM_EDGE = 0.13;           // the dark edge, as a share of the type's size
+    const MEM_EDGE_INK = 'rgba(0,0,0,0.78)';
+    const MEM_SHADOW = 0.3;          // ...and the shadow's blur, likewise
+    const MEM_SHADOW_INK = 'rgba(0,0,0,0.6)';
+    // words already set in ctx's font and fill: [text, x, y] each, edged then filled
+    function memInk(words, px) {
+        ctx.save();
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = Math.max(2, px * MEM_EDGE);
+        ctx.strokeStyle = MEM_EDGE_INK;
+        ctx.shadowColor = MEM_SHADOW_INK;
+        ctx.shadowBlur = px * MEM_SHADOW;
+        for (const [t, x, y, font] of words) { if (font) ctx.font = font; ctx.strokeText(t, x, y); }
+        ctx.restore();
+        for (const [t, x, y, font] of words) { if (font) ctx.font = font; ctx.fillText(t, x, y); }
+    }
     function memLine(parts, who, x, y, px, k, [a, b], shake) {
         if (k <= 0 || k >= 1) return;
         const secs = b - a, into = k * secs;
@@ -636,16 +656,17 @@
         }
         const jx = shake ? (Math.sin(into * 53) + Math.sin(into * 31)) * shake / 2 : 0;
         const jy = shake ? Math.sin(into * 47) * shake / 2 : 0;
+        const set = [];
         rows.forEach((row, r) => {
             const total = row.reduce((p, wd, i) => p + (i === row.length - 1 ? wd.bare : wd.width), 0);
             let cx = Math.max(16, Math.min(LW - 16 - total, x - total / 2));
             for (const wd of row) {
-                ctx.font = font(wd.f);
-                ctx.fillStyle = MEM_VOICE[who].ink;
-                ctx.fillText(wd.w, cx + jx, y + r * px * 1.3 + jy);
+                set.push([wd.w, cx + jx, y + r * px * 1.3 + jy, font(wd.f)]);
                 cx += wd.width;
             }
         });
+        ctx.fillStyle = MEM_VOICE[who].ink;
+        memInk(set, px);
         ctx.restore();
     }
 
@@ -1505,10 +1526,10 @@
     // what it is called. They shout his name back at him, and while they do
     // he strikes the one in the middle of the front rank. That one grows, and
     // goes grey, and rises into the place over them -- the Brandon the first
-    // game ends on, set exactly where the opening sets him -- and HE goes up
-    // and out of the top of the frame. The grown one shouts HIS name after
-    // him, and it cuts. The Angel stands at his
-    // right hand the whole time, his first general, and goes when he goes.
+    // game ends on, set exactly where the opening sets him -- and while he
+    // grows HE goes, quickly, off the left, behind the ranks. The grown one
+    // shouts HIS name after him, and it cuts. The Angel stands at his right
+    // hand the whole time, his first general, and goes when he goes.
     const MR_FADE_IN = 1.2;
     const MR_LINES = [
         [[1.5, 4.5], [['BRANDON', 'surtr'], [' is coming.', 'odin']]],
@@ -1518,7 +1539,8 @@
     const MR_CHEER = [11.0, 15.0];   // they shout his name back
     const MR_ZAP = [12.0, 12.9];     // the bolt, from him to the chosen one
     const MR_GROW = [12.6, 16.0];    // the chosen one grows into his place over them
-    const MR_GO = [13.2, 17.7];      // HE rises out of the top of the frame
+    const MR_GO = [13.0, 15.0];      // HE goes off the left, the Angel with him...
+    const MR_GO_PX = 760;            // ...this far: the middle of the frame to past its edge, light and all
     const MR_SHOUT = [16.0, 18.3];   // the one he made, grown, shouts HIS name
     const MR_CUT = 18.7;             // to black, no fade
     const MR_ODIN_H = 360;
@@ -1534,17 +1556,13 @@
         const span = ([a, b]) => memClamp((s - a) / (b - a));
         ctx.save();
         ctx.globalAlpha = memEase(s / MR_FADE_IN);
-        // he stands behind the back rank, so they are all between you and him
+        // he stands behind the back rank, so they are all between you and him,
+        // and the one he made between you and him as he goes
         const ground = slotY(G_MAX - 1) + 4;
         const go = span(MR_GO);
-        const up = go * go * (ground + MR_ODIN_H * 1.3);
-        // behind them while he stands, and in front of the one he made once
-        // he goes, so his going is seen
-        const odin = () => {
-            memOdin(LW / 2, ground - up, MR_ODIN_H, false, s, 1, 0, true);
-            memAngel(s, MR_ANGEL_X, ground - up, MR_ANGEL_H);
-        };
-        if (s < MR_GO[0]) odin();
+        const off = go * go * MR_GO_PX;
+        memOdin(LW / 2 - off, ground, MR_ODIN_H, false, s, 1, 0, true);
+        memAngel(s, MR_ANGEL_X - off, ground, MR_ANGEL_H);
         const [c0, c1] = MR_CHEER;
         const cheer = s >= c0 && s < c1;
         const army = introFloor().slice().sort((a, b) => a.y - b.y);
@@ -1560,8 +1578,7 @@
             memShip(m.x, y, m.hp, m.tint);
         }
         if (s >= MR_GROW[0]) memRallyChosen(one, grow);
-        if (s >= MR_GO[0]) odin();
-        memBolt(s, MR_ZAP, LW / 2, ground - up - MR_ODIN_H * 0.55, one.x, one.y, 'rgba(255,200,110,1)');
+        memBolt(s, MR_ZAP, LW / 2 - off, ground - MR_ODIN_H * 0.55, one.x, one.y, 'rgba(255,200,110,1)');
         for (const [when, parts] of MR_LINES) {
             memLine(parts, 'odin', LW / 2, 34, 22, memClamp((s - when[0]) / (when[1] - when[0])), when);
         }
@@ -1579,7 +1596,7 @@
             ctx.font = MEM_VOICE.odin.font.replace('{px}', 17);
             ctx.textAlign = 'center';
             ctx.fillStyle = MEM_VOICE.you.ink;
-            ctx.fillText('BRANDON!', m.x, m.y - 26 - k * 22);
+            memInk([['BRANDON!', m.x, m.y - 26 - k * 22]], 17);
             ctx.restore();
         }
         ctx.restore();
@@ -1724,7 +1741,7 @@
         const [sx, sg] = far(MS_SURTR_X, MS_GROUND);
         memSurtr(sx, sg, MS_SURTR_H * z, s, memSeen(s, MS_SEEN));
         const shift = MS_SURGE_PX * memEase(span(MS_SURGE));
-        // in the ranks until they are sent back; then near you, and drawn last
+        // in the ranks until they are sent back; then near you
         const angel = () => {
             if (s < MS_ZOOM[0]) { memAngel(s, MS_ANGEL_X + shift, MS_GROUND - 40, MS_ANGEL_H); return; }
             const x = memLerp(MS_ANGEL_X + MS_SURGE_PX, MS_NEAR[0], k) - MS_DRIFT_PX * memEase(span(MS_DRIFT));
@@ -1747,16 +1764,15 @@
                 if (sp) ctx.drawImage(sp, x - G_SHIP_W * sc / 2, y + bob * sc - G_SHIP_H * sc / 2, G_SHIP_W * sc, G_SHIP_H * sc);
             }
         };
+        // The army is nearest you from the first frame to the last, so that
+        // coming back toward you they never pass through HIM; the Angel is
+        // between their back ranks and the front one throughout, in the
+        // ranks and then close to you, so he never changes layer either.
         const [ox, og] = far(memLerp(MS_ODIN_X[0], MS_ODIN_X[1], memEase(span(MS_STEP))), MS_GROUND);
-        // HIM over them while they stand behind him, as he stays once he is
-        // far off -- by then they are below him in the frame, not over him;
-        // the Angel in the ranks at first, and close to you among them after
-        const near = s >= MS_ZOOM[0];
-        if (!near) angel();
-        army(false);
-        if (!near) army(true);
         memOdin(ox, og, MS_ODIN_H * z, true, s, 1, 0, true);
-        if (near) { angel(); army(true); }
+        army(false);
+        angel();
+        army(true);
         const over = og - (MS_ODIN_H + 30) * z, px = memLerp(22, MS_LAST_PX, k);
         memLine(MS_LINES.taunt, 'odin', ox, over, px, span(MS_TAUNT), MS_TAUNT);
         memLine(MS_LINES.halt, 'odin', ox, over, px, span(MS_HALT), MS_HALT);
@@ -1769,10 +1785,11 @@
     // over it all, and five Brandons coming up to him and standing in a
     // half circle under him. He bids them rise, and strikes them one
     // after another, and each is wrapped in his lightning and swells, cell by
-    // cell, into one of the five this game is fought against -- at the size
-    // it will be when you meet it, so the hall fills with them and you can
-    // see how far each has grown past the Brandon he was. Each is edged in
-    // the hall's ember so the five still read where they stand over one
+    // cell, into one of the five this game is fought against -- a little
+    // under the size it will be when you meet it (MC_SCALE), so the hall
+    // fills with them and you can see how far each has grown past the
+    // Brandon he was. Everything is edged in the hall's ember, from the
+    // first frame, so the five still read where they stand over one
     // another. They shout his name, and it cuts.
     const MC_FADE_IN = 1.2;
     const MC_ARRIVE = 1.0;           // the first of them starts up out of the bottom...
@@ -1789,7 +1806,7 @@
     const MC_SHOUT = [16.9, 19.3];
     const MC_CUT = 19.8;
     const MC_INK = '#080504';
-    const MC_RIM = '#8a3f22';        // the hall's ember, round each of the five once he has changed
+    const MC_RIM = '#8a3f22';        // the hall's ember, round every one of them
     const MC_RIM_PX = 2;
     const MC_GLOW = 'rgba(201,122,90,1)';
     const MC_LU = [400, 150, 0.5];   // where the Fallen is, his middle, and his scale
@@ -1798,7 +1815,10 @@
     // where the five stand, left to right, and which level's boss each becomes:
     // spread the width of the hall and staggered in height, so that grown
     // they overlap only at their edges
-    const MC_RING = [[150, 545, 1], [195, 330, 2], [420, 585, 3], [575, 300, 4], [690, 470, 5]];
+    // GLEEOK is turned about (the last, true) and hung in the top corner so
+    // his body runs off the frame: the fight never shows his back, so neither
+    // does this.
+    const MC_RING = [[150, 545, 1], [195, 330, 2], [420, 585, 3], [655, 560, 4], [690, 225, 5, true]];
     // ...and how big each is grown, of the size his fight has him: under it,
     // so the five each still read as themselves in one hall
     const MC_SCALE = 0.6;
@@ -1833,7 +1853,9 @@
                 const [x, y] = where(i);
                 memCourtLayer(g => memCourtOne(g, s, x, y, MC_RING[i][2], turn, i, true), true);
             });
-        // then the Brandons still to change, and the Fallen over everything
+        // then the Brandons still to change, and the Fallen over everything,
+        // edged in the hall's ember as the bosses are, so no one gains an
+        // edge by changing
         let at = null;
         memCourtLayer(g => {
             at = memLucifer(g, s, MC_LU[0], MC_LU[1], MC_LU[2], 1, 0);
@@ -1843,7 +1865,7 @@
                 const [x, y] = where(i);
                 memCourtOne(g, s, x, y, n, turn, i, false);
             });
-        }, false);
+        }, true);
 
         MC_RING.forEach(([x, y, n], i) => {
             const a = mcZap(i);
@@ -1942,7 +1964,7 @@
             g.translate(x, y);
             g.rotate(wig(2, 1.3));
             const sc = memLerp(MC_TURN_FROM, 1, memCourtGrow(turn)) * MC_SCALE * (1 + 0.02 * Math.sin(s * 2.1 + i));
-            g.scale(sc, sc);
+            g.scale(MC_RING[i][3] ? -sc : sc, sc);
             MC_BOSSES[n](g, s);
             g.restore();
         };
@@ -1986,7 +2008,11 @@
     const MC_GARDEN = [100, 0.62];     // px between WINDMILL's flowers, and their size of his
     const MC_MID = { 1: -150, 2: -90, 3: -40, 4: -90, 5: -90 };
     const MC_TOP = { 1: -300, 2: -300, 3: -140, 4: -250, 5: -330 };
-    const MC_FLAMES = 15, MC_FLAME = 120;   // LAMPS' tongues of fire, and the longest of them
+    // LAMPS' fire: how many tongues, the longest, and how much and how fast
+    // they flicker and lean -- kept low, so his fire says he burns without
+    // pulling the eye off the rest of the hall
+    const MC_FLAMES = 9, MC_FLAME = 70;
+    const MC_FLICKER = 0.15, MC_FLICKER_HZ = 2.5, MC_FLAME_LEAN = 0.07, MC_FLAME_LEAN_HZ = 1.2;
     const MC_DEPTH = [5, 2, 4, 3, 1];
     const memMcBody = (g, x, y, L, a, flip) => {
         const T = L / SHAPE_ASPECT;
@@ -2028,8 +2054,8 @@
             // flickering on its own beat
             for (let i = 0; i < MC_FLAMES; i++) {
                 const u = (i + 0.5) / MC_FLAMES - 0.5;
-                const len = MC_FLAME * (0.6 + 0.4 * Math.sin(s * 7 + i * 2.3)) * (1 - Math.abs(u));
-                const a = -Math.PI / 2 + Math.sin(s * 3 + i * 1.7) * 0.18 + u * 0.5;
+                const len = MC_FLAME * (1 - MC_FLICKER + MC_FLICKER * Math.sin(s * MC_FLICKER_HZ + i * 2.3)) * (1 - Math.abs(u));
+                const a = -Math.PI / 2 + Math.sin(s * MC_FLAME_LEAN_HZ + i * 1.7) * MC_FLAME_LEAN + u * 0.5;
                 const bx = u * LAMP_BOSS_W * 0.9, by = y - T * 0.2;
                 memMcBody(g, bx + Math.cos(a) * len / 2, by + Math.sin(a) * len / 2, len, a, i % 2);
             }
@@ -2120,7 +2146,7 @@
             ctx.font = MEM_VOICE[face].font.replace('{px}', 17);
             ctx.textAlign = 'center';
             ctx.fillStyle = MEM_VOICE[who].ink;
-            ctx.fillText('BRANDON!', x, y - 26 - k * 22);
+            memInk([['BRANDON!', x, y - 26 - k * 22]], 17);
             ctx.restore();
         }
     }
