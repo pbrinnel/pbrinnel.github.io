@@ -3411,6 +3411,12 @@
         ctx.globalAlpha = 1;
     }
 
+    // A leaderboard row's paddle, dark as on the rack until it is yours, so
+    // the table cannot show you one you have not earned yet
+    function menuBoardPadIcon(k, x, y, w, a) {
+        menuRackIcon(k, x, y, w, !menu || !MENU_PADS.includes(k) || !!menu.pads[k], a, false);
+    }
+
     function menuRackDraw() {
         const sc = menu.screen, dash = sc.dash, rack = menuRack();
         const lit = dash ? rack.find(c => c.id === dash.c.id) : menuChoiceAt(paddle.x);

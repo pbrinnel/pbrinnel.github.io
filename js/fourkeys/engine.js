@@ -5158,8 +5158,13 @@
             text(String(i + 1), LW / 2 - 128 * k, y, size, col, 'right');
             text(r.ini, LW / 2 - 60 * k, y, size, col);
             text(String(r.score), LW / 2 + 160 * k, y, size, col, 'right');
-            // the paddle the run was played with, level with the row's letters
-            if (r.pad) labPadIcon(r.pad, LW / 2 + 215 * k, y - size * 0.33, 64 * k, false, mine || i === 0 ? 1 : 0.75);
+            // the paddle the run was played with, level with the row's letters,
+            // dark if it is not yours yet (menuBoardPadIcon)
+            if (r.pad) {
+                const px = LW / 2 + 215 * k, py = y - size * 0.33, a = mine || i === 0 ? 1 : 0.75;
+                if (typeof menuBoardPadIcon === 'function') menuBoardPadIcon(r.pad, px, py, 64 * k, a);
+                else labPadIcon(r.pad, px, py, 64 * k, false, a);
+            }
         }
     }
 
