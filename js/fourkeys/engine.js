@@ -2790,6 +2790,9 @@
             phase = 'ascend';
             ascendT = 0;
             const b = bricks[0];
+            // a win that earns a memory: he lets it go as he dies (memShardDrop)
+            const due = menuMemoryDue();
+            if (due) memShardDrop(b.x + bw / 2, b.y + bh / 2, due);
             bossFall = shatter(b.x + bw / 2, b.y + bh / 2, bw, A_DIE_T);
             bossFall.tilt = b.wigA || 0;   // the angle he died at, eased out -- see LEVEL_SECS
             hitStop(b.x + bw / 2, b.y + bh / 2, bw, b.wigA || 0);   // the blow lands first
@@ -3545,6 +3548,7 @@
 
         stepBonus(dt);           // the end-of-round screen, if one is up
         stepServe(dt);           // a serve waiting on a boss in its way
+        memShardStep(dt);
 
         // the takeover. when it finishes, the banner finally lands.
         // the takeover used to end the game. now it hands over.
@@ -5755,6 +5759,7 @@
         else if (shadeT < SHADE_SECS) drawShade(shadeT / SHADE_SECS);
         labDrawMini();
         if (phase === 'ascend') { drawBossFall(); drawImpact(); }
+        memShardDraw();
         drawRings();
         powDrawLoose();
         drawCapsule();

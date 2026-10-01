@@ -45,7 +45,7 @@
     // Year 0 itself -- the town, which is where it takes you back to
     // (menuReturn) -- is always there; the rest are earned in MENU_MEM_ORDER.
     const MENU_MEMS = [
-        { id: 'exhortation', year: -2784, title: 'Exhortation', ink: '#7fa85a' },
+        { id: 'exhortation', year: -2701, title: 'Exhortation', ink: '#7fa85a' },
         { id: 'salvation', year: -1701, title: 'Salvation', ink: '#b0a894' },
         { id: 'cycle', year: -1342, title: 'Cycle', ink: '#d2622f' },
         { id: 'counsel', year: -126, title: 'Counsel', ink: '#c9a94e' },
@@ -989,6 +989,14 @@
         menu.memFrom[n] = true;
         menu.shows.push({ memCard: id }, { mem: id });
         return true;
+    }
+    // The memory winning this run's level would earn, by its id, or null:
+    // asked at the killing blow, before menuBeat (or menuVoidMemory) hands it
+    // over, so the boss can be seen letting it go (memShardDrop).
+    function menuMemoryDue() {
+        const run = menu && menu.run;
+        if (!run || run.n === M_RUSH || menu.memFrom[run.n]) return null;
+        return MENU_MEM_ORDER.find(k => !menu.mems[k]) || null;
     }
 
     // A boss that ends his level himself, rather than through the takeover (the

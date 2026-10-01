@@ -436,6 +436,60 @@
     // Year 0 is not drawn here: it is the town, and MEMORIES takes you back
     // to it the way the game first did (menuReturn).
 
+    // ---- the piece a boss lets go ---------------------------------------------------
+    // Each of the five was given something of the Angel's with his kingdom,
+    // and the VOID is all that is left of him: so a win that earns a memory
+    // shows it leaving the one who held it. Out of the killing blow comes one
+    // of the Angel's halo pieces -- a Brandon in a brick's colour, glowing his
+    // sky -- and it arcs down into you, whatever you are doing, so it can
+    // never be missed. The memory itself plays later, as it always has.
+    // engine.js steps and draws it (memShardStep, memShardDraw); the boss lab
+    // runs another engine, so lucifer.js drops one only through a typeof.
+    const MEM_SHARD_WAIT = 0.5;      // seconds it hangs where the blow landed
+    const MEM_SHARD_FLY = 1.6;       // ...then into you
+    const MEM_SHARD_TAKE = 0.6;      // ...and you glow with it this long
+    const MEM_SHARD_LEN = 64;        // how long it is when it comes out, px
+    const MEM_SHARD_SPIN = 5;        // radians a second it turns as it goes
+    const MEM_SHARD_RISE = 70;       // px it lifts before it falls to you
+    const MEM_SKY = 'rgba(159,211,240,1)';   // the Angel's own colour (MEM_VOICE.angel)
+    let memShard = null;
+    // from (x, y), for the memory `id` (MENU_MEMS): its colour is the brick
+    // colour the Angel's pieces wear, a different one for each in turn
+    function memShardDrop(x, y, id) {
+        const i = Math.max(0, MENU_MEM_ORDER.indexOf(id));
+        memShard = { x, y, t: 0, tint: TIERS[TIER_KEYS[i % TIER_KEYS.length]].fill };
+    }
+    function memShardStep(dt) {
+        if (memShard && (memShard.t += dt) > MEM_SHARD_WAIT + MEM_SHARD_FLY + MEM_SHARD_TAKE) memShard = null;
+    }
+    function memShardDraw() {
+        const m = memShard;
+        if (!m) return;
+        // where you are now, not where you were: it finds you
+        const px = paddle.x, py = padY();
+        const k = memEase((m.t - MEM_SHARD_WAIT) / MEM_SHARD_FLY);
+        ctx.save();
+        if (k < 1) {
+            const cx = (m.x + px) / 2, cy = Math.min(m.y, py) - MEM_SHARD_RISE;
+            const x = (1 - k) * (1 - k) * m.x + 2 * (1 - k) * k * cx + k * k * px;
+            const y = (1 - k) * (1 - k) * m.y + 2 * (1 - k) * k * cy + k * k * py;
+            const len = MEM_SHARD_LEN * (1 - 0.5 * k);
+            ctx.globalAlpha = memClamp(m.t / 0.2);
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.globalAlpha *= 0.7;
+            ctx.drawImage(memBlob(MEM_SKY), x - len, y - len, len * 2, len * 2);
+            ctx.restore();
+            memBone(ctx, memBrick(m.tint), x, y, len, m.t * MEM_SHARD_SPIN, 0);
+        } else {
+            const g = 1 - (m.t - MEM_SHARD_WAIT - MEM_SHARD_FLY) / MEM_SHARD_TAKE, w = padW();
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.globalAlpha = Math.max(0, g) * 0.8;
+            ctx.drawImage(memBlob(MEM_SKY), px - w, py - w * 0.6, w * 2, w * 1.2);
+        }
+        ctx.restore();
+    }
+
     // the faces are asked for the first time a memory is up, so a player who
     // never sees one never fetches them; a face that fails still lets the
     // memory go on, after MEM_FONT_WAIT
@@ -484,7 +538,7 @@
     // screams; the Fallen is who asks forgiveness.
     const MF_LINES = {
         say0: [['It was you all along.', 'angel']],
-        say1: [['I do what must be done for our world to heal.', 'angel']],
+        say1: [['You never chose an end. I choose it now.', 'angel']],
         scream: [['BRANDON', 'angel'], ['!', 'odin']],
         say2: [['Forgive me, ', 'fallen'], ['BRANDON', 'odin'], ['.', 'fallen']],
     };
@@ -1383,14 +1437,15 @@
     }
 
     // The Angel, standing on `ground` at x, `h` tall, his halo turning at its
-    // own pace (these scenes keep no clock of their own to spin it up with).
-    function memAngel(s, x, ground, h) {
+    // own pace (these scenes keep no clock of their own to spin it up with),
+    // or turned `turn` seconds' worth, for a scene that stops it.
+    function memAngel(s, x, ground, h, turn) {
         const scale = h / MEM_L;
         memLucifer(ctx, s, x, ground - MEM_L / 2 * scale - 8 * scale, scale, 0,
-                   s * 2 * Math.PI / MEM_HALO_PERIOD);
+                   (turn === undefined ? s : turn) * 2 * Math.PI / MEM_HALO_PERIOD);
     }
 
-    // ---- 2784 years back: the rally ---------------------------------------------------
+    // ---- 2701 years back: the rally ---------------------------------------------------
     // HIM, standing over the army that closes the first game -- the same men,
     // the same ranks (intro.js keeps them) -- telling them what is coming and
     // what it is called. They shout his name back at him, and while they do
@@ -1402,18 +1457,16 @@
     // right hand the whole time, his first general, and goes when he goes.
     const MR_FADE_IN = 1.2;
     const MR_LINES = [
-        [[1.5, 5.0], [['We must prepare for the day of reckoning.', 'odin']]],
-        [[5.3, 10.3], [['To protect ourselves from ', 'odin'], ['BRANDON', 'surtr'],
-                       [' we must sharpen ourselves with combat!', 'odin']]],
-        [[10.6, 14.6], [['Fight until we are strong enough to save our future!', 'odin']]],
-        [[14.9, 17.4], [['To stop ', 'odin'], ['BRANDON', 'surtr'], ['!', 'odin']]],
+        [[1.5, 4.5], [['BRANDON', 'surtr'], [' is coming.', 'odin']]],
+        [[4.8, 10.8], [['To protect ourselves from ', 'odin'], ['BRANDON', 'surtr'],
+                       [' we must combat one another! To learn of true power!', 'odin']]],
     ];
-    const MR_CHEER = [17.6, 21.6];   // they shout his name back
-    const MR_ZAP = [18.6, 19.5];     // the bolt, from him to the chosen one
-    const MR_GROW = [19.2, 22.6];    // the chosen one grows into his place over them
-    const MR_GO = [19.8, 24.3];      // HE rises out of the top of the frame
-    const MR_SHOUT = [22.6, 24.9];   // the one he made, grown, shouts HIS name
-    const MR_CUT = 25.3;             // to black, no fade
+    const MR_CHEER = [11.0, 15.0];   // they shout his name back
+    const MR_ZAP = [12.0, 12.9];     // the bolt, from him to the chosen one
+    const MR_GROW = [12.6, 16.0];    // the chosen one grows into his place over them
+    const MR_GO = [13.2, 17.7];      // HE rises out of the top of the frame
+    const MR_SHOUT = [16.0, 18.3];   // the one he made, grown, shouts HIS name
+    const MR_CUT = 18.7;             // to black, no fade
     const MR_ODIN_H = 360;
     const MR_ANGEL_H = MR_ODIN_H / 1.5;
     const MR_ANGEL_X = 225;          // at HIS right hand: HE faces you, so that is your left
@@ -1537,19 +1590,34 @@
 
     // ---- 1701 years back: the stand ---------------------------------------------------
     // HIM at the head of his army, facing the one he warned them of. They
-    // surge; he stops them and sends them back out of the frame, and walks up
-    // to it alone. For a moment you can see what it hangs from, and then you
-    // cannot. It cuts on what he says. The Angel is in the ranks, and goes
-    // back with them.
+    // surge; he stops them and sends them back out of the frame -- and the
+    // view goes back with them. He and the one he faces fall away small into
+    // the distance, and the Angel, in the ranks, comes up close, going back
+    // with the rest, until for a moment you can see what it hangs from. The
+    // Angel stops there, and his halo stops; everyone else has gone. What HE
+    // says next, the Angel overhears. It cuts on that.
     const MS_FADE_IN = 1.2;
-    const MS_TAUNT = [1.5, 5.0];
+    const MS_TAUNT = [1.5, 5.3];
     const MS_SURGE = [5.0, 6.3];     // the army lunges...
     const MS_HALT = [6.2, 9.2];
     const MS_BACK = [8.0, 10.5];     // ...and is sent back out of the frame
     const MS_STEP = [10.5, 12.5];    // he walks up to it alone
-    const MS_SEEN = [12.8, 13.0, 13.3, 13.9];   // the strings: up, held, and gone by the last
-    const MS_LAST = [14.8, 18.8];
-    const MS_CUT = 19.2;
+    const MS_SEEN = [12.8, 13.0, 13.9, 14.7];   // the strings: up, held, and gone by the last
+    const MS_LAST = [15.4, 19.4];
+    const MS_CUT = 20.2;
+    // The view going back: over MS_ZOOM, everything at the far end shrinks
+    // to MS_FAR_Z of its size about MS_FAR_FROM, which ends up at MS_FAR_TO.
+    const MS_ZOOM = [8.0, 11.0];
+    const MS_FAR_Z = 0.46;
+    const MS_FAR_FROM = [470, 575], MS_FAR_TO = [610, 430];
+    const MS_LAST_PX = 16;           // his last line, small: from far off...
+    const MS_LAST_Y = 205;           // ...and up over the Angel's halo, not across it
+    // The Angel close to you once the view has gone back with him: x, ground
+    // (below the frame, he is that close) and height; still backing away
+    // MS_DRIFT_PX over MS_DRIFT, until he sees.
+    const MS_NEAR = [215, 690, 320];
+    const MS_DRIFT = [11.0, 12.9], MS_DRIFT_PX = 35;
+    const MS_HALO = [13.0, 16.8, 0.35];  // his halo stops, then turns again at this pace
     const MS_GROUND = 575;
     const MS_ODIN_H = 250;
     const MS_SURTR_H = MS_ODIN_H * 2;
@@ -1561,9 +1629,9 @@
     // the surge (MS_SURGE_PX) never carries him in behind HIM
     const MS_ANGEL_X = 60;
     const MS_LINES = {
-        taunt: [['You will not triumph today, ', 'odin'], ['BRANDON', 'surtr'], ['!', 'odin']],
+        taunt: [['A thousand years we have waited for this hour, ', 'odin'], ['BRANDON', 'surtr'], ['!', 'odin']],
         halt: [['This moment is mine. Stand back.', 'odin']],
-        last: [['You are not the ', 'odin'], ['BRANDON', 'surtr'], [' I imagined.', 'odin']],
+        last: [['Is this truly the moment for which I have been training?', 'odin']],
     };
     // the army behind him: three ranks, stepping back and to the left
     let msArmy = null;
@@ -1586,26 +1654,40 @@
         const span = ([a, b]) => memClamp((s - a) / (b - a));
         ctx.save();
         ctx.globalAlpha = memEase(s / MS_FADE_IN);
-        memSurtr(MS_SURTR_X, MS_GROUND, MS_SURTR_H, s, memSeen(s, MS_SEEN));
+        // the far end of the field, shrinking away as the view goes back
+        const k = memEase(span(MS_ZOOM)), z = memLerp(1, MS_FAR_Z, k);
+        const fx = memLerp(MS_FAR_FROM[0], MS_FAR_TO[0], k), fy = memLerp(MS_FAR_FROM[1], MS_FAR_TO[1], k);
+        const far = (x, y) => [fx + (x - MS_FAR_FROM[0]) * z, fy + (y - MS_FAR_FROM[1]) * z];
+        const [sx, sg] = far(MS_SURTR_X, MS_GROUND);
+        memSurtr(sx, sg, MS_SURTR_H * z, s, memSeen(s, MS_SEEN));
         const back = span(MS_BACK);
         const shift = MS_SURGE_PX * memEase(span(MS_SURGE)) - MS_BACK_PX * back * back;
-        memAngel(s, MS_ANGEL_X + shift, MS_GROUND - 40, MS_ANGEL_H);
+        // in the ranks until they are sent back; then near you, and drawn last
+        const angel = () => {
+            if (s < MS_ZOOM[0]) { memAngel(s, MS_ANGEL_X + shift, MS_GROUND - 40, MS_ANGEL_H); return; }
+            const x = memLerp(MS_ANGEL_X + MS_SURGE_PX, MS_NEAR[0], k) - MS_DRIFT_PX * memEase(span(MS_DRIFT));
+            const [h0, h1, after] = MS_HALO;
+            memAngel(s, x, memLerp(MS_GROUND - 40, MS_NEAR[1], k), memLerp(MS_ANGEL_H, MS_NEAR[2], k),
+                     s < h0 ? s : s < h1 ? h0 : h0 + (s - h1) * after);
+        };
+        if (s < MS_ZOOM[0]) angel();
         for (const m of memStandArmy()) {
             memShip(m.x + shift, m.y + Math.sin(s * G_SHIP_HZ * 2 * Math.PI + m.ph) * G_SHIP_BOB, m.hp, m.tint);
         }
-        const ox = memLerp(MS_ODIN_X[0], MS_ODIN_X[1], memEase(span(MS_STEP)));
-        memOdin(ox, MS_GROUND, MS_ODIN_H, true, s, 1, 0, true);
-        const over = MS_GROUND - MS_ODIN_H - 30;
-        memLine(MS_LINES.taunt, 'odin', ox, over, 22, span(MS_TAUNT), MS_TAUNT);
-        memLine(MS_LINES.halt, 'odin', ox, over, 22, span(MS_HALT), MS_HALT);
-        memLine(MS_LINES.last, 'odin', ox, over, 22, span(MS_LAST), MS_LAST);
+        const [ox, og] = far(memLerp(MS_ODIN_X[0], MS_ODIN_X[1], memEase(span(MS_STEP))), MS_GROUND);
+        memOdin(ox, og, MS_ODIN_H * z, true, s, 1, 0, true);
+        if (s >= MS_ZOOM[0]) angel();
+        const over = og - (MS_ODIN_H + 30) * z, px = memLerp(22, MS_LAST_PX, k);
+        memLine(MS_LINES.taunt, 'odin', ox, over, px, span(MS_TAUNT), MS_TAUNT);
+        memLine(MS_LINES.halt, 'odin', ox, over, px, span(MS_HALT), MS_HALT);
+        memLine(MS_LINES.last, 'odin', ox, memLerp(over, MS_LAST_Y, k), px, span(MS_LAST), MS_LAST);
         ctx.restore();
     }
 
     // ---- 92 years back: the court -----------------------------------------------------
     // All of it in silhouette, black against the ember of a hall: the Fallen
     // over it all, and five Brandons coming up to him and standing in a
-    // half circle under him. He gives each a kingdom, and strikes them one
+    // half circle under him. He bids them rise, and strikes them one
     // after another, and each is wrapped in his lightning and swells, cell by
     // cell, into one of the five this game is fought against -- at the size
     // it will be when you meet it, so the hall fills with them and you can
@@ -1616,7 +1698,7 @@
     const MC_ARRIVE = 1.0;           // the first of them starts up out of the bottom...
     const MC_WALK = 2.0;             // ...takes this long to get to his place...
     const MC_GAP = 0.45;             // ...and the next starts this much later
-    const MC_SAY = [5.5, 10.8];
+    const MC_SAY = [7.8, 11.0];   // its last word lands just before the first strike
     const MC_ZAP = 11.2;             // the first strike...
     const MC_ZAP_GAP = 0.85;         // ...and each after it this much later, so each change is its own beat
     const MC_ZAP_SECS = 0.7;
@@ -1636,11 +1718,11 @@
     // where the five stand, left to right, and which level's boss each becomes:
     // spread the width of the hall and staggered in height, so that grown
     // they overlap only at their edges
-    const MC_RING = [[165, 540, 1], [255, 330, 2], [400, 575, 3], [560, 330, 4], [700, 455, 5]];
-    // ...and how big each is grown, of the size his fight has him: a little
-    // under, so the five fit the hall together
-    const MC_SCALE = 0.8;
-    const MC_LINE = [['...and to my loyal followers I grant you your own kingdom in this new world.', 'fallen']];
+    const MC_RING = [[150, 545, 1], [195, 330, 2], [420, 585, 3], [575, 300, 4], [690, 470, 5]];
+    // ...and how big each is grown, of the size his fight has him: under it,
+    // so the five each still read as themselves in one hall
+    const MC_SCALE = 0.6;
+    const MC_LINE = [['...and to my loyal followers: rise!', 'fallen']];
 
     const mcZap = i => MC_ZAP + i * MC_ZAP_GAP;
     const mcTurn = (s, i) => memClamp((s - mcZap(i) - MC_ZAP_SECS * 0.5) / MC_TURN);
@@ -1810,17 +1892,18 @@
 
     // Each boss in outline, built from what he is built from, centred on
     // (0, 0) at the size his fight has him, read off his own knobs: WINDMILL
-    // his garden, each flower a head on a stem with brandons for petals, the
-    // middle one hung lower -- drawn closer together and smaller than the
-    // field has them (MC_GARDEN), or the garden would fill the hall; IDOL one
-    // enormous head, TWINS a big one and a small one facing each other, LAMPS
-    // one hung over a campfire of them at either end, and GLEEOK the headless
-    // body leant up off his collar with three heads on its necks and a wing
-    // on either shoulder. MC_REACH is roughly how far each reaches from its
-    // middle, MC_MID where that middle is, and MC_TOP its top, for the
-    // lightning and the shout.
+    // his garden, each flower a head with brandons for petals on a stem as
+    // long as it hangs from the top of the field, the middle one hung lower --
+    // drawn closer together and smaller than the field has them (MC_GARDEN),
+    // or the garden would fill the hall; IDOL one enormous head, TWINS a big
+    // one and a small one facing each other, LAMPS one hung between two
+    // campfires as far apart as the walls stand them, and GLEEOK the headless
+    // body leant up off his collar with a wing on either shoulder and three
+    // maned heads on necks of heads. MC_REACH is roughly how far each reaches
+    // from its middle, MC_MID where that middle is, and MC_TOP its top, for
+    // the lightning and the shout.
     // MC_DEPTH is the order they are laid down in, back to front.
-    const MC_REACH = { 1: 185, 2: 200, 3: 230, 4: 280, 5: 240 };
+    const MC_REACH = { 1: 185, 2: 200, 3: 230, 4: 360, 5: 260 };
     const MC_GARDEN = [100, 0.62];     // px between WINDMILL's flowers, and their size of his
     const MC_MID = { 1: -150, 2: -90, 3: -40, 4: -90, 5: -90 };
     const MC_TOP = { 1: -300, 2: -300, 3: -140, 4: -220, 5: -330 };
@@ -1844,8 +1927,9 @@
             const [gap, k] = MC_GARDEN;
             g.fillStyle = '#000';
             for (let i = 0; i < n; i++) {
+                const hang = WM_Y + (i % 2 ? WM_STAGGER : 0);
                 const fx = (i - (n - 1) / 2) * gap, fy = MC_MID[1] + (i % 2 ? WM_STAGGER * k : 0), dir = i % 2 ? -1 : 1;
-                g.fillRect(fx - 1.5, -900, 3, 900 + fy);
+                g.fillRect(fx - 1.5, fy - hang * k, 3, hang * k);
                 for (let p = 0; p < petals; p++) {
                     const a = dir * s * 0.6 + i * 0.9 + p * Math.PI * 2 / petals, r = (WM_R0 + WM_SAIL / 2) * k;
                     memMcBody(g, fx + Math.cos(a) * r, fy + Math.sin(a) * r, WM_SAIL * k, a, false);
@@ -1859,9 +1943,13 @@
             memMcBody(g, 150, 10, TW_W_SMALL, 0, true);
         },
         4: (g, s) => {                               // LAMPS
+            // he hangs LAMP_Y - LAMP_BOSS_Y over his fires, which stand as
+            // far out as the field's walls put them (LAMPS' start)
+            const out = LW / 2 - LAMP_EDGE - lampHalfW();
             memMcBody(g, 0, -170 + Math.sin(s * 1.4) * 4, LAMP_BOSS_W, 0, false);
-            for (const lx of [-LAMP_BOSS_W * 0.48, LAMP_BOSS_W * 0.48]) {
-                for (const k of lampLogs(lx, Math.sin(s + lx) * 4)) memMcBody(g, k.x, k.y, k.w, k.a, false);
+            for (const lx of [-out, out]) {
+                const ly = -170 + LAMP_Y - LAMP_BOSS_Y + Math.sin(s * LAMP_BOB_RATE * 3 + lx) * LAMP_BOB;
+                for (const k of lampLogs(lx, ly)) memMcBody(g, k.x, k.y, k.w, k.a, k.x < 0);
             }
         },
         5: (g, s) => {                               // GLEEOK
@@ -1887,16 +1975,25 @@
                     g.restore();
                 }
             }
-            g.strokeStyle = '#000';
-            g.lineWidth = 12;
+            // each neck a string of heads shrinking into him, each head in a
+            // mane of him fanned round it, open under the chin (gleeok.js's
+            // glStyleNeck and glStyleFrame, at their fight sizes)
             [-1, 0, 1].forEach((k, ph) => {
                 const a = k * GL_FAN + Math.sin(s * 1.5 + ph * 2) * 0.08;
-                const hx = Math.sin(a) * neck, hy = collar + Math.cos(a) * neck;
-                g.beginPath();
-                g.moveTo(0, collar);
-                g.quadraticCurveTo(hx * 0.3, collar + neck * 0.55, hx, hy);
-                g.stroke();
-                memMcHead(g, hx, hy + hw * 0.35, hw);
+                const hx = Math.sin(a) * neck, hy = collar + Math.cos(a) * neck + hw * 0.35;
+                const beads = Math.max(GL_BEADS, Math.round(Math.hypot(hx, hy - collar) / (hw * 0.3)));
+                for (let i = 0; i < beads; i++) {
+                    const t = i / beads;
+                    memMcHead(g, hx * t, collar + (hy - collar) * t, hw * (0.45 + 0.35 * t));
+                }
+                for (const [n, len] of [[10, 1.2], [8, 0.9]]) {
+                    for (let i = 0; i < n; i++) {
+                        const m = Math.PI * 0.5 + GL_MANE_OPEN + (i + 0.5) / n * (Math.PI * 2 - GL_MANE_OPEN * 2);
+                        const L = hw * len * GL_MANE, r = hw * 0.22 + L / 2;
+                        memMcBody(g, hx + Math.cos(m) * r, hy + Math.sin(m) * r * 1.1, L, m, i % 2);
+                    }
+                }
+                memMcHead(g, hx, hy, hw);
             });
         },
     };
@@ -1949,7 +2046,7 @@
     // The Angel at the head of a great host, facing the one they fear. They
     // shout his name at him; he says nothing, and then his own name, and for a
     // moment what he hangs from shows. Then he turns and runs, and they shout
-    // HIS name after him. It cuts on the cheer.
+    // HIS name after him. The Angel, who led them, asks one word. It cuts.
     const MY_FADE_IN = 1.2;
     const MY_JEER = [1.8, 4.6];      // the host shouts his name at him
     const MY_NOTHING = [5.0, 7.4];
@@ -1957,7 +2054,8 @@
     const MY_SEEN = [10.6, 10.8, 11.1, 11.7];
     const MY_RUN = [12.0, 14.2];     // he turns and is gone off the right
     const MY_CHEER = [12.6, 15.6];   // ...and they shout HIS name
-    const MY_CUT = 16.2;
+    const MY_AGAIN = [15.2, 17.6];
+    const MY_CUT = 18.0;
     const MY_GROUND = 575;
     const MY_ANGEL = [520, 170];     // where the Angel stands, and his height
     const MY_SURTR = [660, 510];     // where it stands, and its height: three times his
@@ -2001,33 +2099,37 @@
         const over = MY_GROUND - MY_SURTR[1] - 20;
         memLine([['...', 'surtr']], 'surtr', MY_SURTR[0], over, 30, span(MY_NOTHING), MY_NOTHING);
         memLine([['BRANDON', 'surtr']], 'surtr', MY_SURTR[0], over, 30, span(MY_NAME), MY_NAME);
+        memLine([['Again?', 'angel']], 'angel', MY_ANGEL[0], MY_GROUND - MY_ANGEL[1] - 70, 24, span(MY_AGAIN), MY_AGAIN);
         ctx.restore();
     }
 
     // ---- 126 years back: counsel ------------------------------------------------------
     // The one they fear walking away out of the frame, beaten back once more,
     // what it hangs from showing for a moment as it goes. The Angel comes to
-    // HIM and asks whether this ever ends. HE says it does not, unless they
-    // let it. It cuts on HIS answer.
+    // HIM: how many times now? Not enough. Does it ever end? HE says it does
+    // not, unless they let it. It cuts on HIS answer.
     const MQ_FADE_IN = 1.2;
     const MQ_LEAVES = [0.3, 6.5];    // it walks off the right
     const MQ_SEEN = [1.8, 2.0, 2.3, 2.9];
     const MQ_ENTER = [4.0, 7.0];     // the Angel comes in from the left
-    const MQ_ASK = [7.5, 13.5];
-    const MQ_ANSWER = [14.0, 22.5];
-    const MQ_CUT = 23.0;
+    // what each says, and when: the Angel's, then HIS
+    const MQ_SAYS = [
+        ['angel', [7.4, 9.6], [['He ran again.', 'angel']]],
+        ['angel', [9.9, 12.8], [['How many times is that, ', 'angel'], ['BRANDON', 'odin'], ['?', 'angel']]],
+        ['odin', [13.2, 15.2], [['Not enough.', 'odin']]],
+        ['angel', [15.6, 21.6], [['Are we destined to stave off annihilation forever? ' +
+                                  'Or is our end inevitable and we only delay it?', 'angel']]],
+        ['odin', [22.1, 30.6], [['There is no end unless we so choose to give up our present. We have kept ', 'odin'],
+                                ['BRANDON', 'surtr'],
+                                [' at bay countless times and we shall do so countless more times.', 'odin']]],
+    ];
+    const MQ_CUT = 31.1;
     const MQ_GROUND = 575;
     const MQ_ANGEL_H = 170;
     const MQ_ANGEL_X = [-120, 170];
     const MQ_ODIN = [360, MQ_ANGEL_H * 1.5];
     const MQ_SURTR = [640, MQ_ANGEL_H * 3];
     const MQ_WALK_PX = 700;
-    const MQ_ASK_LINE = [['Are we destined to stave off annihilation forever? ' +
-                          'Or is our end inevitable and we only delay it?', 'angel']];
-    const MQ_ANSWER_LINE = [['There is no end unless we so choose one. We have kept ', 'odin'],
-                            ['BRANDON', 'surtr'],
-                            [' at bay countless times and we shall do so countless more times. ' +
-                             'It is our sacred duty to protect our world.', 'odin']];
 
     function memCounsel(s) {
         if (s >= MQ_CUT || !greySprite()) return;
@@ -2042,7 +2144,7 @@
         memOdin(MQ_ODIN[0], MQ_GROUND, MQ_ODIN[1], true, s, 1, 0, true);
         const ax = memLerp(MQ_ANGEL_X[0], MQ_ANGEL_X[1], memEase(span(MQ_ENTER)));
         memAngel(s, ax, MQ_GROUND, MQ_ANGEL_H);
-        memLine(MQ_ASK_LINE, 'angel', ax, 200, 22, span(MQ_ASK), MQ_ASK);
-        memLine(MQ_ANSWER_LINE, 'odin', MQ_ODIN[0], 200, 22, span(MQ_ANSWER), MQ_ANSWER);
+        for (const [who, when, parts] of MQ_SAYS)
+            memLine(parts, who, who === 'odin' ? MQ_ODIN[0] : ax, 200, 22, span(when), when);
         ctx.restore();
     }

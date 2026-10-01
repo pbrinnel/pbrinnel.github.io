@@ -233,7 +233,7 @@
             { B: 'wings' }, { L: 'cage', R: 'tree' }, { L: 'fist', R: 'beam' }],
         3: ['beam', 'tree', 'beam', 'beam', 'tree']
     };
-    const LU_LAST = 'It is finished. My world is...';
+    const LU_LAST = 'You have returned?!?';
 
     // His rig, as the memories and the character lab draw him, at LU_RIG
     // tall: the numbers are the same so they stay one person. A pose is a
@@ -1869,6 +1869,10 @@
         if (lu.stage === 1) {
             lu.stage = 'break';
             lu.mem = false; lu.memAsked = false;
+            // the memory this break plays, let go out of him while he reels
+            // (memory.js; the boss lab has none)
+            const due = typeof menuMemoryDue === 'function' && menuMemoryDue();
+            if (due && typeof memShardDrop === 'function') memShardDrop(lu.x, lu.y, due);
             for (const h of lu.hands) if (luActive(h)) luForm(h, 'arm');
             lu.clap = null;
             luCallOff();
@@ -2853,7 +2857,7 @@
         labBar(x, y, w, lu.stage === 'turn' ? luLerp(lu.refill, 1, luEase(lu.sec / luCorruptTimes().end)) : b.hp / b.maxHp);
     }
 
-    // "It is finished. My world is..." -- a letter at a time, under him
+    // his last words (LU_LAST) -- a letter at a time, under him
     function luDrawLast() {
         const n = Math.min(LU_LAST.length, Math.floor(lu.stT * LU_DIE_TYPE));
         if (n <= 0) return;
