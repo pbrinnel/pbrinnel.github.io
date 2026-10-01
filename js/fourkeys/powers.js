@@ -47,7 +47,7 @@
     // lump of bricks in four colours a couple of hundred px across, jumping
     // that far every frame, is the kind of fast, large, high-contrast change
     // that can set off a photosensitive seizure (WCAG 2.3.1). Full spin is
-    // there for any paddle to build, and BLUR, who puts twice the spin on,
+    // there for any paddle to build, and BLUR, who puts three times the spin on,
     // gets there often.
     let KAT_TURN_MAX = 4;
     let KAT_DRAG  = 0.12;   // spin each stuck brick takes off, a share per second

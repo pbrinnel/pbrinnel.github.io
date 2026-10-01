@@ -69,7 +69,7 @@
     let MULTI_PRINT = 0.45;  // ...and how strongly each shows
     let BLUR_LEN   = 0.75;   // BLUR: shorter, so there is less of him to whack with
     let BLUR_SPIN  = 4;      // ...turns a second he spins through, all the way round, at full speed
-    let BLUR_SPIN_X = 2;     // ...times the spin a hit off him puts on a head, off his ends and his travel both
+    let BLUR_SPIN_X = 3;     // ...times the spin a hit off him puts on a head, off his ends and his travel both
     let BLUR_TRAIL = 3;      // ...afterimages of him following round behind
     let BLUR_GAP   = 0.3;    // ...seconds after a whack he only keeps that head out of him
     let BLUR_KICK  = 0.5;    // ...and seconds a whacked head takes to slow back to the game's speed
@@ -933,8 +933,8 @@
 
     // ---- the ones bosses buy --------------------------------------------------------
     // These three, and BLUR below, come with bosses beaten, counted over
-    // every run (MENU_SLAIN_PADS in menu.js), and all but MULTI also with a
-    // flawless win of a stage (MENU_FLAWLESS_PADS). These three lean on the
+    // every run (MENU_SLAIN_PADS in menu.js), or each with a flawless win of
+    // a stage (MENU_FLAWLESS_PADS). These three lean on the
     // capsules: MULTI and PRINCE get PAD_FAVOUR of capsules as their own
     // before the usual roll (the falling capsule in engine.js), and CHELL has
     // PORTAL on all the time (ptOn in powers.js). MULTI pays for his in
@@ -1239,7 +1239,7 @@
         len: () => BLUR_LEN,
         edge: () => BLUR_SPIN_X,
         swipe: () => BLUR_SPIN_X,
-        blurb: 'shorter · double spin · he never stops spinning',
+        blurb: 'shorter · triple spin · he never stops spinning',
         lore: 'The fastest Brandon there ever was, or so he says, and nobody has ever ' +
               'managed to get him to stand still long enough to argue.',
         under() {

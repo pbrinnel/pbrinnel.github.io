@@ -68,9 +68,8 @@
     // RUINS' own for a run without a continue...
     const MENU_SLAIN_PADS = [[3, 'multi'], [4, 'statue'], [10, 'prince'], [15, 'chell'], [20, 'blur']];
     // ...and the rest, sooner, each with a flawless win of a level: not a
-    // head lost and no continue (menuBeatSlew). The FARM has none: a first
-    // clean run there already hands over two paddles.
-    const MENU_FLAWLESS_PADS = { 2: 'prince', 3: 'chell', 4: 'blur' };
+    // head lost and no continue (menuBeatSlew)
+    const MENU_FLAWLESS_PADS = { 1: 'multi', 2: 'prince', 3: 'chell', 4: 'blur' };
     // paddles owned before the BRANDONS sign goes up (menuStands)
     const MENU_RACK_AT = 5;
     // Who a level hands you is whoever the level sliders say, so moving a boss
