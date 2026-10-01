@@ -46,8 +46,9 @@
     // spins. A head at full spin turns about a sixth of a turn a frame, and a
     // lump of bricks in four colours a couple of hundred px across, jumping
     // that far every frame, is the kind of fast, large, high-contrast change
-    // that can set off a photosensitive seizure (WCAG 2.3.1). BLUE BLUR holds
-    // every head at full spin, so with him it was the whole time.
+    // that can set off a photosensitive seizure (WCAG 2.3.1). Full spin is
+    // there for any paddle to build, and BLUR, who puts twice the spin on,
+    // gets there often.
     let KAT_TURN_MAX = 4;
     let KAT_DRAG  = 0.12;   // spin each stuck brick takes off, a share per second
     let KAT_PAD   = 1;      // 1: what is stuck on bounces off him too; 0: only the head does
@@ -329,7 +330,7 @@
     // ==== LASER ====================================================================
     // L  LASER BRANDON: a gun on each end of him. Every LZ_EVERY seconds both
     //    fire a head, LZ_BURSTS times, so three bursts is six heads. The guns
-    //    are fixed to him, so they lean as he leans and turn as BLUE BLUR
+    //    are fixed to him, so they lean as he leans and turn as BLUR
     //    turns, and a shot goes the way its gun is pointing.
     //    With LZ_STAYS off a shot is a bolt: it breaks (or hurts) the first
     //    thing it meets and is gone, as Arkanoid's laser was. On, each shot is

@@ -230,7 +230,7 @@
             b.flash = 1;
             bossIF = BOSS_IF;
             // down on a lamp, a hit is worth more and knocks him back up off it
-            const dmg = low ? LAMP_SWOOP_DMG : 1;
+            const dmg = labBite(low ? LAMP_SWOOP_DMG : 1, cx, cy);
             b.hp = Math.max(0, b.hp - dmg);
             // a hit that hurts shakes him, so it reads apart from a bounce off him
             lamp.shakeAt = clock;

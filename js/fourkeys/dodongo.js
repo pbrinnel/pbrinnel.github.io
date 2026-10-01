@@ -120,7 +120,7 @@
 
     function dodHurt(b, cx, cy) {
         b.flash = 1;
-        b.hp = Math.max(0, b.hp - 1);
+        b.hp = Math.max(0, b.hp - labBite(1, cx, cy));
         bossHits++;
         const done = b.hp <= 1e-6;
         award(BOSS_PTS * (done ? 5 : 2), cx, cy);

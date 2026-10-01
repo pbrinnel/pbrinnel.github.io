@@ -11,7 +11,7 @@
     //   finish a level without using a continue and you keep the paddle it guarded
     //   win any level at all and CLASSIC, the first game's paddle, is yours
     //   every boss beaten counts, and the count buys MULTI, PRINCE, CHELL and
-    //   BLUE BLUR -- or finish the FARM, the RUINS, the CITY or the VOLCANO
+    //   BLUR -- or finish the FARM, the RUINS, the CITY or the VOLCANO
     //   without losing a head or a continue and it hands over its one of them
     //   own enough paddles and the BRANDONS sign goes up: every one on a rack, to pick from
     //   each stage gives the next memory the first time you win it with one left to give
@@ -62,11 +62,15 @@
     // earn -- he is a souvenir, and the first one a player picks up.
     const MENU_SOUVENIR = 'classic';
     // Paddles bought with bosses beaten: every one counts, in any stage or
-    // BOSS RUSH, clean or not, over every run (menuSlew)...
-    const MENU_SLAIN_PADS = [[5, 'multi'], [10, 'prince'], [15, 'chell'], [20, 'blur']];
-    // ...or, sooner, each one with a flawless win of its level: not a head
-    // lost and no continue (menuBeatSlew)
-    const MENU_FLAWLESS_PADS = { 1: 'multi', 2: 'prince', 3: 'chell', 4: 'blur' };
+    // BOSS RUSH, clean or not, over every run (menuSlew). The two easiest to
+    // live with, MULTI and STATUE, come early this way, so a player who
+    // needs the help is not made to win cleanly first; STATUE is still the
+    // RUINS' own for a run without a continue...
+    const MENU_SLAIN_PADS = [[3, 'multi'], [4, 'statue'], [10, 'prince'], [15, 'chell'], [20, 'blur']];
+    // ...and the rest, sooner, each with a flawless win of a level: not a
+    // head lost and no continue (menuBeatSlew). The FARM has none: a first
+    // clean run there already hands over two paddles.
+    const MENU_FLAWLESS_PADS = { 2: 'prince', 3: 'chell', 4: 'blur' };
     // paddles owned before the BRANDONS sign goes up (menuStands)
     const MENU_RACK_AT = 5;
     // Who a level hands you is whoever the level sliders say, so moving a boss
@@ -87,8 +91,9 @@
     const M_HINT = 'move to slide brandon · hold to walk him';
     // the rack, in the order the gates walk through it: the one you start with,
     // then the one each level is guarding, then the souvenir
-    const MENU_PADS = ['standard'].concat(MENU_LEVELS.map(l => l.pad), MENU_LAST.pad, MENU_SOUVENIR,
-                                          MENU_SLAIN_PADS.map(s => s[1]));
+    // (a level's paddle the count also buys keeps its level's place)
+    const MENU_PADS = [...new Set(['standard'].concat(MENU_LEVELS.map(l => l.pad), MENU_LAST.pad, MENU_SOUVENIR,
+                                                      MENU_SLAIN_PADS.map(s => s[1])))];
 
     let menu = null;                 // the hub outlives a stage: see menuWatch
 
@@ -3036,7 +3041,7 @@
                             rush: 'BOSS RUSH' };
     const M_SAVE_PADS = { gilt: 'GILT', statue: 'STATUE', frost: 'FROST', ember: 'EMBER', pair: 'PAIR',
                           classic: 'CLASSIC', multi: 'MULTI', prince: 'PRINCE', chell: 'CHELL',
-                          blur: 'BLUE BLUR' };
+                          blur: 'BLUE BLUR' };      // his old name: shown as BLUR, saved as this
     const M_SAVE_MEMS = { exhortation: 'EXHORTATION', salvation: 'SALVATION', cycle: 'CYCLE',
                           counsel: 'COUNSEL', fall: 'FALL', consolidation: 'CONSOLIDATION' };
     // each kind of line, and which of `menu`'s tables it fills from which tokens
@@ -3380,9 +3385,9 @@
     // what it takes to earn one, from the same lists that hand them over
     function menuRackHow(k) {
         const lv = MENU_LEVELS.concat(MENU_LAST).find(l => l.pad === k);
-        if (lv) return 'win the ' + lv.name + ' without a continue';
-        if (k === MENU_SOUVENIR) return 'win any level';
         const slain = MENU_SLAIN_PADS.find(s => s[1] === k);
+        if (lv) return 'win the ' + lv.name + ' without a continue' + (slain ? ', or beat ' + slain[0] + ' bosses' : '');
+        if (k === MENU_SOUVENIR) return 'win any level';
         if (!slain) return '';
         const n = Object.keys(MENU_FLAWLESS_PADS).find(n => MENU_FLAWLESS_PADS[n] === k);
         const clean = n && MENU_ALL.find(l => l.n === +n);

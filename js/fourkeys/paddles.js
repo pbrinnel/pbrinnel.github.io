@@ -13,6 +13,7 @@
     //   caps   how long a capsule lasts him
     //   split  two of him, with a hole down the middle
     //   favour a capsule he is partial to     portal  PORTAL on for as long as he is
+    //   heavy  hits a head of his lands on silver and gold at once
     //
     // Nothing here touches how fast he answers the pointer: on a phone the
     // finger IS the paddle, and a paddle that lagged would read as the game
@@ -35,6 +36,7 @@
     let STAT_ANGLE = 0.65;   // ...flatter off his ends...
     let STAT_SPIN  = 0.35;   // ...and stone hardly grips, so he puts little spin on
     let STAT_DIP   = 1.3;    // ...but he leans further after one going past
+    let STAT_HEAVY = 2;      // ...and a head off him lands this many hits on silver and gold at once
     let FROST_LEN  = 0.95;   // frost: a touch shorter...
     let FROST_EDGE = 1.5;    // ...spin off his ends...
     let FROST_SWIPE = 2.2;   // ...and off his travel, both far easier
@@ -48,6 +50,7 @@
     let EMB_CATCH  = 0.3;    // ...but a brick a head of his breaks has this chance of going up in embers
     let EMB_SPREAD = 0.45;   // ...a burning brick this chance of catching each one beside it
     let EMB_SPREAD_AT = 1;   // ...seconds into burning that it does
+    let EMB_CRIT   = 0.15;   // ...and a wound on a boss from a head of his this chance of counting double
     let EMB_GLOW   = 0.45;   // how much light he gives off
     let EMB_SPARKS = 17;     // sparks a second rising off him
     let EMB_ASH    = 6;      // wisps of smoke a second: ambiance, never something to look at...
@@ -60,10 +63,13 @@
     let V2_GLINT   = 5;      // ...seconds between one glint and the next...
     let V2_SWEEP   = 0.9;    // ...and how long a glint takes to cross him
     let PAD_FAVOUR = 0.5;    // MULTI, PRINCE: this share of capsules is his, before the usual roll
+    let MULTI_LEN  = 0.8;    // MULTI: shorter, since every other capsule is a spare head
     let MULTI_POP  = 2.5;    // MULTI: seconds between one pair of heads flying off him and the next
     let MULTI_SLIP = 4;      // MULTI: px each of his two misprints is out of register, at the game's size...
     let MULTI_PRINT = 0.45;  // ...and how strongly each shows
-    let BLUR_SPIN  = 4;      // BLUE BLUR: turns a second he spins through, all the way round, at full speed
+    let BLUR_LEN   = 0.75;   // BLUR: shorter, so there is less of him to whack with
+    let BLUR_SPIN  = 4;      // ...turns a second he spins through, all the way round, at full speed
+    let BLUR_SPIN_X = 2;     // ...times the spin a hit off him puts on a head, off his ends and his travel both
     let BLUR_TRAIL = 3;      // ...afterimages of him following round behind
     let BLUR_GAP   = 0.3;    // ...seconds after a whack he only keeps that head out of him
     let BLUR_KICK  = 0.5;    // ...and seconds a whacked head takes to slow back to the game's speed
@@ -72,11 +78,11 @@
     let BLUR_SETTLE = 0.25;  // ...and seconds he takes to lie flat again when no head is in play
     let BLUR_BAND  = 40;     // ...px either side of the middle where he keeps the way he is turning
     let BLUR_FLIP  = 0.4;    // ...and seconds to swing from full one way to full the other
-    LAB_KNOBS.push('PAD_FAVOUR', 'MULTI_POP', 'MULTI_SLIP', 'MULTI_PRINT',
-                   'BLUR_SPIN', 'BLUR_TRAIL', 'BLUR_GAP', 'BLUR_KICK', 'BLUR_UP', 'BLUR_RAMP', 'BLUR_SETTLE', 'BLUR_BAND', 'BLUR_FLIP');
+    LAB_KNOBS.push('PAD_FAVOUR', 'MULTI_LEN', 'MULTI_POP', 'MULTI_SLIP', 'MULTI_PRINT',
+                   'BLUR_LEN', 'BLUR_SPIN', 'BLUR_SPIN_X', 'BLUR_TRAIL', 'BLUR_GAP', 'BLUR_KICK', 'BLUR_UP', 'BLUR_RAMP', 'BLUR_SETTLE', 'BLUR_BAND', 'BLUR_FLIP');
     LAB_KNOBS.push('GILT_LEN', 'GILT_CAPS', 'GILT_SHINE', 'STAT_LEN', 'STAT_ANGLE', 'STAT_SPIN',
-                   'STAT_DIP', 'FROST_LEN', 'FROST_EDGE', 'FROST_SWIPE', 'FROST_DECK', 'FROST_FLAKES', 'FROST_BIG', 'ICE_SECS', 'ICE_RAMP', 'ICE_TURN',
-                   'EMB_LEN', 'EMB_CATCH', 'EMB_SPREAD', 'EMB_SPREAD_AT', 'EMB_GLOW', 'EMB_SPARKS', 'PAIR_LEN', 'PAIR_QUAD', 'PAD_MARK', 'V2_GLOSS', 'V2_GLINT', 'V2_SWEEP');
+                   'STAT_DIP', 'STAT_HEAVY', 'FROST_LEN', 'FROST_EDGE', 'FROST_SWIPE', 'FROST_DECK', 'FROST_FLAKES', 'FROST_BIG', 'ICE_SECS', 'ICE_RAMP', 'ICE_TURN',
+                   'EMB_LEN', 'EMB_CATCH', 'EMB_SPREAD', 'EMB_SPREAD_AT', 'EMB_CRIT', 'EMB_GLOW', 'EMB_SPARKS', 'PAIR_LEN', 'PAIR_QUAD', 'PAD_MARK', 'V2_GLOSS', 'V2_GLINT', 'V2_SWEEP');
     LAB_KNOBS.push('EMB_ASH', 'EMB_ASH_S', 'EMB_ASH_A');
 
     const V2_RIM    = '#e6edf5';
@@ -125,6 +131,7 @@
     const labPadFavour = () => (labP && labP.favour) || null;
     const labPadPortal = () => !!(labP && labP.portal);
     const labPadBlur = () => !!(labP && labP.blur);
+    const labPadHeavy = () => labP && labP.heavy ? labP.heavy() : 1;
     const padQuadOf = v => v && v.quad ? v.quad() : 1;
     const labPadQuad  = () => labPFrom ? padQuadOf(labPFrom) + (padQuadOf(labP) - padQuadOf(labPFrom)) * labPadFadeK() : padQuadOf(labP);
 
@@ -143,6 +150,7 @@
         if (labPadFavour()) say.push(Math.round(PAD_FAVOUR * 100) + '% ' + labPadFavour());
         if (labPadPortal()) say.push('PORTAL always');
         if (labPadBlur()) say.push('spinning ' + BLUR_SPIN + '/s');
+        if (labPadHeavy() > 1) say.push('×' + labPadHeavy() + ' on silver and gold');
         return { name: (labP && labP.name) || LAB_PAD.standard.name, line: say.join(' · ') || 'as the game has him' };
     }
 
@@ -189,12 +197,15 @@
         padBoth('over', []);
         for (const x of embBlasts) {
             const k = x.t / EMB_BLAST, r = x.r * (0.3 + 0.7 * Math.sqrt(k));
-            ctx.globalCompositeOperation = 'lighter';
-            ctx.globalAlpha = (1 - k) * 0.8;
-            ctx.drawImage(padGlow(EMB_INK), x.x - r * 1.2, x.y - r * 1.2, r * 2.4, r * 2.4);
-            ctx.globalCompositeOperation = 'source-over';
+            // fire glows; STATUE's thud (x.ink) is only the ring
+            if (!x.ink) {
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.globalAlpha = (1 - k) * 0.8;
+                ctx.drawImage(padGlow(EMB_INK), x.x - r * 1.2, x.y - r * 1.2, r * 2.4, r * 2.4);
+                ctx.globalCompositeOperation = 'source-over';
+            }
             ctx.globalAlpha = 1 - k;
-            ctx.strokeStyle = EMB_RIM;
+            ctx.strokeStyle = x.ink || EMB_RIM;
             ctx.lineWidth = 4 * (1 - k) + 1;
             ctx.beginPath();
             ctx.arc(x.x, x.y, r, 0, 7);
@@ -347,7 +358,7 @@
     // The part of him that something at (x, y) is touching, or null. It is
     // an ellipse rx by ry round that point, tested against his own outline
     // turned the way he is turned (paddle.dip, as heads meet him), so a
-    // paddle that leans, or BLUE BLUR all the way round, is hit where he is
+    // paddle that leans, or BLUR all the way round, is hit where he is
     // and missed where he is not. Every capsule and every boss's attack asks
     // this, each with the size it always used, so a level paddle is hit just
     // as he was when each of them tested a flat box of their own.
@@ -411,6 +422,21 @@
         ctx.restore();
     }
 
+    // ---- STATUE's weight ---------------------------------------------------------
+    // A head off STATUE strikes silver and gold STAT_HEAVY hits at once
+    // (hitBrick), and the blow lands with a thud of its own.
+    // the heavy blow landing: a ring of the statues' paler stone and a spray
+    // of grit off the brick, bigger than any plain hit's
+    function labPadThud(b) {
+        embBlasts.push({ x: b.x + bw / 2, y: b.y + bh / 2, t: 0, r: (bw + GAP) * 0.6, ink: STONE_RIM });
+        for (let n = 0; n < 18; n++) {
+            const a = Math.random() * Math.PI * 2, v = 50 + Math.random() * 110;
+            padBit(b.x + bw / 2 + (Math.random() - 0.5) * bw * 0.6, b.y + bh / 2,
+                   Math.random() < 0.5 ? STONE_RIM : STONE, 0.5 + Math.random() * 0.4,
+                   Math.cos(a) * v, Math.sin(a) * v - 30, 260, 2 + Math.random() * 2.5);
+        }
+    }
+
     // ---- EMBER's wildfire -------------------------------------------------------
     // A brick broken by a head that EMBER has marked has EMB_CATCH of going
     // up: it bursts in embers and every brick next to it (corners too)
@@ -440,15 +466,31 @@
     function embBlast(x, y, big) { embBlasts.push({ x, y, t: 0, r: (bw + GAP) * (big ? 1.5 : 0.8) }); }
 
     function labBrickGone(b) {
-        const ball = labHitBy;
-        if (!ball || !ball.mark || ball.mark.key !== 'ember' || Math.random() >= EMB_CATCH) return;
-        embBlast(b.x + bw / 2, b.y + bh / 2, true);
+        if (!embLit() || Math.random() >= EMB_CATCH) return;
+        embBurst(b.x + bw / 2, b.y + bh / 2);
+        for (const o of padBeside(b)) if (padBurnable(o)) padIgnite(o);
+    }
+    // whether the head a hit is from carries EMBER's fire
+    const embLit = () => !!(labHitBy && labHitBy.mark && labHitBy.mark.key === 'ember');
+    // going up: the blast and a spray of embers
+    function embBurst(x, y) {
+        embBlast(x, y, true);
         for (let n = 0; n < 40; n++) {
             const a = Math.random() * Math.PI * 2, v = 60 + Math.random() * 160;
-            padBit(b.x + bw / 2, b.y + bh / 2, Math.random() < 0.4 ? EMB_RIM : EMB_INK, 0.5 + Math.random() * 0.6,
+            padBit(x, y, Math.random() < 0.4 ? EMB_RIM : EMB_INK, 0.5 + Math.random() * 0.6,
                    Math.cos(a) * v, Math.sin(a) * v - 40, 60, 2 + Math.random() * 2.5, 0.95, 'glow');
         }
-        for (const o of padBeside(b)) if (padBurnable(o)) padIgnite(o);
+    }
+
+    // ---- EMBER's crit ----------------------------------------------------------------
+    // A boss has no bricks to set alight, so a head carrying EMBER's fire
+    // has EMB_CRIT of going up on him instead: the same burst a brick
+    // catching makes, and the wound counts double. Every boss asks this for
+    // what a wound takes off him; anything else is n as it was.
+    function labBite(n, cx, cy) {
+        if (!embLit() || Math.random() >= EMB_CRIT) return n;
+        if (cx !== undefined) embBurst(cx, cy);
+        return n * 2;
     }
 
     function padBurnStep(dt) {
@@ -719,10 +761,12 @@
     // STATUE: carved, rimmed in pale stone, and shedding dust when struck.
     // Longer than standard and he leans further after a head going past, but
     // stone hardly grips: flat returns, and next to no spin, which is money.
+    // What he scores with instead is weight: his heads hit silver and gold
+    // STAT_HEAVY times at once (STATUE's weight, above).
     LAB_PAD.statue = {
         name: 'STATUE',
         stone: true,
-        blurb: 'longest, leans furthest · flat returns, next to no spin',
+        blurb: 'longest, leans furthest · next to no spin · hits silver and gold twice',
         lore: 'Carved from the ruins\' own stone in the likeness of {angel}, back when he shone. ' +
               'He will not bend and he will not spin, but he will lean a long way to catch you.',
         len: () => STAT_LEN,
@@ -730,6 +774,7 @@
         edge: () => STAT_SPIN,
         swipe: () => STAT_SPIN,
         dip: () => STAT_DIP,
+        heavy: () => STAT_HEAVY,
         under() { padRim('padRimS', STONE_RIM, 3, 0.9); },
         skin(sg, o) {
             padLay(sg, o, shapeSprite('padStone', STONE, PAD_BAKE, PAD_BAKE / SHAPE_ASPECT, 'statue'), 1);
@@ -794,11 +839,12 @@
     // EMBER: lit from underneath, throwing sparks that rise. Much shorter than
     // standard, but a head off him carries his fire into the wall, and now
     // and then a brick it breaks goes up and the fire runs on from there
-    // (EMBER's wildfire, above).
+    // (EMBER's wildfire, above) -- or, on a boss, the wound counts double
+    // (EMBER's crit).
     LAB_PAD.ember = {
         name: 'EMBER',
         ink: EMB_INK, rim: EMB_RIM,
-        blurb: 'much shorter · sets the wall alight',
+        blurb: 'much shorter · sets the wall alight · now and then burns a boss for double',
         lore: 'Forged in the fire of {surtr}\'s footsteps, where the mountain still remembers the ' +
               'weight of him. He has never quite stopped burning.',
         len: () => EMB_LEN,
@@ -886,12 +932,13 @@
     };
 
     // ---- the ones bosses buy --------------------------------------------------------
-    // These three, and BLUE BLUR below, come with bosses beaten, counted over
-    // every run (MENU_SLAIN_PADS in menu.js), or each with a flawless win of
-    // its own stage (MENU_FLAWLESS_PADS). These three play as MODERN does
-    // and leans on the capsules instead: MULTI and PRINCE get PAD_FAVOUR of
-    // capsules as their own before the usual roll (the falling capsule in
-    // engine.js), and CHELL has PORTAL on all the time (ptOn in powers.js).
+    // These three, and BLUR below, come with bosses beaten, counted over
+    // every run (MENU_SLAIN_PADS in menu.js), and all but MULTI also with a
+    // flawless win of a stage (MENU_FLAWLESS_PADS). These three lean on the
+    // capsules: MULTI and PRINCE get PAD_FAVOUR of capsules as their own
+    // before the usual roll (the falling capsule in engine.js), and CHELL has
+    // PORTAL on all the time (ptOn in powers.js). MULTI pays for his in
+    // length; PRINCE and CHELL play as MODERN does.
 
     // Him in two colours, cut where the photograph is: his shirt and head
     // run from PAD_BELT to his right end and take `top`, his jeans take
@@ -931,7 +978,8 @@
         ink: MULTI_INK,
         prints: [[MULTI_INK, -1, -0.5], [MULTI_BLUE, 1, 0.5]],     // colour, and which way it slips
         favour: 'M',
-        blurb: 'half of power-ups are MULTI',
+        len: () => MULTI_LEN,
+        blurb: 'shorter · half of power-ups are MULTI',
         lore: 'Nobody agrees on how many of him there were. ' +
               'Everybody agrees it was more than one.',
         popT: 0,
@@ -996,9 +1044,9 @@
         skin(sg, o) { padLay(sg, o, this.dress(), this.dressA); }
     };
 
-    // ---- BLUE BLUR: spinning ---------------------------------------------------------
-    // Every head in play spins flat out (engine.js holds it at SPIN_MAX), and
-    // so does he: all the way round, up to BLUR_SPIN turns a second. With no
+    // ---- BLUR: spinning ---------------------------------------------------------
+    // A hit off him puts BLUR_SPIN_X times the usual spin on a head, and he
+    // spins himself: all the way round, up to BLUR_SPIN turns a second. With no
     // head in play -- waiting to serve, a life just lost -- he settles flat
     // over BLUR_SETTLE, so a serve leaves a level top, and once it is in
     // play he winds up from still over BLUR_RAMP, so the head's first trip
@@ -1150,6 +1198,14 @@
             const sp = base * kick;
             b.vx = vx / len * sp; b.vy = vy / len * sp;
             padBlurUp(b);
+            // the spin, as off any paddle: how far out on him it struck, left
+            // or right of his middle as it looks on screen, and how fast he is
+            // moving -- each times his own edge and swipe (BLUR_SPIN_X)
+            const off = Math.max(-1, Math.min(1, px / hw));
+            const turn = Math.max(-SPIN_KICK, Math.min(SPIN_KICK,
+                                  off * SPIN_EDGE * labPadEdge() + paddle.vx * SPIN_SWIPE * labPadSwipe()));
+            b.spin = Math.max(-SPIN_MAX, Math.min(SPIN_MAX, b.spin + turn / SPIN_INERTIA));
+            if (turn) b.kickDir = Math.sign(turn);   // ENGLISH turns whichever way this was
             b.blurT = clock + BLUR_GAP;
             // coming home, as off any paddle
             paddle.jt[sg.i] = 1;
@@ -1175,12 +1231,15 @@
         b.vx = Math.sign(b.vx || (Math.random() < 0.5 ? -1 : 1)) * Math.sqrt(Math.max(0, sp * sp - b.vy * b.vy));
     }
 
-    // BLUE BLUR: blue, with afterimages of himself following round behind.
+    // BLUR: blue, with afterimages of himself following round behind.
     LAB_PAD.blur = {
-        name: 'BLUE BLUR',
+        name: 'BLUR',
         ink: BLUR_INK, rim: BLUR_RIM,
         blur: true,
-        blurb: 'heads always spin flat out · he never stops spinning',
+        len: () => BLUR_LEN,
+        edge: () => BLUR_SPIN_X,
+        swipe: () => BLUR_SPIN_X,
+        blurb: 'shorter · double spin · he never stops spinning',
         lore: 'The fastest Brandon there ever was, or so he says, and nobody has ever ' +
               'managed to get him to stand still long enough to argue.',
         under() {

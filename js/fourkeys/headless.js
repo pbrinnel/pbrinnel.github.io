@@ -237,7 +237,7 @@
         if (bossIF > 0) return;
         b.flash = 1;
         bossIF = BOSS_IF;
-        b.hp = Math.max(0, b.hp - 1);
+        b.hp = Math.max(0, b.hp - labBite(1, cx, cy));
         bossHits++;
         const done = b.hp <= 1e-6;
         const x = cx === undefined ? b.x + bw / 2 : cx;

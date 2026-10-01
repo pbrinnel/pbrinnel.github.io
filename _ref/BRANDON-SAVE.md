@@ -67,7 +67,7 @@ reader has no way to read one.
 - The year-0 memory (`now`, marked `always`) is never written either, because everyone
   has it.
 - `BOSSES` is written once, and only when the count is above 0. The count is one way to
-  buy MULTI, PRINCE, CHELL and BLUE BLUR (`MENU_SLAIN_PADS`), but a save lists those paddles on
+  buy MULTI, STATUE, PRINCE, CHELL and BLUR (`MENU_SLAIN_PADS`), but a save lists those paddles on
   `PADDLE` lines like any other, so a paddle never depends on the count to load. Progress
   from before the count existed starts it at the number of keys held, the next time a
   boss is beaten.
@@ -84,7 +84,7 @@ paddle can't break old saves.
 | stage | `FARM` `RUINS` `CITY` `VOLCANO` `CASTLE` `VOID` | 1 2 3 4 5 6 |
 | stage | `BOSS RUSH` | `rush` |
 | paddle | `GILT` `STATUE` `FROST` `EMBER` `PAIR` `CLASSIC` `MULTI` `PRINCE` `CHELL` | same id, lowercase |
-| paddle | `BLUE BLUR` | `blur` |
+| paddle | `BLUE BLUR` (shown as BLUR since 1 Oct 2026) | `blur` |
 | memory | `EXHORTATION` `SALVATION` `CYCLE` `COUNSEL` `FALL` `CONSOLIDATION` | same id, lowercase |
 
 ## The seal

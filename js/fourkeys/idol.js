@@ -227,7 +227,7 @@
             idolStreak();                  // a wound keeps the streak going too
             b.flash = 1;
             bossIF = BOSS_IF;
-            b.hp = Math.max(0, b.hp - 1);
+            b.hp = Math.max(0, b.hp - labBite(1, cx, cy));
             bossHits++;
             // knocked back up, if he is up there to be knocked
             if (idol.stage === 'idle' || idol.stage === 'shake') {

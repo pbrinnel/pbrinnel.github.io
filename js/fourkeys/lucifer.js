@@ -1832,7 +1832,7 @@
     // One off his bar, and he shakes: in the last part, run down into you as
     // HIS light. The first two parts end where the bar says, not at empty.
     function luHurt(b, cx, cy) {
-        b.hp = Math.max(0, b.hp - 1);
+        b.hp = Math.max(0, b.hp - labBite(1, cx, cy));
         bossHits++;
         lu.shake = 1;
         award(BOSS_PTS, cx, cy);

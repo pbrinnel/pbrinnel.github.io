@@ -280,7 +280,7 @@
         if (t.iframes > 0) return;
         t.flash = 1;
         t.iframes = BOSS_IF;
-        t.hp = Math.max(0, t.hp - 1);
+        t.hp = Math.max(0, t.hp - labBite(1, cx, cy));
         bossHits++;
         award(BOSS_PTS, cx, cy);
         if (t.hp <= 0) twDown(t);

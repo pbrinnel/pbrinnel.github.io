@@ -2592,7 +2592,7 @@
 
         if (b.kind === 'Z') {                        // the boss
             bossIF = BOSS_IF;
-            b.hp = Math.max(0, b.hp - bossBite(b.hp));
+            b.hp = Math.max(0, b.hp - labBite(bossBite(b.hp), cx, cy));
             bossHits++;
             // hp is fractional now, so "finished" needs a tolerance rather
             // than an exact zero -- five subtractions of 0.2 do not land on it
@@ -2624,7 +2624,10 @@
 
         if (b.kind === 'S' || b.kind === 'A') {
             labBrickStruck(b);           // FROST's ice, if it was icy
-            if (--b.hp > 0) { labBrickHeld(b); return; }
+            // a head off STATUE lands more than one hit (labPadHeavy); a bolt does not
+            const blow = labHitBy ? labPadHeavy() : 1;
+            if (blow > 1) labPadThud(b);
+            if ((b.hp = Math.max(0, b.hp - blow)) > 0) { labBrickHeld(b); return; }
             b.alive = false;
             shockwave(b);
             if (b.kind === 'A') { round.golden++; goldBurst(b); }
@@ -3296,7 +3299,7 @@
     // he ever turns
     function reachBelow() {
         const hw = padW() / 2, halfH = bodyHalfH(padW());
-        if (labPadBlur()) return Math.hypot(hw, halfH);    // BLUE BLUR turns all the way round
+        if (labPadBlur()) return Math.hypot(hw, halfH);    // BLUR turns all the way round
         const a = Math.min(Math.max(DIP_MAX, DIP_LIMIT), Math.atan2(hw, halfH));
         return hw * Math.sin(a) + halfH * Math.cos(a);
     }
@@ -3408,7 +3411,7 @@
         labBallStep(b);
         powBallStep(b);      // KATAMARI's lump, MIRROR, the CROWD
         const py = padY();
-        // BLUE BLUR spins all the way round, so a head can meet any side of
+        // BLUR spins all the way round, so a head can meet any side of
         // him going any way, and none of what follows holds: he has his own
         if (labPadBlur()) padBlurHit(b, s);
         else if (b.vy > 0) {
@@ -3676,7 +3679,7 @@
             const next = was + (want - was) * (1 - Math.exp(-dt / DIP_EASE));
             if (!balls.some(b => !b.stuck && turnBites(b, sg, was, next))) paddle.dip[sg.i] = next;
         }
-        padBlurTurn(dt);         // BLUE BLUR: he is turned round instead, whatever the above wanted
+        padBlurTurn(dt);         // BLUR: he is turned round instead, whatever the above wanted
 
         // Nothing crosses more than SUBSTEP_PX between checks, and his own
         // travel counts toward that as much as a head's does. He used to be set
@@ -3711,7 +3714,6 @@
             // way the last hit pushed, and gets there at ENG_ACCEL rather than
             // all at once, so bringing it round takes a moment.
             b.spin -= b.spin * SPIN_DRAG / SPIN_INERTIA * dt;
-            if (labPadBlur()) b.spin = (Math.sign(b.spin) || 1) * SPIN_MAX;    // BLUE BLUR: always flat out
             if (fx.E > 0) {
                 const want = (b.kickDir || Math.sign(turnOf(b)) || 1) * ENG_BOOST * SPIN_FULL;
                 const step = ENG_ACCEL * dt;

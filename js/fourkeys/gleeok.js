@@ -402,7 +402,7 @@
             if (k !== 'body' && ball) glChin(k, ball, cx, cy);
             if (k === 'body') {
                 if (!glOpen() || gl.bodyIF > 0) return;
-                glBodyWound(1, cx, cy);
+                glBodyWound(labBite(1, cx, cy), cx, cy);
                 return;
             }
             if (k.iF > 0 || away) return;
@@ -427,7 +427,7 @@
                 k.vy = dy / d * GL_BIG_LOOSE;
                 k.iF = GL_BIG_KNOCK_IF;
             }
-            glWound(k, dazed ? GL_LUNGE_DMG : 1, cx, cy);
+            glWound(k, labBite(dazed ? GL_LUNGE_DMG : 1, cx, cy), cx, cy);
         },
         enterSecs() { return GL_ENTER; },
         draw: glDraw,

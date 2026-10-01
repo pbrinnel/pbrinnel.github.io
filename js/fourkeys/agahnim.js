@@ -110,7 +110,7 @@
         if (bossIF > 0) return;
         bossIF = BOSS_IF;
         ag.flash = 1;
-        br.hp = Math.max(0, br.hp - 1);
+        br.hp = Math.max(0, br.hp - labBite(1, cx, cy));
         bossHits++;
         const done = br.hp <= 1e-6;
         award(BOSS_PTS * (done ? 5 : 2), cx, cy);

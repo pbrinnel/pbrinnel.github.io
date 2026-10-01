@@ -167,7 +167,7 @@
             if (f.iframes > 0) return;
             f.flash = 1;
             f.iframes = BOSS_IF;
-            f.hp = Math.max(0, f.hp - 1);
+            f.hp = Math.max(0, f.hp - labBite(1, cx, cy));
             bossHits++;
             b.hp = wm.flowers.reduce((s, o) => s + (o.alive ? o.hp : 0), 0);
             const done = f.hp <= 1e-6;
