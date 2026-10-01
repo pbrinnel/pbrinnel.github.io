@@ -186,7 +186,7 @@
             boot.sole = floor;
             boot.lift = BOOT_LIFT;
             boot.stamps++;
-            const sg = segs().find(sg => Math.abs(sg.cx - boot.x) < sg.w / 2 + BOOT_W / 2 - 10);
+            const sg = padNear(boot.x, floor, BOOT_W / 2 - 10, padH());
             if (sg) {
                 paddle.jt[sg.i] = 1;
                 boot.caught++;

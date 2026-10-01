@@ -51,10 +51,8 @@
                 const k = Math.max(0, Math.min(1, chain.out / 0.9));
                 chain.r = CH_R + (CH_REACH - CH_R) * Math.sin(Math.PI * (1 - k));
                 const h = chHead();
-                if (!chain.spent && Math.abs(h.y - padY()) < padH() / 2 + CH_HEAD / 2) {
-                    const sg = segs().find(s => Math.abs(h.x - s.cx) < s.w / 2 + CH_HEAD / 2);
-                    if (sg) { addDrag(sg, h.x); chain.spent = true; chain.landed++; }
-                }
+                const sg = !chain.spent && padNear(h.x, h.y, CH_HEAD / 2);
+                if (sg) { addDrag(sg, h.x); chain.spent = true; chain.landed++; }
                 if (chain.out <= 0) { chain.r = CH_R; chain.strike = CH_STRIKE; }
                 return;
             }

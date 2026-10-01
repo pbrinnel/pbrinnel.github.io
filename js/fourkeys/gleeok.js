@@ -329,7 +329,7 @@
                 if (k.x > LW - r && k.vx > 0) k.vx = -k.vx;
                 if (k.y < ry && k.vy < 0) k.vy = -k.vy;
                 if (k.y > padY() - padH() / 2 - ry && k.vy > 0) {
-                    const sg = segs().find(s => Math.abs(k.x - s.cx) < s.w / 2 + r);
+                    const sg = padNear(k.x, k.y, r, ry);
                     // a small one is spent on you; the big one is the kill, so it
                     // only knocks you and goes on
                     if (sg && !k.big) { addDrag(sg, k.x); glPop(k); continue; }
@@ -935,7 +935,7 @@
     function glBite(k, x) {
         const rx = GL_HEAD_W * glSize(k) / 2;
         rings.push({ x, y: padY() - padH() / 2, t: 1 });
-        const sg = segs().find(s => Math.abs(x - s.cx) < s.w / 2 + rx * 0.7);
+        const sg = padNear(x, padY() - padH() / 2, rx * 0.7, padH() / 2);
         if (!sg) return;
         // the boss lab runs brandon.html's engine, which has no stun unless the build lends it one
         if (k.big && typeof stunPad === 'function') stunPad(GL_BIG_STUN);

@@ -471,7 +471,7 @@
             d.x += d.dir * step;
             d.run += step;
             d.rot += d.spin * k * dt;
-            const sg = segs().find(s => Math.abs(d.x - s.cx) < s.w / 2 + IDOL_DEBRIS_W * 0.4);
+            const sg = padNear(d.x, padY(), IDOL_DEBRIS_W * 0.4, padH() / 2);
             // under him, you are pinned already: nothing he throws out reaches you there
             if (sg && !idol.pin && !d.drop.hit) { d.drop.hit = true; addDrag(sg, d.x); idol.debrisHits++; idol.debris.splice(i, 1); continue; }
             if (d.run >= d.max || d.x < -IDOL_DEBRIS_W || d.x > LW + IDOL_DEBRIS_W) idol.debris.splice(i, 1);

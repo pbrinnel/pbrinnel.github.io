@@ -1054,7 +1054,7 @@
             if (h.y >= floor) {
                 h.y = floor; h.st = 'down'; h.stT = 0; h.slams++;
                 lu.slams.push({ x: h.x, y: floor + 10, t: 0 });
-                if (Math.abs(paddle.x - h.x) < halfSpan() + LU_FIST_R) {
+                if (padNear(h.x, padY(), LU_FIST_R, padH())) {
                     dragT = Math.min(DRAG_CAP, dragT + LU_FIST_DRAG);
                     for (const sg of segs()) { paddle.jt[sg.i] = 1; paddle.tilt[sg.i] = (h.x - sg.cx) / Math.max(1, sg.w / 2); }
                 }
@@ -1217,7 +1217,8 @@
                 if (bm.t < charge - bm.lock) bm.x = luToward(bm.x, labFold(paddle.x), LU_BEAM_TRACK * bm.pace * dt);
                 if (bm.t >= charge) { bm.st = 'fire'; bm.t = 0; }
             } else if (bm.st === 'fire') {
-                if (!bm.hit && Math.abs(paddle.x - luBeamAt(bm, padY())) < halfSpan() + LU_BEAM_W / 2) {
+                // a column, top to bottom of the field, against him as he is turned
+                if (!bm.hit && padNear(luBeamAt(bm, padY()), padY(), LU_BEAM_W / 2, LH)) {
                     bm.hit = true;
                     luSlug(LU_BEAM_DRAG);
                     // the boss lab runs brandon.html's engine, which has no stun
@@ -1333,7 +1334,7 @@
                 if (!live) continue;
                 bd.x += bd.vx * dt; bd.y += bd.vy * dt;
                 if (bd.y >= padY() - padH() / 2 - 6) {
-                    if (Math.abs(bd.x - paddle.x) < halfSpan() + LU_BIRD_S * 0.5) luSlug(LU_BIRD_DRAG);
+                    if (padNear(bd.x, padY() - padH() / 2, LU_BIRD_S * 0.5, padH())) luSlug(LU_BIRD_DRAG);
                     bd.st = 'away'; bd.vx = (bd.vx < 0 ? -1 : 1) * 220; bd.vy = -300;
                 }
             } else if (bd.st === 'away') {

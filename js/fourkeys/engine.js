@@ -3506,7 +3506,6 @@
 
     function update(dt) {
         clock += dt;
-        padShrug();          // TEFLON: nothing put on him last frame takes hold
 
 
         // the gauntlet is its own game with its own clock. nothing below this
@@ -3739,15 +3738,9 @@
                 if (f && capsulePool().includes(f) && Math.random() < PAD_FAVOUR) capsule.kind = f;
             }
             capsule.y += CAP_FALL * dt;
-            const halfH2 = padH() / 2, py2 = padY();
-            let caught = false;
-            if (capsule.y + CAP_H / 2 > py2 - halfH2 &&
-                capsule.y - CAP_H / 2 < py2 + halfH2) {
-                for (const sg of segs()) {
-                    if (capsule.x + CAP_W / 2 > sg.cx - sg.w / 2 &&
-                        capsule.x - CAP_W / 2 < sg.cx + sg.w / 2) { caught = true; break; }
-                }
-            }
+            // against his outline as he is turned (padNear), so a leaning
+            // or spinning paddle catches it where he is
+            const caught = !!padNear(capsule.x, capsule.y, CAP_W / 2, CAP_H / 2);
             if (caught) { applyCapsule(capsule.kind); capsule = null; }
             else if (capsule.y - CAP_H > LH) capsule = null;
         }
@@ -5750,7 +5743,6 @@
 
     function draw() {
         ctx.clearRect(0, 0, LW, LH);
-        padShrug();          // ...nor anything put on him since, so none of it is ever drawn
         if (introDraw(uiScale)) return;      // the opening cards, before the town
         if (king && (phase === 'gauntlet' || phase === 'absorb' || phase === 'fall')) {
             drawGauntlet(uiScale);

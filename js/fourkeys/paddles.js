@@ -63,13 +63,17 @@
     let MULTI_POP  = 2.5;    // MULTI: seconds between one pair of heads flying off him and the next
     let MULTI_SLIP = 4;      // MULTI: px each of his two misprints is out of register, at the game's size...
     let MULTI_PRINT = 0.45;  // ...and how strongly each shows
-    let TEF_LEN    = 0.5;    // TEFLON: nothing sticks to him, and this is all the length he has
-    let TEF_GLINT  = 1.2;    // ...seconds between one glint sliding along him and the next
-    let BLUR_SPIN  = 2;      // BLUE BLUR: turns a second he spins through, all the way round
+    let BLUR_SPIN  = 4;      // BLUE BLUR: turns a second he spins through, all the way round, at full speed
     let BLUR_TRAIL = 3;      // ...afterimages of him following round behind
-    let BLUR_GAP   = 0.3;    // ...and seconds a head he has hit is left alone to get away
-    LAB_KNOBS.push('PAD_FAVOUR', 'MULTI_POP', 'MULTI_SLIP', 'MULTI_PRINT', 'TEF_LEN', 'TEF_GLINT',
-                   'BLUR_SPIN', 'BLUR_TRAIL', 'BLUR_GAP');
+    let BLUR_GAP   = 0.3;    // ...seconds after a whack he only keeps that head out of him
+    let BLUR_KICK  = 0.5;    // ...and seconds a whacked head takes to slow back to the game's speed
+    let BLUR_UP    = 0.35;   // ...the least share of a whacked head's speed that is upward
+    let BLUR_RAMP  = 1.5;    // ...seconds from flat to full spin once a head is served
+    let BLUR_SETTLE = 0.25;  // ...and seconds he takes to lie flat again when no head is in play
+    let BLUR_BAND  = 40;     // ...px either side of the middle where he keeps the way he is turning
+    let BLUR_FLIP  = 0.4;    // ...and seconds to swing from full one way to full the other
+    LAB_KNOBS.push('PAD_FAVOUR', 'MULTI_POP', 'MULTI_SLIP', 'MULTI_PRINT',
+                   'BLUR_SPIN', 'BLUR_TRAIL', 'BLUR_GAP', 'BLUR_KICK', 'BLUR_UP', 'BLUR_RAMP', 'BLUR_SETTLE', 'BLUR_BAND', 'BLUR_FLIP');
     LAB_KNOBS.push('GILT_LEN', 'GILT_CAPS', 'GILT_SHINE', 'STAT_LEN', 'STAT_ANGLE', 'STAT_SPIN',
                    'STAT_DIP', 'FROST_LEN', 'FROST_EDGE', 'FROST_SWIPE', 'FROST_DECK', 'FROST_FLAKES', 'FROST_BIG', 'ICE_SECS', 'ICE_RAMP', 'ICE_TURN',
                    'EMB_LEN', 'EMB_CATCH', 'EMB_SPREAD', 'EMB_SPREAD_AT', 'EMB_GLOW', 'EMB_SPARKS', 'PAIR_LEN', 'PAIR_QUAD', 'PAD_MARK', 'V2_GLOSS', 'V2_GLINT', 'V2_SWEEP');
@@ -86,7 +90,6 @@
     // for his shirt and one for his jeans, after who each is named for
     const PRINCE_TOP = '#a8c64e', PRINCE_LEGS = '#8a4fb0', PRINCE_RIM = '#d7ee8c';
     const CHELL_TOP = '#f4f1ea', CHELL_LEGS = '#e0692c', CHELL_RIM = '#ff9a3c';
-    const TEF_INK = '#a3a9b2', TEF_RIM = '#e9edf2';     // the grey of a pan, and the shine on it
     const BLUR_INK = '#3a6fe0', BLUR_RIM = '#a9c8ff';
 
     // ---- what the game asks -------------------------------------------------------
@@ -121,7 +124,6 @@
     const labPadSplit = () => !!(labP && labP.split);
     const labPadFavour = () => (labP && labP.favour) || null;
     const labPadPortal = () => !!(labP && labP.portal);
-    const labPadTeflon = () => !!(labP && labP.teflon);
     const labPadBlur = () => !!(labP && labP.blur);
     const padQuadOf = v => v && v.quad ? v.quad() : 1;
     const labPadQuad  = () => labPFrom ? padQuadOf(labPFrom) + (padQuadOf(labP) - padQuadOf(labPFrom)) * labPadFadeK() : padQuadOf(labP);
@@ -140,7 +142,6 @@
         if (labPadSplit()) say.push('two of him');
         if (labPadFavour()) say.push(Math.round(PAD_FAVOUR * 100) + '% ' + labPadFavour());
         if (labPadPortal()) say.push('PORTAL always');
-        if (labPadTeflon()) say.push('nothing sticks');
         if (labPadBlur()) say.push('spinning ' + BLUR_SPIN + '/s');
         return { name: (labP && labP.name) || LAB_PAD.standard.name, line: say.join(' · ') || 'as the game has him' };
     }
@@ -340,6 +341,36 @@
                     kind: kind || 'speck', sway: sway || 0, ph: Math.random() * 6.28 };
         padBits.push(b);
         return b;
+    }
+
+    // ---- what touches him ------------------------------------------------------------
+    // The part of him that something at (x, y) is touching, or null. It is
+    // an ellipse rx by ry round that point, tested against his own outline
+    // turned the way he is turned (paddle.dip, as heads meet him), so a
+    // paddle that leans, or BLUE BLUR all the way round, is hit where he is
+    // and missed where he is not. Every capsule and every boss's attack asks
+    // this, each with the size it always used, so a level paddle is hit just
+    // as he was when each of them tested a flat box of their own.
+    function padNear(x, y, rx, ry) {
+        if (ry === undefined) ry = rx;
+        const py = padY();
+        for (const sg of segs()) {
+            const hw = sg.w / 2, a = paddle.dip[sg.i] || 0, ca = Math.cos(a), sa = Math.sin(a);
+            const dx = x - sg.cx, dy = y - py;
+            if (Math.abs(dx) > hw + rx + 4 || Math.abs(dy) > hw + ry + 4) continue;
+            const lx = dx * ca + dy * sa, ly = dy * ca - dx * sa;
+            const e = outlineAt(lx, hw);
+            if (e && ly >= e.top && ly <= e.bot) return sg;          // inside him
+            for (let u = -hw; u <= hw; u += 3) {
+                const o = outlineAt(u, hw);
+                if (!o) continue;
+                for (const v of [o.top, o.bot]) {
+                    const ex = (sg.cx + u * ca - v * sa - x) / rx, ey = (py + u * sa + v * ca - y) / ry;
+                    if (ex * ex + ey * ey <= 1) return sg;
+                }
+            }
+        }
+        return null;
     }
 
     // ---- the mark he leaves on a head ----------------------------------------------
@@ -855,7 +886,7 @@
     };
 
     // ---- the ones bosses buy --------------------------------------------------------
-    // These three, and TEFLON and BLUE BLUR below, come with bosses beaten, counted over
+    // These three, and BLUE BLUR below, come with bosses beaten, counted over
     // every run (MENU_SLAIN_PADS in menu.js), or each with a flawless win of
     // its own stage (MENU_FLAWLESS_PADS). These three play as MODERN does
     // and leans on the capsules instead: MULTI and PRINCE get PAD_FAVOUR of
@@ -965,71 +996,53 @@
         skin(sg, o) { padLay(sg, o, this.dress(), this.dressA); }
     };
 
-    // ---- TEFLON: nothing sticks -------------------------------------------------------
-    // SLUGGISH, STUNNED and the siphon's shrink all slide off him. They are
-    // put on from all over (a boss file each, some writing dragT straight),
-    // so rather than guard every one of them, whatever has landed on him is
-    // wiped before he moves and again before he is drawn (engine.js calls
-    // padShrug in both): it never takes hold, and never reaches the screen.
-    // He says so, and it slides off his ends in SLUGGISH's colour.
-    let tefSaid = -9;
-    function padShrug() {
-        if (!labPadTeflon() || !(dragT > 0 || stunT > 0 || shrinkT > 0)) return;
-        dragT = 0; stunT = 0; shrinkT = 0;
-        if (clock - tefSaid < 1) return;
-        tefSaid = clock;
-        popups.push({ x: paddle.x, y: padY() - 40, text: 'NON-STICK', color: TEF_RIM, life: 1 });
-        for (const sg of segs()) for (let n = 0; n < 10; n++) {
-            const dir = n % 2 ? 1 : -1;
-            padBit(sg.cx + dir * sg.w * (0.2 + Math.random() * 0.3), padY() - padH() * 0.2, DRAG_TINT,
-                   0.6 + Math.random() * 0.4, dir * (90 + Math.random() * 80), -20 - Math.random() * 30, 220,
-                   2 + Math.random() * 2, 0.9);
-        }
-    }
-
-    // TEFLON: the grey of a pan with its shine running along him, and tiny
-    // (TEF_LEN). Nothing a boss puts on him sticks (padShrug).
-    LAB_PAD.teflon = {
-        name: 'TEFLON',
-        ink: TEF_INK, rim: TEF_RIM,
-        teflon: true,
-        blurb: 'tiny · nothing slows, stuns or shrinks him',
-        lore: 'Nobody has ever made anything stick to this Brandon: not blame, not a nickname, ' +
-              'and not one thing a boss has thrown at him.',
-        len: () => TEF_LEN,
-        under() { padRim('padRimT', TEF_RIM, 2.5, 0.6); },
-        skin(sg, o) {
-            padLay(sg, o, padTint('padTeflon', TEF_INK), 0.7);
-            // a quick glint sliding along him, often: he is slick, not polished
-            const sp = padFlat('padTefShine', '#ffffff');
-            if (!sp) return;
-            const tw = sg.w, th = tw / SHAPE_ASPECT, t = (clock % TEF_GLINT) / (TEF_GLINT * 0.4);
-            if (t >= 1) return;
-            ctx.save();
-            ctx.translate(sg.cx, padY() + o * JIG_PADDLE);
-            ctx.rotate(segWig(sg.i) + paddle.dip[sg.i]);
-            ctx.beginPath();
-            ctx.rect(-tw / 2 + (t * 1.3 - 0.15) * tw, -th, tw * 0.12, th * 2);
-            ctx.clip();
-            ctx.globalAlpha = padK * 0.4;
-            ctx.drawImage(sp, -tw / 2, -th / 2, tw, th);
-            ctx.globalAlpha = padK;
-            ctx.restore();
-        }
-    };
-
     // ---- BLUE BLUR: spinning ---------------------------------------------------------
     // Every head in play spins flat out (engine.js holds it at SPIN_MAX), and
-    // so does he: all the way round, BLUR_SPIN turns a second, never
-    // stopping. His turn is paddle.dip, which everything that draws him
-    // already turns him by. It is set once a frame (padBlurTurn) and spread
-    // across the substeps (padBlurAt), with his ends' sweep counted toward
-    // how many there are, so an end cannot jump a head between two looks.
-    let blurA = 0, blurFrom = 0, blurD = 0;
+    // so does he: all the way round, up to BLUR_SPIN turns a second. With no
+    // head in play -- waiting to serve, a life just lost -- he settles flat
+    // over BLUR_SETTLE, so a serve leaves a level top, and once it is in
+    // play he winds up from still over BLUR_RAMP, so the head's first trip
+    // home finds him at full speed or nearly. His turn is paddle.dip, which
+    // everything that draws him already turns him by. It is set once a frame
+    // (padBlurTurn) and spread across the substeps (padBlurAt), with his
+    // ends' sweep counted toward how many there are, so an end cannot jump a
+    // head between two looks.
+    //
+    // The top of him moves the way he turns, so a head he strikes from above
+    // is mostly flicked that way. Turning one way all the time, every head
+    // went right, and one out by the right wall could only be spiked into it.
+    // So he turns toward the middle of the field from whichever half he is
+    // in -- clockwise on the left, the other way on the right -- keeps his
+    // way inside BLUR_BAND of the middle so he is not forever changing his
+    // mind, and swings round over BLUR_FLIP rather than at once.
+    let blurA = 0, blurFrom = 0, blurD = 0, blurRate = 0, blurDir = 1, blurFlip = false;
     function padBlurTurn(dt) {
-        if (!labPadBlur()) { blurD = 0; return; }
+        // a head he whacked slows back to the game's speed (padBlurHit)
+        for (const b of balls || []) {
+            if (!b.blurKick) continue;
+            b.boost = Math.max(1, b.boost - (b.blurKick - 1) * dt / BLUR_KICK);
+            if (b.boost <= 1) b.blurKick = 0;
+        }
+        if (!labPadBlur()) { blurD = 0; blurRate = 0; blurA = 0; return; }
         blurFrom = blurA;
-        blurD = BLUR_SPIN * Math.PI * 2 * dt;
+        if (phase === 'play') {
+            const dir = paddle.x < LW / 2 - BLUR_BAND ? 1 : paddle.x > LW / 2 + BLUR_BAND ? -1 : blurDir;
+            if (dir !== blurDir && blurRate) blurFlip = true;
+            blurDir = dir;
+            const want = blurDir * BLUR_SPIN;
+            const secs = blurFlip ? BLUR_FLIP / 2 : BLUR_RAMP;
+            const step = secs > 0 ? BLUR_SPIN * dt / secs : Infinity;
+            blurRate = blurRate < want ? Math.min(want, blurRate + step) : Math.max(want, blurRate - step);
+            if (blurRate === want) blurFlip = false;
+            blurD = blurRate * Math.PI * 2 * dt;
+        } else {
+            // the short way round to lying flat, his top up: at most half a
+            // turn, so at this pace he is level inside BLUR_SETTLE
+            blurRate = 0; blurFlip = false;
+            blurDir = paddle.x > LW / 2 ? -1 : 1;
+            const step = Math.PI * dt / Math.max(1e-3, BLUR_SETTLE);
+            blurD = -Math.sign(blurA) * Math.min(Math.abs(blurA), step);
+        }
         blurA = Math.atan2(Math.sin(blurA + blurD), Math.cos(blurA + blurD));
         for (const sg of segs()) paddle.dip[sg.i] = blurFrom + blurD;
     }
@@ -1043,25 +1056,45 @@
     // A head against him, from any side, going any way. The usual catch
     // takes heads coming down onto his top, and turned over his top faces the
     // floor. Here the head is pushed out of whichever part of his outline it
-    // is in or nearest, and bounced off that surface as it is moving -- his
-    // travel and his spin both -- so a whirling end whacks it, any way at
-    // all, down past him included: that is his cost. Then it goes at the
-    // game's speed, never flatter than the engine allows a bounce off a brick.
-    // His ends sweep far faster than a head flies, so one he has just hit is
-    // left alone for BLUR_GAP: without that the next sweep caught it again,
-    // and the next, and it churned round him and never left.
+    // is in or nearest, so it is never inside him, and bounced off that
+    // surface as it is moving -- his travel and his spin both -- so a
+    // whirling end whacks it off at an angle nobody can call: that is his
+    // cost. But always up, with at least BLUR_UP of its speed: let it go
+    // any way at all and it was spiked down past him too fast to see, which
+    // only ever read as the game taking a life for nothing.
+    //
+    // A head is measured as the ellipse it is, along the line it is struck
+    // on. As a circle of its average size, one turned long side on sank into
+    // him by most of the difference.
+    //
+    // A head is pushed out the side of him it was on the last time it was
+    // clear of him (b.blurSide), not the nearest way out: an end sweeping
+    // onto a head can carry its middle past his own, and the nearest way out
+    // was then straight through him and out underneath -- a head that
+    // jumped through him and fell, which nobody could see happen.
+    //
+    // His ends sweep far faster than a head flies. Slowed to the game's speed
+    // the moment it was whacked, a head was caught again by the next sweep,
+    // and the next, and churned round him. So it leaves at the speed of the
+    // part of him that struck it (b.boost, at most what MAX_SPEED allows) and
+    // eases back down over BLUR_KICK; and for BLUR_GAP after a whack he
+    // gives it no second whack. In that time one flying away from his middle
+    // is let go entirely: pushed out of every end that swept onto it, it was
+    // carried round and round him in jumps, and that is the teleporting.
+    // One heading back in is still kept out of him.
     function padBlurHit(b, s) {
-        if (b.blurT && clock < b.blurT) return;
-        const r = (bRX() + bRY()) / 2;          // turning this fast, a head is round enough
-        const w = BLUR_SPIN * Math.PI * 2, py = padY();
+        const rmax = Math.max(bRX(), bRY());
+        const w = blurRate * Math.PI * 2, py = padY();
+        const calm = b.blurT && clock < b.blurT;
+        if (calm && (b.x - paddle.x) * b.vx + (b.y - py) * b.vy > 0) return;      // on its way out
         for (const sg of segs()) {
             const hw = sg.w / 2, a = paddle.dip[sg.i], ca = Math.cos(a), sa = Math.sin(a);
             const dx = b.x - sg.cx, dy = b.y - py;
             const lx = dx * ca + dy * sa, ly = dy * ca - dx * sa;
-            if (Math.abs(lx) > hw + r || Math.abs(ly) > hw + r) continue;
+            if (Math.abs(lx) > hw + rmax || Math.abs(ly) > hw + rmax) continue;
             // the nearest of him to the head's middle, in his own frame
             let best = null;
-            for (let x = lx - r; x <= lx + r; x += 1.5) {
+            for (let x = lx - rmax; x <= lx + rmax; x += 1.5) {
                 const e = outlineAt(x, hw);
                 if (!e) continue;
                 const inside = ly > e.top && ly < e.bot;
@@ -1069,15 +1102,41 @@
                 const d = Math.hypot(lx - x, ly - y) * (inside ? -1 : 1);
                 if (!best || d < best.d) best = { x, y, d, up: y === e.top };
             }
-            if (!best || best.d >= r) continue;
-            // out of him along the way to his surface; from inside, straight off it
+            // which side of him it is on, while it is clear of him
+            const side = () => {
+                const e = outlineAt(Math.max(-hw + 1, Math.min(hw - 1, lx)), hw);
+                return ly < (e ? (e.top + e.bot) / 2 : 0) ? -1 : 1;
+            };
+            if (!best || best.d >= rmax) { b.blurSide = { i: sg.i, s: side() }; continue; }
+            // the way out of him: back out the side it came from, over him,
+            // or the nearest way off an end
+            const was = b.blurSide && b.blurSide.i === sg.i ? b.blurSide.s : side();
             let nx, ny;
-            if (best.d > 1e-3) { nx = (lx - best.x) / best.d; ny = (ly - best.y) / best.d; }
-            else { nx = 0; ny = best.up ? -1 : 1; }
+            const ex = Math.max(-hw + 1, Math.min(hw - 1, lx)), e0 = outlineAt(ex, hw);
+            const over = e0 && Math.abs(lx) < hw - 1;
+            const wrong = best.d < 0 || (over && Math.sign(ly - (e0.top + e0.bot) / 2) !== was);
+            if (over && wrong) {
+                best = { x: ex, y: was < 0 ? e0.top : e0.bot, d: -1 };
+                nx = 0; ny = was;
+            } else if (best.d > 1e-3) { nx = (lx - best.x) / best.d; ny = (ly - best.y) / best.d; }
+            else { nx = 0; ny = was; best = { x: best.x, y: was < 0 ? (e0 ? e0.top : best.y) : (e0 ? e0.bot : best.y), d: -1 }; }
+            const wx = nx * ca - ny * sa, wy = nx * sa + ny * ca;
+            // how far the head reaches that way, turned as it is
+            const cb = Math.cos(b.angle), sb = Math.sin(b.angle);
+            const nu = wx * cb + wy * sb, nv = wy * cb - wx * sb;
+            const r = Math.hypot(bRX() * nu, bRY() * nv);
+            if (best.d >= r) { b.blurSide = { i: sg.i, s: side() }; continue; }
             const ox = best.x + nx * r, oy = best.y + ny * r;
             b.x = sg.cx + ox * ca - oy * sa;
             b.y = py + ox * sa + oy * ca;
-            const wx = nx * ca - ny * sa, wy = nx * sa + ny * ca;
+            if (calm) {
+                // just whacked: kept out of him, turned back if heading in,
+                // and still going up
+                const dot = b.vx * wx + b.vy * wy;
+                if (dot < 0) { b.vx -= 2 * dot * wx; b.vy -= 2 * dot * wy; }
+                padBlurUp(b);
+                return;
+            }
             // the surface where it struck, moving with him and with his turn
             const px = best.x * ca - best.y * sa, pyy = best.x * sa + best.y * ca;
             const sx = paddle.vx - w * pyy, sy = w * px;
@@ -1086,23 +1145,34 @@
             if (dot >= 0) continue;                   // already leaving him
             rx -= 2 * dot * wx; ry -= 2 * dot * wy;
             let vx = rx + sx, vy = ry + sy;
-            const sp = s * (b.boost || 1), len = Math.hypot(vx, vy) || 1;
-            vx = vx / len * sp; vy = vy / len * sp;
-            if (Math.abs(vy) < sp * 0.16) {
-                vy = (vy < 0 ? -1 : 1) * sp * 0.16;
-                vx = Math.sign(vx || 1) * Math.sqrt(sp * sp - vy * vy);
-            }
-            b.vx = vx; b.vy = vy;
+            const base = effSpeed(), len = Math.hypot(vx, vy) || 1;
+            const kick = Math.max(1, Math.min(Math.max(1, MAX_SPEED / Math.max(1, base)), len / base));
+            const sp = base * kick;
+            b.vx = vx / len * sp; b.vy = vy / len * sp;
+            padBlurUp(b);
             b.blurT = clock + BLUR_GAP;
             // coming home, as off any paddle
             paddle.jt[sg.i] = 1;
             labPadHit(b);
             combo = 0;
             b.pierced.clear();
-            b.boost = 1;
+            b.boost = kick;
+            b.blurKick = kick;
             if (++hits === 4 || hits === 12) bumpSpeed(1.12);
             return;
         }
+    }
+
+    // A head off him goes up, with at least BLUR_UP of its speed, the rest
+    // kept going the way it was across -- one under his middle too. Edge-on,
+    // a head came down past his end, under his middle, and his end then
+    // swept down onto it and batted it into the floor. Lying over it, he
+    // holds it a moment until his turn lets it go, and it goes up.
+    function padBlurUp(b) {
+        const sp = Math.hypot(b.vx, b.vy) || 1, up = Math.max(0.16, BLUR_UP);
+        if (b.vy <= -sp * up) return;
+        b.vy = -Math.max(Math.abs(b.vy), sp * up);
+        b.vx = Math.sign(b.vx || (Math.random() < 0.5 ? -1 : 1)) * Math.sqrt(Math.max(0, sp * sp - b.vy * b.vy));
     }
 
     // BLUE BLUR: blue, with afterimages of himself following round behind.
@@ -1122,7 +1192,7 @@
                 for (let k = BLUR_TRAIL; k >= 1; k--) {
                     ctx.save();
                     ctx.translate(sg.cx, padY() + o * JIG_PADDLE);
-                    ctx.rotate(segWig(sg.i) + paddle.dip[sg.i] - k * 0.22 * Math.sign(BLUR_SPIN));
+                    ctx.rotate(segWig(sg.i) + paddle.dip[sg.i] - k * 0.22 * (Math.sign(blurRate) || blurDir));
                     ctx.globalAlpha = padK * 0.32 * (1 - k / (BLUR_TRAIL + 1));
                     ctx.drawImage(sp, -tw / 2, -th / 2, tw, th);
                     ctx.restore();

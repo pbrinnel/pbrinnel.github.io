@@ -320,7 +320,9 @@
 
     // ==== LASER ====================================================================
     // L  LASER BRANDON: a gun on each end of him. Every LZ_EVERY seconds both
-    //    fire a head straight up, LZ_BURSTS times, so three bursts is six heads.
+    //    fire a head, LZ_BURSTS times, so three bursts is six heads. The guns
+    //    are fixed to him, so they lean as he leans and turn as BLUE BLUR
+    //    turns, and a shot goes the way its gun is pointing.
     //    With LZ_STAYS off a shot is a bolt: it breaks (or hurts) the first
     //    thing it meets and is gone, as Arkanoid's laser was. On, each shot is
     //    a real head that joins the rally.
@@ -340,24 +342,34 @@
     let lzWas = 0;          // fx.L last frame, so a fresh capsule can be told from an old one
     let lzFlash = 0;
 
-    // the two muzzles: outside ends of the outermost of him
+    // The two muzzles, on the outside ends of the outermost of him: where
+    // each sits and which way it points (`a`, 0 straight up), both turned
+    // with the end it is on.
     function lzGuns() {
         const sgs = segs();
         let l = sgs[0], r = sgs[0];
         for (const sg of sgs) { if (sg.cx < l.cx) l = sg; if (sg.cx > r.cx) r = sg; }
-        const y = padY() - padH() * 0.35;
-        return [{ x: l.cx - l.w / 2 * LZ_MOUNT, y, sg: l }, { x: r.cx + r.w / 2 * LZ_MOUNT, y, sg: r }];
+        const ly = -padH() * 0.35;
+        const at = (sg, side) => {
+            const a = segWig(sg.i) + paddle.dip[sg.i], ca = Math.cos(a), sa = Math.sin(a);
+            const lx = side * sg.w / 2 * LZ_MOUNT;
+            return { x: sg.cx + lx * ca - ly * sa, y: padY() + lx * sa + ly * ca, a, sg };
+        };
+        return [at(l, -1), at(r, 1)];
     }
 
     function lzFire() {
         lzFlash = LZ_FLASH;
         for (const g of lzGuns()) {
+            const dx = Math.sin(g.a), dy = -Math.cos(g.a);
             if (LZ_STAYS) {
-                const b = newBall(g.x, g.y - bRY());
-                aim(b, (Math.random() - 0.5) * 0.1);
+                const b = newBall(g.x + dx * bRY(), g.y + dy * bRY());
+                const a = g.a + (Math.random() - 0.5) * 0.1, s = effSpeed();
+                b.vx = Math.sin(a) * s; b.vy = -Math.cos(a) * s;
                 balls.push(b);
             } else {
-                lzBolts.push({ x: g.x, y: g.y - bRY() * LZ_SIZE, a: 0, spin: (Math.random() - 0.5) * 30 });
+                const off = bRY() * LZ_SIZE;
+                lzBolts.push({ x: g.x + dx * off, y: g.y + dy * off, dx, dy, a: 0, spin: (Math.random() - 0.5) * 30 });
             }
         }
         if (balls.length >= HEADS_AT) round.heads = true;
@@ -371,17 +383,19 @@
         for (let k = 0; k < n; k++) {
             for (let i = lzBolts.length - 1; i >= 0; i--) {
                 const z = lzBolts[i];
-                z.y -= LZ_SPEED * dt / n;
+                z.x += z.dx * LZ_SPEED * dt / n;
+                z.y += z.dy * LZ_SPEED * dt / n;
                 z.a += z.spin * dt / n;
-                if (z.y < -bRY()) { lzBolts.splice(i, 1); continue; }
+                const m = bRY();
+                if (z.y < -m || z.y > LH + m || z.x < -m || z.x > LW + m) { lzBolts.splice(i, 1); continue; }
                 const probe = newBall(z.x, z.y);
-                probe.angle = z.a; probe.vy = -LZ_SPEED;
+                probe.angle = z.a; probe.vx = z.dx * LZ_SPEED; probe.vy = z.dy * LZ_SPEED;
                 for (const br of hitOrder()) {
                     if (!br.alive) continue;
                     const hit = labContact(br, probe);
                     if (!hit) continue;
                     if (labGlances(br, hit)) rings.push({ x: hit.cx, y: hit.cy, t: 1 });
-                    else kick(br, 0, -1, 1);
+                    else kick(br, z.dx, z.dy, 1);
                     // SNIPER, if this is the shot that ends the round: set
                     // before the hit, since the hit is what adds the round up
                     const last = bricks.filter(o => o.alive && o.kind !== 'X');
@@ -414,24 +428,31 @@
     // the guns ride on him while it is on, and flash as they go
     function lzDraw() {
         for (const z of lzBolts) {
+            // its trail streams out behind it, whichever way it is going
+            ctx.save();
+            ctx.translate(z.x, z.y);
+            ctx.rotate(Math.atan2(z.dx, -z.dy));
             ctx.globalAlpha = 0.35;
             ctx.fillStyle = CAPS.L.color;
-            ctx.fillRect(z.x - 2, z.y, 4, bRY() * 2.2);
-            ctx.globalAlpha = 1;
+            ctx.fillRect(-2, 0, 4, bRY() * 2.2);
+            ctx.restore();
             drawBall(z.x, z.y, bRX() * LZ_SIZE, z.a);
         }
         if (lzT < 0 || !(phase === 'play' || phase === 'ready')) return;
         for (const g of lzGuns()) {
             const o = paddle.jt[g.sg.i] > 0 ? wobble(paddle.jt[g.sg.i]) * JIG_PADDLE : 0;
+            ctx.save();
+            ctx.translate(g.x, g.y + o);
+            ctx.rotate(g.a);
             ctx.fillStyle = '#2b2b2e';
-            ctx.fillRect(g.x - 5, g.y - 16 + o, 10, 22);
+            ctx.fillRect(-5, -16, 10, 22);
             ctx.fillStyle = CAPS.L.color;
-            ctx.fillRect(g.x - 3, g.y - 20 + o, 6, 6);
+            ctx.fillRect(-3, -20, 6, 6);
             if (lzFlash > 0) {
                 ctx.globalAlpha = lzFlash / LZ_FLASH;
-                ctx.beginPath(); ctx.arc(g.x, g.y - 22 + o, 9, 0, 7); ctx.fill();
-                ctx.globalAlpha = 1;
+                ctx.beginPath(); ctx.arc(0, -22, 9, 0, 7); ctx.fill();
             }
+            ctx.restore();
         }
     }
 

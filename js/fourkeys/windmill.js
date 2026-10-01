@@ -130,13 +130,10 @@
                 p.x += p.vx * dt; p.y += p.vy * dt;
                 p.psi += p.spin * dt;
                 if (p.spent || phase !== 'play') continue;
-                for (const sg of segs()) {
-                    if (Math.abs(p.x - sg.cx) < sg.w / 2 + WM_SAIL * 0.3 &&
-                        Math.abs(p.y - padY()) < padH() / 2 + WM_SAIL * 0.12) {
-                        addDrag(sg, p.x);          // one of him landing on you: a helping of SLUGGISH
-                        p.spent = true;
-                        break;
-                    }
+                const sg = padNear(p.x, p.y, WM_SAIL * 0.3, WM_SAIL * 0.12);
+                if (sg) {
+                    addDrag(sg, p.x);              // one of him landing on you: a helping of SLUGGISH
+                    p.spent = true;
                 }
             }
             wm.falling = wm.falling.filter(p => p.y < LH + WM_SAIL);

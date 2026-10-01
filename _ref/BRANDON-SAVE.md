@@ -67,7 +67,7 @@ reader has no way to read one.
 - The year-0 memory (`now`, marked `always`) is never written either, because everyone
   has it.
 - `BOSSES` is written once, and only when the count is above 0. The count is one way to
-  buy MULTI, PRINCE, CHELL, TEFLON and BLUE BLUR (`MENU_SLAIN_PADS`), but a save lists those paddles on
+  buy MULTI, PRINCE, CHELL and BLUE BLUR (`MENU_SLAIN_PADS`), but a save lists those paddles on
   `PADDLE` lines like any other, so a paddle never depends on the count to load. Progress
   from before the count existed starts it at the number of keys held, the next time a
   boss is beaten.
@@ -83,7 +83,7 @@ paddle can't break old saves.
 |---|---|---|
 | stage | `FARM` `RUINS` `CITY` `VOLCANO` `CASTLE` `VOID` | 1 2 3 4 5 6 |
 | stage | `BOSS RUSH` | `rush` |
-| paddle | `GILT` `STATUE` `FROST` `EMBER` `PAIR` `CLASSIC` `MULTI` `PRINCE` `CHELL` `TEFLON` | same id, lowercase |
+| paddle | `GILT` `STATUE` `FROST` `EMBER` `PAIR` `CLASSIC` `MULTI` `PRINCE` `CHELL` | same id, lowercase |
 | paddle | `BLUE BLUR` | `blur` |
 | memory | `EXHORTATION` `SALVATION` `CYCLE` `COUNSEL` `FALL` `CONSOLIDATION` | same id, lowercase |
 
@@ -155,3 +155,6 @@ the IMPORT screen shows a summary and needs its own press to go ahead.
   `CHELL`. No version bump: an older reader skips them (rule 2).
 - **v1** (30 Sep 2026): the paddle tokens `TEFLON` and `BLUE BLUR` (a token may hold a space,
   as `BOSS RUSH` does: the token is the rest of the line). No version bump.
+- **v1** (30 Sep 2026): the TEFLON paddle cut the same day. Its token is retired: the reader
+  skips a `PADDLE TEFLON` line (rule 2), and `TEFLON` is never to be used for anything else
+  (rule 7).

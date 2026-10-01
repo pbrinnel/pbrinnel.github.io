@@ -302,7 +302,7 @@
         // standing in the fire
         if (lamp.burnCD > 0) lamp.burnCD = Math.max(0, lamp.burnCD - dt);
         for (const p of lamp.burns) {
-            const sg = segs().find(s => Math.abs(s.cx - p.x) < s.w / 2 + LAMP_BURN_W * 0.4);
+            const sg = padNear(p.x, padY(), LAMP_BURN_W * 0.4, padH() / 2);
             if (sg && !lamp.burnCD) { addDrag(sg, p.x); lamp.burnCD = LAMP_BURN_TICK; lamp.metHits++; }
         }
         const m = lamp.met;
@@ -319,7 +319,7 @@
             if (m.t < LAMP_MET_FALL) return;
             // down: on you, and the ground alight
             const py = padY() - padH() / 2, r = lampMetW() / 2;
-            const sg = segs().find(s => Math.abs(s.cx - m.tx) < s.w / 2 + r * 0.7);
+            const sg = padNear(m.tx, py, r * 0.7, padH() / 2);
             if (sg) { addDrag(sg, m.tx); lamp.metHits++; lamp.burnCD = LAMP_BURN_TICK; }
             lamp.burns.push({ x: m.tx, t: 0 });
             rings.push({ x: m.tx, y: py, t: 1 });
