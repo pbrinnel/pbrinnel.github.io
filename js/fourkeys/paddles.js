@@ -3,8 +3,8 @@
     // ---- the paddles ---------------------------------------------------------------
     // What you hold for a whole run, so a variant has to read at a glance and
     // has to give up as much as it gains. Every one is the same photograph with
-    // something done to it -- a wash, a rim, a light, some specks -- over a
-    // handful of factors on the paddle the game already has:
+    // something done to it -- a wash, a rim, a light, some specks, BLUR's
+    // quills -- over a handful of factors on the paddle the game already has:
     //
     //   len    how long he is            angle  how far his ends throw a head
     //   edge   spin off his ends         swipe  spin from his own travel
@@ -97,6 +97,8 @@
     const PRINCE_TOP = '#a8c64e', PRINCE_LEGS = '#8a4fb0', PRINCE_RIM = '#d7ee8c';
     const CHELL_TOP = '#f4f1ea', CHELL_LEGS = '#e0692c', CHELL_RIM = '#ff9a3c';
     const BLUR_INK = '#3a6fe0', BLUR_RIM = '#a9c8ff';
+    // BLUR is dressed as Sonic (blurLook): his blue, his peach and his shoes' red
+    const BLUR_BLUE = '#2b7cf5', BLUR_PEACH = '#f6c99b', BLUR_RED = '#e3242b';
 
     // ---- what the game asks -------------------------------------------------------
     function labPadUse(key) {
@@ -1231,7 +1233,225 @@
         b.vx = Math.sign(b.vx || (Math.random() < 0.5 ? -1 : 1)) * Math.sqrt(Math.max(0, sp * sp - b.vy * b.vy));
     }
 
-    // BLUR: blue, with afterimages of himself following round behind.
+    // ---- BLUR's look: Sonic -------------------------------------------------------
+    // Him, dressed as classic Sonic. Most of it is the photograph coloured
+    // where it already is something: blue all over, peach where he is skin
+    // (found off the photo's own colours) and white on his hands, his boot
+    // red with a white strap and a white cuff. His face is placed by hand
+    // on the levelled box, in fractions of it: a white patch over both eyes
+    // and a peach muzzle, each with his own features multiplied back
+    // through, and the muzzle kept BLUR_HEAD_INSET inside his outline so the
+    // blue of his head goes all the way round it. Green eyes, Sonic's nose
+    // and a smirk were tried and dropped: at his size in play they read as
+    // smudges, where the white and the peach read.
+    //
+    // The quills are the one thing drawn rather than found (blurQuills), and
+    // they are only art: the ball meets his outline as it always has. So none
+    // stands up past his crown, where a head comes down onto him; each base
+    // is hidden behind his head and only the points show, out past his end
+    // and down. The front one's top edge leaves his crown on its tangent, so
+    // it reads as more of his head and squares off the round back of it.
+    //
+    // Baked once, the first time he is drawn. It reads the photo's pixels,
+    // which a page opened from a file may not do, so if that throws he is
+    // drawn in BLUR_INK as before rather than not at all.
+    const BLUR_HEAD = { x: 0.855, y: 0.46 };          // his head lies right of and above these
+    const BLUR_EYES = [[0.9125, 0.216], [0.947, 0.282]];
+    const BLUR_EYE = [0.017, 0.024], BLUR_EYE_JOIN = [0.016, 0.017];    // round each, and between them, in box widths
+    const BLUR_MUZZLE = [0.912, 0.33, 0.05, 0.04];    // middle, then half across and half down his face
+    const BLUR_EYE_SKIN = [0.035, 0.022];             // ...and the peach round his eyes
+    const BLUR_HEAD_INSET = 0.014;
+    const BLUR_SHOW = 0.75, BLUR_MUZZLE_SHOW = 0.6;   // how much of his own eyes and face come back through
+    const BLUR_WASH = 0.97;                           // how thickly the colours are laid over the photograph
+    const BLUR_SOFT = 1.5;                            // px of feather between one colour and the next
+    // the quills: each one's base, from and to, then where its point is, in
+    // degrees round the middle of his head (0 straight out his end, + down),
+    // and how far past his outline the point reaches, in BLUR_QUILL px. Back
+    // one first; the last is the front one.
+    const BLUR_QUILLS = [[38, 80, 80, 1.6], [10, 52, 54, 1], [-32, 12, 26, 1]];
+    const BLUR_QUILL = 38;
+    const BLUR_QUILL_IN = 0.75;                       // their bases, as a share of his outline: behind his head
+    const BLUR_QUILL_PAD = 0.1;                       // of his length, the room round him they are drawn in
+    // his outline round the middle of his head (BLUR_HEAD_MID), measured off
+    // the photo: degrees as above, px of the levelled photo (SHAPE.bw wide)
+    const BLUR_HEAD_MID = [0.93, 0.24];
+    const BLUR_HEAD_R = [[-150, 50], [-135, 54], [-120, 59], [-105, 66], [-90, 71], [-75, 74], [-60, 75], [-45, 74],
+                         [-30, 68], [-15, 61], [0, 55], [15, 50], [30, 47], [45, 47], [60, 52], [75, 62]];
+
+    // what each pixel of him is
+    const BL_BLUE = 0, BL_PEACH = 1, BL_GLOVE = 2, BL_SHOE = 3, BL_WHITE = 4, BL_EYE = 5, BL_FACE = 6;
+    function blurParts(raw) {
+        const W = raw.width, H = raw.height, d = raw.getContext('2d').getImageData(0, 0, W, H).data;
+        const part = new Int8Array(W * H).fill(-1);
+        const turn = PADDLE_LEVEL, cs = Math.cos(turn), sn = Math.sin(turn);
+        // an ellipse lying along his eyes, which is along the photo's own lean
+        const near = (x, y, cx, cy, a, b) => {
+            const dx = x - cx * W, dy = y - cy * H;
+            return ((dx * cs + dy * sn) / (a * W)) ** 2 + ((dy * cs - dx * sn) / (b * W)) ** 2 <= 1;
+        };
+        const solid = (x, y) => x >= 0 && y >= 0 && x < W && y < H && d[(y * W + x) * 4 + 3] > 128;
+        const inset = Math.round(BLUR_HEAD_INSET * W);
+        const inside = (x, y) => {
+            for (let k = 0; k < 16; k++) {
+                const a = k * Math.PI / 8;
+                if (!solid(Math.round(x + Math.cos(a) * inset), Math.round(y + Math.sin(a) * inset))) return false;
+            }
+            return true;
+        };
+        const [e0, e1] = BLUR_EYES, mid = [(e0[0] + e1[0]) / 2, (e0[1] + e1[1]) / 2];
+        for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+            const i = (y * W + x) * 4, r = d[i], g = d[i + 1], b = d[i + 2];
+            if (d[i + 3] < 10) continue;
+            const fx = x / W, fy = y / H;
+            const skin = r > 95 && r > g && g > b && r - b > 35 && r - g > 12;
+            let c = BL_BLUE;
+            if (fx < 0.125) {
+                c = BL_SHOE;
+                // the strap, across the middle of his foot
+                if (Math.abs((fx - 0.06) * W * -0.39 + (fy - 0.36) * H * -0.92) < 0.011 * W) c = BL_WHITE;
+            } else if (skin && fx > 0.6) c = BL_PEACH;
+            if (fx > BLUR_HEAD.x && fy < BLUR_HEAD.y) {
+                c = BL_BLUE;
+                const lum = 0.3 * r + 0.59 * g + 0.11 * b;
+                const [mx, my, ma, mb] = BLUR_MUZZLE;
+                const face = near(x, y, mx, my, ma, mb) || near(x, y, mid[0], mid[1], BLUR_EYE_SKIN[0], BLUR_EYE_SKIN[1]);
+                if (face && lum > 45 && inside(x, y)) c = BL_FACE;
+                for (const [ex, ey] of BLUR_EYES) if (near(x, y, ex, ey, BLUR_EYE[0], BLUR_EYE[1])) c = BL_EYE;
+                if (near(x, y, mid[0], mid[1], BLUR_EYE_JOIN[0], BLUR_EYE_JOIN[1])) c = BL_EYE;
+            }
+            if (skin && fx > 0.70 && fy > 0.74) c = BL_GLOVE;
+            if (fx > 0.112 && fx < 0.15) c = BL_WHITE;                // the cuff
+            part[y * W + x] = c;
+        }
+        return part;
+    }
+
+    // Each part as its own wash, laid over the photograph. The strap and
+    // cuff are over dark denim, where a wash alone came out grey, so they
+    // take a solid white over it; the eyes and face take their colour with
+    // his own features multiplied back through.
+    function blurDress() {
+        const raw = shapeSprite('padBlurRaw', null, PAD_BAKE, PAD_BAKE / SHAPE_ASPECT, false);
+        const W = raw.width, H = raw.height, part = blurParts(raw);
+        const ink = [BLUR_BLUE, BLUR_PEACH, '#ffffff', BLUR_RED, '#ffffff', '#ffffff', BLUR_PEACH];
+        const solid = { [BL_WHITE]: 0.7 };
+        const show = { [BL_EYE]: BLUR_SHOW, [BL_FACE]: BLUR_MUZZLE_SHOW };
+        const canvas = () => Object.assign(document.createElement('canvas'), { width: W, height: H });
+        const c = canvas(), g = c.getContext('2d');
+        g.drawImage(raw, 0, 0);
+        for (let k = 0; k < ink.length; k++) {
+            const m = canvas(), mg = m.getContext('2d'), px = mg.createImageData(W, H);
+            for (let i = 0; i < part.length; i++) if (part[i] === k) px.data[i * 4 + 3] = 255;
+            mg.putImageData(px, 0, 0);
+            const t = canvas(), tg = t.getContext('2d');
+            tg.drawImage(padTint('padBlurPart' + ink[k], ink[k]), 0, 0, W, H);
+            if (solid[k]) {
+                tg.globalCompositeOperation = 'source-atop';
+                tg.globalAlpha = solid[k];
+                tg.drawImage(padFlat('padBlurFlat' + ink[k], ink[k]), 0, 0, W, H);
+                tg.globalAlpha = 1;
+            }
+            if (show[k]) {
+                tg.globalCompositeOperation = 'source-atop';
+                tg.fillStyle = ink[k];
+                tg.fillRect(0, 0, W, H);
+                tg.globalCompositeOperation = 'multiply';
+                tg.globalAlpha = show[k];
+                tg.filter = 'grayscale(1) brightness(1.7) contrast(1.6)';
+                tg.drawImage(raw, 0, 0);
+                tg.filter = 'none';
+                tg.globalAlpha = 1;
+                tg.globalCompositeOperation = 'destination-in';
+                tg.drawImage(raw, 0, 0);
+            }
+            tg.globalCompositeOperation = 'destination-in';
+            tg.filter = 'blur(' + BLUR_SOFT + 'px)';
+            tg.drawImage(m, 0, 0);
+            g.globalAlpha = solid[k] || show[k] ? 1 : BLUR_WASH;
+            g.drawImage(t, 0, 0);
+            g.globalAlpha = 1;
+        }
+        return c;
+    }
+
+    // his outline round the middle of his head, at `deg`
+    function blurHeadR(deg) {
+        for (let i = 1; i < BLUR_HEAD_R.length; i++) {
+            const [a1, r1] = BLUR_HEAD_R[i];
+            if (deg <= a1) { const [a0, r0] = BLUR_HEAD_R[i - 1]; return r0 + (r1 - r0) * (deg - a0) / (a1 - a0); }
+        }
+        return BLUR_HEAD_R[BLUR_HEAD_R.length - 1][1];
+    }
+    // the quills, on a canvas BLUR_QUILL_PAD bigger than him all round, in
+    // the blue his head comes out as
+    function blurQuills(dress) {
+        const W = dress.width, H = dress.height, k = W / SHAPE.bw, p = Math.round(BLUR_QUILL_PAD * W);
+        const q = Object.assign(document.createElement('canvas'), { width: W + 2 * p, height: H + 2 * p });
+        const g = q.getContext('2d');
+        const d = dress.getContext('2d').getImageData(Math.round(0.95 * W), Math.round(0.06 * H), 12, 12).data;
+        const rgb = [0, 0, 0];
+        let n = 0;
+        for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 200) { rgb[0] += d[i]; rgb[1] += d[i + 1]; rgb[2] += d[i + 2]; n++; }
+        const shade = t => 'rgb(' + rgb.map(v => Math.round(Math.min(255, v / Math.max(1, n) * t))).join(',') + ')';
+        g.translate(p, p);
+        const cx = BLUR_HEAD_MID[0] * W, cy = BLUR_HEAD_MID[1] * H;
+        const at = (deg, r) => [cx + Math.cos(deg * Math.PI / 180) * r * k, cy + Math.sin(deg * Math.PI / 180) * r * k];
+        g.lineJoin = 'round';
+        g.lineWidth = 0.004 * W;
+        g.strokeStyle = shade(0.5);
+        BLUR_QUILLS.forEach(([a0, a1, tip, reach], i) => {
+            const pt = at(tip, blurHeadR(tip) + BLUR_QUILL * reach);
+            const m0 = (a0 + tip) / 2, m1 = (a1 + tip) / 2;
+            g.beginPath();
+            g.moveTo(...at(a0, blurHeadR(a0) * BLUR_QUILL_IN));
+            if (i === BLUR_QUILLS.length - 1) {
+                // up onto his outline at the crown, then off it along its tangent
+                const on = at(a0, blurHeadR(a0) * 0.99), on2 = at(a0 + 2, blurHeadR(a0 + 2) * 0.99);
+                const tx = on2[0] - on[0], ty = on2[1] - on[1], tl = Math.hypot(tx, ty);
+                const run = Math.hypot(pt[0] - on[0], pt[1] - on[1]) / 2;
+                g.lineTo(...on);
+                g.quadraticCurveTo(on[0] + tx / tl * run, on[1] + ty / tl * run, ...pt);
+            } else {
+                // the top bows out and the underside in, so it sweeps back
+                g.quadraticCurveTo(...at(m0 - 4, blurHeadR(m0) + BLUR_QUILL * reach * 0.55), ...pt);
+            }
+            g.quadraticCurveTo(...at(m1 + 2, blurHeadR(m1) * 0.98), ...at(a1, blurHeadR(a1) * BLUR_QUILL_IN));
+            g.closePath();
+            const fill = g.createLinearGradient(...at((a0 + a1) / 2, blurHeadR((a0 + a1) / 2)), ...pt);
+            fill.addColorStop(0, shade(0.85));
+            fill.addColorStop(1, shade(1.1));
+            g.fillStyle = fill;
+            g.fill();
+            g.stroke();
+        });
+        q.pad = p / W;
+        return q;
+    }
+
+    // null until his photo is in, false if it cannot be read
+    let blurLook = null;
+    function blurSonic() {
+        if (blurLook !== null || !paddleImg.complete || !paddleImg.naturalWidth) return blurLook;
+        try {
+            const dress = blurDress();
+            blurLook = { dress, quills: blurQuills(dress) };
+        } catch (e) {
+            blurLook = false;
+        }
+        return blurLook;
+    }
+    // his quills on one of him, turned `turn` further than he is
+    function blurQuillsOn(sg, o, alpha, turn) {
+        const q = blurLook.quills, tw = sg.w, th = tw / SHAPE_ASPECT, pw = q.pad * tw;
+        ctx.save();
+        ctx.translate(sg.cx, padY() + o * JIG_PADDLE);
+        ctx.rotate(segWig(sg.i) + paddle.dip[sg.i] + turn);
+        ctx.globalAlpha = padK * alpha;
+        ctx.drawImage(q, -tw / 2 - pw, -th / 2 - pw, tw + 2 * pw, th + 2 * pw);
+        ctx.restore();
+    }
+
+    // BLUR: Sonic, with afterimages of himself following round behind.
     LAB_PAD.blur = {
         name: 'BLUR',
         ink: BLUR_INK, rim: BLUR_RIM,
@@ -1239,26 +1459,37 @@
         len: () => BLUR_LEN,
         edge: () => BLUR_SPIN_X,
         swipe: () => BLUR_SPIN_X,
+        dress: () => blurSonic() ? blurLook.dress : null,
+        dressA: 1,
         blurb: 'shorter · triple spin · he never stops spinning',
         lore: 'The fastest Brandon there ever was, or so he says, and nobody has ever ' +
               'managed to get him to stand still long enough to argue.',
         under() {
-            const sp = padTint('padBlurTrail', BLUR_INK);
+            const look = blurSonic();
+            const sp = look ? look.dress : padTint('padBlurTrail', BLUR_INK);
             if (!sp) return;
             for (const sg of segs()) {
                 const o = paddle.jt[sg.i] > 0 ? wobble(paddle.jt[sg.i]) : 0;
                 const tw = sg.w, th = tw / SHAPE_ASPECT;
                 for (let k = BLUR_TRAIL; k >= 1; k--) {
+                    const turn = -k * 0.22 * (Math.sign(blurRate) || blurDir), alpha = 0.32 * (1 - k / (BLUR_TRAIL + 1));
+                    if (look) blurQuillsOn(sg, o, alpha, turn);
                     ctx.save();
                     ctx.translate(sg.cx, padY() + o * JIG_PADDLE);
-                    ctx.rotate(segWig(sg.i) + paddle.dip[sg.i] - k * 0.22 * (Math.sign(blurRate) || blurDir));
-                    ctx.globalAlpha = padK * 0.32 * (1 - k / (BLUR_TRAIL + 1));
+                    ctx.rotate(segWig(sg.i) + paddle.dip[sg.i] + turn);
+                    ctx.globalAlpha = padK * alpha;
                     ctx.drawImage(sp, -tw / 2, -th / 2, tw, th);
                     ctx.restore();
                 }
             }
             ctx.globalAlpha = padK;
             padRim('padRimB', BLUR_RIM, 2.5, 0.5);
+            // behind his photograph, so his head hides their bases
+            if (look) for (const sg of segs()) blurQuillsOn(sg, paddle.jt[sg.i] > 0 ? wobble(paddle.jt[sg.i]) : 0, 1, 0);
+            ctx.globalAlpha = padK;
         },
-        skin(sg, o) { padLay(sg, o, padTint('padBlur', BLUR_INK), 0.7); }
+        skin(sg, o) {
+            if (blurSonic()) padLay(sg, o, blurLook.dress, 1);
+            else padLay(sg, o, padTint('padBlur', BLUR_INK), 0.7);
+        }
     };
