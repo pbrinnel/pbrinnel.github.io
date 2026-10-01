@@ -18,11 +18,18 @@
     // clear of it: at 0.35 s both were being hit again the moment they were born.
     let SPLIT_GRACE  = 0.7;
     let SPLIT_PTS    = 60;     // a split; a pop pays three of these
+    // The last one left of a split, unhit for SPLIT_LONELY seconds, eases over
+    // SPLIT_EASE to SPLIT_SLOW of its speed and SPLIT_GROW times its size,
+    // so a small quick one nobody can catch cannot hold the stage up for ever.
+    let SPLIT_LONELY = 10;
+    let SPLIT_EASE   = 6;
+    let SPLIT_SLOW   = 0.5;
+    let SPLIT_GROW   = 2;
     // The act a run draws him from, 1 easy to 3 hard. None of them can touch
     // you either; they only crowd the air and make the returns harder to read.
     let SPLIT_LVL    = 1;
     LAB_KNOBS.push('SPLIT_LVL', 'SPLIT_W', 'SPLIT_LEVELS', 'SPLIT_SPEED', 'SPLIT_FASTER',
-                   'SPLIT_FLOOR', 'SPLIT_GRACE', 'SPLIT_PTS');
+                   'SPLIT_FLOOR', 'SPLIT_GRACE', 'SPLIT_PTS', 'SPLIT_LONELY', 'SPLIT_EASE', 'SPLIT_SLOW', 'SPLIT_GROW');
 
     let splitter = null;
     // Making an entrance he comes down out of the top of the screen into
@@ -31,7 +38,7 @@
 
     LAB_MINI.splitter = {
         start(entering) {
-            splitter = { pieces: [splitPiece(LW / 2, 130, 0, 1)], splits: 0, pops: 0, enter: entering ? 0 : 1 };
+            splitter = { pieces: [splitPiece(LW / 2, 130, 0, 1)], splits: 0, pops: 0, enter: entering ? 0 : 1, idle: 0 };
             return true;
         },
         enter() {
@@ -59,7 +66,7 @@
     function splitPiece(x, y, lvl, dir) {
         const w = SPLIT_W * Math.pow(0.5, lvl), sp = SPLIT_SPEED * Math.pow(SPLIT_FASTER, lvl);
         return { x, y, lvl, w, h: w / SHAPE_ASPECT, vx: dir * sp, vy: sp * 0.55,
-                 flash: 0, grace: 0, mir: dir < 0 };
+                 w0: w, sp0: Math.hypot(sp, sp * 0.55), flash: 0, grace: 0, mir: dir < 0 };
     }
 
     // how many more splits a piece has in it, as the wall's ladder
@@ -81,6 +88,17 @@
             if (p.grace > 0) p.grace = Math.max(0, p.grace - dt);
         }
         if (phase !== 'play') return;          // they hang still while you are waiting to serve
+        // the last one, left alone: slower and bigger, a little at a time
+        // (not the first, whole, before anything has been split off him)
+        const lone = splitter.pieces.length === 1 && splitter.splits > 0 ? splitter.pieces[0] : null;
+        splitter.idle = lone ? splitter.idle + dt : 0;
+        if (lone) {
+            const k = Math.max(0, Math.min(1, (splitter.idle - SPLIT_LONELY) / SPLIT_EASE)), e = k * k * (3 - 2 * k);
+            lone.w = lone.w0 * (1 + (SPLIT_GROW - 1) * e);
+            lone.h = lone.w / SHAPE_ASPECT;
+            const want = lone.sp0 * (1 + (SPLIT_SLOW - 1) * e), now = Math.hypot(lone.vx, lone.vy) || 1;
+            lone.vx *= want / now; lone.vy *= want / now;
+        }
         for (const p of splitter.pieces) {
             p.x += p.vx * dt;
             p.y += p.vy * dt;
@@ -107,6 +125,7 @@
 
     function splitHit(p, hit, b) {
         const all = splitter.pieces;
+        splitter.idle = 0;
         all.splice(all.indexOf(p), 1);
         if (p.lvl < Math.round(SPLIT_LEVELS) - 1) {
             // two of him, half the size, off in either direction and up
