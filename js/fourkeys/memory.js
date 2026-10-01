@@ -1524,25 +1524,33 @@
     // HIM, standing over the army that closes the first game -- the same men,
     // the same ranks (intro.js keeps them) -- telling them what is coming and
     // what it is called. They shout his name back at him, and while they do
-    // he strikes the one in the middle of the front rank. That one grows, and
-    // goes grey, and rises into the place over them -- the Brandon the first
-    // game ends on, set exactly where the opening sets him -- and while he
-    // grows HE goes, quickly, off the left, behind the ranks. The grown one
-    // shouts HIS name after him, and it cuts. The Angel stands at his right
-    // hand the whole time, his first general, and goes when he goes.
+    // his light gathers and he strikes the one in the middle of the front
+    // rank -- a long, heavy strike, its light swelling over everything once.
+    // That one grows, and goes grey, and rises into the place over them --
+    // the Brandon the first game ends on, set exactly where the opening sets
+    // him. HE watches it done, then walks off the left, unhurried, behind the
+    // ranks: the one he made is theirs now, and the one they fear is another
+    // Brandon. The grown one shouts HIS name after him, and it cuts. The
+    // Angel stands at his right hand the whole time, his first general, and
+    // goes when he goes.
     const MR_FADE_IN = 1.2;
     const MR_LINES = [
         [[1.5, 4.5], [['BRANDON', 'surtr'], [' is coming.', 'odin']]],
         [[4.8, 10.8], [['To protect ourselves from ', 'odin'], ['BRANDON', 'surtr'],
                        [' we must combat one another! To learn of true power!', 'odin']]],
     ];
-    const MR_CHEER = [11.0, 15.0];   // they shout his name back
-    const MR_ZAP = [12.0, 12.9];     // the bolt, from him to the chosen one
-    const MR_GROW = [12.6, 16.0];    // the chosen one grows into his place over them
-    const MR_GO = [13.0, 15.0];      // HE goes off the left, the Angel with him...
+    const MR_CHEER = [11.0, 15.5];   // they shout his name back
+    const MR_CHARGE = [11.8, 13.0];  // his light gathers...
+    const MR_CHARGE_UP = 0.9;        // ...to this much more than his own...
+    const MR_ZAP = [13.0, 14.8];     // ...and goes, a heavy bolt to the chosen one...
+    const MR_SETTLE = 1.0;           // ...his light settling back over this long after
+    const MR_WASH = 0.3;             // the strike's light over everything, at its height, swelling once
+    const MR_GROW = [13.4, 16.8];    // the chosen one grows into his place over them
+    const MR_GO = [17.6, 21.0];      // HE walks off the left, the Angel with him...
     const MR_GO_PX = 760;            // ...this far: the middle of the frame to past its edge, light and all
-    const MR_SHOUT = [16.0, 18.3];   // the one he made, grown, shouts HIS name
-    const MR_CUT = 18.7;             // to black, no fade
+    const MR_GO_STEP = 4;            // ...px he steps up and down as he walks
+    const MR_SHOUT = [18.2, 20.6];   // the one he made, grown, shouts HIS name after him
+    const MR_CUT = 21.6;             // to black, no fade
     const MR_ODIN_H = 360;
     const MR_ANGEL_H = MR_ODIN_H / 1.5;
     const MR_ANGEL_X = 225;          // at HIS right hand: HE faces you, so that is your left
@@ -1560,9 +1568,11 @@
         // and the one he made between you and him as he goes
         const ground = slotY(G_MAX - 1) + 4;
         const go = span(MR_GO);
-        const off = go * go * MR_GO_PX;
-        memOdin(LW / 2 - off, ground, MR_ODIN_H, false, s, 1, 0, true);
-        memAngel(s, MR_ANGEL_X - off, ground, MR_ANGEL_H);
+        const off = memEase(go) * MR_GO_PX;
+        const step = go > 0 && go < 1 ? Math.abs(Math.sin(s * 5)) * MR_GO_STEP : 0;
+        const charge = memEase(span(MR_CHARGE)) * (1 - memEase(span([MR_ZAP[1], MR_ZAP[1] + MR_SETTLE])));
+        memOdin(LW / 2 - off, ground - step, MR_ODIN_H, false, s, 1 + MR_CHARGE_UP * charge, 0, true);
+        memAngel(s, MR_ANGEL_X - off, ground - step, MR_ANGEL_H);
         const [c0, c1] = MR_CHEER;
         const cheer = s >= c0 && s < c1;
         const army = introFloor().slice().sort((a, b) => a.y - b.y);
@@ -1578,7 +1588,19 @@
             memShip(m.x, y, m.hp, m.tint);
         }
         if (s >= MR_GROW[0]) memRallyChosen(one, grow);
-        memBolt(s, MR_ZAP, LW / 2 - off, ground - MR_ODIN_H * 0.55, one.x, one.y, 'rgba(255,200,110,1)');
+        memBolt(s, MR_ZAP, LW / 2 - off, ground - MR_ODIN_H * 0.55, one.x, one.y, 'rgba(255,200,110,1)', true);
+        // the strike's light, over everything: up quickly, held while it
+        // strikes, and down slowly -- once, never a flash
+        const wash = MR_WASH * Math.min(memEase(span([MR_ZAP[0], MR_ZAP[0] + 0.4])),
+                                        1 - memEase(span([MR_ZAP[1], MR_ZAP[1] + MR_SETTLE])));
+        if (wash > 0.002) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.globalAlpha *= wash;
+            const r = LW * 0.9;
+            ctx.drawImage(memBlob(MF_ODIN_GLOW), one.x - r, one.y - r, r * 2, r * 2);
+            ctx.restore();
+        }
         for (const [when, parts] of MR_LINES) {
             memLine(parts, 'odin', LW / 2, 34, 22, memClamp((s - when[0]) / (when[1] - when[0])), when);
         }
@@ -1632,29 +1654,34 @@
 
     // A strike: a crooked line from (x0, y0) to (x1, y1) across [a, b] that
     // changes shape as it holds, a wide soft `glow` under a thin pale core,
-    // faded in and out rather than flashed.
-    function memBolt(s, [a, b], x0, y0, x1, y1, glow) {
+    // faded in and out rather than flashed. `heavy` makes it two strands,
+    // each MEM_BOLT_HEAVY times as thick: a strike meant to be seen.
+    const MEM_BOLT_HEAVY = 2.2;
+    function memBolt(s, [a, b], x0, y0, x1, y1, glow, heavy) {
         const k = (s - a) / (b - a);
         if (k <= 0 || k >= 1) return;
         const alpha = Math.min(1, k / 0.12, (1 - k) / 0.3);
-        const seed = Math.floor(s / MR_BOLT_KINK);
-        const pts = [[x0, y0]];
         const dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy);
-        for (let i = 1; i < MR_BOLT_BENDS; i++) {
-            const f = i / MR_BOLT_BENDS, off = (memHash(seed * 17 + i + x1) - 0.5) * 60 * Math.sin(f * Math.PI);
-            pts.push([x0 + dx * f - dy / len * off, y0 + dy * f + dx / len * off]);
-        }
-        pts.push([x1, y1]);
+        const thick = heavy ? MEM_BOLT_HEAVY : 1;
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
         ctx.lineJoin = 'round';
-        for (const [wd, col, al] of [[12, glow, 0.35], [3, 'rgba(255,248,230,1)', 0.95]]) {
-            ctx.globalAlpha = alpha * al;
-            ctx.strokeStyle = col;
-            ctx.lineWidth = wd;
-            ctx.beginPath();
-            pts.forEach(([px, py], i) => i ? ctx.lineTo(px, py) : ctx.moveTo(px, py));
-            ctx.stroke();
+        for (let strand = 0; strand < (heavy ? 2 : 1); strand++) {
+            const seed = Math.floor(s / MR_BOLT_KINK) + strand * 7919;
+            const pts = [[x0, y0]];
+            for (let i = 1; i < MR_BOLT_BENDS; i++) {
+                const f = i / MR_BOLT_BENDS, off = (memHash(seed * 17 + i + x1) - 0.5) * 60 * Math.sin(f * Math.PI);
+                pts.push([x0 + dx * f - dy / len * off, y0 + dy * f + dx / len * off]);
+            }
+            pts.push([x1, y1]);
+            for (const [wd, col, al] of [[12, glow, 0.35], [3, 'rgba(255,248,230,1)', 0.95]]) {
+                ctx.globalAlpha = alpha * al;
+                ctx.strokeStyle = col;
+                ctx.lineWidth = wd * thick;
+                ctx.beginPath();
+                pts.forEach(([px, py], i) => i ? ctx.lineTo(px, py) : ctx.moveTo(px, py));
+                ctx.stroke();
+            }
         }
         ctx.restore();
     }
