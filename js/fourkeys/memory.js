@@ -505,7 +505,8 @@
     // ---- 99 years back: how he fell ------------------------------------------------------
     // Seconds into the scene, after the card. The Brandon who stands there
     // first is clay all over and lit from inside; he is looking away, out of
-    // the frame, and never turns. The Angel drifts in and speaks. Then the
+    // the frame, and never turns. The Angel drifts in, the five walking in
+    // behind him, and speaks. Then the
     // colour runs out of the one who was there first and into the halo, and
     // the halo falls into arms, while he screams the Angel's name. He goes
     // grey, and comes apart the way every Brandon does, and his light swells
@@ -531,6 +532,12 @@
     const MF_ODIN_X = 590;
     const MF_ODIN_H = MF_LU_H * 1.5;     // the one he stood by is half again his height
     const MF_ODIN_GLOW = 'rgba(255,210,120,0.9)';
+    // the five come in behind the Angel to face HIM with him: each walks in
+    // over MF_FIVE_IN, MF_FIVE_GAP after the one before, to stand at
+    // MF_FIVE_X about the Angel's feet, MF_FIVE_H tall
+    const MF_FIVE_IN = [2.0, 5.0], MF_FIVE_GAP = 0.25;
+    const MF_FIVE_X = [70, 130, 190, 310, 370], MF_FIVE_H = 120;
+    const MF_FIVE_STEP = 5;              // px each hops as he walks
     const MF_ODIN_RAYS = 28;
     const MF_STREAMS = 44;               // flecks of colour in flight at once, at the height of it
     const MF_FLECK = 12;                 // px wide an average fleck is: a head of his, so no smaller
@@ -566,6 +573,12 @@
         memOdin(MF_ODIN_X, MF_GROUND, MF_ODIN_H, true, s, aura, drain, s < MF_BREAK);
         if (s >= MF_BREAK) memOdinCrumble(dt);
 
+        MF_FIVE_X.forEach((x, i) => {
+            const a = MF_FIVE_IN[0] + i * MF_FIVE_GAP, b = MF_FIVE_IN[1] + i * MF_FIVE_GAP;
+            const k = span([a, b]), walking = k > 0 && k < 1;
+            const hop = walking ? Math.abs(Math.sin(s * 9 + i)) * MF_FIVE_STEP : 0;
+            memGeneral(i, memLerp(MF_LU_FROM - i * 40, x, memEase(k)), MF_GROUND - hop, MF_FIVE_H, s);
+        });
         const enter = memEase(span(MF_ENTER));
         const fly = span(MF_FLY);
         const luX = memLerp(MF_LU_FROM, MF_LU_X, enter);
@@ -1445,6 +1458,40 @@
                    (turn === undefined ? s : turn) * 2 * Math.PI / MEM_HALO_PERIOD);
     }
 
+    // The five who will be the bosses, long before they are: the Angel's own,
+    // each in the colour of the level he will be given (menu.js's), in the
+    // ranks at −1701, at the Angel's side at the head of them at −1342,
+    // behind him when he faces HIM at −99, and in the hall at −92.
+    const MEM_FIVE_GLOW = 0.4;       // the light of his colour round each, so he stands out of a crowd
+    const memFiveInk = i => [...MENU_LEVELS, MENU_LAST][i].ink;
+    // one of them stood on `ground` at x, L tall
+    function memGeneral(i, x, ground, L, s) {
+        const ink = memFiveInk(i), cy = ground - L / 2 - 4;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha *= MEM_FIVE_GLOW;
+        ctx.drawImage(memBlob(ink), x - L * 0.45, cy - L * 0.6, L * 0.9, L * 1.2);
+        ctx.restore();
+        ctx.save();
+        // a soldier's stillness: barely a sway
+        ctx.translate(x, ground);
+        ctx.rotate(Math.sin(s * 1.3 + i * 1.7) * 0.02);
+        ctx.translate(-x, -ground);
+        memBody(ctx, memFlesh(ink), x, cy, L);
+        ctx.restore();
+    }
+    // ...or lying in the ranks the way the army does, w long
+    function memGeneralShip(i, x, y, w) {
+        const ink = memFiveInk(i), h = w / SHAPE_ASPECT;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha *= MEM_FIVE_GLOW * 2;
+        ctx.drawImage(memBlob(ink), x - w * 0.8, y - w * 0.8, w * 1.6, w * 1.6);
+        ctx.restore();
+        const sp = memBrick(ink);
+        if (sp) ctx.drawImage(sp, x - w / 2, y - h / 2, w, h);
+    }
+
     // ---- 2701 years back: the rally ---------------------------------------------------
     // HIM, standing over the army that closes the first game -- the same men,
     // the same ranks (intro.js keeps them) -- telling them what is coming and
@@ -1590,17 +1637,17 @@
 
     // ---- 1701 years back: the stand ---------------------------------------------------
     // HIM at the head of his army, facing the one he warned them of. They
-    // surge; he stops them and sends them back out of the frame -- and the
-    // view goes back with them. He and the one he faces fall away small into
-    // the distance, and the Angel, in the ranks, comes up close, going back
-    // with the rest, until for a moment you can see what it hangs from. The
-    // Angel stops there, and his halo stops; everyone else has gone. What HE
-    // says next, the Angel overhears. It cuts on that.
+    // surge; he stops them and sends them back -- and the view goes back with
+    // them. He and the one he faces fall away small into the distance, and
+    // the army comes up close, big along the bottom of the frame, the Angel
+    // among them, all still backing away, until for a moment you can see
+    // what it hangs from. The Angel stops there, and his halo stops; the rest
+    // go on backing away without him. What HE says next, the Angel
+    // overhears. It cuts on that.
     const MS_FADE_IN = 1.2;
     const MS_TAUNT = [1.5, 5.3];
     const MS_SURGE = [5.0, 6.3];     // the army lunges...
     const MS_HALT = [6.2, 9.2];
-    const MS_BACK = [8.0, 10.5];     // ...and is sent back out of the frame
     const MS_STEP = [10.5, 12.5];    // he walks up to it alone
     const MS_SEEN = [12.8, 13.0, 13.9, 14.7];   // the strings: up, held, and gone by the last
     const MS_LAST = [15.4, 19.4];
@@ -1618,12 +1665,19 @@
     const MS_NEAR = [215, 690, 320];
     const MS_DRIFT = [11.0, 12.9], MS_DRIFT_PX = 35;
     const MS_HALO = [13.0, 16.8, 0.35];  // his halo stops, then turns again at this pace
+    // The army close to you, over MS_ZOOM: a rank's left end at MS_ARMY_NEAR.x
+    // + its own x times dx, the back rank at y and each nearer one dy lower,
+    // `size` times as big -- the front rank half under the frame, and drawn
+    // over the Angel. They keep backing away MS_ARMY_DRIFT_PX over
+    // MS_ARMY_DRIFT, the Angel's stop or not.
+    const MS_ARMY_NEAR = { x: -60, dx: 1.7, y: 470, dy: 58, size: 1.7 };
+    const MS_ARMY_DRIFT = [11.0, 20.2], MS_ARMY_DRIFT_PX = 90;
     const MS_GROUND = 575;
     const MS_ODIN_H = 250;
     const MS_SURTR_H = MS_ODIN_H * 2;
     const MS_ODIN_X = [240, 320];    // where he stands, and where he walks to
     const MS_SURTR_X = 590;
-    const MS_SURGE_PX = 70, MS_BACK_PX = 700;
+    const MS_SURGE_PX = 70;
     const MS_ANGEL_H = MS_ODIN_H / 1.5;
     // among the ranks, behind the front of them -- and far enough back that
     // the surge (MS_SURGE_PX) never carries him in behind HIM
@@ -1633,7 +1687,8 @@
         halt: [['This moment is mine. Stand back.', 'odin']],
         last: [['Is this truly the moment for which I have been training?', 'odin']],
     };
-    // the army behind him: three ranks, stepping back and to the left
+    // the army behind him: three ranks, stepping back and to the left, the
+    // five in the front one nearest the Angel
     let msArmy = null;
     function memStandArmy() {
         if (msArmy) return msArmy;
@@ -1643,7 +1698,8 @@
                 const i = r * 6 + c, h = memHash(i + 500);
                 msArmy.push({ x: 40 + c * 62 + (r % 2) * 30, y: 480 + r * 34, ph: memHash(i + 510) * 6.28,
                               hp: h < 0.08 ? 3 : h < 0.22 ? 2 : 1,
-                              tint: TIER_KEYS[Math.floor(memHash(i + 520) * TIER_KEYS.length)] });
+                              tint: TIER_KEYS[Math.floor(memHash(i + 520) * TIER_KEYS.length)],
+                              five: r === 2 && c < 5 ? c : undefined });
             }
         }
         return msArmy;
@@ -1660,8 +1716,7 @@
         const far = (x, y) => [fx + (x - MS_FAR_FROM[0]) * z, fy + (y - MS_FAR_FROM[1]) * z];
         const [sx, sg] = far(MS_SURTR_X, MS_GROUND);
         memSurtr(sx, sg, MS_SURTR_H * z, s, memSeen(s, MS_SEEN));
-        const back = span(MS_BACK);
-        const shift = MS_SURGE_PX * memEase(span(MS_SURGE)) - MS_BACK_PX * back * back;
+        const shift = MS_SURGE_PX * memEase(span(MS_SURGE));
         // in the ranks until they are sent back; then near you, and drawn last
         const angel = () => {
             if (s < MS_ZOOM[0]) { memAngel(s, MS_ANGEL_X + shift, MS_GROUND - 40, MS_ANGEL_H); return; }
@@ -1670,13 +1725,31 @@
             memAngel(s, x, memLerp(MS_GROUND - 40, MS_NEAR[1], k), memLerp(MS_ANGEL_H, MS_NEAR[2], k),
                      s < h0 ? s : s < h1 ? h0 : h0 + (s - h1) * after);
         };
-        if (s < MS_ZOOM[0]) angel();
-        for (const m of memStandArmy()) {
-            memShip(m.x + shift, m.y + Math.sin(s * G_SHIP_HZ * 2 * Math.PI + m.ph) * G_SHIP_BOB, m.hp, m.tint);
-        }
+        // the army: where they stood, or coming up close; the front rank
+        // `front` or the ones behind it
+        const n = MS_ARMY_NEAR, drift = MS_ARMY_DRIFT_PX * memEase(span(MS_ARMY_DRIFT));
+        const army = front => {
+            for (const m of memStandArmy()) {
+                const r = Math.round((m.y - 480) / 34);
+                if ((r === 2) !== front) continue;
+                const bob = Math.sin(s * G_SHIP_HZ * 2 * Math.PI + m.ph) * G_SHIP_BOB;
+                const x = memLerp(m.x + shift, n.x + m.x * n.dx, k) - drift, y = memLerp(m.y, n.y + r * n.dy, k);
+                const sc = memLerp(1, n.size, k);
+                if (m.five !== undefined) { memGeneralShip(m.five, x, y + bob * sc, G_SHIP_W * sc); continue; }
+                const sp = shipSprite(m.hp, m.tint);
+                if (sp) ctx.drawImage(sp, x - G_SHIP_W * sc / 2, y + bob * sc - G_SHIP_H * sc / 2, G_SHIP_W * sc, G_SHIP_H * sc);
+            }
+        };
         const [ox, og] = far(memLerp(MS_ODIN_X[0], MS_ODIN_X[1], memEase(span(MS_STEP))), MS_GROUND);
+        // HIM over them while they stand behind him, as he stays once he is
+        // far off -- by then they are below him in the frame, not over him;
+        // the Angel in the ranks at first, and close to you among them after
+        const near = s >= MS_ZOOM[0];
+        if (!near) angel();
+        army(false);
+        if (!near) army(true);
         memOdin(ox, og, MS_ODIN_H * z, true, s, 1, 0, true);
-        if (s >= MS_ZOOM[0]) angel();
+        if (near) { angel(); army(true); }
         const over = og - (MS_ODIN_H + 30) * z, px = memLerp(22, MS_LAST_PX, k);
         memLine(MS_LINES.taunt, 'odin', ox, over, px, span(MS_TAUNT), MS_TAUNT);
         memLine(MS_LINES.halt, 'odin', ox, over, px, span(MS_HALT), MS_HALT);
@@ -1896,17 +1969,17 @@
     // long as it hangs from the top of the field, the middle one hung lower --
     // drawn closer together and smaller than the field has them (MC_GARDEN),
     // or the garden would fill the hall; IDOL one enormous head, TWINS a big
-    // one and a small one facing each other, LAMPS one hung between two
-    // campfires as far apart as the walls stand them, and GLEEOK the headless
-    // body leant up off his collar with a wing on either shoulder and three
-    // maned heads on necks of heads. MC_REACH is roughly how far each reaches
+    // one and a small one facing each other, LAMPS him alone, burning, and
+    // GLEEOK the headless body leant up off his collar with a wing on either
+    // shoulder and three maned heads on necks of heads. MC_REACH is roughly how far each reaches
     // from its middle, MC_MID where that middle is, and MC_TOP its top, for
     // the lightning and the shout.
     // MC_DEPTH is the order they are laid down in, back to front.
-    const MC_REACH = { 1: 185, 2: 200, 3: 230, 4: 360, 5: 260 };
+    const MC_REACH = { 1: 185, 2: 200, 3: 230, 4: 230, 5: 260 };
     const MC_GARDEN = [100, 0.62];     // px between WINDMILL's flowers, and their size of his
     const MC_MID = { 1: -150, 2: -90, 3: -40, 4: -90, 5: -90 };
-    const MC_TOP = { 1: -300, 2: -300, 3: -140, 4: -220, 5: -330 };
+    const MC_TOP = { 1: -300, 2: -300, 3: -140, 4: -250, 5: -330 };
+    const MC_FLAMES = 15, MC_FLAME = 120;   // LAMPS' tongues of fire, and the longest of them
     const MC_DEPTH = [5, 2, 4, 3, 1];
     const memMcBody = (g, x, y, L, a, flip) => {
         const T = L / SHAPE_ASPECT;
@@ -1943,14 +2016,17 @@
             memMcBody(g, 150, 10, TW_W_SMALL, 0, true);
         },
         4: (g, s) => {                               // LAMPS
-            // he hangs LAMP_Y - LAMP_BOSS_Y over his fires, which stand as
-            // far out as the field's walls put them (LAMPS' start)
-            const out = LW / 2 - LAMP_EDGE - lampHalfW();
-            memMcBody(g, 0, -170 + Math.sin(s * 1.4) * 4, LAMP_BOSS_W, 0, false);
-            for (const lx of [-out, out]) {
-                const ly = -170 + LAMP_Y - LAMP_BOSS_Y + Math.sin(s * LAMP_BOB_RATE * 3 + lx) * LAMP_BOB;
-                for (const k of lampLogs(lx, ly)) memMcBody(g, k.x, k.y, k.w, k.a, k.x < 0);
+            const y = MC_MID[4] + Math.sin(s * 1.4) * 4, T = LAMP_BOSS_W / SHAPE_ASPECT;
+            // his fire, licking up off him: tongues of Brandons, each
+            // flickering on its own beat
+            for (let i = 0; i < MC_FLAMES; i++) {
+                const u = (i + 0.5) / MC_FLAMES - 0.5;
+                const len = MC_FLAME * (0.6 + 0.4 * Math.sin(s * 7 + i * 2.3)) * (1 - Math.abs(u));
+                const a = -Math.PI / 2 + Math.sin(s * 3 + i * 1.7) * 0.18 + u * 0.5;
+                const bx = u * LAMP_BOSS_W * 0.9, by = y - T * 0.2;
+                memMcBody(g, bx + Math.cos(a) * len / 2, by + Math.sin(a) * len / 2, len, a, i % 2);
             }
+            memMcBody(g, 0, y, LAMP_BOSS_W, 0, false);
         },
         5: (g, s) => {                               // GLEEOK
             const L = GL_W, T = L / SHAPE_ASPECT, collar = -60, o = glOrigin();
@@ -2043,7 +2119,8 @@
     }
 
     // ---- 1342 years back: the cycle ---------------------------------------------------
-    // The Angel at the head of a great host, facing the one they fear. They
+    // The Angel at the head of a great host, the five at his side, facing the
+    // one they fear. They
     // shout his name at him; he says nothing, and then his own name, and for a
     // moment what he hangs from shows. Then he turns and runs, and they shout
     // HIS name after him. The Angel, who led them, asks one word. It cuts.
@@ -2061,6 +2138,9 @@
     const MY_SURTR = [660, 510];     // where it stands, and its height: three times his
     const MY_RUN_PX = 900;
     const MY_HOP = 14;
+    // the five at the head of the host with the Angel, out in front of the
+    // ranks: where each stands, how tall, and how much nearer than the ranks
+    const MY_FIVE_X = [270, 320, 370, 420, 465], MY_FIVE_H = 110, MY_FIVE_NEAR = 15;
     let myArmy = null;
     function memCycleArmy() {
         if (myArmy) return myArmy;
@@ -2092,6 +2172,8 @@
             if (hopping) y -= Math.max(0, Math.sin(((s - hopping[0]) * 2.4 + m.ph) * Math.PI)) * MY_HOP;
             memShip(m.x, y, m.hp, m.tint);
         }
+        // they do not hop: they are his, not the crowd's
+        MY_FIVE_X.forEach((x, i) => memGeneral(i, x, MY_GROUND + MY_FIVE_NEAR, MY_FIVE_H, s));
         memAngel(s, MY_ANGEL[0], MY_GROUND, MY_ANGEL[1]);
         const where = army.map(m => [m.x, m.y]);
         memShouts(s, where, 16, MY_JEER, 'surtr', 'you', 700);
