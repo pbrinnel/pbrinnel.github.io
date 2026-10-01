@@ -41,14 +41,21 @@
     let KAT_GRAV  = 320;    // px/s a piece is drawn in toward the head at
     let KAT_PACK  = 0.8;    // how tight they pack: 1 just touching, lower overlaps
     let KAT_WRAP  = 0.6;    // how far a piece turns to lie along the lump, 1 all the way
-    let KAT_ROLL  = 1;      // how much of the head's turning the lump turns with
+    let KAT_ROLL  = 1;      // how much of the head's turning the lump turns with...
+    // ...but never more than this many turns a second, however fast the head
+    // spins. A head at full spin turns about a sixth of a turn a frame, and a
+    // lump of bricks in four colours a couple of hundred px across, jumping
+    // that far every frame, is the kind of fast, large, high-contrast change
+    // that can set off a photosensitive seizure (WCAG 2.3.1). BLUE BLUR holds
+    // every head at full spin, so with him it was the whole time.
+    let KAT_TURN_MAX = 4;
     let KAT_DRAG  = 0.12;   // spin each stuck brick takes off, a share per second
     let KAT_PAD   = 1;      // 1: what is stuck on bounces off him too; 0: only the head does
     let KAT_SHED  = 170;    // px/s the pieces fly off at when it wears off
     let KAT_FALL  = 900;    // px/s^2 they fall at
     const KAT_COOL = 0.08;  // seconds one brick is left alone after the lump hits it
     LAB_KNOBS.push('KAT_SECS', 'KAT_MAX', 'KAT_BURST', 'KAT_WINDOW', 'KAT_WAIT_BREAKS', 'KAT_SCALE', 'KAT_GRAV', 'KAT_PACK', 'KAT_WRAP',
-                   'KAT_ROLL', 'KAT_DRAG', 'KAT_PAD', 'KAT_SHED', 'KAT_FALL');
+                   'KAT_ROLL', 'KAT_TURN_MAX', 'KAT_DRAG', 'KAT_PAD', 'KAT_SHED', 'KAT_FALL');
 
     // the capsules this file adds, the rest of CAPS being the game's own
     const POW_KEYS = ['K', 'L', 'T', 'I', 'C', 'A', 'U', '?'];
@@ -300,7 +307,8 @@
 
         for (const b of katOn) if (!(fx.K > 0) || !balls.includes(b)) katShed(b);
         for (const b of katOn) {
-            b.katA += (b.angle - b.katWas) * KAT_ROLL;
+            const cap = KAT_TURN_MAX * Math.PI * 2 * dt;
+            b.katA += Math.max(-cap, Math.min(cap, (b.angle - b.katWas) * KAT_ROLL));
             b.katWas = b.angle;
             b.spin -= b.spin * Math.min(1, KAT_DRAG * b.kat.length * dt);
             katGather(b, dt);
