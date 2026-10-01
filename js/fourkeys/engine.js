@@ -1151,7 +1151,8 @@
     // Worker of brandon2's own (its source is
     // _worker/brandon2-leaderboard-worker.js). Each stage's table works the way
     // brandon.html's one does; TOTAL is worked out by the worker from everyone's
-    // best on each stage it counts. Everything here fails soft: if the board is
+    // best on each stage it counts, for whoever has one on all of them.
+    // Everything here fails soft: if the board is
     // unreachable the game plays exactly as it did before, just without a
     // table. It is never awaited on a hot path.
     // Paste the deployed worker's URL here to switch the board on. While it is

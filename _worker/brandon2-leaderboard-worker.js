@@ -13,8 +13,10 @@
 //
 // Every stage in STAGES is a table of its own, exactly like brandon.html's:
 // the best TOP_N runs, the same initials as often as they earn it. TOTAL is
-// each set of initials' best on every stage in IN_TOTAL, added up. Two players
-// with the same initials are one player to it, which is accepted.
+// each set of initials' best on every stage in IN_TOTAL, added up, and only
+// for initials with a best on all of them: a total with a stage missing from
+// it is not the number it says it is. Two players with the same initials are
+// one player to it, which is accepted.
 //
 // TOTAL needs everyone's best on every stage, not only the rows that made a
 // table, so every score posted is also kept as a best per initials in BESTS.
@@ -67,11 +69,15 @@ function shape(view) {
 }
 
 function totals(bests) {
-  const sum = {};
+  const sum = {}, stages = {};
   for (const s of IN_TOTAL) {
-    for (const [ini, n] of Object.entries(bests[s] || {})) sum[ini] = (sum[ini] || 0) + n;
+    for (const [ini, n] of Object.entries(bests[s] || {})) {
+      sum[ini] = (sum[ini] || 0) + n;
+      stages[ini] = (stages[ini] || 0) + 1;
+    }
   }
   return Object.entries(sum)
+    .filter(([ini]) => stages[ini] === IN_TOTAL.length)
     .map(([ini, score]) => ({ ini, score }))
     .sort((a, b) => b.score - a.score || (a.ini < b.ini ? -1 : 1))
     .slice(0, TOP_N);

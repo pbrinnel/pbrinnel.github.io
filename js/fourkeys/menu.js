@@ -295,15 +295,17 @@
         if (qualifies(p.score) || (boardLive && p.score > p.was)) boardAsk(p.n, p.score, () => {}, p.pad);
     }
 
-    // The LEADERBOARD building: a tab for TOTAL and one for every stage that
-    // is standing in the town, so it names nothing you have not found yet.
+    // The LEADERBOARD building: a tab for every stage that is standing in the
+    // town, so it names nothing you have not found yet, and one for TOTAL once
+    // you have a best on all six -- the worker counts nobody with fewer, so
+    // it is the table you are not on yet until then.
     // The table up is whichever tab he is under; a press on one fetches it
     // again, and BACK is the way out.
     function menuBoardTabs() {
         const tab = (id, label, ink, view) => ({ id, label, ink, view, act: fetchBoard });
         const side = k => M_SIDES.find(s => s.key === k);
-        return [{ id: 'back', label: 'BACK', ink: M_SAFE, act: menuLeave },
-                tab('total', 'TOTAL', side('board').ink, BOARD_TOTAL)]
+        return [{ id: 'back', label: 'BACK', ink: M_SAFE, act: menuLeave }]
+            .concat(menuBestTotal() > 0 ? [tab('total', 'TOTAL', side('board').ink, BOARD_TOTAL)] : [])
             .concat(MENU_ALL.filter(l => !l.after || menu.keys[l.after]).map(l => tab('s' + l.n, l.name, l.ink, l.n)))
             .concat(menu.keys[MENU_VOID.n] ? [tab('rush', 'BOSS RUSH', side('rush').ink, M_RUSH)] : []);
     }
@@ -2965,8 +2967,9 @@
                       { id: 'load', label: 'LOAD IT', ink: M_RISK, act: () => menuLoadSave(sc.n) }] },
         // a table, not a question: the title and line go up out of its way and
         // the choices are the smaller tabs along the bottom (menuBoardTabs)
-        board: { title: 'LEADERBOARD', ink: '#c9a94e', home: 'total', table: true,
-                 line: sc => sc.view === BOARD_TOTAL ? 'everyone\'s best on every stage (excluding BOSS RUSH), added up'
+        // home is TOTAL once there is a TOTAL tab, and FARM's until then
+        board: { title: 'LEADERBOARD', ink: '#c9a94e', home: () => menuBestTotal() > 0 ? 'total' : 's1', table: true,
+                 line: sc => sc.view === BOARD_TOTAL ? 'best on all six stages (excluding BOSS RUSH), added up'
                                                      : 'the ten best runs',
                  choices: menuBoardTabs }
     };
@@ -2998,7 +3001,10 @@
         menu.press = null;
         menuCutHintOff(false);
         const s = M_SCREENS[kind];
-        if (s) paddle.x = paddle.tx = menuChoices().find(c => c.id === s.home).cx;
+        if (s) {
+            const home = typeof s.home === 'function' ? s.home() : s.home;
+            paddle.x = paddle.tx = menuChoices().find(c => c.id === home).cx;
+        }
         // the rack's home is the peg of the one in his hands
         if (kind === 'paddles') paddle.x = paddle.tx = menuRack().find(c => c.id === LAB.pad).cx;
         setHint(kind === 'memory' ? 'hold to skip'
