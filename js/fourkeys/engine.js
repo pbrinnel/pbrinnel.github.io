@@ -245,7 +245,7 @@
         // every one of FROST's icy bricks struck again, broken or not
         { key: 'shattered', label: 'SHATTERED',      pts: 25, many: true },
         // not one capsule caught all round
-        { key: 'powerless', label: 'POWERLESS',      pts: 1000 },
+        { key: 'powerless', label: 'NO POWERUPS',    pts: 1000 },
         // every time a head went out one side through PORTAL and in the other
         { key: 'portaled', label: 'PORTALED',        pts: 50, many: true },
         // the round won inside SPEEDY_SECS of play, counted only while a head
@@ -2290,7 +2290,7 @@
     // whatever, so nothing can hold it for ever. (Stun and SLUGGISH are
     // already gone: a fresh head clears every effect -- see clearEffects.)
     const SERVE_CLEAR = 130;
-    const SERVE_WAIT_MAX = 4;
+    const SERVE_WAIT_MAX = 2.5;
     let serveWait = 0;               // seconds a serve has been waiting, or 0
     function serveBlocked() {
         for (const b of balls) {
@@ -2526,7 +2526,7 @@
         if (score > best) { best = score; saveBest(); }
         popups.push({ x: paddle.x, y: padY() - 40, text: '+' + CAP_SCORE, color: cap.color, life: 1 });
         callout = { text: cap.name, color: cap.color, life: CALLOUT_SECS };
-        round.powered = true;             // there goes POWERLESS
+        round.powered = true;             // there goes NO POWERUPS
 
         if (kind === 'M') { splitBalls(); return; }
         fx[kind] = cap.secs * labPadCaps();
@@ -6004,7 +6004,9 @@
             const sub = phase === 'over' ? 'final score ' + score
                             + '   ·   click/tap a choice   ·   '
                             + Math.ceil(overT)
-                      : phase === 'ready' ? (serveWait ? 'it goes as soon as the way is clear' : 'click/tap or space to serve')
+                      : phase === 'ready' ? (serveWait ? 'something is in the way · serving in '
+                                                          + Math.max(0, SERVE_WAIT_MAX - serveWait).toFixed(1) + 's'
+                                                        : 'click/tap or space to serve')
                       : phase === 'ascend' ? ''
                       : 'click/tap to continue';
             if (sub) text(sub, LW / 2, my + 26 * u, 15 * u, '#9a958c', 'center');
@@ -6099,23 +6101,22 @@
         const u = uiScale, my = 424, bandH = 104 * u;
         ctx.fillStyle = 'rgba(0,0,0,0.72)';
         ctx.fillRect(0, my - bandH / 2, LW, bandH);
-        const pulse = 0.8 + 0.2 * Math.sin(performance.now() / 1000 * Math.PI * 2 * 0.6);
-        for (const b of balls || []) {
-            const r = labBallR(b), R = r * 3.2;
-            ctx.save();
-            ctx.globalCompositeOperation = 'lighter';
-            ctx.globalAlpha = 0.75 * pulse;
-            ctx.drawImage(padGlow('#ffe6a8'), b.x - R, b.y - R * BALL_RY / BALL_RX, R * 2, R * 2 * BALL_RY / BALL_RX);
-            ctx.restore();
-            drawBall(b.x, b.y, r, b.angle);
-            ctx.save();
-            ctx.globalAlpha = 0.9 * pulse;
-            ctx.strokeStyle = '#ffe6a8';
-            ctx.lineWidth = 2.5;
-            ctx.beginPath();
-            ctx.ellipse(b.x, b.y, r + 5, r * BALL_RY / BALL_RX + 5, b.angle, 0, 7);
-            ctx.stroke();
-            ctx.restore();
+        // only heads you are playing: not in the town, and not under a cutscene
+        // or a memory played over a fight, where the head is not yours to find
+        const cut = menuUp() || (typeof menuUnlockUp === 'function' && menuUnlockUp())
+                  || (typeof introUp === 'function' && introUp());
+        if (!cut && (phase === 'play' || phase === 'ready')) {
+            const pulse = 0.8 + 0.2 * Math.sin(performance.now() / 1000 * Math.PI * 2 * 0.6);
+            for (const b of balls || []) {
+                if (labSkipBall(b)) continue;
+                const r = labBallR(b), R = r * 2.6;
+                ctx.save();
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.globalAlpha = 0.45 * pulse;
+                ctx.drawImage(padGlow('#ffe6a8'), b.x - R, b.y - R * BALL_RY / BALL_RX, R * 2, R * 2 * BALL_RY / BALL_RX);
+                ctx.restore();
+                drawBall(b.x, b.y, r, b.angle);
+            }
         }
         text('PAUSED', LW / 2, my - 4 * u, 32 * u, '#f2efe9', 'center');
         text('click to resume', LW / 2, my + 26 * u, 15 * u, '#9a958c', 'center');

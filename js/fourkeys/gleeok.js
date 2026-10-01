@@ -135,6 +135,7 @@
     let GL_FINALE   = 0.45;   // seconds a finished big head takes to fly into his body
     let GL_BIG_LOOSE = 260;   // ...and px/s it flies at, and is knocked away at
     let GL_BIG_KNOCK_IF = 0.9; // ...and seconds it tumbles after a knock before it can be hit again
+    let GL_TEAR_GRACE  = 0.5; // seconds a head just torn loose passes through the balls
     let GL_LUNGE_FIRST = 6;   // seconds into the fight before the first lunge
     let GL_LUNGE_MIN   = 8;   // seconds between one lunge and the next, at least...
     let GL_LUNGE_MAX   = 12;  // ...and at most
@@ -188,7 +189,7 @@
                    'GL_LOOSE_SPIN', 'GL_STONE_A0', 'GL_STONE_A1', 'GL_STONE_HZ', 'GL_STONE_STEER',
                    'GL_BIG', 'GL_BIG_HP', 'GL_BIG_CHARGE', 'GL_BIG_SHAKE',
                    'GL_BIG_ARC', 'GL_BIG_NECK', 'GL_BIG_BOB', 'GL_BIG_ROLL', 'GL_BIG_HZ', 'GL_BIG_STUN',
-                   'GL_BIG_LOOSE_HP', 'GL_BIG_LOOSE', 'GL_BIG_KNOCK_IF', 'GL_SAG', 'GL_STUMP_MIN', 'GL_STUMP_MAX', 'GL_HEAD_IF',
+                   'GL_BIG_LOOSE_HP', 'GL_BIG_LOOSE', 'GL_BIG_KNOCK_IF', 'GL_TEAR_GRACE', 'GL_SAG', 'GL_STUMP_MIN', 'GL_STUMP_MAX', 'GL_HEAD_IF',
                    'GL_LUNGE_FIRST', 'GL_LUNGE_MIN', 'GL_LUNGE_MAX', 'GL_LUNGE_REAR', 'GL_LUNGE_BITE', 'GL_LUNGE_HOLD', 'GL_LUNGE_DODGE', 'GL_LUNGE_DAZE',
                    'GL_BIG_REAR', 'GL_LUNGE_GAP', 'GL_LUNGE_SPRING', 'GL_LUNGE_DAMP', 'GL_LUNGE_BACK', 'GL_LUNGE_DMG', 'GL_LUNGE_IF',
                    'GL_AMMO_SPEED', 'GL_AMMO_CONE', 'GL_AMMO_TURN', 'GL_AMMO_DMG', 'GL_AMMO_BODY',
@@ -343,7 +344,7 @@
             if (gl.finale) { gl.pend = null; return null; }     // nothing to hit: it is over
             for (const k of gl.heads) {
                 // nothing to hit until it is whole, and a shot one is the ball's already
-                if (!k.alive || k.grow >= 0 || k.shot) continue;
+                if (!k.alive || k.grow >= 0 || k.shot || k.tearT > clock) continue;
                 if (k.lg && k.lg.st === 'bite' && !k.loose) {
                     const rx = GL_HEAD_W * glSize(k) / 2, ry = rx * (BALL_RY / BALL_RX);
                     if (Math.hypot((ball.x - k.x) / rx, (ball.y - k.y) / ry) < 1 || glHeadContact(ball, k)) {
@@ -629,10 +630,16 @@
             if (!k.big) k.hp = GL_LOOSE_HP;
             k.charge = 0; k.shots = 0; k.jx = 0; k.lg = null; k.roll = 0; k.iF = 0;
             gl.torn++;
-            const a = Math.PI * (0.15 + Math.random() * 0.7);
+            // Off away from the ball that tore it, and up: it used to set off
+            // at random, mostly down, and lurched straight back into the ball,
+            // spiking it at you. It touches no ball for GL_TEAR_GRACE.
             const sp = k.big ? GL_BIG_LOOSE : GL_LOOSE;
-            k.vx = Math.cos(a) * sp * (Math.random() < 0.5 ? -1 : 1);
-            k.vy = Math.sin(a) * sp;
+            let dx = k.x - cx, dy = Math.min(-0.4, (k.y - cy) / (Math.hypot(k.x - cx, k.y - cy) || 1));
+            if (Math.abs(dx) < 1) dx = Math.random() < 0.5 ? -1 : 1;
+            const d = Math.hypot(Math.sign(dx), dy) || 1;
+            k.vx = Math.sign(dx) / d * sp;
+            k.vy = dy / d * sp;
+            k.tearT = clock + GL_TEAR_GRACE;
             award(BOSS_PTS * 2, cx, cy);
             maybeDropCapsule(cx, cy);
             // the big one roars as it comes free, and he turns to stone behind it

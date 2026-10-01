@@ -200,7 +200,7 @@
     let LU_END_SETTLE = 2;      // ...and back to his own over this, from BRANDON!
     let LU_END_SWAP   = 1.4;    // your paddle becoming the standard one, as he starts to burn
     let LU_END_HOLD   = 2.6;    // BRANDON!, held
-    let LU_END_WINS   = 4;      // BRANDON WINS, over you as Odin
+    let LU_END_WINS   = 6;      // BRANDON WINS, over you as Odin
     let LU_END_OUT    = 0.8;    // ...then the black, and the town
     LAB_KNOBS.push('LU_GLITCH', 'LU_GLITCH_AT', 'LU_DRAIN_LEFT', 'LU_SHAKE', 'LU_SHAKE_SECS', 'LU_WING2_SPAN', 'LU_WING2_DEG',
                    'LU_CROWN_REGROW', 'LU_CROWN_GROW_IN', 'LU_END_CRUMBLE', 'LU_END_STAND', 'LU_END_GROW',
