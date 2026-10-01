@@ -511,7 +511,7 @@
     // the halo falls into arms, while he screams the Angel's name. He goes
     // grey, and comes apart the way every Brandon does, and his light swells
     // as he goes -- a death that size lights the room. The Fallen says the
-    // dead one's name, and goes up and out of the top of the frame.
+    // dead one's name, and walks off the left with the five behind him.
     const MF_FADE_IN = 1.0;
     const MF_ENTER = [1.5, 4.5];         // the Angel drifts in from the left
     const MF_SAY_0 = [5.0, 7.8];
@@ -523,8 +523,11 @@
     const MF_BREAK_SPAN = 4.5;           // first piece to last
     const MF_SWELL = [18.6, 21.6, 26.1]; // his light rises, holds, and is gone by the last
     const MF_SAY_2 = [26.6, 30.6];
-    const MF_FLY = [31.1, 33.1];         // up and out of the top
-    const MF_BLACK = [32.1, 34.1];
+    // The Fallen walks out off the left over MF_LEAVE, MF_LEAVE_PX, bobbing
+    // MF_LEAVE_BOB as he goes; each of the five sets off MF_FIVE_GAP after
+    // the one on his left, so they file out after him. Black once they are gone.
+    const MF_LEAVE = [31.0, 34.0], MF_LEAVE_PX = 560, MF_LEAVE_BOB = 4;
+    const MF_BLACK = [34.6, 35.8];
     const MF_SAY_IN = 0.4;               // seconds a line takes to come up, and to go
     const MF_GROUND = 575;
     const MF_LU_X = 250, MF_LU_FROM = -170;
@@ -575,15 +578,19 @@
 
         MF_FIVE_X.forEach((x, i) => {
             const a = MF_FIVE_IN[0] + i * MF_FIVE_GAP, b = MF_FIVE_IN[1] + i * MF_FIVE_GAP;
-            const k = span([a, b]), walking = k > 0 && k < 1;
+            const k = span([a, b]);
+            const out = span([MF_LEAVE[0] + i * MF_FIVE_GAP, MF_LEAVE[1] + i * MF_FIVE_GAP]);
+            const walking = (k > 0 && k < 1) || (out > 0 && out < 1);
             const hop = walking ? Math.abs(Math.sin(s * 9 + i)) * MF_FIVE_STEP : 0;
-            memGeneral(i, memLerp(MF_LU_FROM - i * 40, x, memEase(k)), MF_GROUND - hop, MF_FIVE_H, s);
+            const gx = memLerp(MF_LU_FROM - i * 40, x, memEase(k)) - MF_LEAVE_PX * memEase(out);
+            memGeneral(i, gx, MF_GROUND - hop, MF_FIVE_H, s);
         });
         const enter = memEase(span(MF_ENTER));
-        const fly = span(MF_FLY);
-        const luX = memLerp(MF_LU_FROM, MF_LU_X, enter);
+        const leave = span(MF_LEAVE);
+        const luX = memLerp(MF_LU_FROM, MF_LU_X, enter) - MF_LEAVE_PX * memEase(leave);
         const scale = MF_LU_H / MEM_L;
-        const luY = MF_GROUND - MEM_L / 2 * scale - 8 * scale - fly * fly * (LH + MF_LU_H * 2);
+        const step = leave > 0 && leave < 1 ? Math.abs(Math.sin(s * 6)) * MF_LEAVE_BOB : 0;
+        const luY = MF_GROUND - MEM_L / 2 * scale - 8 * scale - step;
         const at = memLucifer(ctx, s, luX, luY, scale, fall, mf.spin);
 
         memStreams(s, drain, at);
