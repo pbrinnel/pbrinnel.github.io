@@ -53,7 +53,9 @@ touches it.
   mini-boss and paddle, `powers.js` (the sequel's eight capsules, KATAMARI to WILD),
   `levels.js` (each level's three screens: a wall, a second
   wall a mini-boss makes an entrance on, then the boss), `dark.js` (the VOLCANO fight's
-  dark room: lit only by what burns, the rest flat silhouettes), `menu.js` (the town), `debug.js` (what the konami code and
+  dark room: lit only by what burns, the rest flat silhouettes), `storm.js` (the VOID
+  fight's storm: silhouette and lightning, his cracked red sky in the last part; it only
+  draws, and every flash in it is rationed for photosensitive players), `menu.js` (the town), `debug.js` (what the konami code and
   `?debug` open: the keys, the paddles, and a hold to forget it all), `intro.js` (the
   BRANDON WINS and 2000 YEARS LATER cards before the town), `memory.js` (the cutscene a
   level's first win plays and MEMORIES replays), and `start.js`, which is where the game
