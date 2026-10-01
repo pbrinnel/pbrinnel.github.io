@@ -222,9 +222,10 @@
         { key: 'peak',     label: 'MAX BONUS',       pts: 100, mul: true },
         { key: 'flawless', label: 'FLAWLESS',        pts: 1000 },
         { key: 'multi',    label: 'MULTI-FINISH',    pts: 300 },
-        // the heads still in the corner when a level's boss goes down, which
-        // is the only screen that pays it (see endOfRound)
-        { key: 'spare',    label: "DIDN'T NEED EM",  pts: 500, many: true },
+        // the heads still in the corner when a level's boss goes down -- not
+        // the one in play (spares) -- which is the only screen that pays it
+        // (see endOfRound)
+        { key: 'spare',    label: 'EXTRA',           pts: 2000, many: true },
         { key: 'fast',     label: 'GOTTA GO FAST',   pts: 300 },
         { key: 'heads',    label: HEADS_AT + ' HEADS', pts: 600 },
         { key: 'grit',     label: 'NEVER GIVE UP',   pts: 400 },
@@ -243,7 +244,9 @@
         // every one of FROST's icy bricks struck again, broken or not
         { key: 'shattered', label: 'SHATTERED',      pts: 10, many: true },
         // not one capsule caught all round
-        { key: 'powerless', label: 'POWERLESS',      pts: 1000 }
+        { key: 'powerless', label: 'POWERLESS',      pts: 1000 },
+        // every time a head went out one side through PORTAL and in the other
+        { key: 'portaled', label: 'PORTALED',        pts: 50, many: true }
     ];
 
     // The reveal. The score does not move until the last line has landed --
@@ -1536,7 +1539,7 @@
         // a round's tally starts here and nowhere else -- a lost life and a
         // continue both happen inside one, and neither may wipe it
         round = { lost: false, fast: false, heads: false, grit: false, hunter: 0, peak: 1, mini: 0, cosmos: 0,
-                  sniper: false, golden: 0, shattered: 0, powered: false };
+                  sniper: false, golden: 0, shattered: 0, powered: false, portaled: 0 };
         eor = null;
 
         if (lvl.boss) {
@@ -2560,7 +2563,10 @@
 
     // his BRANDON!, just under him, riding along with him while it lasts.
     // The same for the one your first ball gets and the ones a hit rolls for.
+    // A boss whose box is not himself (a pair, a garden, a field-wide box)
+    // says it himself, riding on whichever of him is shouting (labB.shout).
     function bossShout(b) {
+        if (labB && labB.shout) { labB.shout(); return; }
         shout = { life: SHOUT_SECS, at: () => ({ x: b.x + bw * 0.88, y: b.y + bh + 8 }) };
     }
 
@@ -2674,7 +2680,8 @@
             sniper:   round.sniper ? 1 : 0,
             golden:   round.golden,
             shattered: round.shattered,
-            powerless: round.powered ? 0 : 1
+            powerless: round.powered ? 0 : 1,
+            portaled: round.portaled
         };
         for (const r of EOR_ROWS) {
             const n = met[r.key];
@@ -2754,7 +2761,7 @@
     // The town's levels never reach the takeover's title, where the screen
     // used to go up on a boss (menuHoldsTakeover). So once he has finished
     // coming apart the town puts it up here instead, and waits for a tap on
-    // it as a stage clear does -- which is what pays DIDN'T NEED EM.
+    // it as a stage clear does -- which is what pays EXTRA.
     function eorHold() {
         eorHeld = true;
         if (eor) eor.t = 0;
@@ -2883,7 +2890,7 @@
 
     // What you have IN RESERVE: `lives` counts the head in your hands as well,
     // and that one is not a spare. This is the number the corner prints, the
-    // number SPARE BALL pays for and the number the throne absorbs -- one
+    // number EXTRA pays for and the number the throne absorbs -- one
     // function so the three can never disagree.
     function spares() { return Math.max(0, lives - 1); }
 

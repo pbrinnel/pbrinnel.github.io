@@ -469,11 +469,14 @@
         return 1 + (PT_CATCH / s - 1) * e;
     }
 
-    // stepBall's side walls: true when PORTAL has taken them
+    // stepBall's side walls: true when PORTAL has taken them. Each trip
+    // through is a PORTALED on the round's bonus.
     function powWrap(b) {
         if (!ptOn()) return false;
-        if (b.x < 0) b.x += LW;
-        else if (b.x > LW) b.x -= LW;
+        if (b.x < 0 || b.x > LW) {
+            b.x += b.x < 0 ? LW : -LW;
+            if (round) round.portaled++;
+        }
         return true;
     }
 

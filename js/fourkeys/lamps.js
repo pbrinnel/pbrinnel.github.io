@@ -108,6 +108,12 @@
     let lamp = null;
 
     LAB_BOSS.lamps = {
+        // the engine's yell (bossShout): under him, wherever he sweeps to
+        shout() {
+            const at = () => ({ x: lamp.x, y: lamp.y + LAMP_BOSS_W / SHAPE_ASPECT / 2 + 8 });
+            const p = at();
+            labShout(p.x, p.y, null, null, at);
+        },
         start(b) {
             b.hp = b.maxHp = LAMP_HP;
             const n = Math.max(1, Math.round(LAMP_N));

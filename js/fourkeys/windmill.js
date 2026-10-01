@@ -64,6 +64,12 @@
     let wm = null;
 
     LAB_BOSS.windmill = {
+        // the engine's yell (bossShout): from the middle flower still standing
+        shout() {
+            const live = wm.flowers.filter(f => f.alive);
+            const f = live[Math.floor((live.length - 1) / 2)];
+            if (f) labShout(f.cx, f.cy + WM_HUB * 0.8, null, null, () => ({ x: f.cx, y: f.cy + WM_HUB * 0.8 }));
+        },
         start(b) {
             const n = Math.max(1, Math.round(WM_FLOWERS));
             const petals = Math.max(1, Math.round(WM_SAILS));

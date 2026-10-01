@@ -227,6 +227,14 @@
     }
 
     LAB_BOSS.gleeok = {
+        // the engine's yell (bossShout): from the head nearest his middle still on a neck
+        shout() {
+            const on = gl.heads.filter(k => k.alive && !k.loose);
+            if (!on.length) return;
+            const k = on.reduce((a, q) => Math.abs(q.x - gl.cx) < Math.abs(a.x - gl.cx) ? q : a);
+            const hh = GL_HEAD_W * glSize(k) * (BALL_RY / BALL_RX);
+            labShout(k.x, k.y, 'BRANDON!', 2.4, () => ({ x: k.x, y: k.y + hh / 2 + 10 }));
+        },
         start(b) {
             const n = Math.max(1, Math.round(GL_HEADS));
             gl = { t: 0, ph: 0, cx: LW / 2, cy: -GL_W, pend: null, hitBall: null, torn: 0, done: 0, spread: 0, yelled: false,

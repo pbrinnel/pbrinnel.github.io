@@ -43,6 +43,8 @@
     let tw = null;
 
     LAB_BOSS.twins = {
+        // the engine's yell (bossShout): whichever of them are down here, together
+        shout() { for (const t of tw.twins) if (t.alive && t.away < 0.05) twShout(t, 'BRANDON!'); },
         start(b) {
             const one = (key, w, hp, sweep, mir, dy, ph) => ({
                 key, w, h: w / SHAPE_ASPECT,
