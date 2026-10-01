@@ -658,7 +658,9 @@
             if (p.stone) lay(shapeSprite('padStone', STONE, PAD_BAKE, PAD_BAKE / SHAPE_ASPECT, 'statue'), 1, dx, ww);
             else {
                 lay(shapeSprite('padIcon', null, PAD_BAKE, PAD_BAKE / SHAPE_ASPECT, false), 1, dx, ww);
-                if (p.dress) lay(p.dress(), p.dressA, dx, ww);
+                // a dress that cannot be made yet (or at all) leaves his plain tint
+                const dress = p.dress && p.dress();
+                if (dress) lay(dress, p.dressA, dx, ww);
                 else if (p.ink && !p.prints) lay(padTint('padTint' + p.ink, p.ink), 0.8, dx, ww);
             }
         }
