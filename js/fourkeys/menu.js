@@ -125,7 +125,7 @@
             wipe() {
                 menuLoad();
                 menu.keys = {}; menu.pads = { standard: true }; menu.best = {}; menu.seen = {}; menu.mems = {};
-                menu.memFrom = {}; menu.slain = 0;
+                menu.memFrom = {}; menu.slain = 0; menu.padNext = null;
                 menuSave();
                 LAB.usePad('standard');
                 return true;
@@ -145,7 +145,7 @@
                  cards: [], run: null, side: 0, hold: 0, sw: null,
                  march: false, lift: 0, lastX: 0, into: null, walk: 0, gait: 0, arriveT: -1,
                  going: null, screen: null, press: null,
-                 shows: [], showT: 0, a0: 1 };
+                 shows: [], showT: 0, a0: 1, padNext: null };
         let kept = null;
         try { kept = localStorage.getItem(MENU_PAD_KEY); } catch (e) { /* a private window */ }
         // The first load is engine.js's own setup (debugBuild), before its
@@ -205,11 +205,13 @@
     // Every paddle comes in through here, so the one that makes MENU_RACK_AT
     // puts up the BRANDONS sign with its BRANDONS UNLOCKED card. That card
     // is kept last in the queue, after every paddle it counted, however many
-    // more one win hands over after it. `show` is his own PADDLE UNLOCKED card.
+    // more one win hands over after it. `show` is his own PADDLE UNLOCKED card,
+    // and a paddle shown is the one put in your hands once the cards are
+    // done (menuShowNext): the last shown, so the last one you were told of.
     function menuAddPad(pad, show) {
         const had = menuOwned().length;
         menu.pads[pad] = true;
-        if (show) menu.shows.push({ pad });
+        if (show) { menu.shows.push({ pad }); menu.padNext = pad; }
         const i = menu.shows.findIndex(s => s.rackCard);
         if (i >= 0) menu.shows.push(...menu.shows.splice(i, 1));
         else if (had < MENU_RACK_AT && menuOwned().length >= MENU_RACK_AT) menu.shows.push({ rackCard: true });
@@ -1113,19 +1115,9 @@
         // the stage's memory plays before any paddle is shown: after that
         // it is in MEMORIES
         menuNextMemory(level.n);
-        // A paddle just won is in your hands when the town comes back: the
-        // level's own if there is one, since it is the one you played for,
-        // or else the souvenir. A paddle kept back says nothing.
-        let take = null;
-        if (clean && !menu.pads[level.pad]) {
-            menuAddPad(level.pad, true);
-            take = level.pad;
-        }
-        if (!menu.pads[MENU_SOUVENIR]) {
-            menuAddPad(MENU_SOUVENIR, true);
-            take = take || MENU_SOUVENIR;
-        }
-        if (take && LAB_PAD[take]) LAB.usePad(take);
+        // A paddle kept back says nothing
+        if (clean && !menu.pads[level.pad]) menuAddPad(level.pad, true);
+        if (!menu.pads[MENU_SOUVENIR]) menuAddPad(MENU_SOUVENIR, true);
         menuSave();
         return true;
     }
@@ -1150,16 +1142,13 @@
     }
     // A run's end, won. A flawless win's paddle and whatever its last boss
     // buys come after menuBeat and after `end` (the VOID's credits), so they
-    // are shown last, and put in your hands only if the level gave you none.
+    // are shown last.
     function menuBeatSlew(run, boss, end) {
-        const was = LAB.pad;
         menuBeat(!run.cont, run.n);
         if (end) menu.shows.push(...end);
-        let got = null;
         const flawless = MENU_FLAWLESS_PADS[run.n];
-        if (flawless && !run.cont && !run.lost && menuGive(flawless)) { got = flawless; menuSave(); }
-        if (boss) got = menuSlew() || got;
-        if (got && LAB.pad === was && LAB_PAD[got]) LAB.usePad(got);
+        if (flawless && !run.cont && !run.lost && menuGive(flawless)) menuSave();
+        if (boss) menuSlew();
     }
 
     // back to the hub: an empty field with the town on it
@@ -2597,12 +2586,20 @@
         if (menu.showT >= UNLOCK_WAIT) menuShowNext();
         return true;
     }
+    // The paddle you won with stays in your hands through BRANDON WINS and
+    // every card after it, and only once the last is gone, back in the town,
+    // are you handed the last paddle those cards showed you (menuAddPad).
     function menuShowNext() {
         menu.shows.shift();
         menu.showT = 0;
         menu.skipT = -1;
         if (!menu.shows.length) menu.fightShow = false;
         if (!menuCutUp()) menuCutHintOff(true);
+        const next = menu.padNext;
+        if (!menu.shows.length && menuUp() && next) {
+            menu.padNext = null;
+            if (menu.pads[next] && LAB_PAD[next]) LAB.usePad(next);
+        }
     }
 
     function menuUnlockDraw() {
@@ -3172,6 +3169,7 @@
         menuLoad();
         Object.assign(menu, s);
         menu.dusting = null;
+        menu.padNext = null;
         menuSave();
         if (!menu.pads[LAB.pad]) LAB.usePad('standard');
         clearBest();
