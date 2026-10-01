@@ -9,15 +9,15 @@
     // so this brings the other player back. On a stage he lies above the wall;
     // on an open field it is just the two of you.
     let PONG_HP    = 5;       // heads past him to finish him
-    let PONG_SPEED = 305;     // px/s he can move
+    let PONG_SPEED = 320;     // px/s he can move
     // He is beaten the way a Pong opponent always has been: late, and off the
     // walls. He does not move for a head until it is within PONG_WAKE of him,
     // and he only reads PONG_READ of a bounce off a side wall -- at 0 he runs
     // to where it would land if the walls were not there, and has to turn
     // round once he sees it come off one.
-    let PONG_WAKE  = 270;     // px below him a head has to be before he goes for it
+    let PONG_WAKE  = 285;     // px below him a head has to be before he goes for it
     let PONG_READ  = 0.3;     // how much of a bank shot he sees coming
-    let PONG_ERR   = 38;      // px he can be out by, rolled each time one comes up at him
+    let PONG_ERR   = 34;      // px he can be out by, rolled each time one comes up at him
     let PONG_AIM   = 0.5;     // how far along himself he tries to take it, to send it away from you
     let PONG_HOME  = 0.3;     // share of the way back to the middle he goes while it is away
     let PONG_Y     = 36;      // his middle, down from the ceiling

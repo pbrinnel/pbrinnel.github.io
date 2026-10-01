@@ -241,7 +241,7 @@
         // the round's last brick taken by a LASER bolt (see lzStep)
         { key: 'sniper',   label: 'SNIPER',          pts: 200 },
         // every gold brick broken, born gold or turned by MIDAS
-        { key: 'golden',   label: 'GOLDEN',          pts: 50, many: true },
+        { key: 'golden',   label: 'GOLDEN',          pts: 150, many: true },
         // every one of FROST's icy bricks struck again, broken or not
         { key: 'shattered', label: 'SHATTERED',      pts: 25, many: true },
         // not one capsule caught all round
@@ -2693,7 +2693,7 @@
             if (n <= 0) continue;
             const x = r.mul ? ' x' + n.toFixed(1) : r.many ? ' x' + n : '';
             // rounded, because a tenth multiplies out a hair off whole in floats
-            rows.push({ label: r.label + x, pts: Math.round(r.pts * n) });
+            rows.push({ key: r.key, label: r.label + x, pts: Math.round(r.pts * n) });
         }
         return bonusScreen(rows);
     }
@@ -5224,11 +5224,11 @@
             const a = Math.max(0, Math.min(1, (eor.t - EOR_IN - EOR_ROW * i) / EOR_FADE));
             if (a <= 0) continue;
             ctx.globalAlpha = a * out;
-            // the base is the one you were always getting; the rest you earned,
+            // the base and MAX BONUS are on every round; the rest you earned,
             // and they are gold to say so
             row(eor.rows[i].label, eor.rows[i].pts,
                 top + pitch * (EOR_TITLE_U + i + 1), pitch * 0.72,
-                i === 0 ? '#9a958c' : '#c9a94e');
+                i === 0 || eor.rows[i].key === 'peak' ? '#9a958c' : '#c9a94e');
             ctx.globalAlpha = out;
         }
 
