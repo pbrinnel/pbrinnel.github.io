@@ -24,41 +24,51 @@
     // line in the plain voice of nobody in particular -- the memories' rule
     // (MEM_VOICE), so you can tell which one is meant without being told.
     const LAB_PAD = {};
+    // Paddles renamed after they shipped: the id each one had, and the id it
+    // has now. Progress kept in this browser and leaderboard rows still
+    // carry the old ids.
+    const PAD_WAS = { gilt: 'gilded', frost: 'crystalline', ember: 'magma' };
+    const padNow = k => Object.hasOwn(PAD_WAS, k) ? PAD_WAS[k] : k;
+    function padsRenamed(pads) {
+        const out = {};
+        for (const k of Object.keys(pads)) out[padNow(k)] = pads[k];
+        return out;
+    }
     let labP = null;
     let padBits = [];               // specks of whatever he sheds
     let deckAtPad = -1;             // the deck cache holds per width AND per paddle
     const PAD_BAKE = 320;           // tints are baked this long and scaled
 
-    let GILT_LEN   = 0.85;   // gilt: shorter...
-    let GILT_CAPS  = 1.6;    // ...and every capsule lasts him longer, by this much
-    let GILT_SHINE = 3;      // seconds a sweep of light takes to cross him
+    let GILDED_LEN = 0.85;   // gilded: shorter...
+    let GILDED_CAPS = 1.6;   // ...and every capsule lasts him longer, by this much
+    let GILDED_SHINE = 3;    // seconds a sweep of light takes to cross him
     let STAT_LEN   = 1.2;    // statue: longer...
     let STAT_ANGLE = 0.65;   // ...flatter off his ends...
     let STAT_SPIN  = 0.35;   // ...and stone hardly grips, so he puts little spin on
     let STAT_DIP   = 1.3;    // ...but he leans further after one going past
     let STAT_HEAVY = 2;      // ...and a head off him lands this many hits on silver and gold at once
-    let FROST_LEN  = 0.95;   // frost: a touch shorter...
-    let FROST_EDGE = 1.5;    // ...spin off his ends...
-    let FROST_SWIPE = 2.2;   // ...and off his travel, both far easier
-    let FROST_DECK = 0.6;    // ...on a narrower flat, so more of him is a curve
-    let FROST_FLAKES = 10;   // snowflakes a second coming off him...
-    let FROST_BIG  = 0.25;   // ...this share of them a big one, six of him heads out
+    let CRYST_LEN  = 0.95;   // crystalline: a touch shorter...
+    let CRYST_EDGE = 1.5;    // ...spin off his ends...
+    let CRYST_SWIPE = 2.2;   // ...and off his travel, both far easier
+    let CRYST_DECK = 0.6;    // ...on a narrower flat, so more of him is a curve
+    let CRYST_FLAKES = 10;   // snowflakes a second coming off him...
+    let CRYST_BIG  = 0.25;   // ...this share of them a big one, six of him heads out
     let ICE_SECS   = 1;      // an icy brick struck sends the head off at full speed this long...
     let ICE_RAMP   = 0.15;   // ...getting there over this, and coming back down over twice it
     let ICE_TURN   = 0.35;   // ...turned this far (rad) the way it is spinning, at the most spin
-    let EMB_LEN    = 0.7;    // ember: much shorter...
-    let EMB_CATCH  = 0.3;    // ...but a brick a head of his breaks has this chance of going up in embers
-    let EMB_SPREAD = 0.45;   // ...a burning brick this chance of catching each one beside it
-    let EMB_SPREAD_AT = 1;   // ...seconds into burning that it does
-    let EMB_CRIT   = 0.15;   // ...and a wound on a boss from a head of his this chance of counting double
-    let EMB_GLOW   = 0.45;   // how much light he gives off
-    let EMB_SPARKS = 17;     // sparks a second rising off him
-    let EMB_ASH    = 6;      // wisps of smoke a second: ambiance, never something to look at...
-    let EMB_ASH_S  = 2.5;    // ...so each only about this many px either side of its middle...
-    let EMB_ASH_A  = 0.3;    // ...and at most this solid
+    let MAGMA_LEN  = 0.7;    // magma: much shorter...
+    let MAGMA_CATCH = 0.3;   // ...but a brick a head of his breaks has this chance of going up in embers
+    let MAGMA_SPREAD = 0.45; // ...a burning brick this chance of catching each one beside it
+    let MAGMA_SPREAD_AT = 1; // ...seconds into burning that it does
+    let MAGMA_CRIT = 0.15;   // ...and a wound on a boss from a head of his this chance of counting double
+    let MAGMA_GLOW = 0.45;   // how much light he gives off
+    let MAGMA_SPARKS = 17;   // sparks a second rising off him
+    let MAGMA_ASH  = 6;      // wisps of smoke a second: ambiance, never something to look at...
+    let MAGMA_ASH_S = 2.5;   // ...so each only about this many px either side of its middle...
+    let MAGMA_ASH_A = 0.3;   // ...and at most this solid
     let PAIR_LEN   = 0.62;   // the pair: two of him, each this much of one
     let PAIR_QUAD  = 0.7;    // ...and under DOUBLE, four, each this much of one of the two
-    let PAD_MARK   = 3;      // seconds a head FROST or EMBER hits wears his frost or fire
+    let PAD_MARK   = 3;      // seconds a head CRYSTALLINE or MAGMA hits wears his frost or fire
     let V2_GLOSS   = 0.22;   // MODERN: how bright the gloss along his top is...
     let V2_GLINT   = 5;      // ...seconds between one glint and the next...
     let V2_SWEEP   = 0.9;    // ...and how long a glint takes to cross him
@@ -80,19 +90,19 @@
     let BLUR_FLIP  = 0.4;    // ...and seconds to swing from full one way to full the other
     LAB_KNOBS.push('PAD_FAVOUR', 'MULTI_LEN', 'MULTI_POP', 'MULTI_SLIP', 'MULTI_PRINT',
                    'BLUR_LEN', 'BLUR_SPIN', 'BLUR_SPIN_X', 'BLUR_TRAIL', 'BLUR_GAP', 'BLUR_KICK', 'BLUR_UP', 'BLUR_RAMP', 'BLUR_SETTLE', 'BLUR_BAND', 'BLUR_FLIP');
-    LAB_KNOBS.push('GILT_LEN', 'GILT_CAPS', 'GILT_SHINE', 'STAT_LEN', 'STAT_ANGLE', 'STAT_SPIN',
-                   'STAT_DIP', 'STAT_HEAVY', 'FROST_LEN', 'FROST_EDGE', 'FROST_SWIPE', 'FROST_DECK', 'FROST_FLAKES', 'FROST_BIG', 'ICE_SECS', 'ICE_RAMP', 'ICE_TURN',
-                   'EMB_LEN', 'EMB_CATCH', 'EMB_SPREAD', 'EMB_SPREAD_AT', 'EMB_CRIT', 'EMB_GLOW', 'EMB_SPARKS', 'PAIR_LEN', 'PAIR_QUAD', 'PAD_MARK', 'V2_GLOSS', 'V2_GLINT', 'V2_SWEEP');
-    LAB_KNOBS.push('EMB_ASH', 'EMB_ASH_S', 'EMB_ASH_A');
+    LAB_KNOBS.push('GILDED_LEN', 'GILDED_CAPS', 'GILDED_SHINE', 'STAT_LEN', 'STAT_ANGLE', 'STAT_SPIN',
+                   'STAT_DIP', 'STAT_HEAVY', 'CRYST_LEN', 'CRYST_EDGE', 'CRYST_SWIPE', 'CRYST_DECK', 'CRYST_FLAKES', 'CRYST_BIG', 'ICE_SECS', 'ICE_RAMP', 'ICE_TURN',
+                   'MAGMA_LEN', 'MAGMA_CATCH', 'MAGMA_SPREAD', 'MAGMA_SPREAD_AT', 'MAGMA_CRIT', 'MAGMA_GLOW', 'MAGMA_SPARKS', 'PAIR_LEN', 'PAIR_QUAD', 'PAD_MARK', 'V2_GLOSS', 'V2_GLINT', 'V2_SWEEP');
+    LAB_KNOBS.push('MAGMA_ASH', 'MAGMA_ASH_S', 'MAGMA_ASH_A');
 
     const V2_RIM    = '#e6edf5';
-    const GILT_INK  = '#efb920', GILT_RIM = '#ffe9a3';
-    const FROST_INK = '#8fe3f2', FROST_RIM = '#dff6ff';
-    const EMB_INK   = '#e2683a', EMB_RIM = '#ffb072';
-    const PAIR_INK  = '#8f7fc4';      // DOUBLE's own colour, since he is two of him
-    // MULTI's own colour, as PAIR has DOUBLE's, and a blue to print against it
+    const GILDED_INK = '#efb920', GILDED_RIM = '#ffe9a3';
+    const CRYST_INK = '#8fe3f2', CRYST_RIM = '#dff6ff';
+    const MAGMA_INK = '#e2683a', MAGMA_RIM = '#ffb072';
+    const PAIR_INK  = '#8f7fc4';      // DOUBLE's own color, since he is two of him
+    // MULTI's own color, as PAIR has DOUBLE's, and a blue to print against it
     const MULTI_INK = '#e0c060', MULTI_BLUE = '#5b8cc4';
-    // PRINCE and CHELL are dressed rather than washed (padDress): a colour
+    // PRINCE and CHELL are dressed rather than washed (padDress): a color
     // for his shirt and one for his jeans, after who each is named for
     const PRINCE_TOP = '#a8c64e', PRINCE_LEGS = '#8a4fb0', PRINCE_RIM = '#d7ee8c';
     const CHELL_TOP = '#f4f1ea', CHELL_LEGS = '#e0692c', CHELL_RIM = '#ff9a3c';
@@ -172,8 +182,8 @@
             if (b.sway) b.x += Math.sin(b.t * 3 + b.ph) * b.sway * dt;
         }
         padBits = padBits.filter(b => b.t < b.life);
-        for (const x of embBlasts) x.t += dt;
-        embBlasts = embBlasts.filter(x => x.t < EMB_BLAST);
+        for (const x of magmaBlasts) x.t += dt;
+        magmaBlasts = magmaBlasts.filter(x => x.t < MAGMA_BLAST);
     }
 
     // A boss may fade all of you (padAlpha, set here and put back at the end of
@@ -197,17 +207,17 @@
     }
     function labPadOver() {
         padBoth('over', []);
-        for (const x of embBlasts) {
-            const k = x.t / EMB_BLAST, r = x.r * (0.3 + 0.7 * Math.sqrt(k));
+        for (const x of magmaBlasts) {
+            const k = x.t / MAGMA_BLAST, r = x.r * (0.3 + 0.7 * Math.sqrt(k));
             // fire glows; STATUE's thud (x.ink) is only the ring
             if (!x.ink) {
                 ctx.globalCompositeOperation = 'lighter';
                 ctx.globalAlpha = (1 - k) * 0.8;
-                ctx.drawImage(padGlow(EMB_INK), x.x - r * 1.2, x.y - r * 1.2, r * 2.4, r * 2.4);
+                ctx.drawImage(padGlow(MAGMA_INK), x.x - r * 1.2, x.y - r * 1.2, r * 2.4, r * 2.4);
                 ctx.globalCompositeOperation = 'source-over';
             }
             ctx.globalAlpha = 1 - k;
-            ctx.strokeStyle = x.ink || EMB_RIM;
+            ctx.strokeStyle = x.ink || MAGMA_RIM;
             ctx.lineWidth = 4 * (1 - k) + 1;
             ctx.beginPath();
             ctx.arc(x.x, x.y, r, 0, 7);
@@ -264,8 +274,8 @@
         ctx.globalAlpha = 1;
     }
 
-    // A spark's light, baked once per colour, so each spark in a frame is a
-    // drawImage rather than a gradient of its own: EMBER keeps dozens alive.
+    // A spark's light, baked once per color, so each spark in a frame is a
+    // drawImage rather than a gradient of its own: MAGMA keeps dozens alive.
     const padGlows = new Map();
     function padGlow(ink) {
         if (padGlows.has(ink)) return padGlows.get(ink);
@@ -321,7 +331,7 @@
             return true;
         });
     }
-    // his head gone grey and soft as smoke, with `ink` through it. The blur
+    // his head gone gray and soft as smoke, with `ink` through it. The blur
     // needs room round him or it is cut off square at the canvas edge.
     const PAD_ASH_BLUR = 3;           // px of blur at PAD_SPECK_BAKE: past about 6 he is no longer anyone
     function padHeadSprite(ink) {
@@ -387,7 +397,7 @@
     }
 
     // ---- the mark he leaves on a head ----------------------------------------------
-    // A head FROST or EMBER sends back carries a little of him away with it:
+    // A head CRYSTALLINE or MAGMA sends back carries a little of him away with it:
     // his tint over it and his specks coming off it, both fading out over
     // PAD_MARK. It changes nothing about the head -- it is how you see which
     // paddle hit it, and a thing to watch as it goes.
@@ -430,7 +440,7 @@
     // the heavy blow landing: a ring of the statues' paler stone and a spray
     // of grit off the brick, bigger than any plain hit's
     function labPadThud(b) {
-        embBlasts.push({ x: b.x + bw / 2, y: b.y + bh / 2, t: 0, r: (bw + GAP) * 0.6, ink: STONE_RIM });
+        magmaBlasts.push({ x: b.x + bw / 2, y: b.y + bh / 2, t: 0, r: (bw + GAP) * 0.6, ink: STONE_RIM });
         for (let n = 0; n < 18; n++) {
             const a = Math.random() * Math.PI * 2, v = 50 + Math.random() * 110;
             padBit(b.x + bw / 2 + (Math.random() - 0.5) * bw * 0.6, b.y + bh / 2,
@@ -439,12 +449,12 @@
         }
     }
 
-    // ---- EMBER's wildfire -------------------------------------------------------
-    // A brick broken by a head that EMBER has marked has EMB_CATCH of going
+    // ---- MAGMA's wildfire -------------------------------------------------------
+    // A brick broken by a head that MAGMA has marked has MAGMA_CATCH of going
     // up: it bursts in embers and every brick next to it (corners too)
     // catches. A burning brick wears the head's mark -- his tint, his sparks
     // -- and burns up when PAD_MARK is out, scoring as if you had hit it. Each
-    // has one roll of EMB_SPREAD for each brick beside it, EMB_SPREAD_AT into
+    // has one roll of MAGMA_SPREAD for each brick beside it, MAGMA_SPREAD_AT into
     // its burning, so now and then a vein of it runs on through the wall.
     // Only the wall's own bricks down to their last hit ever burn: never a
     // boss, stone, a mini-boss, or silver or gold with more than one hit in it.
@@ -457,47 +467,47 @@
         const px = (bw + GAP) * 1.01, py = (bh + GAP) * 1.01;
         return bricks.filter(o => o !== b && Math.abs(o.x - b.x) <= px && Math.abs(o.y - b.y) <= py);
     }
-    function padIgnite(o) { o.burn = { t: PAD_MARK, spread: EMB_SPREAD_AT, rolled: false }; }
+    function padIgnite(o) { o.burn = { t: PAD_MARK, spread: MAGMA_SPREAD_AT, rolled: false }; }
 
     // a brick has just been broken, by whatever labHitBy says
     // Going up is a blast you cannot miss -- a flash, a ring of heat thrown
     // out over the bricks it lights, and a spray of embers -- and a brick
     // burning out goes with a smaller one, so each link of a vein shows.
-    let embBlasts = [];
-    const EMB_BLAST = 0.4;           // seconds a blast takes to spread and fade
-    function embBlast(x, y, big) { embBlasts.push({ x, y, t: 0, r: (bw + GAP) * (big ? 1.5 : 0.8) }); }
+    let magmaBlasts = [];
+    const MAGMA_BLAST = 0.4;           // seconds a blast takes to spread and fade
+    function magmaBlast(x, y, big) { magmaBlasts.push({ x, y, t: 0, r: (bw + GAP) * (big ? 1.5 : 0.8) }); }
 
     function labBrickGone(b) {
-        if (!embLit() || Math.random() >= EMB_CATCH) return;
-        embBurst(b.x + bw / 2, b.y + bh / 2);
+        if (!magmaLit() || Math.random() >= MAGMA_CATCH) return;
+        magmaBurst(b.x + bw / 2, b.y + bh / 2);
         for (const o of padBeside(b)) if (padBurnable(o)) padIgnite(o);
     }
-    // whether the head a hit is from carries EMBER's fire
-    const embLit = () => !!(labHitBy && labHitBy.mark && labHitBy.mark.key === 'ember');
+    // whether the head a hit is from carries MAGMA's fire
+    const magmaLit = () => !!(labHitBy && labHitBy.mark && labHitBy.mark.key === 'magma');
     // going up: the blast and a spray of embers
-    function embBurst(x, y) {
-        embBlast(x, y, true);
+    function magmaBurst(x, y) {
+        magmaBlast(x, y, true);
         for (let n = 0; n < 40; n++) {
             const a = Math.random() * Math.PI * 2, v = 60 + Math.random() * 160;
-            padBit(x, y, Math.random() < 0.4 ? EMB_RIM : EMB_INK, 0.5 + Math.random() * 0.6,
+            padBit(x, y, Math.random() < 0.4 ? MAGMA_RIM : MAGMA_INK, 0.5 + Math.random() * 0.6,
                    Math.cos(a) * v, Math.sin(a) * v - 40, 60, 2 + Math.random() * 2.5, 0.95, 'glow');
         }
     }
 
-    // ---- EMBER's crit ----------------------------------------------------------------
-    // A boss has no bricks to set alight, so a head carrying EMBER's fire
-    // has EMB_CRIT of going up on him instead: the same burst a brick
+    // ---- MAGMA's crit ----------------------------------------------------------------
+    // A boss has no bricks to set alight, so a head carrying MAGMA's fire
+    // has MAGMA_CRIT of going up on him instead: the same burst a brick
     // catching makes, and the wound counts double. Every boss asks this for
     // what a wound takes off him; anything else is n as it was.
     function labBite(n, cx, cy) {
-        if (!embLit() || Math.random() >= EMB_CRIT) return n;
-        if (cx !== undefined) embBurst(cx, cy);
+        if (!magmaLit() || Math.random() >= MAGMA_CRIT) return n;
+        if (cx !== undefined) magmaBurst(cx, cy);
         return n * 2;
     }
 
     function padBurnStep(dt) {
         if (phase !== 'play' || !bricks) return;
-        const shed = LAB_PAD.ember.shed;
+        const shed = LAB_PAD.magma.shed;
         for (const b of bricks) {
             const f = b.burn;
             if (!f) continue;
@@ -505,25 +515,25 @@
             f.t -= dt;
             if (!f.rolled && PAD_MARK - f.t >= f.spread) {
                 f.rolled = true;
-                for (const o of padBeside(b)) if (padBurnable(o) && Math.random() < EMB_SPREAD) padIgnite(o);
+                for (const o of padBeside(b)) if (padBurnable(o) && Math.random() < MAGMA_SPREAD) padIgnite(o);
             }
             const k = Math.max(0, f.t / PAD_MARK);
             if (Math.random() < dt * 45) shed(b.x + Math.random() * bw, b.y + Math.random() * bh, Math.max(0.6, k));
             if (f.t <= 0) {
                 b.burn = null;
                 if (b.alive) {
-                    embBlast(b.x + bw / 2, b.y + bh / 2, false);
+                    magmaBlast(b.x + bw / 2, b.y + bh / 2, false);
                     hitBrick(b, b.x + bw / 2, b.y + bh / 2);
                 }
             }
         }
     }
 
-    // ---- FROST's ice -----------------------------------------------------------------
-    // A head FROST has marked that strikes a silver or gold and leaves it
+    // ---- CRYSTALLINE's ice -----------------------------------------------------------------
+    // A head CRYSTALLINE has marked that strikes a silver or gold and leaves it
     // standing leaves it icy. The next head to strike an icy brick, whoever
     // sent it, goes off it at MAX_SPEED for ICE_SECS, turned a little the way
-    // it is spinning -- and the ice is spent, unless that head is FROST's
+    // it is spinning -- and the ice is spent, unless that head is CRYSTALLINE's
     // too and the brick still stands.
     // Any strike on an icy brick shatters its ice (SHATTERED), a LASER bolt's
     // too; only a head is sent off by it.
@@ -539,7 +549,7 @@
             [ball.vx, ball.vy] = [ball.vx * c - ball.vy * sn, ball.vx * sn + ball.vy * c];
             ball.ice = { t: 0 };
             for (let n = 0; n < 12; n++) {
-                padBit(b.x + Math.random() * bw, b.y + Math.random() * bh, Math.random() < 0.5 ? FROST_RIM : FROST_INK,
+                padBit(b.x + Math.random() * bw, b.y + Math.random() * bh, Math.random() < 0.5 ? CRYST_RIM : CRYST_INK,
                        0.6 + Math.random() * 0.4, (Math.random() - 0.5) * 120, (Math.random() - 0.5) * 120, 60,
                        2 + Math.random() * 2, 0.9, 'flake');
             }
@@ -548,7 +558,7 @@
     // ...and one that it did not break
     function labBrickHeld(b) {
         const ball = labHitBy;
-        if (ball && ball.mark && ball.mark.key === 'frost' && b.hp >= 1 && !b.lab) b.icy = true;
+        if (ball && ball.mark && ball.mark.key === 'crystalline' && b.hp >= 1 && !b.lab) b.icy = true;
     }
     function padIceStep(dt) {
         if (!balls) return;
@@ -560,14 +570,14 @@
             const up = Math.min(1, ic.t / ICE_RAMP), down = Math.max(0, (ic.t - ICE_SECS) / (ICE_RAMP * 2));
             b.boost = 1 + (Math.max(1, full) - 1) * up * (1 - Math.min(1, down));
             if (down >= 1) { b.ice = null; b.boost = 1; }
-            else if (Math.random() < dt * 40) padBit(b.x, b.y, FROST_RIM, 0.5, 0, 0, 0, 2, 0.8, 'flake');
+            else if (Math.random() < dt * 40) padBit(b.x, b.y, CRYST_RIM, 0.5, 0, 0, 0, 2, 0.8, 'flake');
         }
     }
 
     // a burning or icy brick's tint, over it where drawBrick has it
     function labPadBurn(b) {
         if (b.icy) {
-            const sp = shapeSprite('iceFrost', FROST_INK, bw, bh, true);
+            const sp = shapeSprite('iceCrystal', CRYST_INK, bw, bh, true);
             if (sp) {
                 ctx.globalAlpha = 0.45 + 0.08 * Math.sin(clock * 2 + b.x);
                 ctx.drawImage(sp, -bw / 2, -bh / 2, bw, bh);
@@ -576,7 +586,7 @@
         }
         const f = b.burn;
         if (!f) return;
-        const sp = shapeSprite('burnEmber', EMB_INK, bw, bh, true);
+        const sp = shapeSprite('burnMagma', MAGMA_INK, bw, bh, true);
         if (!sp) return;
         ctx.globalAlpha = 0.5 + 0.35 * Math.max(0, 1 - f.t / PAD_MARK) + 0.12 * Math.sin(clock * 9 + b.x);
         ctx.drawImage(sp, -bw / 2, -bh / 2, bw, bh);
@@ -606,7 +616,7 @@
     const padTint = (key, ink) => shapeSprite(key, ink, PAD_BAKE, PAD_BAKE / SHAPE_ASPECT, false);
     const padFlat = (key, ink) => shapeSprite(key, ink, PAD_BAKE, PAD_BAKE / SHAPE_ASPECT, true);
 
-    // his outline, in one colour, a little proud of him all round
+    // his outline, in one color, a little proud of him all round
     function padRim(key, ink, grow, alpha) {
         const sp = padFlat(key, ink);
         if (!sp) return;
@@ -623,7 +633,7 @@
         }
     }
 
-    // one of them at any size: his look without his behaviour. `locked` draws
+    // one of them at any size: his look without his behavior. `locked` draws
     // him as the stone he is until you have earned him, and `fade` is for the
     // one nosing in off the wall in the hub, which has not arrived yet.
     function labPadIcon(key, x, y, w, locked, fade) {
@@ -637,7 +647,7 @@
             ctx.drawImage(sprite, x + dx - ww / 2, y + (dy || 0) - hh / 2, ww, hh);
             ctx.globalAlpha = 1;
         };
-        // the game's own colours are asked for here rather than held on the
+        // the game's own colors are asked for here rather than held on the
         // variant: these files are injected at the top of the closure, where
         // every const of the game's is still in its dead zone
         const rim = p.stone ? STONE_RIM : p.rim;
@@ -675,9 +685,8 @@
     LAB_PAD.standard = {
         name: 'MODERN',
         rim: V2_RIM,
-        blurb: 'the paddle you start with, polished',
-        lore: 'Two thousand years after the last Brandon won, someone had to pick up where he left off. ' +
-              'Freshly polished, a little too clean, and very much yours.',
+        blurb: 'starting paddle',
+        lore: 'Reborn and freshly polished.',
         under() { padRim('padRimV', V2_RIM, 2, 0.45); },
         skin(sg, o) {
             const sp = padFlat('padGloss', '#ffffff');
@@ -728,27 +737,25 @@
     // nothing changed about how he plays -- he is MODERN without the polish,
     // there to be carried for old times' sake. The first level you win gives him.
     LAB_PAD.classic = { name: 'CLASSIC', blurb: 'the original · plays the same as MODERN',
-                        lore: 'The one who won, the first time. Worn smooth by the old game, ' +
-                              'and still the only Brandon who remembers what the world was like before.' };
+                        lore: 'Brandon' };
 
-    // GILT: gold leaf over the photograph, with a sweep of light crossing him
+    // GILDED: gold leaf over the photograph, with a sweep of light crossing him
     // every few seconds. Shorter than standard, and everything he catches
     // lasts him longer.
-    LAB_PAD.gilt = {
-        name: 'GILT',
-        ink: GILT_INK, rim: GILT_RIM,
-        blurb: 'shorter · power-ups last longer',
-        lore: 'Leafed in the gold of the harvest {odin} blessed when he walked these fields. ' +
-              'The farmers kept him polished for two thousand years, waiting for hands worth the shine.',
-        len: () => GILT_LEN,
-        caps: () => GILT_CAPS,
-        under() { padRim('padRimG', GILT_RIM, 3, 0.5); },
+    LAB_PAD.gilded = {
+        name: 'GILDED',
+        ink: GILDED_INK, rim: GILDED_RIM,
+        blurb: '15% shorter · power-ups last 60% longer',
+        lore: 'Leafed in the gold of the harvest {odin} blessed when he walked these fields.',
+        len: () => GILDED_LEN,
+        caps: () => GILDED_CAPS,
+        under() { padRim('padRimG', GILDED_RIM, 3, 0.5); },
         skin(sg, o) {
-            padLay(sg, o, padTint('padGilt', GILT_INK), 0.8);
+            padLay(sg, o, padTint('padGilded', GILDED_INK), 0.8);
             const sp = padFlat('padShine', '#fff6d8');
             if (!sp) return;
             const tw = sg.w, th = tw / SHAPE_ASPECT;
-            const t = (clock % GILT_SHINE) / GILT_SHINE;
+            const t = (clock % GILDED_SHINE) / GILDED_SHINE;
             ctx.save();
             ctx.translate(sg.cx, padY() + o * JIG_PADDLE);
             ctx.rotate(segWig(sg.i) + paddle.dip[sg.i]);
@@ -770,9 +777,8 @@
     LAB_PAD.statue = {
         name: 'STATUE',
         stone: true,
-        blurb: 'longest, leans furthest · next to no spin · hits silver and gold twice',
-        lore: 'Carved from the ruins\' own stone in the likeness of {angel}, back when he shone. ' +
-              'He will not bend and he will not spin, but he will lean a long way to catch you.',
+        blurb: '20% longer, leans 30% further · -65% spin, 35% flatter ends · 2x damage to silver & gold',
+        lore: 'Carved larger than life from the ruins\' own stone. Imbued with the power of his likeness.',
         len: () => STAT_LEN,
         angle: () => STAT_ANGLE,
         edge: () => STAT_SPIN,
@@ -792,27 +798,26 @@
         }
     };
 
-    // FROST: cold and bright, throwing sparks as he travels. Spin goes on him
+    // CRYSTALLINE: cold and bright, throwing sparks as he travels. Spin goes on him
     // far more easily, both off his ends and off his own travel -- and spin is
     // the multiplier -- but his flat middle is narrow, so most of him is the
     // curve of his own outline and a return is less of a sure thing.
-    LAB_PAD.frost = {
-        name: 'FROST',
-        ink: FROST_INK, rim: FROST_RIM,
-        blurb: 'easier to add spin · smaller sweet spot · ices what it cannot break',
-        lore: 'Cut from the ice that sealed the city the winter {odin}\'s light went out. ' +
-              'Still cold to hold, and a head slides off him any way you like.',
-        len: () => FROST_LEN,
-        edge: () => FROST_EDGE,
-        swipe: () => FROST_SWIPE,
-        deck: () => FROST_DECK,
-        under() { padRim('padRimF', FROST_RIM, 2.5, 0.55); },
-        skin(sg, o) { padLay(sg, o, padTint('padFrost', FROST_INK), 0.82); },
-        mark: 'frost',
+    LAB_PAD.crystalline = {
+        name: 'CRYSTALLINE',
+        ink: CRYST_INK, rim: CRYST_RIM,
+        blurb: '5% shorter, 40% smaller sweet spot · +50% end spin, +120% moving spin · ices what it cannot break',
+        lore: 'Cut from the ice that sealed the city when {odin} vanished. Forever cold to the touch.',
+        len: () => CRYST_LEN,
+        edge: () => CRYST_EDGE,
+        swipe: () => CRYST_SWIPE,
+        deck: () => CRYST_DECK,
+        under() { padRim('padRimF', CRYST_RIM, 2.5, 0.55); },
+        skin(sg, o) { padLay(sg, o, padTint('padCrystal', CRYST_INK), 0.82); },
+        mark: 'crystalline',
         shedRate: 21,
         // one of his flakes, off a head he has hit
         shed(x, y, k) {
-            padBit(x, y, Math.random() < 0.5 ? FROST_RIM : FROST_INK, 0.9 + Math.random() * 0.6,
+            padBit(x, y, Math.random() < 0.5 ? CRYST_RIM : CRYST_INK, 0.9 + Math.random() * 0.6,
                    (Math.random() - 0.5) * 16, 8 + Math.random() * 12, 8, 1.8 + Math.random() * 1.8,
                    0.85 * k + 0.15, 'flake', 16);
         },
@@ -820,10 +825,10 @@
             // flakes coming off him all the time, drifting down and wandering
             // as they go, the big ones slower and longer, so there is time to
             // see what they are made of...
-            if (Math.random() < dt * FROST_FLAKES) {
-                const p = padSomewhere(0.95), big = Math.random() < FROST_BIG;
+            if (Math.random() < dt * CRYST_FLAKES) {
+                const p = padSomewhere(0.95), big = Math.random() < CRYST_BIG;
                 padBit(p.x, padY() + (Math.random() - 0.5) * padH() * 0.6,
-                       Math.random() < 0.5 ? FROST_RIM : FROST_INK, (big ? 2.2 : 1.4) + Math.random() * 1.2,
+                       Math.random() < 0.5 ? CRYST_RIM : CRYST_INK, (big ? 2.2 : 1.4) + Math.random() * 1.2,
                        (Math.random() - 0.5) * 14, (big ? 4 : 6) + Math.random() * (big ? 8 : 14), big ? 4 : 8,
                        big ? 9 + Math.random() * 4 : 2 + Math.random() * 2.2, 0.85,
                        big ? 'bigflake' : 'flake', 18 + Math.random() * 16);
@@ -834,56 +839,55 @@
                 if (Math.random() > fast * 0.56) continue;
                 const p = padSomewhere(1);
                 padBit(p.x, padY() + (Math.random() - 0.5) * padH(),
-                       FROST_RIM, 0.5 + Math.random() * 0.4, -paddle.vx * 0.12 + (Math.random() - 0.5) * 40,
+                       CRYST_RIM, 0.5 + Math.random() * 0.4, -paddle.vx * 0.12 + (Math.random() - 0.5) * 40,
                        -30 - Math.random() * 40, 40, 1.5 + Math.random() * 2);
             }
         }
     };
 
-    // EMBER: lit from underneath, throwing sparks that rise. Much shorter than
+    // MAGMA: lit from underneath, throwing sparks that rise. Much shorter than
     // standard, but a head off him carries his fire into the wall, and now
     // and then a brick it breaks goes up and the fire runs on from there
-    // (EMBER's wildfire, above) -- or, on a boss, the wound counts double
-    // (EMBER's crit).
-    LAB_PAD.ember = {
-        name: 'EMBER',
-        ink: EMB_INK, rim: EMB_RIM,
-        blurb: 'much shorter · sets the wall alight · now and then burns a boss for double',
-        lore: 'Forged in the fire of {surtr}\'s footsteps, where the mountain still remembers the ' +
-              'weight of him. He has never quite stopped burning.',
-        len: () => EMB_LEN,
+    // (MAGMA's wildfire, above) -- or, on a boss, the wound counts double
+    // (MAGMA's crit).
+    LAB_PAD.magma = {
+        name: 'MAGMA',
+        ink: MAGMA_INK, rim: MAGMA_RIM,
+        blurb: '30% shorter · 30% of breaks ignite neighbors · 15% chance of 2x boss damage',
+        lore: 'Forged in the fire of {surtr}\'s footsteps, he still remembers his name.',
+        len: () => MAGMA_LEN,
         under() {
             const r = padW() * 0.95;
             const g = ctx.createRadialGradient(paddle.x, padY(), 8, paddle.x, padY(), r);
-            g.addColorStop(0, EMB_INK);
+            g.addColorStop(0, MAGMA_INK);
             g.addColorStop(1, 'rgba(0,0,0,0)');
             // a steady light with a slow breath in it: nothing here flashes
-            ctx.globalAlpha = padK * (EMB_GLOW * (0.85 + 0.15 * Math.sin(clock * 1.7)));
+            ctx.globalAlpha = padK * (MAGMA_GLOW * (0.85 + 0.15 * Math.sin(clock * 1.7)));
             ctx.fillStyle = g;
             ctx.beginPath();
             ctx.arc(paddle.x, padY(), r, 0, Math.PI * 2);
             ctx.fill();
             ctx.globalAlpha = padK;
-            padRim('padRimE', EMB_RIM, 2.5, 0.5);
+            padRim('padRimE', MAGMA_RIM, 2.5, 0.5);
         },
-        skin(sg, o) { padLay(sg, o, padTint('padEmber', EMB_INK), 0.72); },
-        mark: 'ember',
+        skin(sg, o) { padLay(sg, o, padTint('padMagma', MAGMA_INK), 0.72); },
+        mark: 'magma',
         shedRate: 20,
         // one of his sparks, off a head he has hit
         shed(x, y, k) {
-            padBit(x, y, Math.random() < 0.4 ? EMB_RIM : EMB_INK, 0.5 + Math.random() * 0.5,
+            padBit(x, y, Math.random() < 0.4 ? MAGMA_RIM : MAGMA_INK, 0.5 + Math.random() * 0.5,
                    (Math.random() - 0.5) * 30, -30 - Math.random() * 40, -20, 1.8 + Math.random() * 2,
                    0.95 * k + 0.05, 'glow', 20);
         },
         step(dt) {
             // sparks lifting off him with light round them, weaving as they
             // climb, and left behind when he moves
-            let n = EMB_SPARKS * dt;
+            let n = MAGMA_SPARKS * dt;
             while (n > 0) {
                 if (Math.random() < n) {
                     const p = padSomewhere(0.9);
                     padBit(p.x, padY() - padH() * (0.1 + Math.random() * 0.3),
-                           Math.random() < 0.4 ? EMB_RIM : EMB_INK, 0.8 + Math.random() * 0.9,
+                           Math.random() < 0.4 ? MAGMA_RIM : MAGMA_INK, 0.8 + Math.random() * 0.9,
                            (Math.random() - 0.5) * 30 - paddle.vx * 0.08, -40 - Math.random() * 70, -30,
                            2 + Math.random() * 2.5, 0.95, 'glow', 20 + Math.random() * 30);
                 }
@@ -891,23 +895,22 @@
             }
             // a thin smoke of his heads, drifting up slower and greyer,
             // turning over as it goes
-            if (Math.random() < dt * EMB_ASH) {
+            if (Math.random() < dt * MAGMA_ASH) {
                 const p = padSomewhere(0.8);
                 padBit(p.x, padY() - padH() * 0.2, '#8a7f76', 1.8 + Math.random(),
-                       (Math.random() - 0.5) * 20, -18 - Math.random() * 20, -4, EMB_ASH_S * (0.8 + 0.4 * Math.random()), EMB_ASH_A, 'head');
+                       (Math.random() - 0.5) * 20, -18 - Math.random() * 20, -4, MAGMA_ASH_S * (0.8 + 0.4 * Math.random()), MAGMA_ASH_A, 'head');
             }
         }
     };
 
-    // THE PAIR: two of him, always, in DOUBLE's own colour, each one shorter
+    // THE PAIR: two of him, always, in DOUBLE's own color, each one shorter
     // than standard. Wider reach than anybody and a hole down the middle of
     // it -- and DOUBLE, when it drops, makes four of him, smaller again.
     LAB_PAD.pair = {
         name: 'THE PAIR',
         ink: PAIR_INK, twin: true,
-        blurb: 'two of him · a hole down the middle',
-        lore: 'Two Brandons who swore to hold the castle gate together, and in all the years since ' +
-              'have never once agreed on which of them is on the left.',
+        blurb: 'two of him, each 38% shorter · a hole down the middle · four of him under DOUBLE',
+        lore: 'Soldiers. Brandons. How much longer?',
         len: () => PAIR_LEN,
         split: () => true,
         quad: () => PAIR_QUAD,
@@ -944,7 +947,7 @@
     // PORTAL on all the time (ptOn in powers.js). MULTI pays for his in
     // length; PRINCE and CHELL play as MODERN does.
 
-    // Him in two colours, cut where the photograph is: his shirt and head
+    // Him in two colors, cut where the photograph is: his shirt and head
     // run from PAD_BELT to his right end and take `top`, his jeans take
     // `legs`, and `boots` puts his boots, left of PAD_BOOTS, back in `top`.
     const PAD_BELT  = [0.5, 0.6];     // across him, where his jeans give way to his shirt
@@ -975,17 +978,16 @@
     // MULTI: his photograph as it is, over two more prints of him out of
     // register, gold up and left and blue down and right, so there is more
     // than one of him without anything washed over him (a gold wash read as
-    // GILT). Every MULTI_POP two heads fly up off him on the fan MULTI sends
+    // GILDED). Every MULTI_POP two heads fly up off him on the fan MULTI sends
     // new heads out on, so he says what he is for. `ink` is only for his card.
     LAB_PAD.multi = {
         name: 'MULTI',
         ink: MULTI_INK,
-        prints: [[MULTI_INK, -1, -0.5], [MULTI_BLUE, 1, 0.5]],     // colour, and which way it slips
+        prints: [[MULTI_INK, -1, -0.5], [MULTI_BLUE, 1, 0.5]],     // color, and which way it slips
         favour: 'M',
         len: () => MULTI_LEN,
-        blurb: 'shorter · half of power-ups are MULTI',
-        lore: 'Nobody agrees on how many of him there were. ' +
-              'Everybody agrees it was more than one.',
+        blurb: '20% shorter · 50% of power-ups are MULTI',
+        lore: 'Countless soldiers. Countless Brandons. Forever.',
         popT: 0,
         under() {
             ctx.globalCompositeOperation = 'lighter';
@@ -1026,9 +1028,8 @@
         favour: 'K',
         dress: () => padDress('padPrince', PRINCE_TOP, PRINCE_LEGS, false),
         dressA: 0.85,
-        blurb: 'half of power-ups are KATAMARI, where they can be',
-        lore: 'The smallest Brandon there ever was, sent down by an enormous father ' +
-              'to roll up whatever had been left lying around. He is rolling still.',
+        blurb: '50% of power-ups are KATAMARI, where they can be',
+        lore: 'The smallest Brandon there ever was, he rolls up whatever has been left lying around.',
         under() { padRim('padRimP', PRINCE_RIM, 2.5, 0.5); },
         skin(sg, o) { padLay(sg, o, this.dress(), this.dressA); }
     };
@@ -1041,9 +1042,8 @@
         portal: true,
         dress: () => padDress('padChell', CHELL_TOP, CHELL_LEGS, true),
         dressA: 0.8,
-        blurb: 'PORTAL, always',
-        lore: 'Woke in a room with no way out but through the walls, and has never taken ' +
-              'a wall seriously since. Has never said a word about it, either.',
+        blurb: 'PORTAL always on',
+        lore: 'Never speaks.',
         under() { padRim('padRimC', CHELL_RIM, 2.5, 0.5); },
         skin(sg, o) { padLay(sg, o, this.dress(), this.dressA); }
     };
@@ -1236,7 +1236,7 @@
     }
 
     // ---- BLUR's look: Sonic -------------------------------------------------------
-    // Him, dressed as classic Sonic. Most of it is the photograph coloured
+    // Him, dressed as classic Sonic. Most of it is the photograph colored
     // where it already is something: blue all over, peach where he is skin
     // and white on his hands, his boot red with a white strap and a white
     // cuff. On his face, a white patch over both eyes and a peach muzzle,
@@ -1262,8 +1262,8 @@
     // Baked once, the first time he is drawn with both images in. Should it
     // fail anyway, he is drawn in BLUR_INK as before rather than not at all.
     const BLUR_SHOW = 0.75, BLUR_MUZZLE_SHOW = 0.6;   // how much of his own eyes and face come back through
-    const BLUR_WASH = 0.97;                           // how thickly the colours are laid over the photograph
-    const BLUR_SOFT = 1.5;                            // px of feather between one colour and the next
+    const BLUR_WASH = 0.97;                           // how thickly the colors are laid over the photograph
+    const BLUR_SOFT = 1.5;                            // px of feather between one color and the next
     // the quills: each one's base, from and to, then where its point is, in
     // degrees round the middle of his head (0 straight out his end, + down),
     // and how far past his outline the point reaches, in BLUR_QUILL px. Back
@@ -1279,7 +1279,7 @@
     const BLUR_HEAD_R = [[-150, 50], [-135, 54], [-120, 59], [-105, 66], [-90, 71], [-75, 74], [-60, 75], [-45, 74],
                          [-30, 68], [-15, 61], [0, 55], [15, 50], [30, 47], [45, 47], [60, 52], [75, 62]];
 
-    // the parts, in the order blurDress colours them
+    // the parts, in the order blurDress colors them
     const BL_WHITE = 4, BL_EYE = 5, BL_FACE = 6;
     const BLUR_PARTS = 'data:image/png;base64,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';
     const blurPartsImg = Object.assign(new Image(), { src: BLUR_PARTS });
@@ -1294,8 +1294,8 @@
     }
 
     // Each part as its own wash, laid over the photograph. The strap and
-    // cuff are over dark denim, where a wash alone came out grey, so they
-    // take a solid white over it; the eyes and face take their colour with
+    // cuff are over dark denim, where a wash alone came out gray, so they
+    // take a solid white over it; the eyes and face take their color with
     // his own features multiplied back through.
     function blurDress() {
         const raw = shapeSprite('padBlurRaw', null, PAD_BAKE, PAD_BAKE / SHAPE_ASPECT, false);
@@ -1424,9 +1424,8 @@
         swipe: () => BLUR_SPIN_X,
         dress: () => blurSonic() ? blurLook.dress : null,
         dressA: 1,
-        blurb: 'shorter · triple spin · he never stops spinning',
-        lore: 'The fastest Brandon there ever was, or so he says, and nobody has ever ' +
-              'managed to get him to stand still long enough to argue.',
+        blurb: '25% shorter, +200% spin · never stops spinning · knocks heads upward',
+        lore: 'The fastest Brandon.',
         under() {
             const look = blurSonic();
             const sp = look ? look.dress : padTint('padBlurTrail', BLUR_INK);

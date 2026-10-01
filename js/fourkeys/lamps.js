@@ -8,7 +8,7 @@
     // its wall -- any gap there was a place a head rattled for seconds. The
     // leaning one is the fire's face: a head that comes down on it is sent
     // in toward him, and one that comes up across it at a slant is turned up
-    // and in. He cannot be touched while either of them is stone. The boss burns the way the EMBER
+    // and in. He cannot be touched while either of them is stone. The boss burns the way the MAGMA
     // paddle does, and a hit on a cold lamp steals some of his fire: a stream
     // of it pulled off him and across to the lamp, the way the original's
     // second wind drank the life out of you, and the lamp catches as it
@@ -319,7 +319,7 @@
             for (let i = 0; i < 26; i++) {
                 lamp.sparks.push({ x: m.tx + (Math.random() - 0.5) * r * 2, y: py, vx: (Math.random() - 0.5) * 260,
                                    vy: -80 - Math.random() * 220, t: 0, life: 0.5 + Math.random() * 0.6,
-                                   s: 2 + Math.random() * 3, ink: Math.random() < 0.4 ? EMB_RIM : EMB_INK, ph: Math.random() * 6.28 });
+                                   s: 2 + Math.random() * 3, ink: Math.random() < 0.4 ? MAGMA_RIM : MAGMA_INK, ph: Math.random() * 6.28 });
             }
             lamp.met = null;
             return;
@@ -379,7 +379,7 @@
             // the lamp's fire running back into him
             for (sw.acc = (sw.acc || 0) + dt * LAMP_MOTES; sw.acc >= 1; sw.acc--) {
                 lamp.motes.push({ t: 0, l: sw.l, rev: true, sway: (Math.random() - 0.5) * 40, dx: 0, dy: 0,
-                                  ink: Math.random() < 0.4 ? EMB_RIM : EMB_INK });
+                                  ink: Math.random() < 0.4 ? MAGMA_RIM : MAGMA_INK });
             }
             if (sw.t >= LAMP_SWOOP_DRINK) {
                 if (sw.l.on > 0) { sw.l.on = 0; sw.l.lit = 99; lamp.drunk++; }
@@ -416,7 +416,7 @@
         lamp.pyreT = ascendT;
         const lw = LAMP_W, lh = lw / SHAPE_ASPECT;
         const raw = shapeSprite('lampRaw', null, lw, lh, false);
-        const ember = padTint('padEmber', EMB_INK);
+        const ember = padTint('padMagma', MAGMA_INK);
         if (!raw) return;
         const hw = lampHalfW(), top = lampHalfH() + lh / 2;
         for (const l of lamp.lamps) {
@@ -459,7 +459,7 @@
             if (burn < 1 && Math.random() < dt * LAMP_SPARKS * 3 * blaze) {
                 lamp.sparks.push({ x: x + (Math.random() - 0.5) * hw * 1.6, y: line, vx: (Math.random() - 0.5) * 50,
                                    vy: -60 - Math.random() * 110, t: 0, life: 0.8 + Math.random() * 0.8,
-                                   s: 2 + Math.random() * 2.5, ink: Math.random() < 0.4 ? EMB_RIM : EMB_INK, ph: Math.random() * 6.28 });
+                                   s: 2 + Math.random() * 2.5, ink: Math.random() < 0.4 ? MAGMA_RIM : MAGMA_INK, ph: Math.random() * 6.28 });
             }
         }
         for (const p of lamp.sparks) {
@@ -477,12 +477,12 @@
     function lampDrawMeteor() {
         if (lampLater(lampDrawMeteor)) return;
         const m = lamp.met, w = lampMetW(), hh = w * (BALL_RY / BALL_RX);
-        const tint = headSprite2('flat', EMB_INK);
+        const tint = headSprite2('flat', MAGMA_INK);
         const head = (x, y, sc, rot) => {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
             ctx.globalAlpha = 0.7 * sc;
-            ctx.drawImage(padGlow(EMB_INK), x - w * 1.3 * sc, y - w * 1.3 * sc, w * 2.6 * sc, w * 2.6 * sc);
+            ctx.drawImage(padGlow(MAGMA_INK), x - w * 1.3 * sc, y - w * 1.3 * sc, w * 2.6 * sc, w * 2.6 * sc);
             ctx.restore();
             ctx.save();
             ctx.translate(x, y);
@@ -500,13 +500,13 @@
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
             const g = ctx.createLinearGradient(0, py + padH(), 0, py - 170);
-            g.addColorStop(0, EMB_RIM);
+            g.addColorStop(0, MAGMA_RIM);
             g.addColorStop(1, 'rgba(226,104,58,0)');
             ctx.globalAlpha = 0.12 + 0.3 * e;
             ctx.fillStyle = g;
             ctx.fillRect(m.tx - cw / 2, py - 170, cw, 170 + padH());
             ctx.globalAlpha = 0.35 + 0.4 * e;
-            ctx.fillStyle = EMB_INK;
+            ctx.fillStyle = MAGMA_INK;
             ctx.beginPath();
             ctx.ellipse(m.tx, py + padH() / 2, cw * (0.5 + 0.2 * e), 9, 0, 0, Math.PI * 2);
             ctx.fill();
@@ -521,7 +521,7 @@
                     ctx.save();
                     ctx.globalCompositeOperation = 'lighter';
                     ctx.globalAlpha = a;
-                    ctx.drawImage(padGlow(EMB_RIM), p.x - w, p.y - w, w * 2, w * 2);
+                    ctx.drawImage(padGlow(MAGMA_RIM), p.x - w, p.y - w, w * 2, w * 2);
                     ctx.restore();
                 }
                 m.t = k;
@@ -553,7 +553,7 @@
     // LAMP_FOOT either side, the inner one leaned LAMP_LEAN and the one by the
     // wall LAMP_LEAN_OUT, and the one across their feet, its inner end raised
     // LAMP_BASE_TILT. Each is { x, y, a, w }, a brandon of length w
-    // centred on (x, y) and turned a -- what contact() and the drawing share.
+    // centerd on (x, y) and turned a -- what contact() and the drawing share.
     function lampLogs(cx, cy) {
         const L = LAMP_W, t = L / SHAPE_ASPECT;
         const foot = cy + L / 2 * Math.cos(LAMP_LEAN), wall = cx < LW / 2 ? -1 : 1;
@@ -618,7 +618,7 @@
             for (l.acc += dt * LAMP_MOTES; l.acc >= 1; l.acc--) {
                 lamp.motes.push({ t: 0, l, sway: (Math.random() - 0.5) * 120,
                                   dx: (Math.random() - 0.5) * LAMP_BOSS_W * 0.8, dy: (Math.random() - 0.5) * h * 0.5,
-                                  ink: Math.random() < 0.4 ? EMB_RIM : EMB_INK });
+                                  ink: Math.random() < 0.4 ? MAGMA_RIM : MAGMA_INK });
             }
         }
         lamp.motes = lamp.motes.filter(m => (m.t += dt) < LAMP_MOTE_SECS);
@@ -652,7 +652,7 @@
     }
 
     // Sparks off whatever is burning: each lit lamp as much as it is lit, and
-    // him as much as his fire is in him. EMBER's own sparks, kept here rather
+    // him as much as his fire is in him. MAGMA's own sparks, kept here rather
     // than in the paddle's list so a fight's worth of them never crowds his out.
     function lampSparkStep(b, dt) {
         const burn = (k, x, y, rx, ry) => {
@@ -660,7 +660,7 @@
             lamp.sparks.push({ x: x + (Math.random() - 0.5) * rx * 2, y: y + (Math.random() - 0.5) * ry * 2,
                                vx: (Math.random() - 0.5) * 30, vy: -40 - Math.random() * 70, t: 0,
                                life: 0.7 + Math.random() * 0.8, s: 2 + Math.random() * 2.5,
-                               ink: Math.random() < 0.4 ? EMB_RIM : EMB_INK, ph: Math.random() * 6.28 });
+                               ink: Math.random() < 0.4 ? MAGMA_RIM : MAGMA_INK, ph: Math.random() * 6.28 });
         };
         if (phase !== 'entrance') {
             for (const l of lamp.lamps) burn(lampWarm(l), l.u * LW, l.y, lampHalfW() * 0.7, lampHalfH() * 0.9);
@@ -705,16 +705,16 @@
         lamp.emit = self.dark && self.dark() ? [] : null;
     }
 
-    // EMBER's light under a body: a steady glow with a slow breath in it
+    // MAGMA's light under a body: a steady glow with a slow breath in it
     function lampGlow(x, y, r, k) {
         if (lampLater(() => lampGlow(x, y, r, k))) return;
         // a gradient throws on a position that is not a number, and a throw
         // in draw() stops the loop for good
         if (k <= 0.002 || !Number.isFinite(x + y + r)) return;
         const g = ctx.createRadialGradient(x, y, 8, x, y, r);
-        g.addColorStop(0, EMB_INK);
+        g.addColorStop(0, MAGMA_INK);
         g.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.globalAlpha = EMB_GLOW * k * (0.85 + 0.15 * Math.sin(clock * 1.7));
+        ctx.globalAlpha = MAGMA_GLOW * k * (0.85 + 0.15 * Math.sin(clock * 1.7));
         ctx.fillStyle = g;
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
@@ -733,7 +733,7 @@
         ctx.restore();
     }
 
-    // A flame stood on (x, y): a teardrop of EMBER's colours, `k` of its
+    // A flame stood on (x, y): a teardrop of MAGMA's colors, `k` of its
     // full height, flickering in its shape rather than in its brightness.
     // `lit` 0 draws the dim wick a cold lamp keeps; `sc` scales the lot.
     function lampFlame(x, y, k, lit, sc = 1) {
@@ -748,7 +748,7 @@
         ctx.globalAlpha = lit ? 0.9 : 0.35;
         const g = ctx.createRadialGradient(x, y - tall * 0.3, 1, x, y - tall * 0.3, tall * 0.7);
         g.addColorStop(0, '#fff1d6');
-        g.addColorStop(0.35, EMB_RIM);
+        g.addColorStop(0.35, MAGMA_RIM);
         g.addColorStop(1, 'rgba(226,104,58,0)');
         ctx.fillStyle = g;
         ctx.beginPath();
@@ -762,7 +762,7 @@
         const lw = LAMP_W, lh = lw / SHAPE_ASPECT;
         const raw = shapeSprite('lampRaw', null, lw, lh, false);
         const stone = shapeSprite('lampStone', STONE, lw, lh, 'statue');
-        const ember = padTint('padEmber', EMB_INK);
+        const ember = padTint('padMagma', MAGMA_INK);
         if (!raw || !stone) return;
         for (const l of lamp.lamps) {
             const x = l.u * LW, warm = lampWarm(l), logs = lampLogs(x, l.y);
@@ -808,7 +808,7 @@
             ctx.scale(lamp.fx * (1 + 0.06 * rear), 1 + 0.12 * rear);
             ctx.translate(-lamp.x, -lamp.y);
             ctx.drawImage(body, lamp.x - LAMP_BOSS_W / 2, lamp.y - h / 2, LAMP_BOSS_W, h);
-            lampLay(padTint('lampBossEmber', EMB_INK), lamp.x, lamp.y, LAMP_BOSS_W, h, 0, 0.72 * lamp.heat);
+            lampLay(padTint('lampBossEmber', MAGMA_INK), lamp.x, lamp.y, LAMP_BOSS_W, h, 0, 0.72 * lamp.heat);
             if (b.flash > 0) {
                 ctx.globalAlpha = Math.min(1, b.flash) * 0.7;
                 ctx.drawImage(shapeSprite('flash', '#f2efe9', BOSS_W0, BOSS_H, true),

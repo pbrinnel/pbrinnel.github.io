@@ -5,7 +5,7 @@
 // Cloudflare dashboard.
 //
 //   GET  /  -> { boards: { FARM: [...], ... }, total: [...] }
-//   POST /  -> { stage: "FARM", ini: "ABC", score: 1234, pad: "ember" }, returns the same
+//   POST /  -> { stage: "FARM", ini: "ABC", score: 1234, pad: "magma" }, returns the same
 //
 // A stage's row keeps the paddle the run was played with, when it is one of
 // PADS, and the page shows it beside the score. TOTAL adds up runs that may
@@ -39,9 +39,10 @@ const BESTS = 'bests';
 // here and in the page's BOARD_IDS.
 const STAGES = ['FARM', 'RUINS', 'CITY', 'VOLCANO', 'CASTLE', 'VOID', 'BOSS RUSH'];
 const IN_TOTAL = ['FARM', 'RUINS', 'CITY', 'VOLCANO', 'CASTLE', 'VOID'];
-// The paddles' keys, as the save file pins them (_ref/BRANDON-SAVE.md). One the
+// The paddles' ids, the keys of LAB_PAD in js/fourkeys/paddles.js. These are not
+// the save file's tokens, which stay pinned when a paddle is renamed. One the
 // page sends that is not here is left off the row rather than refused.
-const PADS = ['standard', 'classic', 'gilt', 'statue', 'frost', 'ember', 'pair', 'multi', 'prince', 'chell', 'blur'];
+const PADS = ['standard', 'classic', 'gilded', 'statue', 'crystalline', 'magma', 'pair', 'multi', 'prince', 'chell', 'blur'];
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',

@@ -24,14 +24,14 @@
     // middle, high and small. Nearer is lower and bigger, so the FARM is a step
     // away and the CASTLE is a walk. No two of them share any part of a lane,
     // so there is always a straight walk up to the one you want.
-    // Each one owns a colour, and its key is a head in that colour -- five keys
+    // Each one owns a color, and its key is a head in that color -- five keys
     // that can be told apart at a glance, and a town where every building reads
     // as its own place.
     const MENU_LEVELS = [
-        { n: 1, name: 'FARM', ink: '#7fa85a', cap: 'gable', pad: 'gilt' },
+        { n: 1, name: 'FARM', ink: '#7fa85a', cap: 'gable', pad: 'gilded' },
         { n: 2, name: 'RUINS', ink: '#b0a894', cap: 'broken', pad: 'statue' },
-        { n: 3, name: 'CITY', ink: '#6f9bc4', cap: 'skyline', pad: 'frost' },
-        { n: 4, name: 'VOLCANO', ink: '#d2622f', cap: 'cone', pad: 'ember' }
+        { n: 3, name: 'CITY', ink: '#6f9bc4', cap: 'skyline', pad: 'crystalline' },
+        { n: 4, name: 'VOLCANO', ink: '#d2622f', cap: 'cone', pad: 'magma' }
     ];
     const MENU_LAST = { n: 5, name: 'CASTLE', ink: '#9a7fc9', cap: 'crown', pad: 'pair' };
     // The finale, which is not there at all until the CASTLE has been won
@@ -41,7 +41,7 @@
     // is no building at all but a hole turning in the town (menuDrawVoid).
     const MENU_VOID = { n: 6, name: 'VOID', ink: '#dcd6ee', after: 5 };
     // Every memory, by the year it is set in: the game starts in year 0. Each
-    // is named on the timeline by its year and its title, in its own colour.
+    // is named on the timeline by its year and its title, in its own color.
     // Year 0 itself -- the town, which is where it takes you back to
     // (menuReturn) -- is always there; the rest are earned in MENU_MEM_ORDER.
     const MENU_MEMS = [
@@ -137,7 +137,7 @@
         if (menu) return menu;
         let saved = null;
         try { saved = JSON.parse(localStorage.getItem(MENU_KEY) || 'null'); } catch (e) { saved = null; }
-        menu = { keys: (saved && saved.keys) || {}, pads: (saved && saved.pads) || { standard: true },
+        menu = { keys: (saved && saved.keys) || {}, pads: padsRenamed((saved && saved.pads) || { standard: true }),
                  best: (saved && saved.best) || {}, seen: (saved && saved.seen) || {},
                  mems: (saved && saved.mems) || {}, memFrom: (saved && saved.memFrom) || {},
                  slain: (saved && saved.slain) || 0,
@@ -148,6 +148,7 @@
                  shows: [], showT: 0, a0: 1, padNext: null };
         let kept = null;
         try { kept = localStorage.getItem(MENU_PAD_KEY); } catch (e) { /* a private window */ }
+        kept = padNow(kept);
         // The first load is engine.js's own setup (debugBuild), before its
         // lets exist, and putting a paddle in hand writes some of them: so
         // it waits for the script under way to finish.
@@ -315,7 +316,7 @@
         return null;
     }
 
-    // the colour of the level a boss is fought in, for his entrance (drawShade)
+    // the color of the level a boss is fought in, for his entrance (drawShade)
     function menuInkOf(who) {
         const n = MENU_BOSSES[who] ? LAB.ev(MENU_BOSSES[who]) : null;
         const l = MENU_ALL.find(o => o.n === n);
@@ -332,7 +333,7 @@
     //
     // The five stand 26px apart all the way across, between the two gates at
     // 0-24 and 776-800. Evenly spaced is the whole of the arrangement: the
-    // CASTLE used to sit in a 6px slot between its neighbours, which read as
+    // CASTLE used to sit in a 6px slot between its neighbors, which read as
     // the middle of the town being crowded rather than as the far end of it.
     // Buying that room cost every building some width, and the far pair lost
     // most -- which is what being further away should look like anyway.
@@ -1351,7 +1352,7 @@
     // ---- the picture ----------------------------------------------------------------
     // The town is drawn the way the characters are: in the game's two pictures,
     // his body and his head, and little else. Every building is a plain dark
-    // shape with a rim of its colour and ONE thing made of him that is its own
+    // shape with a rim of its color and ONE thing made of him that is its own
     // (M_HERALDS), big enough to read as him. Nothing is ever darkened toward
     // black to say it is asleep: it goes toward slate (M_SLATE) instead.
     function menuPanel(x, y, w, h, on, ink) {
@@ -1367,11 +1368,11 @@
     // The town's contrast (CRISP): its shapes a deep dark on a dark ground, so
     // they stand on it rather than sinking into a haze; a rim at rest only
     // M_RIM_REST of the way to the dark, and words at rest bright enough to read.
-    const M_DARK = '#14110e';        // what a colour dims toward
+    const M_DARK = '#14110e';        // what a color dims toward
     const M_FILL = '#090806';        // every building's, sign's and gate's own shape
     const M_RIM_REST = 0.3;          // how far a rim is toward the dark while he is elsewhere
     const M_WORD_REST = '#c3bfb8';   // a name or a best while he is elsewhere
-    const M_SLATE = '#6b665d';       // where a colour goes while he is elsewhere
+    const M_SLATE = '#6b665d';       // where a color goes while he is elsewhere
     const M_EMPTY = '#3a362f';       // a key not won yet
     const M_RISE_IN = 3, M_RISE_OUT = 2;   // per second a building lights as he lines up, and goes back
     // Each building keeps a clock of its own (c.stir) that everything moving
@@ -1397,8 +1398,8 @@
     // town's arrival (menuArriveCard) still fades everything in together.
     function menuAlpha(a) { ctx.globalAlpha = menu.a0 * a; }
 
-    // him lying down, baked once: 'wash' is the bricks' own (lifted grey with
-    // the colour over it, so his shape still shows), 'flat' one solid colour
+    // him lying down, baked once: 'wash' is the bricks' own (lifted gray with
+    // the color over it, so his shape still shows), 'flat' one solid color
     function menuBody(color, mode) {
         const k = 'mBody' + mode + color;
         if (spriteCache.has(k)) return spriteCache.get(k);
@@ -1531,12 +1532,12 @@
         if (c.level.cap) menuCapPath(c);
     }
     const menuTopOf = c => c.y - c.h / 2 - (c.level.cap ? ROOF_H : 0);
-    // slate while he is elsewhere, its own colour as he lines up
+    // slate while he is elsewhere, its own color as he lines up
     const menuAround = st => st.covered ? M_EMPTY : menuMix(st.ink, M_SLATE, 0.45 * (1 - st.rise));
     // stood in the doorway: how full it is, 0..1
     function menuDoorK(c) { return menu.into && menu.into.card === c ? Math.min(1, menu.into.t / DOOR_HOLD) : 0; }
 
-    // The building itself: its shape, dark, a rim of its colour that lights
+    // The building itself: its shape, dark, a rim of its color that lights
     // as he lines up, and the doorway filling from the floor while he stands
     // in it. `shape` is a smaller card to draw in its place (the boards' plate).
     function menuSilhouette(c, st, shape = c) {
@@ -1573,7 +1574,7 @@
 
     // ---- the keys: a sigil for each boss ----------------------------------------------
     // Each level's key is its boss, drawn in a few of him and a head, in shades
-    // of the level's own colour. Not won yet it is the same sigil in slate, so
+    // of the level's own color. Not won yet it is the same sigil in slate, so
     // a door says what is behind it from the start. On the CASTLE the four sit
     // smaller, in a row.
     const M_FIRE = '#e0702f';
@@ -1584,7 +1585,7 @@
                          [0.68, 0.72], [0.8, 0.8], [1.05, 0.82]];
     // The IDOL as the fight has him: his head under a coat of him laid in
     // courses like stone, coarser than the fight's so it reads at a key's
-    // size, with one chunk knocked off the edge and his face grey under it.
+    // size, with one chunk knocked off the edge and his face gray under it.
     function menuIdolHead() {
         const k = 'mIdol';
         if (spriteCache.has(k)) return spriteCache.get(k);
@@ -1847,7 +1848,7 @@
             }
         });
         // each level's foundation: a circle on the ground, flatter further back,
-        // lit in its colour as he lines up with it
+        // lit in its color as he lines up with it
         for (const c of menu.cards) {
             if (c.level.key || !menuStands(c)) continue;
             const near = menuNear(c);
@@ -2088,7 +2089,7 @@
     // they are signs rather than buildings -- a board hung on two short chains
     // of little heads, from a post and arm on the big two and a bracket on the
     // small two -- drawn in thin lines that sit in slate while he is elsewhere
-    // and take their colour as he lines up, swaying a little more when lit.
+    // and take their color as he lines up, swaying a little more when lit.
     // Each board is cut to what it is for: MEMORIES a scroll, the LEADERBOARD
     // a plaque with a crest its wings rise out of, SETTINGS a tag, BOSS RUSH an
     // arrow pointing into the town, BRANDONS a plain board with every paddle you
@@ -2232,7 +2233,7 @@
         M_COVERS[l.n](c, st, Math.min(1, w.t / M_COVER_WIPE));
     }
 
-    // the building under its cover: its shape, dark, a faint rim of its colour
+    // the building under its cover: its shape, dark, a faint rim of its color
     function menuCovered(c) {
         menuOutline(c);
         ctx.fillStyle = M_FILL; ctx.fill();
@@ -2297,7 +2298,7 @@
 
     // CITY: closed off. Hazard tape crossed over it, striped barriers along the
     // front with a lamp on each, and a cone at each corner -- the tape and the
-    // planks him lying down in hazard colours, the cones him stood up.
+    // planks him lying down in hazard colors, the cones him stood up.
     // Cleared, it all drops away.
     const M_HAZARD = ['#e0702f', '#efe9dd'];
     function menuCoverBarriers(c, st, k) {
@@ -2465,7 +2466,7 @@
     // A gate on each wall, standing where he stands, naming the paddle it
     // leads to: a tab pulled in from off the screen, rounded on the side facing
     // the town and running off the edge on the other, drawn like the buildings
-    // -- a flat dark shape with a rim of that paddle's colour, slate while he is
+    // -- a flat dark shape with a rim of that paddle's color, slate while he is
     // out in the town and lighting as he walks toward the wall. The name reads
     // along it, and the note beside it names the paddle while he stands in
     // front of it; a chevron at the top points the way out. With only the one paddle there is nowhere
@@ -2567,14 +2568,14 @@
     // town, one at a time, each held until you tap: the level's memory first,
     // the first time it is beaten, named on a MEMORY UNLOCKED card before it
     // plays, then every paddle earned -- his name, and him, big, on a field
-    // of his own colour, with what he does and a few lines of where he is from. Only a win shows them (menuBeat,
+    // of his own color, with what he does and a few lines of where he is from. Only a win shows them (menuBeat,
     // which the lab's "count it beaten" buttons also call); the debug menu's
     // toggles and "unlock everything" do not -- except BRANDONS UNLOCKED,
     // which a debug toggle that puts the sign up shows too (menuAddPad).
     const UNLOCK_WAIT = 0.6;         // seconds up before a tap takes it away
     const UNLOCK_IN = 0.45;          // him rising into place
     const UNLOCK_W = 500;            // how long he is drawn
-    const UNLOCK_BACK = 0.22;        // his colour, this much of it over black, behind him
+    const UNLOCK_BACK = 0.22;        // his color, this much of it over black, behind him
 
     // up in the town, or over the VOID's fight while its memory plays
     function menuUnlockUp() { return !!(menu && menu.shows.length && (menuUp() || menu.fightShow)); }
@@ -2631,9 +2632,9 @@
         return true;
     }
 
-    // A paddle's lore, wrapped to w and centred on x: {odin}, {surtr} and
+    // A paddle's lore, wrapped to w and centerd on x: {odin}, {surtr} and
     // {angel} print as "Brandon" in that Brandon's face, the rest in the
-    // plain voice, all of it in the plain voice's colour (see LAB_PAD). The
+    // plain voice, all of it in the plain voice's color (see LAB_PAD). The
     // faces are memory.js's; the boss lab has them too, but asks first.
     const UNLOCK_LORE_W = 560;
     const UNLOCK_LORE_PX = 13;
@@ -2683,7 +2684,7 @@
     }
 
     // MEMORY UNLOCKED, the paddle card's twin: the memory's title big in its
-    // own colour, then a tap and it plays. The title comes the way something
+    // own color, then a tap and it plays. The title comes the way something
     // half-remembered does -- out of a haze, soft copies of it drifting in
     // round where it will be and settling into one over MEM_HAZE, wavering a
     // little as it does. Copies laid round it rather than a blur filter,
@@ -3042,9 +3043,10 @@
     // (menuSaveText warns about anything had that has none).
     const M_SAVE_STAGES = { 1: 'FARM', 2: 'RUINS', 3: 'CITY', 4: 'VOLCANO', 5: 'CASTLE', 6: 'VOID',
                             rush: 'BOSS RUSH' };
-    const M_SAVE_PADS = { gilt: 'GILT', statue: 'STATUE', frost: 'FROST', ember: 'EMBER', pair: 'PAIR',
+    // Some keep the token of the name they had when they shipped.
+    const M_SAVE_PADS = { gilded: 'GILT', statue: 'STATUE', crystalline: 'FROST', magma: 'EMBER', pair: 'PAIR',
                           classic: 'CLASSIC', multi: 'MULTI', prince: 'PRINCE', chell: 'CHELL',
-                          blur: 'BLUE BLUR' };      // his old name: shown as BLUR, saved as this
+                          blur: 'BLUE BLUR' };
     const M_SAVE_MEMS = { exhortation: 'EXHORTATION', reckoning: 'RECKONING', cycle: 'CYCLE',
                           counsel: 'COUNSEL', fall: 'FALL', consolidation: 'CONSOLIDATION' };
     // each kind of line, and which of `menu`'s tables it fills from which tokens

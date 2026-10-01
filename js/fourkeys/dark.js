@@ -3,12 +3,12 @@
     // ---- the VOLCANO's dark room (LAMPS) ----------------------------------------
     // The fight is in the dark: only what burns gives light. Whatever the light
     // doesn't reach is a flat silhouette with an ember rim, the memory scenes'
-    // look, and the light turns it back into full colour. No darkening layer
+    // look, and the light turns it back into full color. No darkening layer
     // is ever laid over a photo: each point is either the photo or the flat
     // silhouette, and DARK_STYLE is only how the two meet --
     //   0  a soft crossfade
     //   1  a ragged edge, drifting up like heat, each point one or the other
-    //   2  the same with a band of ember where colour meets dark, like paper
+    //   2  the same with a band of ember where color meets dark, like paper
     //      catching
     // What burns is drawn over all of it as it is (lampLater in lamps.js), and
     // so is what has to stay readable: his health, capsules, anything said.
@@ -27,7 +27,7 @@
     let DARK_BOSS_R = 300;    // px round him he lights, with all his fire in him; less with less
     let DARK_SELF   = 3;      // how much his own fire lights his body: at 1 / DARK_SELF of it or more, all of him
     let DARK_MET_R  = 150;    // px the meteor, its mark and the burning ground light
-    let DARK_PAD    = 0;      // 1: the paddle and head give light whatever the paddle (EMBER always does)
+    let DARK_PAD    = 0;      // 1: the paddle and head give light whatever the paddle (MAGMA always does)
     let DARK_PAD_R  = 150;
     let DARK_NOISE  = 0.45;   // how ragged the dissolving edge is
     let DARK_EDGE   = 0.12;   // ...and how wide its burning band
@@ -36,7 +36,7 @@
     LAB_KNOBS.push('DARK_ON', 'DARK_STYLE', 'DARK_SIL', 'DARK_RIM', 'DARK_RIM_PX', 'DARK_ROOM', 'DARK_FIRE_R', 'DARK_COLD_R',
                    'DARK_BOSS_R', 'DARK_SELF', 'DARK_MET_R', 'DARK_PAD', 'DARK_PAD_R', 'DARK_NOISE', 'DARK_EDGE', 'DARK_RISE', 'DARK_CELL');
 
-    const DARK_AT = 0.45;     // how much light turns a point to colour
+    const DARK_AT = 0.45;     // how much light turns a point to color
     const DARK_PHASES = ['entrance', 'ready', 'play', 'cleared', 'ascend'];
 
     let darkBuf = null;
@@ -108,7 +108,7 @@
             if (m.st === 'fall') { const p = lampMetAt(m); out.push({ x: p.x, y: p.y, r: DARK_MET_R }); }
         }
         for (const p of lamp.burns) out.push({ x: p.x, y: padY(), r: DARK_MET_R * (1 - p.t / LAMP_BURN_SECS) });
-        if (DARK_PAD || LAB.pad === 'ember') {
+        if (DARK_PAD || LAB.pad === 'magma') {
             for (const sg of segs()) out.push({ x: sg.cx, y: padY(), r: DARK_PAD_R });
             for (const b of balls) out.push({ x: b.x, y: b.y, r: DARK_PAD_R * 0.6 });
         }
@@ -116,7 +116,7 @@
     }
 
     // The light over the field, cell by cell, as two masks: where it is
-    // colour, and where it is the burning edge. Each light only visits the
+    // color, and where it is the burning edge. Each light only visits the
     // cells it reaches, and the noise is only read where it could tip a cell.
     function darkMasks(lights) {
         const d = darkBufs(), { cell, gw, gh, L } = d;
@@ -196,9 +196,9 @@
         const rg = darkClear(rim);
         rg.drawImage(canvas, 0, 0);
         rg.globalCompositeOperation = 'source-in';
-        rg.fillStyle = EMB_RIM;
+        rg.fillStyle = MAGMA_RIM;
         rg.fillRect(0, 0, W, H);
-        // colour only where the light reaches
+        // color only where the light reaches
         const lg = darkClear(lit);
         lg.drawImage(canvas, 0, 0);
         lg.globalCompositeOperation = 'destination-in';

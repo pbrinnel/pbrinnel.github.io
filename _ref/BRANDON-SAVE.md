@@ -83,7 +83,10 @@ paddle can't break old saves.
 |---|---|---|
 | stage | `FARM` `RUINS` `CITY` `VOLCANO` `CASTLE` `VOID` | 1 2 3 4 5 6 |
 | stage | `BOSS RUSH` | `rush` |
-| paddle | `GILT` `STATUE` `FROST` `EMBER` `PAIR` `CLASSIC` `MULTI` `PRINCE` `CHELL` | same id, lowercase |
+| paddle | `STATUE` `PAIR` `CLASSIC` `MULTI` `PRINCE` `CHELL` | same id, lowercase |
+| paddle | `GILT` (shown as GILDED since 1 Oct 2026) | `gilded` |
+| paddle | `FROST` (shown as CRYSTALLINE since 1 Oct 2026) | `crystalline` |
+| paddle | `EMBER` (shown as MAGMA since 1 Oct 2026) | `magma` |
 | paddle | `BLUE BLUR` (shown as BLUR since 1 Oct 2026) | `blur` |
 | memory | `EXHORTATION` `RECKONING` `CYCLE` `COUNSEL` `FALL` `CONSOLIDATION` | same id, lowercase |
 
@@ -117,7 +120,7 @@ These rules are why a save written in any version of the game loads in any other
 1. **Anything a save doesn't mention, the player doesn't have.** When an older file lacks
    something added later, that thing starts locked, unvisited or unscored. A file with
    only the first and last lines loads as a fresh game.
-2. **The reader skips lines it doesn't recognise.** This covers an unknown word, an
+2. **The reader skips lines it doesn't recognize.** This covers an unknown word, an
    unknown token, and a `BEST` line whose score isn't a whole number above 0. A file
    from a newer game still loads everything this game understands. A file is never
    rejected for its contents, only for a bad first line, another game's id, a bad seal,
@@ -163,3 +166,8 @@ the IMPORT screen shows a summary and needs its own press to go ahead.
   on Paul's say-so: the only saves holding `SALVATION` were his own, and he deleted them.
   A save that still says `SALVATION` loads without that memory (rule 2). `SALVATION` is
   retired; never reuse it.
+- **v1** (1 Oct 2026): GILT, FROST and EMBER were renamed GILDED, CRYSTALLINE and MAGMA,
+  with internal ids `gilded`, `crystalline` and `magma`. Under rule 7, the tokens `GILT`,
+  `FROST` and `EMBER` stay and point at the new ids, so the file format is unchanged.
+  Progress kept in localStorage and leaderboard rows can still hold the old ids. The page
+  maps them on load (`PAD_WAS` in `paddles.js`).

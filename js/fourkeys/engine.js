@@ -62,7 +62,7 @@
     // the ball passing through his chest
     // BIG and the boss climb are both 1.5x, and they take the larger rather
     // than multiplying: 2.25x brandon plus DOUBLE asks for more span than the
-    // field has, and the clamp would answer by pinning him at dead centre,
+    // field has, and the clamp would answer by pinning him at dead center,
     // unable to move, during the tightest part of the fight. so BIG keeps
     // winning for most of the climb and simply stops compounding at the end.
     const padW = () => Math.max(paddle.w, PADDLE_W * (1 + CLIMB_GROW * climb)) * lifeScale() * labPadW();
@@ -242,7 +242,7 @@
         { key: 'sniper',   label: 'SNIPER',          pts: 200 },
         // every gold brick broken, born gold or turned by MIDAS
         { key: 'golden',   label: 'GOLDEN',          pts: 150, many: true },
-        // every one of FROST's icy bricks struck again, broken or not
+        // every one of CRYSTALLINE's icy bricks struck again, broken or not
         { key: 'shattered', label: 'SHATTERED',      pts: 25, many: true },
         // not one capsule caught all round
         { key: 'powerless', label: 'NO POWERUPS',    pts: 1000 },
@@ -298,8 +298,8 @@
     // he arrives high as well as wide, so his top is cut off too and you only
     // ever see a slice of him. he settles down to BOSS_Y on the same curve he
     // shrinks on, which turns the early hits into a slow reveal.
-    const BOSS_Y0     = 30;     // centre on arrival
-    const BOSS_Y      = 150;    // centre once he is down to size
+    const BOSS_Y0     = 30;     // center on arrival
+    const BOSS_Y      = 150;    // center once he is down to size
     const BOSS_STILL  = 0.18;   // fraction of damage before he bothers to move
     const ASCEND_W    = 760;    // the size you inherit -- imposing, but on screen
     const BOSS_SWEEP0 = 0.35;   // rad/s once he gets going
@@ -345,7 +345,7 @@
     // From a third of his health down he flushes red, in a slow swell that
     // deepens the closer he gets to finished -- and it ebbs again if his second
     // wind takes him back above a third. Well under three swells a second, and
-    // colour laid over him, never a darkening of his face.
+    // color laid over him, never a darkening of his face.
     const RAGE_AT    = 1 / 3;
     const RAGE_A     = 0.45;      // how red he gets at the very end
     const RAGE_HZ    = 0.9;       // swells a second
@@ -460,7 +460,7 @@
     const PH_ALPHA  = 0.45;
     // ...and what is washed over them so they read as HIS, not as a stray ball.
     // They stay see-through -- that is still the tell for which head matters --
-    // but a colour makes it unmistakable that the thing coming at you was
+    // but a color makes it unmistakable that the thing coming at you was
     // thrown rather than hit.
     //
     // There is no black option here, for two reasons. On a black field it is
@@ -469,7 +469,7 @@
     // that black was being asked to do, and it reads on a dark background.
     // Sickly green, chosen off a sheet of five. Not red: a red head reads as
     // the real ball's own skin tone at a glance, which is the one confusion
-    // this colour exists to prevent.
+    // this color exists to prevent.
     const PH_LOOK = { color: '#6faf3a', wash: 0.55, glow: 0.34 };
 
     const PH_START  = 0.2;      // damage before he starts throwing them: 80% of him left
@@ -536,8 +536,8 @@
     const ENTER_WAIT = 0.7;
     const ENTER_SECS = 2.6;
     // He comes on as a silhouette against a hall light, the court memory's
-    // (memCourt), in his level's colour (drawShade). Once he is in place it
-    // lifts over SHADE_SECS and leaves him in colour for the serve. Lucifer's
+    // (memCourt), in his level's color (drawShade). Once he is in place it
+    // lifts over SHADE_SECS and leaves him in color for the serve. Lucifer's
     // later parts are the same fight, not a new entrance, so they never get it.
     const SHADE_SECS = 1.4;
     const SHADE_IN = 1.2;       // seconds the hall light takes to come up, from the entrance's start
@@ -556,7 +556,7 @@
     // will -- same grid, same drift, same order, boot to face. That is the
     // whole cycle in one gesture: by the time it is happening to you, you have
     // already watched it once and done it on purpose.
-    const A_DIE    = 1.1;   // a beat and the colour going, then he lets go
+    const A_DIE    = 1.1;   // a beat and the color going, then he lets go
     const A_DIE_T  = 3.4;   // how long the peeling takes end to end
     const A_RISE   = 4.2;   // you start climbing while the last of him falls
     const A_RISE_T = 4.4;   // ...and how long the climb takes
@@ -602,12 +602,12 @@
     const G_OVERHEAL = 4;         // health per unspent life
     const G_GROW     = 26;        // ...and how much bigger each one makes you
 
-    // The handover. The takeover ends with you grey and dead still -- the
-    // colour has been draining out of you since you started climbing, and the
-    // throne does not bob. This mode had you in full colour and already
+    // The handover. The takeover ends with you gray and dead still -- the
+    // color has been draining out of you since you started climbing, and the
+    // throne does not bob. This mode had you in full color and already
     // breathing on its very first frame, which swapped one picture for a
     // different one between two frames of the same man. Everything that
-    // differs between the two now arrives over this: the colour comes back
+    // differs between the two now arrives over this: the color comes back
     // into you, the bob winds up from nothing, and the bar fades in. It is
     // short -- you have just sat down, you have not changed seats.
     const G_IN       = 1.4;
@@ -643,7 +643,7 @@
     // paddle was when you walked into the boss fight, and he is the untinted
     // photograph -- the same as you. For a few seconds there are two brandons
     // on the screen and no way to tell which one answers to you except by
-    // moving. Then you find out, and the colours start arriving.
+    // moving. Then you find out, and the colors start arriving.
     const G_INTRO_W  = PADDLE_W;
     const G_INTRO_RISE = 2.4;     // he walks on slowly, and from further down
     // ...and then he has you to himself for a while. Whatever the batch clock
@@ -659,11 +659,11 @@
     const G_DOUBLE   = 26;
     const G_GAP0     = 3, G_GAP1 = 10;
     // How much killing one takes. A hit knocks it one rung DOWN the ladder, so
-    // the colour it is wearing is always how many more you still owe it: gold
-    // for three and silver for two, the colours the bricks wear for the hits
+    // the color it is wearing is always how many more you still owe it: gold
+    // for three and silver for two, the colors the bricks wear for the hits
     // they have left -- see shipSprite, which takes theirs.
     //
-    // The last rung is its OWN colour, drawn from the wall you spent four
+    // The last rung is its OWN color, drawn from the wall you spent four
     // stages knocking down. An army of identical slate was a crowd; an army in
     // red, orange, green and yellow is the whole game coming back for you.
     const G_TOUGH    = 85;        // seconds until the mix is at its meanest
@@ -800,7 +800,7 @@
     // He is marked by NOT being marked -- the one man nobody dyed, wearing the
     // photograph while the rest of the floor wears the wall. See drawShips for
     // why that beats hanging anything on him.
-    const G_MARK_IN   = 1.0;      // seconds for the colour to drain out of him
+    const G_MARK_IN   = 1.0;      // seconds for the color to drain out of him
     const G_MARK_MUL  = 5;        // what he pays, against an ordinary kill
     // ...and what taking him does to the men around him. The blast is the
     // whole reason the dig pays: it opens the one rank you cannot otherwise
@@ -816,7 +816,7 @@
     // which is the tension the mode was built on.
     //
     // The shot leaves from his CENTRE, so the only thing that matters is that
-    // his centre can reach every place a ship can stand. See G_REACH.
+    // his center can reach every place a ship can stand. See G_REACH.
 
     // his size is eased rather than stepped -- a hit taking 160px off him in
     // one frame reads as a glitch, not as damage
@@ -905,11 +905,11 @@
     const F_ABSORB   = 1.35;      // one life, corner to chest
     const F_ABSORB_G = 0.45;      // ...and the pause before the next sets off
     // Where his chest actually is, as a fraction of the silhouette box from
-    // its centre. He lies on the diagonal with his head up and to the right,
+    // its center. He lies on the diagonal with his head up and to the right,
     // so the CENTRE of his box -- which is where these were flying -- is his
     // hips. Read off the mask: the head is rows 0-1 at columns 17-23, so his
     // chest is around column 18, row 2.5, which is up and to the right of
-    // centre by these much.
+    // center by these much.
     const G_CHEST_X  = 0.25;
     const G_CHEST_Y  = -0.22;
 
@@ -947,7 +947,7 @@
     };
     const TIMED = ['B', 'D', 'S', 'R', 'P', 'W', 'E', 'K', 'L', 'T', 'I', 'C', 'A', 'U'];     // M and WILD are not
     const CAP_KEYS = Object.keys(CAPS);
-    // the four brick colours, for the gauntlet's army to wear
+    // the four brick colors, for the gauntlet's army to wear
     const TIER_KEYS = ['R', 'O', 'G', 'Y'];
 
     // Two of them simply do not work against one enormous target. PIERCE would
@@ -1182,7 +1182,7 @@
             ini: String((r && r.ini) || '???').toUpperCase()
                      .replace(/[^A-Z]/g, '').slice(0, 3).padEnd(3, '?'),
             score: Math.max(0, Math.min(cap || SCORE_CAP, parseInt(r && r.score, 10) || 0)),
-            pad: r && typeof r.pad === 'string' && Object.hasOwn(LAB_PAD, r.pad) ? r.pad : null
+            pad: r && typeof r.pad === 'string' && Object.hasOwn(LAB_PAD, padNow(r.pad)) ? padNow(r.pad) : null
         })).sort((a, b) => b.score - a.score).slice(0, TOP_N);
     }
 
@@ -1295,7 +1295,7 @@
         return t * t * (3 - 2 * t);
     }
     // Four of him under BIG would want more than the field, and the clamp
-    // would pin him dead centre, so each of the four gives up length until the
+    // would pin him dead center, so each of the four gives up length until the
     // row fits in SPAN4_MAX of it.
     const SPAN4_MAX = 0.84;
     function segW() {
@@ -1912,7 +1912,7 @@
     // Requesting fullscreen is the ONLY lever for this. There is no separate
     // "hide the bar" control, and the old scrollTo(0,1) trick that used to
     // collapse Safari's has not worked since iOS 8 -- since then the bar only
-    // minimises for a real scroll gesture, which here is the swipe that steers
+    // minimizes for a real scroll gesture, which here is the swipe that steers
     // brandon. So: no button, no prompt, nothing to read. The tap that dismisses
     // the splash is the tap that starts the game, and it asks for fullscreen on
     // the way through.
@@ -2599,7 +2599,7 @@
             const done = b.hp <= 1e-6;
             // Where the BALL struck, not the corner of his box. Every other
             // brick hands award() its own top edge, which is fine when the
-            // brick is 90px across -- but he arrives 1060 wide with his centre
+            // brick is 90px across -- but he arrives 1060 wide with his center
             // at BOSS_Y0, so his box top is about 160px ABOVE the ceiling and
             // the number was being drawn off the screen for most of the fight.
             // The contact point is the one place on him you are certainly
@@ -2623,7 +2623,7 @@
         }
 
         if (b.kind === 'S' || b.kind === 'A') {
-            labBrickStruck(b);           // FROST's ice, if it was icy
+            labBrickStruck(b);           // CRYSTALLINE's ice, if it was icy
             // a head off STATUE lands more than one hit (labPadHeavy); a bolt does not
             const blow = labHitBy ? labPadHeavy() : 1;
             if (blow > 1) labPadThud(b);
@@ -3034,7 +3034,7 @@
     }
 
     // ---- collision against his shape ----------------------------------------
-    // Everything happens in the brick's OWN frame: spin the ball's centre back
+    // Everything happens in the brick's OWN frame: spin the ball's center back
     // by the brick's wiggle, test the mask, then spin the resulting normal
     // forward again. The ball is tested as its real ellipse, not a circle, so
     // how far it reaches depends on which way the head is facing.
@@ -3051,7 +3051,7 @@
             by = ccy + dx * s + dy * c;
         }
 
-        // a cell counts as touched if its centre falls inside the ball's
+        // a cell counts as touched if its center falls inside the ball's
         // ellipse grown by half a cell
         const pad = Math.max(cw, chh) * 0.5;
         const rx = bRX() + pad, ry = bRY() + pad;
@@ -3154,7 +3154,7 @@
     // lab's four sliders and carry its signs, so a value tuned there can be
     // copied here as it reads.
     const DECK_SPAN = 64;      // % of his width the flat part covers
-    const DECK_AT   = -14;     // % of his width, the deck's centre off his own
+    const DECK_AT   = -14;     // % of his width, the deck's center off his own
     const DECK_LIFT = -4.5;    // px at PADDLE_W: + floats it clear, - lets him through
     const DECK_RAMP = 1;       // 45 degrees, where the deck runs back down to him
 
@@ -3263,12 +3263,12 @@
 
     // How far past his end a head really is, and where it will be by the time
     // it has fallen to him. Measured from its NEAR EDGE, not its middle: a head
-    // is bRX() * 2 across, so one whose centre is a few pixels past his end
+    // is bRX() * 2 across, so one whose center is a few pixels past his end
     // still overlaps that end and would land on his top untouched. Measuring
     // from the middle called that out of reach, he leaned, and the lean took
     // the top out from under a head that was about to land on it. And measured
     // where it will have fallen to rather than where it is now, because a head
-    // out past him but travelling back inward is over him by the time it
+    // out past him but traveling back inward is over him by the time it
     // arrives. Both readings are what dipFor then aims at.
     function dipGap(b, sg, lip) {
         const t = b.vy > 0 ? Math.max(0, (lip - (b.y + extY(b))) / b.vy) : 0;
@@ -3379,7 +3379,7 @@
             const glances = labGlances(br, hit);
             if (glances) rings.push({ x: hit.cx, y: hit.cy, t: 1 });
             else kick(br, -nx, -ny, 1);   // shoved away from where the ball struck
-            labHitBy = b;                  // EMBER's fire goes where his heads do
+            labHitBy = b;                  // MAGMA's fire goes where his heads do
             hitBrick(br, hit.cx, hit.cy);
             labHitBy = null;
             // it is the bounce that pays, not the wound: a glance off stone
@@ -3479,7 +3479,7 @@
 
                 paddle.jt[sg.i] = 1;        // recoil, tilting toward the end he took it on
                 paddle.tilt[sg.i] = off;
-                labPadHit(b);               // FROST and EMBER leave their mark on it
+                labPadHit(b);               // CRYSTALLINE and MAGMA leave their mark on it
 
                 combo = 0;                  // the run ends when it comes home
                 b.pierced.clear();          // ...and so does what it has been through
@@ -3800,7 +3800,7 @@
     const gRamp = (a, b) => a + (b - a) * gPressure();
 
     // how far the world has come back to you since the handover. eased, so the
-    // colour and the breath arrive rather than switch on.
+    // color and the breath arrive rather than switch on.
     function gInK() { return ease01(gIn / G_IN); }
 
     function kingW() {
@@ -3914,7 +3914,7 @@
             riseT: intro ? G_INTRO_RISE : G_RISE,
             riseFrom,
             // the introduction is the untouched photograph, same as you. every
-            // one after it wears a brick's colour on its last rung.
+            // one after it wears a brick's color on its last rung.
             tint: intro ? null : TIER_KEYS[(Math.random() * TIER_KEYS.length) | 0],
             intro: !!intro,
             // each on its own phase, its own reach and its own tempo, so the
@@ -3951,7 +3951,7 @@
 
         // Once in fifty he serves you something useful by mistake. Same throw,
         // same arc, and it is coming at you exactly like everything else -- the
-        // only tell is that it is the wrong colour and has a letter on it, so
+        // only tell is that it is the wrong color and has a letter on it, so
         // for a beat you cannot be sure whether to get under it or out of its
         // way. Slower than a head, because a free thing you have no chance of
         // catching is not a gift, it is a taunt.
@@ -4089,7 +4089,7 @@
     }
 
     // ---- your reply ----------------------------------------------------------
-    // How far in his centre may come. Never tighter than the outermost place a
+    // How far in his center may come. Never tighter than the outermost place a
     // ship can stand, so that every one of them is under him at some point on
     // his travel -- at full size that means hanging a long way off the edge of
     // the world, which is the price of shooting from the middle of a body that
@@ -4144,7 +4144,7 @@
         // won anything; it is just the caption this game puts under whoever
         // is on top.
         banner = 'BRANDON WINS';
-        // under the spot you fell from, in any arrival's colour -- see drawVictor
+        // under the spot you fell from, in any arrival's color -- see drawVictor
         victor = { x: king.x, tint: TIER_KEYS[(Math.random() * TIER_KEYS.length) | 0] };
         gShake = 1;
         kingFall = shatter(king.x, G_Y, kingShown, F_SPAN);
@@ -4349,7 +4349,7 @@
 
         // He may hang off the edges, exactly as the boss did on arrival. At 760
         // across an 800 field there is no honest way to keep him inside it, and
-        // clamping on his half-width would pin him dead centre and unable to
+        // clamping on his half-width would pin him dead center and unable to
         // move during the very stretch that is supposed to feel hopeless.
         // Hopeless is not the same as frozen.
         const edge = kingEdge();
@@ -4498,7 +4498,7 @@
     const SS = 3;
     const spriteCache = new Map();
 
-    // t > 0 lifts a colour toward the page cream, t < 0 sinks it toward black
+    // t > 0 lifts a color toward the page cream, t < 0 sinks it toward black
     function shade(hex, t) {
         const n = parseInt(hex.slice(1), 16);
         const to = t > 0 ? [242, 239, 233] : [0, 0, 0];
@@ -4526,7 +4526,7 @@
     // one tinted brandon at a given size, cached. `flat` true gives a solid
     // silhouette (the white hit flash); 'statue' gives stone with a whisper of
     // carved relief, which is how the unbreakable ones read as a different
-    // material rather than just a different colour.
+    // material rather than just a different color.
     function shapeSprite(key, color, w, h, flat) {
         const k = key + '@' + Math.round(w);
         if (spriteCache.has(k)) return spriteCache.get(k);
@@ -4555,8 +4555,8 @@
             }
         } else {
             // he is nearly all black shirt and dark denim, so multiplying a
-            // colour through him just makes mud. lift him to near-white first,
-            // then wash the colour over only his own pixels.
+            // color through him just makes mud. lift him to near-white first,
+            // then wash the color over only his own pixels.
             placeShape(g, w, h, true);
             g.globalCompositeOperation = 'source-atop';
             g.globalAlpha = 0.8;
@@ -4610,7 +4610,7 @@
     }
 
     // The boss is drawn from the untinted photograph -- every brick so far has
-    // been a coloured copy of him, so the real one showing up in full colour
+    // been a colored copy of him, so the real one showing up in full color
     // reads as the genuine article. He is cached once at full size and scaled
     // down as he shrinks, rather than re-baking a sprite at every width.
     const BOSS_H = BOSS_W0 / SHAPE_ASPECT;
@@ -4660,7 +4660,7 @@
     // The boss as a silhouette, `gone` of the way to lifted. Nothing is on
     // the field under him when he is drawn, so what is on it is him: laid
     // flat in ink over only what is there, his edge laid under it, and the
-    // court memory's hall light under everything, in the colour of the level
+    // court memory's hall light under everything, in the color of the level
     // he is fought in (the town draws each level in it). Lucifer's is the
     // court's own ember, the memory exactly: it is his hall. It all lifts the
     // way Lucifer's silhouette does as he changes, eased, all of him at once.
@@ -4724,11 +4724,11 @@
             ctx.drawImage(shapeSprite('flash', '#f2efe9', bw, bh, true), -bw / 2, -bh / 2, bw, bh);
             ctx.globalAlpha = 1;
         }
-        labPadBurn(b);               // EMBER's fire in it
+        labPadBurn(b);               // MAGMA's fire in it
         ctx.restore();
     }
 
-    // the capsule is a small brandon in the effect's colour, with the letter
+    // the capsule is a small brandon in the effect's color, with the letter
     // that matches the name it will shout
     function drawCapsule() {
         if (!capsule) return;
@@ -4751,7 +4751,7 @@
         return v * SWELL_PEAK;
     }
 
-    // the colour bleeding out of the world as he takes the throne -- it starts
+    // the color bleeding out of the world as he takes the throne -- it starts
     // when he does, not when the old one began falling
     function drain() {
         return Math.min(1, Math.max(0, (ascendT - A_RISE) / DRAIN_SECS));
@@ -4784,7 +4784,7 @@
             ctx.save();
             ctx.translate(LW / 2 + (paddle.x - LW / 2) * (1 - k), y);
             ctx.rotate(PADDLE_LEVEL);
-            // the colour drains out of him as he rises -- one slow transition,
+            // the color drains out of him as he rises -- one slow transition,
             // which is where the black and white comes from now
             ctx.filter = 'grayscale(' + drain().toFixed(3) + ')';
             if (ready(paddleImg)) {
@@ -4843,7 +4843,7 @@
             labPadSkin(sg, o);
 
             // the phantom hanging off him, washed over the photograph. the
-            // tint sprite is the lift-then-colour one the capsules use, so he
+            // tint sprite is the lift-then-color one the capsules use, so he
             // goes PALE and cold rather than dark -- and it is baked once at a
             // fixed width and scaled, because padW() slides continuously during
             // the boss climb and a sprite per pixel of it would be hundreds of
@@ -4915,9 +4915,9 @@
         ctx.globalAlpha = 1;
     }
 
-    // a head with his colour washed through it. Cached per look, and built the
+    // a head with his color washed through it. Cached per look, and built the
     // same way a tinted brandon is: lift the pixels first, then wash, because
-    // multiplying a colour straight through a dark photograph only makes mud.
+    // multiplying a color straight through a dark photograph only makes mud.
     function headSprite(key, color, wash) {
         if (spriteCache.has(key)) return spriteCache.get(key);
         if (!ready(ballImg)) return null;
@@ -4946,11 +4946,11 @@
 
     // his phantoms, drawn under the real ball so the one that matters stays
     // the most solid thing on screen. The transparency is still the tell for
-    // WHICH head to track; the colour is the tell for where it came from.
+    // WHICH head to track; the color is the tell for where it came from.
     function drawPhantoms() {
         if (!phantoms.length) return;
         for (const p of phantoms) {
-            // a boss may colour his own (p.look), so you can see which of his
+            // a boss may color his own (p.look), so you can see which of his
             // heads threw it; the rest are PH_LOOK's
             const look = p.look || PH_LOOK;
             const sprite = look.color ? phantomSprite(look) : null;
@@ -5316,9 +5316,9 @@
         ctx.restore();
     }
 
-    // him, level and already grey, so the pieces need no per-shard filter --
+    // him, level and already gray, so the pieces need no per-shard filter --
     // two hundred of those a frame is not a thing to ask a canvas for, and the
-    // colour has finished leaving him before the first one lets go anyway
+    // color has finished leaving him before the first one lets go anyway
     function greySprite() {
         if (spriteCache.has('kingGrey')) return spriteCache.get('kingGrey');
         if (!ready(paddleImg)) return null;
@@ -5377,17 +5377,17 @@
             ctx.globalAlpha = s.alive ? 1 : t;
             ctx.drawImage(sprite, s.x - w / 2, s.y - h / 2, w, h);
             // The bounty is the one nobody dyed. Every other man on the floor
-            // is wearing a colour off the wall you spent four stages knocking
+            // is wearing a color off the wall you spent four stages knocking
             // down; he is the photograph, which is the same thing the very
             // first arrival is and the same thing you are.
             //
-            // It arrives as the colour DRAINING OUT of him over G_MARK_IN,
+            // It arrives as the color DRAINING OUT of him over G_MARK_IN,
             // which is the move this game already makes when somebody stops
             // being part of the crowd -- it is what happened to you on the way
             // up to the throne. Nothing is added: no glow, no ring, no marker
             // hung off him. The floor is busy enough without one more thing
-            // drawn on top of it, and a man who is simply not the colour of
-            // his neighbours is found faster than a man with a badge.
+            // drawn on top of it, and a man who is simply not the color of
+            // his neighbors is found faster than a man with a badge.
             //
             // Only while there is a game to spend it on -- once you are
             // falling, the man who was worth going after is not.
@@ -5400,7 +5400,7 @@
                 }
             }
             // the same white knock the bricks give: "I hurt it", distinct from
-            // the colour change that says "and there is still some left"
+            // the color change that says "and there is still some left"
             if (s.flash > 0) {
                 const f = shapeSprite('gflash', '#f2efe9', 300,
                                       300 / SHAPE_ASPECT, true);
@@ -5416,7 +5416,7 @@
     // His health bar, the same one he had, in the same place, and the overheal
     // makes it LONGER. The span his own G_HP occupies is fixed off his size and
     // never moves; every life absorbed hangs its G_OVERHEAL off the end of that
-    // span in its own colour, so the meter grows out past where full used to be
+    // span in its own color, so the meter grows out past where full used to be
     // instead of the orange giving up room to the yellow. The whole point of
     // having saved a spare is that you end up with more bar than he ever had,
     // and at a full pair it very nearly spans the field.
@@ -5492,8 +5492,8 @@
         ctx.globalAlpha = 1;
     }
 
-    // You. The colour goes, then you sag, then you let go a piece at a time.
-    // No black wash over any of it -- the screen going grey IS the death, and a
+    // You. The color goes, then you sag, then you let go a piece at a time.
+    // No black wash over any of it -- the screen going gray IS the death, and a
     // photograph of a man is not a thing to fade to black.
     function drawFall() {
         const wilt = Math.max(0, Math.min(1, (fallT - F_HOLD) / (F_WILT - F_HOLD)));
@@ -5533,7 +5533,7 @@
         }
         // he arrives in black and white -- the exact state you were in with
         // BRANDON WINS across your chest. the picture of a new king in this
-        // game has never once been in colour.
+        // game has never once been in color.
         drawFigure(x, y, w, t, 1, 0);
     }
 
@@ -5561,7 +5561,7 @@
             // was. these are the heads you used to be the one throwing.
             for (const b of gBul) gHead(null, b.x, b.y, G_BUL_R, b.angle, 0.95 * live);
 
-            // yours: his colour, because it is his weapon
+            // yours: his color, because it is his weapon
             const look = PH_LOOK;
             const ph = look.color ? phantomSprite(look) : null;
             for (const t of gThrow) {
@@ -5587,7 +5587,7 @@
             // bar over him does not
             const o = king.jt > 0 ? wobble(king.jt) * JIG_BRICK : 0;
             const kx = king.x + king.jnx * o, ky = kingY() + king.jny * o;
-            // the takeover left you grey; the colour comes back over G_IN
+            // the takeover left you gray; the color comes back over G_IN
             drawFigure(kx, ky, kingShown, a, 1 - gInK(), 0);
             if (king.flash > 0) {
                 const w = kingShown, h = kingH();
@@ -5678,7 +5678,7 @@
             text(multText(gMult), 15 * u + sw + 10 * u, 27 * u, 15 * u, '#c9a94e');
         }
 
-        // What you are carrying, in the same words and colours the stages
+        // What you are carrying, in the same words and colors the stages
         // print their capsules in. The stages keep that row along the bottom,
         // under the paddle; up here you ARE the top of the screen, so it sits
         // under the score.
@@ -5845,7 +5845,7 @@
         // sideways every time a capsule lands or lapses. The transient ones can
         // do the moving; they are transient.
         //
-        // The whole row goes out with the colour over the takeover -- see
+        // The whole row goes out with the color over the takeover -- see
         // drain(). These are readings off a fight that is over, and a gold
         // x17.5 BONUS blinking off at the handover is a cut in the middle of
         // what is otherwise one long fade.
