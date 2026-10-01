@@ -21,8 +21,8 @@
     // swelling under him and a mark on your line that follows you, and it
     // comes down where the mark stopped. Under it and you are SLUGGISH, and
     // where it lands the ground flares for LAMP_BURN_SECS -- a splash, not a
-    // hazard left lying about: dodge the shot and it is gone a moment later,
-    // unless you step back into it. Its clock runs as fast as the fire left in him, but
+    // hazard left lying about: it only hurts as it lands, so dodge the shot
+    // and you can walk straight back through the fire. Its clock runs as fast as the fire left in him, but
     // never slower than LAMP_MET_KEEP of its pace while any lamp is cold:
     // every LAMP_MET_EVERY with all of them cold, and not at all with all of
     // them lit -- lighting lamps disarms him as well as opening him, without
@@ -85,7 +85,6 @@
     let LAMP_MET_SIZE  = 1.7; // ...and how big it is, of a head
     let LAMP_BURN_SECS = 0.5; // seconds the ground burns where it lands
     let LAMP_BURN_W    = 130; // ...px wide
-    let LAMP_BURN_TICK = 1;   // ...and seconds between helpings of SLUGGISH while you stand in it
     let LAMP_SWOOP_AT  = 0.75; // share of his health under which he swoops on his lamps
     let LAMP_SWOOP_EVERY = 12; // seconds between swoops
     let LAMP_SWOOP_DIVE  = 1.5; // seconds down to the lamp, which is the time to knock him away
@@ -99,7 +98,7 @@
                    'LAMP_BOSS_W', 'LAMP_BOSS_Y', 'LAMP_SINK', 'LAMP_SWEEP', 'LAMP_OVER', 'LAMP_SHAKE_PX', 'LAMP_SHAKE_SECS', 'LAMP_CLIMB', 'LAMP_BOB', 'LAMP_BOB_RATE',
                    'LAMP_SPARKS', 'LAMP_COOL', 'LAMP_STEAL', 'LAMP_MOTES', 'LAMP_MOTE_SECS',
                    'LAMP_MET_EVERY', 'LAMP_MET_KEEP', 'LAMP_MET_WIND', 'LAMP_MET_LOCK', 'LAMP_MET_FALL', 'LAMP_MET_SIZE',
-                   'LAMP_BURN_SECS', 'LAMP_BURN_W', 'LAMP_BURN_TICK',
+                   'LAMP_BURN_SECS', 'LAMP_BURN_W',
                    'LAMP_SWOOP_AT', 'LAMP_SWOOP_EVERY', 'LAMP_SWOOP_DIVE', 'LAMP_SWOOP_DRINK', 'LAMP_SWOOP_BACK', 'LAMP_SWOOP_DMG',
                    'LAMP_DIE_FLARE', 'LAMP_DIE_BURN', 'LAMP_DIE_ASH');
 
@@ -124,7 +123,7 @@
                      lamps: Array.from({ length: n }, (_, i) => ({ u: n > 1 ? (e0 + (LW - 2 * e0) * i / (n - 1)) / LW : 0.5, on: 0, y: LAMP_Y,
                                                                   ph: i * 2.3, lit: 99, acc: 0 })),
                      motes: [], sink: 0, fx: 1,
-                     met: null, metT: LAMP_MET_EVERY * 0.6, burns: [], burnCD: 0, metN: 0, metHits: 0,
+                     met: null, metT: LAMP_MET_EVERY * 0.6, burns: [], metN: 0, metHits: 0,
                      swoop: null, swoopT: LAMP_SWOOP_EVERY * 0.5, swoops: 0, knocked: 0, drunk: 0 };
             lampBox(b);
         },
@@ -299,12 +298,6 @@
     function lampMeteorStep(dt) {
         if (phase === 'play') lamp.burns = lamp.burns.filter(p => (p.t += dt) < LAMP_BURN_SECS);
         if (phase !== 'play') { lamp.met = null; return; }
-        // standing in the fire
-        if (lamp.burnCD > 0) lamp.burnCD = Math.max(0, lamp.burnCD - dt);
-        for (const p of lamp.burns) {
-            const sg = padNear(p.x, padY(), LAMP_BURN_W * 0.4, padH() / 2);
-            if (sg && !lamp.burnCD) { addDrag(sg, p.x); lamp.burnCD = LAMP_BURN_TICK; lamp.metHits++; }
-        }
         const m = lamp.met;
         if (m) {
             m.t += dt;
@@ -320,7 +313,7 @@
             // down: on you, and the ground alight
             const py = padY() - padH() / 2, r = lampMetW() / 2;
             const sg = padNear(m.tx, py, r * 0.7, padH() / 2);
-            if (sg) { addDrag(sg, m.tx); lamp.metHits++; lamp.burnCD = LAMP_BURN_TICK; }
+            if (sg) { addDrag(sg, m.tx); lamp.metHits++; }
             lamp.burns.push({ x: m.tx, t: 0 });
             rings.push({ x: m.tx, y: py, t: 1 });
             for (let i = 0; i < 26; i++) {

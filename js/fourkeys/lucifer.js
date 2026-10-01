@@ -15,8 +15,9 @@
     //   FIST   balled up over you, following you, then down: under it and
     //          you are SLUGGISH
     //   BEAM   the hand hangs over you, the little ones in it close in and
-    //          spin up, and it fires straight down: in it and you are
-    //          STUNNED, then SLUGGISH. Knock all three of its little ones
+    //          spin up, and it fires straight down, one shot: under it
+    //          as it fires and you are STUNNED, then SLUGGISH; what is left
+    //          of it after is only light. Knock all three of its little ones
     //          away first and it never fires
     //   TREE   HIS tree, stolen and gone bad: it grows down out of the hand,
     //          a wall of branches, and birds sit in it that come down at you
@@ -131,16 +132,16 @@
     let LU_BEAM_Y     = 230;    // the line a hand hangs on to fire down
     let LU_BEAM_CHARGE = 1.5;   // seconds a beam gathers, following you, before it fires
     let LU_BEAM_TRACK = 150;    // px/s it follows you while it gathers
-    let LU_BEAM_SECS  = 0.8;    // seconds it fires
+    let LU_BEAM_SECS  = 0.8;    // seconds the shot takes to die away; it only hurts as it fires
     let LU_BEAM_W     = 26;     // px across
     let LU_BEAM_STUN  = 1.5;    // seconds it holds you still, STUNNED...
     // The last part's beam, from his head, is his strongest: it held you too
     // long, gave too little warning and stayed out too long to tell when it
     // was safe. So it stops following you LU_BEAM_LOCK3 before it fires --
-    // the line goes solid where it will land -- fires for less, and holds you
-    // for less.
+    // the line goes solid where it will land -- dies away sooner, and holds
+    // you for less.
     let LU_BEAM_LOCK3 = 0.45;   // seconds it stands still, marked, before it fires
-    let LU_BEAM_SECS3 = 0.45;   // seconds it fires
+    let LU_BEAM_SECS3 = 0.45;   // seconds it takes to die away
     let LU_BEAM_STUN3 = 0.9;    // seconds it holds you
     let LU_BEAM_DRAG  = 2.5;    // ...and the SLUGGISH it leaves on you after
     let LU_BEAM_LOOK12 = 0.55;  // how bright a hand's beam is next to the last part's, so that one lands
@@ -1202,7 +1203,7 @@
     // growing brighter where it will land and following you, then fires.
     function luBeam(src, pace) {
         const three = lu.stage === 3;
-        const bm = { src, x: paddle.x, st: 'charge', t: 0, pace, hit: false, look: three ? 1 : LU_BEAM_LOOK12,
+        const bm = { src, x: paddle.x, st: 'charge', t: 0, pace, look: three ? 1 : LU_BEAM_LOOK12,
                      lock: three ? LU_BEAM_LOCK3 : 0, secs: three ? LU_BEAM_SECS3 : LU_BEAM_SECS,
                      stun: three ? LU_BEAM_STUN3 : LU_BEAM_STUN };
         lu.beams.push(bm);
@@ -1215,15 +1216,18 @@
             if (bm.st === 'charge') {
                 const charge = LU_BEAM_CHARGE / bm.pace + bm.lock;
                 if (bm.t < charge - bm.lock) bm.x = luToward(bm.x, labFold(paddle.x), LU_BEAM_TRACK * bm.pace * dt);
-                if (bm.t >= charge) { bm.st = 'fire'; bm.t = 0; }
-            } else if (bm.st === 'fire') {
-                // a column, top to bottom of the field, against him as he is turned
-                if (!bm.hit && padNear(luBeamAt(bm, padY()), padY(), LU_BEAM_W / 2, LH)) {
-                    bm.hit = true;
+                if (bm.t < charge) continue;
+                bm.st = 'fire'; bm.t = 0;
+                // one shot, a column top to bottom of the field, against him
+                // as he is turned. Only the moment it fires counts: what
+                // stands after is light, so moving into it is never a
+                // punishment for having dodged it.
+                if (padNear(luBeamAt(bm, padY()), padY(), LU_BEAM_W / 2, LH)) {
                     luSlug(LU_BEAM_DRAG);
                     // the boss lab runs brandon.html's engine, which has no stun
                     if (typeof stunPad === 'function') stunPad(bm.stun);
                 }
+            } else if (bm.st === 'fire') {
                 if (bm.t >= bm.secs) { bm.st = 'fade'; bm.t = 0; }
             } else if (bm.st === 'fade' && bm.t >= 0.3) bm.st = 'gone';
         }
@@ -2691,6 +2695,7 @@
         }
     }
 
+    const LU_BEAM_LEFT = 0.35;       // how bright a fired beam still is as it goes out
     // A beam gathering is a thin line where it will land, brighter and
     // wider as it comes, and light gathering where it starts; fired, it is a
     // column of red with a hot core, edged in black.
@@ -2726,7 +2731,8 @@
                 ctx.globalAlpha = (0.5 + 0.4 * k) * lk;
                 ctx.drawImage(luBlob('rgba(255,40,30,1)'), sx - r, sy - r, r * 2, r * 2);
             } else {
-                const fade = bm.st === 'fade' ? 1 - bm.t / 0.3 : 1;
+                // brightest the moment it fires, the one moment it hurts
+                const fade = bm.st === 'fade' ? LU_BEAM_LEFT * (1 - bm.t / 0.3) : 1 - (1 - LU_BEAM_LEFT) * luClamp(bm.t / bm.secs);
                 const flick = 0.9 + 0.1 * Math.sin(clock * 60);
                 ctx.globalAlpha = 0.6 * fade * lk;
                 ctx.strokeStyle = 'rgba(20,0,4,1)';
