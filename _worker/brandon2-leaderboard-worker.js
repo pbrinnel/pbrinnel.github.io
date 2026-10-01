@@ -41,7 +41,7 @@ const STAGES = ['FARM', 'RUINS', 'CITY', 'VOLCANO', 'CASTLE', 'VOID', 'BOSS RUSH
 const IN_TOTAL = ['FARM', 'RUINS', 'CITY', 'VOLCANO', 'CASTLE', 'VOID'];
 // The paddles' keys, as the save file pins them (_ref/BRANDON-SAVE.md). One the
 // page sends that is not here is left off the row rather than refused.
-const PADS = ['standard', 'classic', 'gilt', 'statue', 'frost', 'ember', 'pair', 'multi', 'prince', 'chell'];
+const PADS = ['standard', 'classic', 'gilt', 'statue', 'frost', 'ember', 'pair', 'multi', 'prince', 'chell', 'teflon', 'blur'];
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',

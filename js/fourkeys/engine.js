@@ -3296,6 +3296,7 @@
     // he ever turns
     function reachBelow() {
         const hw = padW() / 2, halfH = bodyHalfH(padW());
+        if (labPadBlur()) return Math.hypot(hw, halfH);    // BLUE BLUR turns all the way round
         const a = Math.min(Math.max(DIP_MAX, DIP_LIMIT), Math.atan2(hw, halfH));
         return hw * Math.sin(a) + halfH * Math.cos(a);
     }
@@ -3407,7 +3408,10 @@
         labBallStep(b);
         powBallStep(b);      // KATAMARI's lump, MIRROR, the CROWD
         const py = padY();
-        if (b.vy > 0) {
+        // BLUE BLUR spins all the way round, so a head can meet any side of
+        // him going any way, and none of what follows holds: he has his own
+        if (labPadBlur()) padBlurHit(b, s);
+        else if (b.vy > 0) {
             for (const sg of segs()) {
                 const a = paddle.dip[sg.i];
                 const c = touching(b, sg, a);
@@ -3502,6 +3506,7 @@
 
     function update(dt) {
         clock += dt;
+        padShrug();          // TEFLON: nothing put on him last frame takes hold
 
 
         // the gauntlet is its own game with its own clock. nothing below this
@@ -3672,6 +3677,7 @@
             const next = was + (want - was) * (1 - Math.exp(-dt / DIP_EASE));
             if (!balls.some(b => !b.stuck && turnBites(b, sg, was, next))) paddle.dip[sg.i] = next;
         }
+        padBlurTurn(dt);         // BLUE BLUR: he is turned round instead, whatever the above wanted
 
         // Nothing crosses more than SUBSTEP_PX between checks, and his own
         // travel counts toward that as much as a head's does. He used to be set
@@ -3684,10 +3690,11 @@
             const fast = Math.max(...balls.map(b => Math.hypot(b.vx, b.vy)), effSpeed());
             const slid = Math.abs(paddle.x - padFrom);
             const steps = Math.max(1, Math.min(SUBSTEP_CAP,
-                          Math.ceil(Math.max(fast * dt, slid) / SUBSTEP_PX)));
+                          Math.ceil(Math.max(fast * dt, slid, padBlurSweep()) / SUBSTEP_PX)));
             const padTo = paddle.x;
             for (let i = 0; i < steps && phase === 'play'; i++) {
                 paddle.x = padFrom + (padTo - padFrom) * ((i + 1) / steps);
+                padBlurAt((i + 1) / steps);
                 for (let j = balls.length - 1; j >= 0; j--) {
                     if (balls[j].stuck || caught(balls[j])) continue;
                     if (!stepBall(balls[j], dt / steps)) balls.splice(j, 1);
@@ -3705,6 +3712,7 @@
             // way the last hit pushed, and gets there at ENG_ACCEL rather than
             // all at once, so bringing it round takes a moment.
             b.spin -= b.spin * SPIN_DRAG / SPIN_INERTIA * dt;
+            if (labPadBlur()) b.spin = (Math.sign(b.spin) || 1) * SPIN_MAX;    // BLUE BLUR: always flat out
             if (fx.E > 0) {
                 const want = (b.kickDir || Math.sign(turnOf(b)) || 1) * ENG_BOOST * SPIN_FULL;
                 const step = ENG_ACCEL * dt;
@@ -5742,6 +5750,7 @@
 
     function draw() {
         ctx.clearRect(0, 0, LW, LH);
+        padShrug();          // ...nor anything put on him since, so none of it is ever drawn
         if (introDraw(uiScale)) return;      // the opening cards, before the town
         if (king && (phase === 'gauntlet' || phase === 'absorb' || phase === 'fall')) {
             drawGauntlet(uiScale);

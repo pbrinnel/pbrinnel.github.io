@@ -10,9 +10,10 @@
     //   four keys open the CASTLE
     //   finish a level without using a continue and you keep the paddle it guarded
     //   win any level at all and CLASSIC, the first game's paddle, is yours
-    //   every boss beaten counts, and the count buys MULTI, PRINCE and CHELL --
-    //   or finish the FARM, the RUINS or the CITY without losing a head or a
-    //   continue and it hands over its one of them
+    //   every boss beaten counts, and the count buys MULTI, PRINCE, CHELL,
+    //   TEFLON and BLUE BLUR -- or finish the FARM, the RUINS, the CITY, the
+    //   VOLCANO or the CASTLE without losing a head or a continue and it hands
+    //   over its one of them
     //   own enough paddles and the BRANDONS sign goes up: every one on a rack, to pick from
     //   each stage gives the next memory the first time you win it with one left to give
     //   win the CASTLE and the VOID stands in the way to it: its memory comes
@@ -63,10 +64,10 @@
     const MENU_SOUVENIR = 'classic';
     // Paddles bought with bosses beaten: every one counts, in any stage or
     // BOSS RUSH, clean or not, over every run (menuSlew)...
-    const MENU_SLAIN_PADS = [[5, 'multi'], [10, 'prince'], [15, 'chell']];
+    const MENU_SLAIN_PADS = [[5, 'multi'], [10, 'prince'], [15, 'chell'], [20, 'teflon'], [25, 'blur']];
     // ...or, sooner, each one with a flawless win of its level: not a head
     // lost and no continue (menuBeatSlew)
-    const MENU_FLAWLESS_PADS = { 1: 'multi', 2: 'prince', 3: 'chell' };
+    const MENU_FLAWLESS_PADS = { 1: 'multi', 2: 'prince', 3: 'chell', 4: 'teflon', 5: 'blur' };
     // paddles owned before the BRANDONS sign goes up (menuStands)
     const MENU_RACK_AT = 5;
     // Who a level hands you is whoever the level sliders say, so moving a boss
@@ -3026,7 +3027,8 @@
     const M_SAVE_STAGES = { 1: 'FARM', 2: 'RUINS', 3: 'CITY', 4: 'VOLCANO', 5: 'CASTLE', 6: 'VOID',
                             rush: 'BOSS RUSH' };
     const M_SAVE_PADS = { gilt: 'GILT', statue: 'STATUE', frost: 'FROST', ember: 'EMBER', pair: 'PAIR',
-                          classic: 'CLASSIC', multi: 'MULTI', prince: 'PRINCE', chell: 'CHELL' };
+                          classic: 'CLASSIC', multi: 'MULTI', prince: 'PRINCE', chell: 'CHELL',
+                          teflon: 'TEFLON', blur: 'BLUE BLUR' };
     const M_SAVE_MEMS = { exhortation: 'EXHORTATION', salvation: 'SALVATION', cycle: 'CYCLE',
                           counsel: 'COUNSEL', fall: 'FALL', consolidation: 'CONSOLIDATION' };
     // each kind of line, and which of `menu`'s tables it fills from which tokens

@@ -63,7 +63,13 @@
     let MULTI_POP  = 2.5;    // MULTI: seconds between one pair of heads flying off him and the next
     let MULTI_SLIP = 4;      // MULTI: px each of his two misprints is out of register, at the game's size...
     let MULTI_PRINT = 0.45;  // ...and how strongly each shows
-    LAB_KNOBS.push('PAD_FAVOUR', 'MULTI_POP', 'MULTI_SLIP', 'MULTI_PRINT');
+    let TEF_LEN    = 0.5;    // TEFLON: nothing sticks to him, and this is all the length he has
+    let TEF_GLINT  = 1.2;    // ...seconds between one glint sliding along him and the next
+    let BLUR_SPIN  = 2;      // BLUE BLUR: turns a second he spins through, all the way round
+    let BLUR_TRAIL = 3;      // ...afterimages of him following round behind
+    let BLUR_GAP   = 0.3;    // ...and seconds a head he has hit is left alone to get away
+    LAB_KNOBS.push('PAD_FAVOUR', 'MULTI_POP', 'MULTI_SLIP', 'MULTI_PRINT', 'TEF_LEN', 'TEF_GLINT',
+                   'BLUR_SPIN', 'BLUR_TRAIL', 'BLUR_GAP');
     LAB_KNOBS.push('GILT_LEN', 'GILT_CAPS', 'GILT_SHINE', 'STAT_LEN', 'STAT_ANGLE', 'STAT_SPIN',
                    'STAT_DIP', 'FROST_LEN', 'FROST_EDGE', 'FROST_SWIPE', 'FROST_DECK', 'FROST_FLAKES', 'FROST_BIG', 'ICE_SECS', 'ICE_RAMP', 'ICE_TURN',
                    'EMB_LEN', 'EMB_CATCH', 'EMB_SPREAD', 'EMB_SPREAD_AT', 'EMB_GLOW', 'EMB_SPARKS', 'PAIR_LEN', 'PAIR_QUAD', 'PAD_MARK', 'V2_GLOSS', 'V2_GLINT', 'V2_SWEEP');
@@ -80,6 +86,8 @@
     // for his shirt and one for his jeans, after who each is named for
     const PRINCE_TOP = '#a8c64e', PRINCE_LEGS = '#8a4fb0', PRINCE_RIM = '#d7ee8c';
     const CHELL_TOP = '#f4f1ea', CHELL_LEGS = '#e0692c', CHELL_RIM = '#ff9a3c';
+    const TEF_INK = '#a3a9b2', TEF_RIM = '#e9edf2';     // the grey of a pan, and the shine on it
+    const BLUR_INK = '#3a6fe0', BLUR_RIM = '#a9c8ff';
 
     // ---- what the game asks -------------------------------------------------------
     function labPadUse(key) {
@@ -113,6 +121,8 @@
     const labPadSplit = () => !!(labP && labP.split);
     const labPadFavour = () => (labP && labP.favour) || null;
     const labPadPortal = () => !!(labP && labP.portal);
+    const labPadTeflon = () => !!(labP && labP.teflon);
+    const labPadBlur = () => !!(labP && labP.blur);
     const padQuadOf = v => v && v.quad ? v.quad() : 1;
     const labPadQuad  = () => labPFrom ? padQuadOf(labPFrom) + (padQuadOf(labP) - padQuadOf(labPFrom)) * labPadFadeK() : padQuadOf(labP);
 
@@ -130,6 +140,8 @@
         if (labPadSplit()) say.push('two of him');
         if (labPadFavour()) say.push(Math.round(PAD_FAVOUR * 100) + '% ' + labPadFavour());
         if (labPadPortal()) say.push('PORTAL always');
+        if (labPadTeflon()) say.push('nothing sticks');
+        if (labPadBlur()) say.push('spinning ' + BLUR_SPIN + '/s');
         return { name: (labP && labP.name) || LAB_PAD.standard.name, line: say.join(' · ') || 'as the game has him' };
     }
 
@@ -843,9 +855,9 @@
     };
 
     // ---- the ones bosses buy --------------------------------------------------------
-    // These three come with bosses beaten, counted over every run
-    // (MENU_SLAIN_PADS in menu.js), or each with a flawless win of the FARM,
-    // the RUINS or the CITY (MENU_FLAWLESS_PADS). Each plays as MODERN does
+    // These three, and TEFLON and BLUE BLUR below, come with bosses beaten, counted over
+    // every run (MENU_SLAIN_PADS in menu.js), or each with a flawless win of
+    // its own stage (MENU_FLAWLESS_PADS). These three play as MODERN does
     // and leans on the capsules instead: MULTI and PRINCE get PAD_FAVOUR of
     // capsules as their own before the usual roll (the falling capsule in
     // engine.js), and CHELL has PORTAL on all the time (ptOn in powers.js).
@@ -951,4 +963,173 @@
               'a wall seriously since. Has never said a word about it, either.',
         under() { padRim('padRimC', CHELL_RIM, 2.5, 0.5); },
         skin(sg, o) { padLay(sg, o, this.dress(), this.dressA); }
+    };
+
+    // ---- TEFLON: nothing sticks -------------------------------------------------------
+    // SLUGGISH, STUNNED and the siphon's shrink all slide off him. They are
+    // put on from all over (a boss file each, some writing dragT straight),
+    // so rather than guard every one of them, whatever has landed on him is
+    // wiped before he moves and again before he is drawn (engine.js calls
+    // padShrug in both): it never takes hold, and never reaches the screen.
+    // He says so, and it slides off his ends in SLUGGISH's colour.
+    let tefSaid = -9;
+    function padShrug() {
+        if (!labPadTeflon() || !(dragT > 0 || stunT > 0 || shrinkT > 0)) return;
+        dragT = 0; stunT = 0; shrinkT = 0;
+        if (clock - tefSaid < 1) return;
+        tefSaid = clock;
+        popups.push({ x: paddle.x, y: padY() - 40, text: 'NON-STICK', color: TEF_RIM, life: 1 });
+        for (const sg of segs()) for (let n = 0; n < 10; n++) {
+            const dir = n % 2 ? 1 : -1;
+            padBit(sg.cx + dir * sg.w * (0.2 + Math.random() * 0.3), padY() - padH() * 0.2, DRAG_TINT,
+                   0.6 + Math.random() * 0.4, dir * (90 + Math.random() * 80), -20 - Math.random() * 30, 220,
+                   2 + Math.random() * 2, 0.9);
+        }
+    }
+
+    // TEFLON: the grey of a pan with its shine running along him, and tiny
+    // (TEF_LEN). Nothing a boss puts on him sticks (padShrug).
+    LAB_PAD.teflon = {
+        name: 'TEFLON',
+        ink: TEF_INK, rim: TEF_RIM,
+        teflon: true,
+        blurb: 'tiny · nothing slows, stuns or shrinks him',
+        lore: 'Nobody has ever made anything stick to this Brandon: not blame, not a nickname, ' +
+              'and not one thing a boss has thrown at him.',
+        len: () => TEF_LEN,
+        under() { padRim('padRimT', TEF_RIM, 2.5, 0.6); },
+        skin(sg, o) {
+            padLay(sg, o, padTint('padTeflon', TEF_INK), 0.7);
+            // a quick glint sliding along him, often: he is slick, not polished
+            const sp = padFlat('padTefShine', '#ffffff');
+            if (!sp) return;
+            const tw = sg.w, th = tw / SHAPE_ASPECT, t = (clock % TEF_GLINT) / (TEF_GLINT * 0.4);
+            if (t >= 1) return;
+            ctx.save();
+            ctx.translate(sg.cx, padY() + o * JIG_PADDLE);
+            ctx.rotate(segWig(sg.i) + paddle.dip[sg.i]);
+            ctx.beginPath();
+            ctx.rect(-tw / 2 + (t * 1.3 - 0.15) * tw, -th, tw * 0.12, th * 2);
+            ctx.clip();
+            ctx.globalAlpha = padK * 0.4;
+            ctx.drawImage(sp, -tw / 2, -th / 2, tw, th);
+            ctx.globalAlpha = padK;
+            ctx.restore();
+        }
+    };
+
+    // ---- BLUE BLUR: spinning ---------------------------------------------------------
+    // Every head in play spins flat out (engine.js holds it at SPIN_MAX), and
+    // so does he: all the way round, BLUR_SPIN turns a second, never
+    // stopping. His turn is paddle.dip, which everything that draws him
+    // already turns him by. It is set once a frame (padBlurTurn) and spread
+    // across the substeps (padBlurAt), with his ends' sweep counted toward
+    // how many there are, so an end cannot jump a head between two looks.
+    let blurA = 0, blurFrom = 0, blurD = 0;
+    function padBlurTurn(dt) {
+        if (!labPadBlur()) { blurD = 0; return; }
+        blurFrom = blurA;
+        blurD = BLUR_SPIN * Math.PI * 2 * dt;
+        blurA = Math.atan2(Math.sin(blurA + blurD), Math.cos(blurA + blurD));
+        for (const sg of segs()) paddle.dip[sg.i] = blurFrom + blurD;
+    }
+    // how far his ends travel this frame, in px
+    const padBlurSweep = () => Math.abs(blurD) * padW() / 2;
+    function padBlurAt(k) {
+        if (!blurD) return;
+        for (const sg of segs()) paddle.dip[sg.i] = blurFrom + blurD * k;
+    }
+
+    // A head against him, from any side, going any way. The usual catch
+    // takes heads coming down onto his top, and turned over his top faces the
+    // floor. Here the head is pushed out of whichever part of his outline it
+    // is in or nearest, and bounced off that surface as it is moving -- his
+    // travel and his spin both -- so a whirling end whacks it, any way at
+    // all, down past him included: that is his cost. Then it goes at the
+    // game's speed, never flatter than the engine allows a bounce off a brick.
+    // His ends sweep far faster than a head flies, so one he has just hit is
+    // left alone for BLUR_GAP: without that the next sweep caught it again,
+    // and the next, and it churned round him and never left.
+    function padBlurHit(b, s) {
+        if (b.blurT && clock < b.blurT) return;
+        const r = (bRX() + bRY()) / 2;          // turning this fast, a head is round enough
+        const w = BLUR_SPIN * Math.PI * 2, py = padY();
+        for (const sg of segs()) {
+            const hw = sg.w / 2, a = paddle.dip[sg.i], ca = Math.cos(a), sa = Math.sin(a);
+            const dx = b.x - sg.cx, dy = b.y - py;
+            const lx = dx * ca + dy * sa, ly = dy * ca - dx * sa;
+            if (Math.abs(lx) > hw + r || Math.abs(ly) > hw + r) continue;
+            // the nearest of him to the head's middle, in his own frame
+            let best = null;
+            for (let x = lx - r; x <= lx + r; x += 1.5) {
+                const e = outlineAt(x, hw);
+                if (!e) continue;
+                const inside = ly > e.top && ly < e.bot;
+                const y = inside ? (ly - e.top < e.bot - ly ? e.top : e.bot) : Math.max(e.top, Math.min(e.bot, ly));
+                const d = Math.hypot(lx - x, ly - y) * (inside ? -1 : 1);
+                if (!best || d < best.d) best = { x, y, d, up: y === e.top };
+            }
+            if (!best || best.d >= r) continue;
+            // out of him along the way to his surface; from inside, straight off it
+            let nx, ny;
+            if (best.d > 1e-3) { nx = (lx - best.x) / best.d; ny = (ly - best.y) / best.d; }
+            else { nx = 0; ny = best.up ? -1 : 1; }
+            const ox = best.x + nx * r, oy = best.y + ny * r;
+            b.x = sg.cx + ox * ca - oy * sa;
+            b.y = py + ox * sa + oy * ca;
+            const wx = nx * ca - ny * sa, wy = nx * sa + ny * ca;
+            // the surface where it struck, moving with him and with his turn
+            const px = best.x * ca - best.y * sa, pyy = best.x * sa + best.y * ca;
+            const sx = paddle.vx - w * pyy, sy = w * px;
+            let rx = b.vx - sx, ry = b.vy - sy;
+            const dot = rx * wx + ry * wy;
+            if (dot >= 0) continue;                   // already leaving him
+            rx -= 2 * dot * wx; ry -= 2 * dot * wy;
+            let vx = rx + sx, vy = ry + sy;
+            const sp = s * (b.boost || 1), len = Math.hypot(vx, vy) || 1;
+            vx = vx / len * sp; vy = vy / len * sp;
+            if (Math.abs(vy) < sp * 0.16) {
+                vy = (vy < 0 ? -1 : 1) * sp * 0.16;
+                vx = Math.sign(vx || 1) * Math.sqrt(sp * sp - vy * vy);
+            }
+            b.vx = vx; b.vy = vy;
+            b.blurT = clock + BLUR_GAP;
+            // coming home, as off any paddle
+            paddle.jt[sg.i] = 1;
+            labPadHit(b);
+            combo = 0;
+            b.pierced.clear();
+            b.boost = 1;
+            if (++hits === 4 || hits === 12) bumpSpeed(1.12);
+            return;
+        }
+    }
+
+    // BLUE BLUR: blue, with afterimages of himself following round behind.
+    LAB_PAD.blur = {
+        name: 'BLUE BLUR',
+        ink: BLUR_INK, rim: BLUR_RIM,
+        blur: true,
+        blurb: 'heads always spin flat out · he never stops spinning',
+        lore: 'The fastest Brandon there ever was, or so he says, and nobody has ever ' +
+              'managed to get him to stand still long enough to argue.',
+        under() {
+            const sp = padTint('padBlurTrail', BLUR_INK);
+            if (!sp) return;
+            for (const sg of segs()) {
+                const o = paddle.jt[sg.i] > 0 ? wobble(paddle.jt[sg.i]) : 0;
+                const tw = sg.w, th = tw / SHAPE_ASPECT;
+                for (let k = BLUR_TRAIL; k >= 1; k--) {
+                    ctx.save();
+                    ctx.translate(sg.cx, padY() + o * JIG_PADDLE);
+                    ctx.rotate(segWig(sg.i) + paddle.dip[sg.i] - k * 0.22 * Math.sign(BLUR_SPIN));
+                    ctx.globalAlpha = padK * 0.32 * (1 - k / (BLUR_TRAIL + 1));
+                    ctx.drawImage(sp, -tw / 2, -th / 2, tw, th);
+                    ctx.restore();
+                }
+            }
+            ctx.globalAlpha = padK;
+            padRim('padRimB', BLUR_RIM, 2.5, 0.5);
+        },
+        skin(sg, o) { padLay(sg, o, padTint('padBlur', BLUR_INK), 0.7); }
     };
