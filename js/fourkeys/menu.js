@@ -2805,9 +2805,11 @@
     // them: one landing by accident, or meant for the card before, would
     // throw away a scene there is no getting back to straight away. Held
     // SKIP_HOLD it skips. HOLD TO SKIP is the line under the field for as
-    // long as the scene is up, brightening as it is held, and nothing is
-    // written over the scene -- except on a phone, which has no line under
-    // the field, where a press puts it at the foot of the field with a bar.
+    // long as the scene is up (a phone has no such line), and nothing is
+    // written over the scene until a press: then, on every machine, a panel
+    // at the foot of the field with a bar filling and the seconds left, so
+    // it is plain the press has been felt and how long is left. A colour
+    // change on the line alone was too easy to miss.
     // Whatever instead waits on a tap says so at the foot of the field
     // (menuTapPrompt).
     const SKIP_HOLD = 2;             // seconds held to skip
@@ -2838,26 +2840,34 @@
     }
     const SKIP_INK0 = '#6d685f';     // the line under the field, as fourkeys.html has it...
     const SKIP_INK1 = '#f2efe9';     // ...and held all the way
+    const SKIP_BAR_W = 240;          // the bar, px at full size
+    const SKIP_BAR_H = 10;
     function menuSkipDraw() {
-        const held = menu.skipT >= 0;
+        const held = menu.skipT >= 0, k = held ? Math.min(1, menu.skipT / SKIP_HOLD) : 0;
         const el = document.querySelector('.hint');
         if (el && el.offsetParent) {
             if (menu.hintWas === undefined) menu.hintWas = el.textContent;
             el.textContent = 'hold to skip';
-            el.style.color = menuMix(SKIP_INK0, SKIP_INK1, held ? Math.min(1, menu.skipT / SKIP_HOLD) : 0);
-            return;
+            el.style.color = menuMix(SKIP_INK0, SKIP_INK1, k);
         }
         const a = held ? 1 : Math.min(1, (menu.skipShow || 0) / SKIP_FADE);
         if (a <= 0) return;
-        const u = uiScale;
+        const u = uiScale, w = SKIP_BAR_W * u, h = SKIP_BAR_H * u;
+        const x = LW / 2 - w / 2, y = LH - PROMPT_UP - h / 2;
+        ctx.save();
         ctx.globalAlpha = a;
-        text('hold to skip', LW / 2, LH - PROMPT_UP, 15 * u, PROMPT_INK, 'center');
-        const w = 90 * u, y = LH - PROMPT_UP + 8 * u;
-        ctx.fillStyle = 'rgba(242,239,233,0.14)';
-        ctx.fillRect(LW / 2 - w / 2, y, w, 2);
-        ctx.fillStyle = '#f2efe9';
-        ctx.fillRect(LW / 2 - w / 2, y, w * (held ? Math.min(1, menu.skipT / SKIP_HOLD) : 0), 2);
-        ctx.globalAlpha = 1;
+        // a dark panel under it all, so it reads over any scene
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.beginPath(); ctx.roundRect(x - 16 * u, y - 30 * u, w + 32 * u, h + 42 * u, 8 * u); ctx.fill();
+        const line = held ? 'skipping in ' + Math.max(0, SKIP_HOLD - menu.skipT).toFixed(1) + 's' : 'hold to skip';
+        text(line, LW / 2, y - 10 * u, 15 * u, held ? SKIP_INK1 : PROMPT_INK, 'center');
+        ctx.fillStyle = 'rgba(242,239,233,0.18)';
+        ctx.beginPath(); ctx.roundRect(x, y, w, h, h / 2); ctx.fill();
+        if (k > 0) {
+            ctx.fillStyle = SKIP_INK1;
+            ctx.beginPath(); ctx.roundRect(x, y, Math.max(h, w * k), h, h / 2); ctx.fill();
+        }
+        ctx.restore();
     }
     // the line under the field back to what it said before the scene, or
     // only let go of when whatever comes next says something of its own

@@ -731,41 +731,75 @@
 
     // ---- gold's cracks -------------------------------------------------------------
     // Gold takes several hits and stays gold to the last, so what it has left
-    // is shown as cracks: one set for each third of it gone. Baked once per
-    // set, cut to his silhouette, and flipped on half the bricks so a row of
-    // them does not crack alike. Drawn inside drawBrick, like the glint.
+    // is shown as cracks. Each starts at the edge of his outline -- where a
+    // knock would start one -- and wanders in along his length, thinning as
+    // it goes, now and then splitting. GC_PER more for each third of it gone,
+    // on top of the ones already there, so a brick cracks further rather than
+    // differently. GC_LOOKS layouts, picked off each brick's own sway phase,
+    // so a row of gold does not crack alike. Baked once per layout and level,
+    // cut to his silhouette; drawn inside drawBrick, like the glint.
     const GC_SETS = 3;
-    function gcSprite(level) {
-        const k = 'goldCrack' + level + '@' + Math.round(bw);
+    const GC_PER = 2;
+    const GC_LOOKS = 3;
+    // every crack layout v has, as polylines in his box: [points, width at the start]
+    function gcPaths(v) {
+        let seed = 977 + v * 7919;
+        const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+        const edge = katEdgePts(), out = [];
+        const walk = (x, y, a, steps, w0) => {
+            const pts = [[x, y]], step = bw * 0.04;
+            for (let i = 0; i < steps; i++) {
+                a += (rnd() - 0.5) * 1.1;
+                x += Math.cos(a) * step * (0.7 + rnd() * 0.6);
+                y += Math.sin(a) * step * 0.55 * (0.7 + rnd() * 0.6);
+                pts.push([x, y]);
+                if (i === (steps >> 1) && rnd() < 0.6) walk(x, y, a + (rnd() < 0.5 ? -1 : 1) * (0.6 + rnd() * 0.5), 3 + ((rnd() * 2) | 0), w0 * 0.6);
+            }
+            const entry = [pts, w0];
+            out.push(entry);
+            return entry;
+        };
+        for (let i = 0; i < GC_SETS * GC_PER; i++) {
+            const e = edge[(rnd() * edge.length) | 0];
+            const x = (e.u + 0.5) * bw, y = (e.v + 0.5) * bh;
+            // in from the edge it starts on, mostly along his length
+            const along = e.u < 0 ? 0 : Math.PI, toMid = Math.atan2(bh / 2 - y, (bw / 2 - x) * 0.4);
+            const a = along + Math.atan2(Math.sin(toMid - along), Math.cos(toMid - along)) * 0.4;
+            // its trunk, so the levels count cracks, not branches
+            walk(x, y, a, 5 + ((rnd() * 4) | 0), 2.4).first = true;
+        }
+        return out;
+    }
+    const gcCache = {};
+    function gcSprite(v, level) {
+        const k = 'goldCrack' + v + '.' + level + '@' + Math.round(bw);
         if (spriteCache.has(k)) return spriteCache.get(k);
         const sil = shapeSprite('glint', '#fff6d8', bw, bh, true);
-        if (!sil) return null;
+        if (!sil || !katEdgePts().length) return null;
         const c = document.createElement('canvas');
         c.width = sil.width; c.height = sil.height;
         const g = c.getContext('2d');
         g.scale(c.width / bw, c.height / bh);
-        let seed = 7 + level * 31;
-        const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-        // from one struck point, jagged lines running out, more and longer each set
-        const ox = bw * 0.42, oy = bh * 0.45;
-        const lines = 2 + level * 2;
-        for (let pass = 0; pass < 2; pass++) {
-            g.strokeStyle = pass ? 'rgba(80, 50, 4, 1)' : 'rgba(255, 244, 200, 0.75)';
-            g.lineWidth = pass ? 2 : 3;
-            let s0 = seed;
-            for (let n = 0; n < lines; n++) {
-                let a = (n / lines) * Math.PI * 2 + rnd() * 0.6, x = ox, y = oy;
-                const len = bw * (0.16 + 0.12 * level) * (0.6 + rnd() * 0.6);
-                g.beginPath();
-                g.moveTo(x + (pass ? 0 : 0.8), y + (pass ? 0 : 0.8));
-                for (let st = 0; st < 5; st++) {
-                    a += (rnd() - 0.5) * 0.9;
-                    x += Math.cos(a) * len / 5; y += Math.sin(a) * len / 5 * 0.6;
-                    g.lineTo(x + (pass ? 0 : 0.8), y + (pass ? 0 : 0.8));
+        g.lineCap = 'round'; g.lineJoin = 'round';
+        // a crack's trunk and the branches walked off it are pushed together,
+        // branches first, so take trunks in order and everything before each
+        const paths = gcCache[v + '@' + Math.round(bw)] || (gcCache[v + '@' + Math.round(bw)] = gcPaths(v));
+        let trunks = 0, upto = 0;
+        for (let i = 0; i < paths.length; i++) {
+            if (paths[i].first && ++trunks > level * GC_PER) break;
+            upto = i + 1;
+        }
+        for (const [dx, ink, wk] of [[0.7, 'rgba(255, 244, 200, 0.7)', 1.5], [0, 'rgba(80, 50, 4, 1)', 1]]) {
+            g.strokeStyle = ink;
+            for (const [pts, w0] of paths.slice(0, upto)) {
+                for (let i = 1; i < pts.length; i++) {
+                    g.lineWidth = Math.max(0.6, w0 * wk * (1 - i / pts.length * 0.7));
+                    g.beginPath();
+                    g.moveTo(pts[i - 1][0] + dx, pts[i - 1][1] + dx);
+                    g.lineTo(pts[i][0] + dx, pts[i][1] + dx);
+                    g.stroke();
                 }
-                g.stroke();
             }
-            if (!pass) seed = s0;           // the dark pass follows the light one exactly
         }
         g.setTransform(1, 0, 0, 1, 0, 0);
         g.globalCompositeOperation = 'destination-in';
@@ -776,12 +810,9 @@
     function powCracks(b, kind) {
         if (kind !== 'A' || !(b.maxHp > 1) || b.hp >= b.maxHp) return;
         const level = Math.max(1, Math.min(GC_SETS, Math.ceil((1 - b.hp / b.maxHp) * GC_SETS)));
-        const sp = gcSprite(level);
-        if (!sp) return;
-        ctx.save();
-        if ((b.wigP || 0) > Math.PI) ctx.scale(-1, 1);
-        ctx.drawImage(sp, -bw / 2, -bh / 2, bw, bh);
-        ctx.restore();
+        const v = Math.floor(((b.wigP || 0) / (Math.PI * 2)) * GC_LOOKS) % GC_LOOKS;
+        const sp = gcSprite(Math.max(0, v), level);
+        if (sp) ctx.drawImage(sp, -bw / 2, -bh / 2, bw, bh);
     }
 
     // ---- gold's glimmer ----------------------------------------------------------

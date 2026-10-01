@@ -212,6 +212,7 @@
     // The end of a reign in the gauntlet goes out on the same screen, with
     // the same reveal and the same rule about when the score moves. It has
     // its own rows, not these -- see endOfReign.
+    const SPEEDY_SECS = 10;     // SPEEDY: a round won inside this many seconds of play
     const EOR_BASE = 500;       // ...times the round number, so later rounds pay more
     // every head the field will hold at once, so the row names its own number
     // and raising MAX_BALLS renames the bonus with it
@@ -242,11 +243,14 @@
         // every gold brick broken, born gold or turned by MIDAS
         { key: 'golden',   label: 'GOLDEN',          pts: 50, many: true },
         // every one of FROST's icy bricks struck again, broken or not
-        { key: 'shattered', label: 'SHATTERED',      pts: 10, many: true },
+        { key: 'shattered', label: 'SHATTERED',      pts: 25, many: true },
         // not one capsule caught all round
         { key: 'powerless', label: 'POWERLESS',      pts: 1000 },
         // every time a head went out one side through PORTAL and in the other
-        { key: 'portaled', label: 'PORTALED',        pts: 50, many: true }
+        { key: 'portaled', label: 'PORTALED',        pts: 50, many: true },
+        // the round won inside SPEEDY_SECS of play, counted only while a head
+        // is in play (round.t)
+        { key: 'speedy',   label: 'SPEEDY',          pts: 1500 }
     ];
 
     // The reveal. The score does not move until the last line has landed --
@@ -1539,7 +1543,7 @@
         // a round's tally starts here and nowhere else -- a lost life and a
         // continue both happen inside one, and neither may wipe it
         round = { lost: false, fast: false, heads: false, grit: false, hunter: 0, peak: 1, mini: 0, cosmos: 0,
-                  sniper: false, golden: 0, shattered: 0, powered: false, portaled: 0 };
+                  sniper: false, golden: 0, shattered: 0, powered: false, portaled: 0, t: 0 };
         eor = null;
 
         if (lvl.boss) {
@@ -2681,7 +2685,8 @@
             golden:   round.golden,
             shattered: round.shattered,
             powerless: round.powered ? 0 : 1,
-            portaled: round.portaled
+            portaled: round.portaled,
+            speedy: round.t < SPEEDY_SECS ? 1 : 0
         };
         for (const r of EOR_ROWS) {
             const n = met[r.key];
@@ -3548,6 +3553,7 @@
 
         stepBonus(dt);           // the end-of-round screen, if one is up
         stepServe(dt);           // a serve waiting on a boss in its way
+        if (phase === 'play' && round) round.t += dt;     // SPEEDY's clock
         memShardStep(dt);
 
         // the takeover. when it finishes, the banner finally lands.

@@ -107,6 +107,9 @@
             for (const t of tw.twins) {       // the small one first: he hangs in front
                 if (!t.alive || t.away > 0.5) continue;
                 const hit = maskContact(ball, t.x, twY(t), twAng(t), t.w, t.h, MASK, t.mir);
+                // one he has just sent back is not his until it is clear of him:
+                // let go slowly against his own face, it was killing him
+                if (ball.twFrom === t) { if (!hit) ball.twFrom = null; continue; }
                 if (hit) { tw.pend = t; return hit; }
             }
             tw.pend = null;
@@ -125,6 +128,7 @@
                 labBounce(ball, hit);
                 ball.vx = -Math.sin(l.aim) * s;
                 ball.vy = Math.cos(l.aim) * s;
+                ball.twFrom = t;
                 l.stage = 'back';
             } else if (l.stage === 'rear') {
                 l.stage = 'hold';
@@ -249,6 +253,7 @@
             ball.vx = -Math.sin(l.aim) * m;
             ball.vy = Math.cos(l.aim) * m;
             ball.boost = TOUCH_MUL;
+            ball.twFrom = t;
             l.stage = 'back';
         }
         if (l.stage === 'back' && Math.abs(l.off) < 0.5) t.lunge = null;
