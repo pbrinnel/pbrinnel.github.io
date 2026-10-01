@@ -2182,21 +2182,23 @@
     // The Angel at the head of a great host, the five at his side, facing the
     // one they fear. They
     // shout his name at him; he says nothing, and then his own name, and for a
-    // moment what he hangs from shows. Then he turns and runs, and they shout
+    // moment what he hangs from shows. Then he backs away off the right,
+    // still facing them, and they shout
     // HIS name after him. The Angel, who led them, asks one word. It cuts.
     const MY_FADE_IN = 1.2;
     const MY_JEER = [1.8, 4.6];      // the host shouts his name at him
     const MY_NOTHING = [5.0, 7.4];
     const MY_NAME = [7.8, 10.4];
     const MY_SEEN = [10.6, 10.8, 11.1, 11.7];
-    const MY_RUN = [12.0, 14.2];     // he turns and is gone off the right
+    const MY_RUN = [12.0, 16.0];     // he backs away off the right, facing them still...
+    const MY_RUN_STEP = [4, 6];      // ...each heavy step: its pace, and px he lifts
     const MY_CHEER = [12.6, 15.6];   // ...and they shout HIS name
     const MY_AGAIN = [15.2, 17.6];
     const MY_CUT = 18.0;
     const MY_GROUND = 575;
     const MY_ANGEL = [520, 170];     // where the Angel stands, and his height
     const MY_SURTR = [660, 510];     // where it stands, and its height: three times his
-    const MY_RUN_PX = 900;
+    const MY_RUN_PX = 650;
     const MY_HOP = 14;
     // the five at the head of the host with the Angel, out in front of the
     // ranks: where each stands, how tall, and how much nearer than the ranks
@@ -2222,9 +2224,9 @@
         ctx.save();
         ctx.globalAlpha = memEase(s / MY_FADE_IN);
         const run = span(MY_RUN);
-        const sx = MY_SURTR[0] + run * run * MY_RUN_PX;
-        const bob = run > 0 ? Math.abs(Math.sin(s * 9)) * 10 : 0;
-        memSurtr(sx, MY_GROUND - bob, MY_SURTR[1], s, memSeen(s, MY_SEEN), run > 0);
+        const sx = MY_SURTR[0] + memEase(run) * MY_RUN_PX;
+        const bob = run > 0 && run < 1 ? Math.abs(Math.sin(s * MY_RUN_STEP[0])) * MY_RUN_STEP[1] : 0;
+        memSurtr(sx, MY_GROUND - bob, MY_SURTR[1], s, memSeen(s, MY_SEEN), false);
         const army = memCycleArmy();
         const hopping = [MY_JEER, MY_CHEER].find(([a, b]) => s >= a && s < b);
         for (const m of army) {
