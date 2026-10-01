@@ -213,7 +213,7 @@
     // the same reveal and the same rule about when the score moves. It has
     // its own rows, not these -- see endOfReign.
     const SPEEDY_SECS = 10;     // SPEEDY: a round won inside this many seconds of play
-    const EOR_BASE = 500;       // ...times the round number, so later rounds pay more
+    const EOR_BASE = 500;       // ...times the round number, so later rounds pay more (BOSS RUSH pays its own, menuRoundBase)
     // every head the field will hold at once, so the row names its own number
     // and raising MAX_BALLS renames the bonus with it
     const HEADS_AT = MAX_BALLS;
@@ -2663,7 +2663,7 @@
     // paid here -- see payBonus.
     function endOfRound() {
         const boss = !!LEVELS[stage].boss;
-        const rows = [{ label: 'END OF ROUND BONUS', pts: EOR_BASE * (stage + 1) }];
+        const rows = [{ label: 'END OF ROUND BONUS', pts: menuRoundBase() || EOR_BASE * (stage + 1) }];
         const met = {
             // the hit that ends a round moves BONUS in the same step that ends
             // play, so update never reads it. One more look here, or the screen

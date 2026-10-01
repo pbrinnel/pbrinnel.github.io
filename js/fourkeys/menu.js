@@ -862,6 +862,15 @@
     // between them and the next arriving straight after (menuWatch). No
     // memories, no keys, no paddles -- just a score, kept as a best of its
     // own. The boss lab has no levels.js, so no rush.
+    //
+    // Each boss's END OF ROUND BONUS, in the order they come; the last is
+    // a step bigger than the rest. Past the end of the list, the last again.
+    const M_RUSH_PAYS = [1000, 2000, 3000, 4000, 5000, 7000];
+    // ...or 0 outside BOSS RUSH, and the engine pays by the screen number
+    function menuRoundBase() {
+        if (!menu || !menu.run || menu.run.n !== M_RUSH) return 0;
+        return M_RUSH_PAYS[Math.min(stage, M_RUSH_PAYS.length - 1)];
+    }
     function menuRush() {
         const whos = MENU_ALL.map(l => menuBossFor(l.n)).filter(Boolean);
         if (typeof levelsRush !== 'function' || !whos.length) { menuSay('BOSS RUSH · not in here'); return; }
