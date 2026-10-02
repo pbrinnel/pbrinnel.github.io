@@ -55,10 +55,15 @@
     //
     // Below LAMP_SWOOP_AT of his health he takes his fire back: every
     // LAMP_SWOOP_EVERY he swoops down on the lit lamp nearest him, turning to
-    // face it, and drinks it out, then climbs back up hotter. He is low and
-    // in the ball's way for the whole of the dive and the drink, and a hit
-    // then is worth LAMP_SWOOP_DMG whether he is open or not: it knocks him
-    // back up and the lamp stays lit.
+    // face it, and drinks it out, then climbs back up hotter. For the last
+    // LAMP_SWOOP_KNOCK of the dive and the drink he is low and in the
+    // ball's way, and a hit then is worth LAMP_SWOOP_DMG whether he is open
+    // or not: it knocks him back up and the lamp stays lit. Either way the
+    // swoop ends in a meteor (LAMP_SWOOP_THROW): drunk, he throws the lamp's
+    // flame back at you as he climbs; knocked off, the flame in his mouth
+    // spills down on you. The meteor's own clock stops while every lamp is
+    // lit, so without this a player keeping the fires fed would hardly ever
+    // see one -- and the swoop only ever goes for a lit lamp.
     let LAMP_LVL    = 4;
     let LAMP_HP     = 28;     // hits to finish him, once you can reach him
     let LAMP_N      = 2;      // how many lamps there are, spread evenly between the two edge ones
@@ -109,7 +114,9 @@
     let LAMP_SWOOP_DIVE  = 1.5; // seconds down to the lamp, which is the time to knock him away
     let LAMP_SWOOP_DRINK = 0.8; // ...seconds drinking it, when he still can be
     let LAMP_SWOOP_BACK  = 1.0; // ...and seconds back up
+    let LAMP_SWOOP_KNOCK = 1.5; // seconds at the end of the dive and the drink when a hit knocks him off
     let LAMP_SWOOP_DMG   = 2;   // what a hit on him down there is worth
+    let LAMP_SWOOP_THROW = 1;   // 1: every swoop ends in a meteor, drunk or knocked
     let LAMP_DIE_FLARE   = 0.6; // seconds his fires blaze up as he dies...
     let LAMP_DIE_BURN    = 2.6; // ...then burn down through their logs, top to bottom...
     let LAMP_DIE_ASH     = 1.0; // ...and leave embers that die away
@@ -127,7 +134,7 @@
                    'LAMP_MET_EVERY', 'LAMP_MET_KEEP', 'LAMP_MET_WIND', 'LAMP_MET_LOCK', 'LAMP_MET_FALL', 'LAMP_MET_SIZE',
                    'LAMP_BURN_SECS', 'LAMP_BURN_W',
                    'LAMP_SPRAY_AT', 'LAMP_SPRAY_EVERY', 'LAMP_SPRAY_OPEN', 'LAMP_SPRAY_WIND', 'LAMP_SPRAY_LOCK', 'LAMP_SPRAY_FLY', 'LAMP_SPRAY_GAP', 'LAMP_SPRAY_SIZE',
-                   'LAMP_SWOOP_AT', 'LAMP_SWOOP_EVERY', 'LAMP_SWOOP_DIVE', 'LAMP_SWOOP_DRINK', 'LAMP_SWOOP_BACK', 'LAMP_SWOOP_DMG',
+                   'LAMP_SWOOP_AT', 'LAMP_SWOOP_EVERY', 'LAMP_SWOOP_DIVE', 'LAMP_SWOOP_DRINK', 'LAMP_SWOOP_BACK', 'LAMP_SWOOP_KNOCK', 'LAMP_SWOOP_DMG', 'LAMP_SWOOP_THROW',
                    'LAMP_DIE_FLARE', 'LAMP_DIE_BURN', 'LAMP_DIE_ASH',
                    'LAMP_LAUGH_MIN', 'LAMP_LAUGH_MAX', 'LAMP_WORRY_GAP');
 
@@ -149,7 +156,7 @@
                                                                   ph: i * 2.3, lit: 99, acc: 0 })),
                      motes: [], sink: 0, fx: 1,
                      met: null, metT: LAMP_MET_EVERY * 0.6, burns: [], metN: 0, metHits: 0,
-                     swoop: null, swoopT: LAMP_SWOOP_EVERY * 0.5, swoops: 0, knocked: 0, drunk: 0,
+                     swoop: null, swoopT: LAMP_SWOOP_EVERY * 0.5, swoops: 0, knocked: 0, drunk: 0, thrown: 0,
                      spray: null, sprayT: LAMP_SPRAY_EVERY * 0.3, sprayN: 0, sprayHits: 0,
                      smug: 0, smugAt: lampLaughAt(), worryAt: -Infinity, laughs: 0, worries: 0 };
             lampBox(b);
@@ -286,6 +293,7 @@
                 lamp.swoop.st = 'back';
                 lamp.swoop.t = 0;
                 lamp.knocked++;
+                lampThrow();
             }
             const done = b.hp <= 1e-6;
             award(BOSS_PTS * (done ? 5 : 1), cx, cy);
@@ -327,7 +335,7 @@
                            (on === lamp.lamps.length ? ' · he is open, ' + soon.toFixed(1) + ' s left'
                             : ' · he cannot be touched') + ' · ' + lamp.windows + ' windows · meteors ' +
                            lamp.metN + ' (' + lamp.metHits + ' on you) · spits ' + lamp.sprayN + ' (' + lamp.sprayHits + ' gobs on you) · swoops ' + lamp.swoops + ', knocked ' +
-                           lamp.knocked + ', drunk ' + lamp.drunk + ' · laughs ' + lamp.laughs + ', MY LAMPS ' + lamp.worries + (lamp.swoop ? ' · swooping: ' + lamp.swoop.st : '') };
+                           lamp.knocked + ', drunk ' + lamp.drunk + ', thrown back ' + lamp.thrown + ' · laughs ' + lamp.laughs + ', MY LAMPS ' + lamp.worries + (lamp.swoop ? ' · swooping: ' + lamp.swoop.st : '') };
         }
     };
 
@@ -348,8 +356,15 @@
 
     function lampOpen() { return lamp.lamps.every(l => l.on > 0); }
 
-    // Down on a lamp -- diving or drinking -- he is there to be hit.
-    function lampLow() { return !!lamp.swoop && lamp.swoop.st !== 'back'; }
+    // Down on a lamp -- the last LAMP_SWOOP_KNOCK of the dive and the drink --
+    // he is there to be hit. Before that he is still near his own height,
+    // and a hit is an ordinary one.
+    function lampLow() {
+        const sw = lamp.swoop;
+        if (!sw || sw.st === 'back') return false;
+        const left = sw.st === 'dive' ? LAMP_SWOOP_DIVE - sw.t + LAMP_SWOOP_DRINK : LAMP_SWOOP_DRINK - sw.t;
+        return left <= LAMP_SWOOP_KNOCK;
+    }
 
     // How big a meteor is, across.
     const lampMetW = () => BALL_RX * 2 * LAMP_MET_SIZE;
@@ -455,6 +470,15 @@
         lamp.sprayN++;
     }
 
+    // The end of a swoop, drunk or knocked: the flame in his mouth comes at
+    // you as he climbs. The meteor's own clock is left alone, so it is extra.
+    function lampThrow() {
+        if (!LAMP_SWOOP_THROW || lamp.met) return;
+        lamp.met = { st: 'wind', t: 0, tx: segs()[0].cx };
+        lamp.metN++;
+        lamp.thrown++;
+    }
+
     // where the meteor is while it falls: on a curve, gathering speed
     function lampMetAt(m) {
         const k = Math.min(1, m.t / LAMP_MET_FALL), ty = padY() - padH() / 2 - lampMetW() * 0.3;
@@ -506,7 +530,10 @@
                                   ink: Math.random() < 0.4 ? MAGMA_RIM : MAGMA_INK });
             }
             if (sw.t >= LAMP_SWOOP_DRINK) {
-                if (sw.l.on > 0) { sw.l.on = 0; sw.l.lit = 99; lamp.drunk++; }
+                if (sw.l.on > 0) {
+                    sw.l.on = 0; sw.l.lit = 99; lamp.drunk++;
+                    lampThrow();
+                }
                 sw.st = 'back'; sw.t = 0;
             }
         }
