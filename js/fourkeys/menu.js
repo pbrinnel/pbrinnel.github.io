@@ -142,7 +142,7 @@
                  mems: (saved && saved.mems) || {}, memFrom: (saved && saved.memFrom) || {},
                  slain: (saved && saved.slain) || 0,
                  dusting: null, sel: 1, say: null, sayT: 0,
-                 cards: [], run: null, side: 0, hold: 0, sw: null,
+                 cards: [], run: null, side: 0, hold: 0, spent: 0, sw: null,
                  march: false, lift: 0, lastX: 0, into: null, walk: 0, gait: 0, arriveT: -1,
                  going: null, screen: null, press: null,
                  shows: [], showT: 0, a0: 1, padNext: null };
@@ -402,6 +402,7 @@
         menu.sw = null;
         menu.side = 0;
         menu.hold = 0;
+        menu.spent = 0;
         menu.march = false;
         menu.lift = 0;
         menu.into = null;
@@ -1292,12 +1293,17 @@
     // standing on it or not.
     //
     // The hold is what keeps it from firing every time a walk ends in a corner.
+    // A gate goes through once a lean: to go again you step off the wall by
+    // SWAP_BACKOFF and lean again. Holding still would otherwise flip through
+    // the rack, or stall on the first shorter paddle, whose end no longer
+    // reaches where the hand is.
     // Leaning while walking up the town does nothing: the gates are at home.
     const SWAP_HOLD = 0.85;          // pinned against the wall before he goes
     const SWAP_OUT = 0.26;           // him walking off
     const SWAP_IN = 0.34;            // the next one arriving
     const SWAP_PEEK = 52;            // how far in the next one noses while you hold
     const SWAP_CLEAR = 12;           // and how far past the wall they go
+    const SWAP_BACKOFF = 24;         // px the hand comes off the wall to lean on a gate again
 
     function menuNextPad(side) {
         const owned = MENU_PADS.filter(k => menu.pads[k]);
@@ -1330,11 +1336,17 @@
         // paddle.tx is the hand; paddle.x is where he got to. The hand is what
         // decides you are leaning on the wall.
         const side = paddle.tx <= hs + 1 ? -1 : paddle.tx >= LW - hs - 1 ? 1 : 0;
+        if (menu.spent) {
+            const off = menu.spent < 0 ? paddle.tx - hs : LW - hs - paddle.tx;
+            if (off >= SWAP_BACKOFF) menu.spent = 0;
+            else { menu.side = 0; menu.hold = 0; return; }
+        }
         if (side !== menu.side) { menu.side = side; menu.hold = 0; }
         if (!side || menu.lift > 1 || !menuNextPad(side)) { menu.hold = 0; return; }
         if ((menu.hold += dt) < SWAP_HOLD) return;
         menu.sw = { side, to: menuNextPad(side), from: paddle.x, t: 0, out: true };
         menu.hold = 0;
+        menu.spent = side;
     }
 
     // The next one, nosing in off the wall while you lean. Drawn over the one
