@@ -1762,7 +1762,6 @@
         menuDrawGateNote(-1);
         menuDrawGateNote(1);
         menuDrawLine();
-        menuDrawHowTo();
         // every level's best added up, along the floor under him, once there is one
         const total = menuBestTotal();
         if (total > 0) text('TOTAL HIGH SCORE ' + total, LW / 2, M_TOTAL_Y, 12, '#8d877d', 'center');
@@ -2563,23 +2562,6 @@
         if (menu.sw || menu.going || menu.sayT <= 0) return;
         ctx.globalAlpha = Math.min(1, menu.sayT / 0.4);
         text(menu.say, LW / 2, M_SAY_Y, 16, '#c9a94e', 'center');
-        ctx.globalAlpha = 1;
-    }
-
-    // M_HINT, for a phone. fourkeys.html hides the line under the field there
-    // to give its height to the field, which left nothing saying how to walk,
-    // so it is said on the town instead: in the open lane over his head while
-    // he stands at home, fading out over his first M_HOWTO_FADE px of walking.
-    const M_HOWTO = 'drag to slide brandon · hold to walk him';
-    const M_HOWTO_Y = 500;
-    const M_HOWTO_FADE = 40;
-    function menuDrawHowTo() {
-        const el = document.querySelector('.hint');
-        if (menu.sw || (el && el.offsetParent)) return;
-        const a = 1 - Math.min(1, menu.lift / M_HOWTO_FADE);
-        if (a <= 0) return;
-        ctx.globalAlpha = a;
-        text(M_HOWTO, LW / 2, M_HOWTO_Y, 15 * uiScale, PROMPT_INK, 'center');
         ctx.globalAlpha = 1;
     }
 
