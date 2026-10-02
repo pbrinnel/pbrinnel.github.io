@@ -896,7 +896,7 @@
     LAB_PAD.pair = {
         name: 'THE PAIR',
         ink: PAIR_INK, twin: true,
-        blurb: 'two of him, each 38% shorter · a hole down the middle · four of him under DOUBLE',
+        blurb: 'two of him, each 38% shorter · a hole down the middle',
         lore: 'Soldiers. Brandons. How much longer?',
         len: () => PAIR_LEN,
         split: () => true,
