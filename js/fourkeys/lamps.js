@@ -94,13 +94,22 @@
     let LAMP_DIE_FLARE   = 0.6; // seconds his fires blaze up as he dies...
     let LAMP_DIE_BURN    = 2.6; // ...then burn down through their logs, top to bottom...
     let LAMP_DIE_ASH     = 1.0; // ...and leave embers that die away
+    // He tells you where his weakness is. Hit him while he can't be touched
+    // and every few hits in a row he laughs at you; light a lamp while they
+    // are all cold and he yells MY LAMPS!, which cuts the laugh off, so the
+    // turn from smug to worried reads. The count starts over whenever a lamp
+    // is lit or a hit lands.
+    let LAMP_LAUGH_MIN = 2;   // closed hits in a row before he laughs, at least...
+    let LAMP_LAUGH_MAX = 4;   // ...and at most, rolled again after each laugh
+    let LAMP_WORRY_GAP = 25;  // seconds before MY LAMPS! can come again; the first one always comes
     LAB_KNOBS.push('LAMP_LVL', 'LAMP_HP', 'LAMP_N', 'LAMP_EDGE', 'LAMP_SECS', 'LAMP_WARN', 'LAMP_W', 'LAMP_LEAN', 'LAMP_LEAN_OUT', 'LAMP_FOOT', 'LAMP_BASE', 'LAMP_BASE_TILT', 'LAMP_Y', 'LAMP_STEER',
                    'LAMP_BOSS_W', 'LAMP_BOSS_Y', 'LAMP_SINK', 'LAMP_SWEEP', 'LAMP_OVER', 'LAMP_SHAKE_PX', 'LAMP_SHAKE_SECS', 'LAMP_CLIMB', 'LAMP_BOB', 'LAMP_BOB_RATE',
                    'LAMP_SPARKS', 'LAMP_COOL', 'LAMP_STEAL', 'LAMP_MOTES', 'LAMP_MOTE_SECS',
                    'LAMP_MET_EVERY', 'LAMP_MET_KEEP', 'LAMP_MET_WIND', 'LAMP_MET_LOCK', 'LAMP_MET_FALL', 'LAMP_MET_SIZE',
                    'LAMP_BURN_SECS', 'LAMP_BURN_W',
                    'LAMP_SWOOP_AT', 'LAMP_SWOOP_EVERY', 'LAMP_SWOOP_DIVE', 'LAMP_SWOOP_DRINK', 'LAMP_SWOOP_BACK', 'LAMP_SWOOP_DMG',
-                   'LAMP_DIE_FLARE', 'LAMP_DIE_BURN', 'LAMP_DIE_ASH');
+                   'LAMP_DIE_FLARE', 'LAMP_DIE_BURN', 'LAMP_DIE_ASH',
+                   'LAMP_LAUGH_MIN', 'LAMP_LAUGH_MAX', 'LAMP_WORRY_GAP');
 
     const LAMP_UP = -Math.PI / 2;     // stood on end, head at the top
 
@@ -108,11 +117,7 @@
 
     LAB_BOSS.lamps = {
         // the engine's yell (bossShout): under him, wherever he sweeps to
-        shout() {
-            const at = () => ({ x: lamp.x, y: lamp.y + LAMP_BOSS_W / SHAPE_ASPECT / 2 + 8 });
-            const p = at();
-            labShout(p.x, p.y, null, null, at);
-        },
+        shout() { lampSay(null); },
         start(b) {
             b.hp = b.maxHp = LAMP_HP;
             const n = Math.max(1, Math.round(LAMP_N));
@@ -124,7 +129,8 @@
                                                                   ph: i * 2.3, lit: 99, acc: 0 })),
                      motes: [], sink: 0, fx: 1,
                      met: null, metT: LAMP_MET_EVERY * 0.6, burns: [], metN: 0, metHits: 0,
-                     swoop: null, swoopT: LAMP_SWOOP_EVERY * 0.5, swoops: 0, knocked: 0, drunk: 0 };
+                     swoop: null, swoopT: LAMP_SWOOP_EVERY * 0.5, swoops: 0, knocked: 0, drunk: 0,
+                     smug: 0, smugAt: lampLaughAt(), worryAt: -Infinity, laughs: 0, worries: 0 };
             lampBox(b);
         },
         reset() { lamp = null; },
@@ -220,13 +226,31 @@
             lamp.pend = null;
             if (l) {
                 // a cold one has to be lit off him; one still burning is only topped up
-                if (l.on <= 0) l.lit = 0;
+                if (l.on <= 0) {
+                    if (lamp.lamps.every(o => o.on <= 0) && lamp.t - lamp.worryAt >= LAMP_WORRY_GAP) {
+                        lamp.worryAt = lamp.t;
+                        lamp.worries++;
+                        lampSay('MY LAMPS!');
+                    }
+                    lamp.smug = 0;
+                    l.lit = 0;
+                }
                 l.on = LAMP_SECS;
                 lamp.lit++;
                 return;
             }
             const low = lampLow();
-            if ((!lampOpen() && !low) || bossIF > 0) return;
+            if (!lampOpen() && !low) {
+                if (++lamp.smug >= lamp.smugAt) {
+                    lamp.smug = 0;
+                    lamp.smugAt = lampLaughAt();
+                    lamp.laughs++;
+                    lampSay('HAHAHA!');
+                }
+                return;
+            }
+            if (bossIF > 0) return;
+            lamp.smug = 0;
             b.flash = 1;
             bossIF = BOSS_IF;
             // down on a lamp, a hit is worth more and knocks him back up off it
@@ -281,9 +305,24 @@
                            (on === lamp.lamps.length ? ' · he is open, ' + soon.toFixed(1) + ' s left'
                             : ' · he cannot be touched') + ' · ' + lamp.windows + ' windows · meteors ' +
                            lamp.metN + ' (' + lamp.metHits + ' on you) · swoops ' + lamp.swoops + ', knocked ' +
-                           lamp.knocked + ', drunk ' + lamp.drunk + (lamp.swoop ? ' · swooping: ' + lamp.swoop.st : '') };
+                           lamp.knocked + ', drunk ' + lamp.drunk + ' · laughs ' + lamp.laughs + ', MY LAMPS ' + lamp.worries + (lamp.swoop ? ' · swooping: ' + lamp.swoop.st : '') };
         }
     };
+
+    // A bubble under him, riding along as he sweeps; null text is his BRANDON!
+    // A line of his own replaces whatever he was saying, so MY LAMPS! cuts
+    // the laugh off and two laughs never stack.
+    function lampSay(text) {
+        if (text) labShouts = [];
+        const at = () => ({ x: lamp.x, y: lamp.y + LAMP_BOSS_W / SHAPE_ASPECT / 2 + 8 });
+        const p = at();
+        labShout(p.x, p.y, text, null, at);
+    }
+
+    function lampLaughAt() {
+        const lo = Math.round(LAMP_LAUGH_MIN), hi = Math.max(lo, Math.round(LAMP_LAUGH_MAX));
+        return lo + Math.floor(Math.random() * (hi - lo + 1));
+    }
 
     function lampOpen() { return lamp.lamps.every(l => l.on > 0); }
 
