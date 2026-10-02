@@ -142,7 +142,7 @@
                  mems: (saved && saved.mems) || {}, memFrom: (saved && saved.memFrom) || {},
                  slain: (saved && saved.slain) || 0,
                  dusting: null, sel: 1, say: null, sayT: 0,
-                 cards: [], run: null, side: 0, hold: 0, spent: 0, gate: { '-1': 1, '1': 1 }, sw: null,
+                 cards: [], run: null, side: 0, hold: 0, spent: 0, gate: { '-1': 1, '1': 1 }, gateTo: {}, gateQuick: {}, sw: null,
                  march: false, lift: 0, lastX: 0, into: null, walk: 0, gait: 0, arriveT: -1,
                  going: null, screen: null, press: null,
                  shows: [], showT: 0, a0: 1, padNext: null };
@@ -404,6 +404,8 @@
         menu.hold = 0;
         menu.spent = 0;
         menu.gate = { '-1': 1, '1': 1 };
+        menu.gateTo = {};
+        menu.gateQuick = {};
         menu.march = false;
         menu.lift = 0;
         menu.into = null;
@@ -1298,7 +1300,8 @@
     // wall by SWAP_BACKOFF and lean again. Holding still would otherwise flip through
     // the rack, or stall on the first shorter paddle, whose end no longer
     // reaches where the hand is. The spent gate slides back out through its
-    // wall, and slides in again once it can be leaned on.
+    // wall, and slides in again once it can be leaned on. A gate whose paddle
+    // changes does the same, quicker, and comes back with the new name.
     // Leaning while walking up the town does nothing: the gates are at home.
     const SWAP_HOLD = 0.85;          // pinned against the wall before he goes
     const SWAP_OUT = 0.26;           // him walking off
@@ -1307,6 +1310,7 @@
     const SWAP_CLEAR = 12;           // and how far past the wall they go
     const SWAP_BACKOFF = 24;         // px the hand comes back off where it leaned before that gate opens again
     const GATE_SLIDE = 0.32;         // a spent gate going, or coming back
+    const GATE_QUICK = 0.14;         // each way, for a gate trading one name for the next
 
     function menuNextPad(side) {
         const owned = MENU_PADS.filter(k => menu.pads[k]);
@@ -1317,8 +1321,16 @@
 
     function menuSwapStep(dt) {
         for (const side of [-1, 1]) {
-            const to = menu.spent === side ? 0 : 1, v = menu.gate[side];
-            menu.gate[side] = to > v ? Math.min(1, v + dt / GATE_SLIDE) : Math.max(0, v - dt / GATE_SLIDE);
+            const next = menuNextPad(side);
+            if (!(side in menu.gateTo)) menu.gateTo[side] = next;
+            const changing = next !== menu.gateTo[side];
+            if (changing) menu.gateQuick[side] = true;
+            const to = menu.spent === side || changing ? 0 : 1, v = menu.gate[side];
+            const step = dt / (menu.gateQuick[side] ? GATE_QUICK : GATE_SLIDE);
+            menu.gate[side] = to ? Math.min(1, v + step) : Math.max(0, v - step);
+            if (menu.gate[side] === 0 && changing) menu.gateTo[side] = next;
+            // a spent gate comes back at its own pace, whatever it went out at
+            if (menu.gate[side] === 1 || (menu.gate[side] === 0 && menu.spent === side)) menu.gateQuick[side] = false;
         }
         const hs = halfSpan();
         if (menu.sw) {
@@ -2528,7 +2540,8 @@
         ctx.closePath();
     }
     function menuDrawGate(side) {
-        const to = menuNextPad(side);
+        // the name it is showing, which trails the real one by a slide out
+        const to = side in menu.gateTo ? menu.gateTo[side] : menuNextPad(side);
         const p = to && LAB_PAD[to];
         if (!p) return;
         const on = menu.side === side && !menu.sw && menu.lift <= 1;
