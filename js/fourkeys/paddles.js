@@ -74,7 +74,6 @@
     let V2_SWEEP   = 0.9;    // ...and how long a glint takes to cross him
     let PAD_FAVOUR = 0.5;    // MULTI, PRINCE: this share of capsules is his, before the usual roll
     let MULTI_LEN  = 0.7;    // MULTI: shorter, since every other capsule is a spare head
-    let MULTI_POP  = 2.5;    // MULTI: seconds between one pair of heads flying off him and the next
     let MULTI_SLIP = 4;      // MULTI: px each of his two misprints is out of register, at the game's size...
     let MULTI_PRINT = 0.45;  // ...and how strongly each shows
     let BLUR_LEN   = 0.75;   // BLUR: shorter, so there is less of him to whack with
@@ -88,7 +87,7 @@
     let BLUR_SETTLE = 0.25;  // ...and seconds he takes to lie flat again when no head is in play
     let BLUR_BAND  = 40;     // ...px either side of the middle where he keeps the way he is turning
     let BLUR_FLIP  = 0.4;    // ...and seconds to swing from full one way to full the other
-    LAB_KNOBS.push('PAD_FAVOUR', 'MULTI_LEN', 'MULTI_POP', 'MULTI_SLIP', 'MULTI_PRINT',
+    LAB_KNOBS.push('PAD_FAVOUR', 'MULTI_LEN', 'MULTI_SLIP', 'MULTI_PRINT',
                    'BLUR_LEN', 'BLUR_SPIN', 'BLUR_SPIN_X', 'BLUR_TRAIL', 'BLUR_GAP', 'BLUR_KICK', 'BLUR_UP', 'BLUR_RAMP', 'BLUR_SETTLE', 'BLUR_BAND', 'BLUR_FLIP');
     LAB_KNOBS.push('GILDED_LEN', 'GILDED_CAPS', 'GILDED_SHINE', 'STAT_LEN', 'STAT_ANGLE', 'STAT_SPIN',
                    'STAT_DIP', 'STAT_HEAVY', 'CRYST_LEN', 'CRYST_EDGE', 'CRYST_SWIPE', 'CRYST_DECK', 'CRYST_FLAKES', 'CRYST_BIG', 'ICE_SECS', 'ICE_RAMP', 'ICE_TURN',
@@ -225,21 +224,20 @@
         }
         ctx.globalAlpha = 1;
         for (const b of padBits) {
-            const a = Math.max(0, 1 - b.t / b.life) * b.a * (b.fadeIn ? Math.min(1, b.t / b.fadeIn) : 1);
-            const baked = b.kind === 'bigflake' ? padFlakeSprite(b.ink) : b.kind === 'head' ? padHeadSprite(b.ink)
-                        : b.kind === 'face' ? padFaceSprite(b.ink) : null;
+            const a = Math.max(0, 1 - b.t / b.life) * b.a;
+            const baked = b.kind === 'bigflake' ? padFlakeSprite(b.ink) : b.kind === 'head' ? padHeadSprite(b.ink) : null;
             if (baked) {
                 // s is half its width, as a flake's is
                 const w = b.s * 2, h = w * baked.height / baked.width;
                 ctx.save();
                 ctx.globalAlpha = a;
                 ctx.translate(b.x, b.y);
-                ctx.rotate(b.ph + b.t * (b.turn !== undefined ? b.turn : b.kind === 'head' ? 0.6 : 0.8));
+                ctx.rotate(b.ph + b.t * (b.kind === 'head' ? 0.6 : 0.8));
                 ctx.drawImage(baked, -w / 2, -h / 2, w, h);
                 ctx.restore();
                 continue;
             }
-            if (b.kind === 'head' || b.kind === 'face') continue;     // his art is not in yet
+            if (b.kind === 'head') continue;     // his art is not in yet
             // a big flake whose sprite is not ready yet is drawn as a small one
             if (b.kind === 'flake' || b.kind === 'bigflake') {
                 // a six-armed speck of ice, turning as it goes
@@ -340,17 +338,6 @@
             if (!ready(ballImg)) return false;
             g.filter = 'blur(' + PAD_ASH_BLUR + 'px) grayscale(1) contrast(1.35) brightness(1.05)';
             g.drawImage(ballImg, m, m, w, h);
-            return true;
-        });
-    }
-
-    // his head as it is, with only a little of `ink` over it: MULTI's heads
-    // are the heads in play, and have to look like them
-    function padFaceSprite(ink) {
-        const w = PAD_SPECK_BAKE, h = Math.round(w * BALL_RY / BALL_RX);
-        return padBakeSpeck('face' + ink, w, h, ink, 0.3, g => {
-            if (!ready(ballImg)) return false;
-            g.drawImage(ballImg, 0, 0, w, h);
             return true;
         });
     }
@@ -978,8 +965,7 @@
     // MULTI: his photograph as it is, over two more prints of him out of
     // register, gold up and left and blue down and right, so there is more
     // than one of him without anything washed over him (a gold wash read as
-    // GILDED). Every MULTI_POP two heads fly up off him on the fan MULTI sends
-    // new heads out on, so he says what he is for. `ink` is only for his card.
+    // GILDED). `ink` is only for his card.
     LAB_PAD.multi = {
         name: 'MULTI',
         ink: MULTI_INK,
@@ -988,7 +974,6 @@
         len: () => MULTI_LEN,
         blurb: '30% shorter · 50% of power-ups are MULTI',
         lore: 'Countless soldiers. Countless Brandons. Forever.',
-        popT: 0,
         under() {
             ctx.globalCompositeOperation = 'lighter';
             for (const [ink, ux, uy] of this.prints) {
@@ -1007,17 +992,6 @@
             }
             ctx.globalCompositeOperation = 'source-over';
             ctx.globalAlpha = padK;
-        },
-        step(dt) {
-            if ((this.popT += dt) < MULTI_POP) return;
-            this.popT = 0;
-            const p = padSomewhere(0.3);
-            for (const side of [-1, 1]) {
-                const a = -Math.PI / 2 + side * 0.42, v = 150;
-                const b = padBit(p.x, padY() - padH() * 0.3, MULTI_INK, 1.1, Math.cos(a) * v, Math.sin(a) * v,
-                                 110, 9, 0.9, 'face');
-                if (b) { b.turn = side * 2; b.fadeIn = 0.12; }
-            }
         }
     };
 
