@@ -20,12 +20,16 @@
 //
 // TOTAL needs everyone's best on every stage, not only the rows that made a
 // table, so every score posted is also kept as a best per initials in BESTS.
-// That is what lets IN_TOTAL change later and still add up right: the next
-// posted score recomputes it from BESTS.
+// That is what lets IN_TOTAL change later and still add up right.
+//
+// VIEW is stamped with the TOTAL_RULE it was added up under. A deploy that
+// changes how TOTAL is counted changes the rule, and the first GET after it
+// finds a stale stamp and recomputes TOTAL from BESTS, so a stored TOTAL never
+// outlives the code that made it.
 //
 // Two keys, so a page load reads only the small one: VIEW is what GET returns,
-// BESTS is only read on a POST. A POST is at most two KV writes, which puts the
-// free plan's 1,000 writes a day at 500 scores a day.
+// BESTS is only read on a POST, or on that one GET. A POST is at most two KV
+// writes, which puts the free plan's 1,000 writes a day at 500 scores a day.
 //
 // No attempt is made to stop a determined cheat -- the game is client side, so
 // anyone can POST whatever they like. The clamps only keep the tables from
@@ -41,6 +45,8 @@ const BESTS = 'bests';
 // here and in the page's BOARD_IDS.
 const STAGES = ['FARM', 'RUINS', 'CITY', 'VOLCANO', 'CASTLE', 'VOID', 'BOSS RUSH'];
 const IN_TOTAL = ['FARM', 'RUINS', 'CITY', 'VOLCANO', 'CASTLE', 'VOID'];
+// how totals() counts; change the word in front whenever totals() changes
+const TOTAL_RULE = 'every:' + IN_TOTAL.join(',');
 // The paddles' ids, the keys of LAB_PAD in js/fourkeys/paddles.js. These are not
 // the save file's tokens, which stay pinned when a paddle is renamed. One the
 // page sends that is not here is left off the row rather than refused.
@@ -65,7 +71,7 @@ const byScore = (a, b) => b.score - a.score || (a.at || 0) - (b.at || 0);
 function shape(view) {
   const boards = {};
   for (const s of STAGES) boards[s] = (view && view.boards && view.boards[s]) || [];
-  return { boards, total: (view && view.total) || [] };
+  return { boards, total: (view && view.total) || [], rule: view && view.rule };
 }
 
 function totals(bests) {
@@ -88,7 +94,13 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, { headers: CORS });
 
     if (request.method === 'GET') {
-      return json(shape(await env.SCORES.get(VIEW, 'json')));
+      const view = shape(await env.SCORES.get(VIEW, 'json'));
+      if (view.rule !== TOTAL_RULE) {
+        view.total = totals((await env.SCORES.get(BESTS, 'json')) || {});
+        view.rule = TOTAL_RULE;
+        await env.SCORES.put(VIEW, JSON.stringify(view));
+      }
+      return json(view);
     }
 
     if (request.method === 'POST') {
@@ -129,11 +141,15 @@ export default {
         list.sort(byScore);
         view.boards[stage] = list.slice(0, TOP_N);
       }
-      if (raised) view.total = totals(bests);
+      const stale = view.rule !== TOTAL_RULE;
+      if (raised || stale) {
+        view.total = totals(bests);
+        view.rule = TOTAL_RULE;
+      }
 
       await Promise.all([
         raised && env.SCORES.put(BESTS, JSON.stringify(bests)),
-        (raised || onBoard) && env.SCORES.put(VIEW, JSON.stringify(view)),
+        (raised || onBoard || stale) && env.SCORES.put(VIEW, JSON.stringify(view)),
       ]);
       return json(view);
     }
