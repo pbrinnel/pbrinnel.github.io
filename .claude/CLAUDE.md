@@ -58,7 +58,8 @@ touches it.
   draws, and every flash in it is rationed for photosensitive players), `menu.js` (the town), `debug.js` (what the konami code and
   `?debug` open: the keys, the paddles, and a hold to forget it all), `intro.js` (the
   BRANDON WINS and 2000 YEARS LATER cards before the town), `memory.js` (the cutscene a
-  level's first win plays and MEMORIES replays), and `start.js`, which is where the game
+  level's first win plays and MEMORIES replays), `lore.js` (the lines PAUSED, and READY after a
+  lost head, pick from at random; Paul writes them), and `start.js`, which is where the game
   begins.
 - The boss lab builds from these files but not from `intro.js`, `debug.js`, `levels.js` or `powers.js`, and it runs
   brandon.html's engine. It does build `memory.js`, for the VOID's end (Odin, and his

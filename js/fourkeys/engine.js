@@ -2119,6 +2119,7 @@
 
     // stopped, the pointer comes back, so you can see what you are clicking on
     function hold(on) {
+        if (on && !paused) loreNow = lorePick();
         paused = on;
         lockMissed = false;
         showCursor(on);
@@ -4900,6 +4901,62 @@
         return w > maxW ? size * (maxW / w) : size;
     }
 
+    // The lore line under PAUSED, and under READY once you are down a head --
+    // never the first serve of a run (Paul, 2 Oct 2026). Word-wrapped to at
+    // most LORE_ROWS rows, shrinking from LORE_SIZE until it fits, so the hud's
+    // phone scale-up can't push it into a third row. Returns the rows and size
+    // without drawing, so a screen can make room for them first.
+    const LORE_SIZE = 14, LORE_ROWS = 2, LORE_W = LW - 120, LORE_PITCH = 1.3;
+    function loreFont(size) { return 'italic ' + size + 'px "Fira Sans", "Trebuchet MS", sans-serif'; }
+    function loreWrap(str, w) {
+        const rows = [''];
+        for (const word of str.split(' ')) {
+            const row = rows[rows.length - 1], next = row ? row + ' ' + word : word;
+            if (row && ctx.measureText(next).width > w) rows.push(word);
+            else rows[rows.length - 1] = next;
+        }
+        return rows;
+    }
+    function loreLayout(str, u) {
+        let size = LORE_SIZE * u;
+        for (;;) {
+            ctx.font = loreFont(size);
+            let rows = loreWrap(str, LORE_W);
+            if (rows.length <= LORE_ROWS || size < 8) {
+                // narrowed as far as it keeps the same rows, so the last row
+                // isn't one word left hanging under a full one
+                let w = LORE_W;
+                while (rows.length > 1) {
+                    const tighter = loreWrap(str, w - 8);
+                    if (tighter.length > rows.length) break;
+                    rows = tighter;
+                    w -= 8;
+                }
+                return { rows, size };
+            }
+            size *= 0.92;
+        }
+    }
+    // y is the first row's baseline
+    function drawLore(lay, y) {
+        ctx.font = loreFont(lay.size);
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#b8ae9c';
+        lay.rows.forEach((row, i) => ctx.fillText(row, LW / 2, y + i * lay.size * LORE_PITCH));
+    }
+    let loreNow = '';              // the line the pause or READY screen up now drew
+    let loreReady = false;         // READY has picked its line; cleared once READY is gone
+
+    // A dark band at my, bandH tall, grown down to hold the lore under the
+    // band's own caption, whose baseline is subY. Draws the band, then the lore.
+    function loreBand(lay, my, bandH, subY, u) {
+        const y = subY + 22 * u + lay.size * 0.7;
+        const bottom = y + (lay.rows.length - 1) * lay.size * LORE_PITCH + lay.size * 0.3 + 18 * u;
+        ctx.fillStyle = 'rgba(0,0,0,0.72)';
+        ctx.fillRect(0, my - bandH / 2, LW, Math.max(bandH, bottom - (my - bandH / 2)));
+        drawLore(lay, y);
+    }
+
     // the clang off an unbreakable brick: a ring spreading from the point of
     // contact. deliberately nothing like the damage flash -- it says "solid",
     // not "nearly".
@@ -5992,6 +6049,7 @@
             return;
         }
 
+        if (phase !== 'ready') loreReady = false;
         // the band stays away until the title beat, so the rise plays clean --
         // and out of his second wind entirely, which has nothing to tap and
         // plays out right where the band would sit
@@ -5999,8 +6057,15 @@
             && (phase !== 'ascend' || ascendT >= A_TITLE)) {
             const my = 424;
             const bandH = 104 * u;
-            ctx.fillStyle = 'rgba(0,0,0,0.72)';
-            ctx.fillRect(0, my - bandH / 2, LW, bandH);
+            // READY carries lore once a head is gone (a run starts with 3), and
+            // draws a fresh line each time it comes up
+            if (phase === 'ready' && lives < 3) {
+                if (!loreReady) { loreNow = lorePick(); loreReady = true; }
+                loreBand(loreLayout(loreNow, u), my, bandH, my + 26 * u, u);
+            } else {
+                ctx.fillStyle = 'rgba(0,0,0,0.72)';
+                ctx.fillRect(0, my - bandH / 2, LW, bandH);
+            }
 
             const msg = phase === 'ready' ? (serveWait ? 'WAIT' : stage === 0 && lives === 3 && score === 0
                             ? 'BRANDON' : 'READY')
@@ -6107,8 +6172,7 @@
     // it is drawn over. The words go over the glow, not under it.
     function drawPaused() {
         const u = uiScale, my = 424, bandH = 104 * u;
-        ctx.fillStyle = 'rgba(0,0,0,0.72)';
-        ctx.fillRect(0, my - bandH / 2, LW, bandH);
+        loreBand(loreLayout(loreNow, u), my, bandH, my + 26 * u, u);
         // only heads you are playing: not in the town, and not under a cutscene
         // or a memory played over a fight, where the head is not yours to find
         const cut = menuUp() || (typeof menuUnlockUp === 'function' && menuUnlockUp())
