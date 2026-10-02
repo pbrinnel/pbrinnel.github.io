@@ -67,7 +67,7 @@ reader has no way to read one.
 - The year-0 memory (`now`, marked `always`) is never written either, because everyone
   has it.
 - `BOSSES` is written once, and only when the count is above 0. The count is one way to
-  buy MULTI, STATUE, PRINCE, CHELL and BLUR (`MENU_SLAIN_PADS`), but a save lists those paddles on
+  buy STATUE, MULTI, PRINCE, CHELL and BLUR (`MENU_SLAIN_PADS`), but a save lists those paddles on
   `PADDLE` lines like any other, so a paddle never depends on the count to load. Progress
   from before the count existed starts it at the number of keys held, the next time a
   boss is beaten.

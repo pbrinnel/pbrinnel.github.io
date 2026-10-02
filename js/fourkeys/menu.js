@@ -66,7 +66,7 @@
     // live with, MULTI and STATUE, come early this way, so a player who
     // needs the help is not made to win cleanly first; STATUE is still the
     // RUINS' own for a run without a continue...
-    const MENU_SLAIN_PADS = [[3, 'multi'], [4, 'statue'], [10, 'prince'], [15, 'chell'], [20, 'blur']];
+    const MENU_SLAIN_PADS = [[3, 'statue'], [5, 'multi'], [10, 'prince'], [15, 'chell'], [20, 'blur']];
     // ...and the rest, sooner, each with a flawless win of a level: not a
     // head lost and no continue (menuBeatSlew)
     const MENU_FLAWLESS_PADS = { 1: 'multi', 2: 'prince', 3: 'chell', 4: 'blur' };
