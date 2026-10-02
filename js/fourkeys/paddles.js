@@ -73,7 +73,7 @@
     let V2_GLINT   = 5;      // ...seconds between one glint and the next...
     let V2_SWEEP   = 0.9;    // ...and how long a glint takes to cross him
     let PAD_FAVOUR = 0.5;    // MULTI, PRINCE: this share of capsules is his, before the usual roll
-    let MULTI_LEN  = 0.8;    // MULTI: shorter, since every other capsule is a spare head
+    let MULTI_LEN  = 0.7;    // MULTI: shorter, since every other capsule is a spare head
     let MULTI_POP  = 2.5;    // MULTI: seconds between one pair of heads flying off him and the next
     let MULTI_SLIP = 4;      // MULTI: px each of his two misprints is out of register, at the game's size...
     let MULTI_PRINT = 0.45;  // ...and how strongly each shows
@@ -986,7 +986,7 @@
         prints: [[MULTI_INK, -1, -0.5], [MULTI_BLUE, 1, 0.5]],     // color, and which way it slips
         favour: 'M',
         len: () => MULTI_LEN,
-        blurb: '20% shorter · 50% of power-ups are MULTI',
+        blurb: '30% shorter · 50% of power-ups are MULTI',
         lore: 'Countless soldiers. Countless Brandons. Forever.',
         popT: 0,
         under() {
