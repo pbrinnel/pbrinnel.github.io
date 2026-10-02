@@ -1805,14 +1805,23 @@
         }
         if (!him) menuDrawHim();
         menuDrawPush();
-        if (k < 1 || menuMotion()) return;
+        // every level's best added up, along the floor under him, once there is one.
+        // It eases in and out with the town settling rather than switching on.
+        const total = menuBestTotal(), still = k >= 1 && !menuMotion();
+        const tt = menuNow(), tdt = Math.min(0.1, tt - (menu.totalT || tt));
+        menu.totalT = tt;
+        menu.totalA = menuClamp((menu.totalA || 0) + (still && total > 0 ? tdt : -tdt) / M_TOTAL_FADE);
+        if (menu.totalA > 0) {
+            ctx.globalAlpha = menu.totalA;
+            text('TOTAL HIGH SCORE ' + fmtScore(total), LW / 2, M_TOTAL_Y, 12, '#8d877d', 'center');
+            ctx.globalAlpha = 1;
+        }
+        if (!still) return;
         menuPadPeek();
         menuDrawLine();
-        // every level's best added up, along the floor under him, once there is one
-        const total = menuBestTotal();
-        if (total > 0) text('TOTAL HIGH SCORE ' + total, LW / 2, M_TOTAL_Y, 12, '#8d877d', 'center');
     }
     const M_TOTAL_Y = 592;
+    const M_TOTAL_FADE = 0.6;        // seconds for the TOTAL line to fade in or out
 
     // ---- the ground and the sky --------------------------------------------------------
     // What the town stands on, under the town's own rules: flat, thin, dark,
