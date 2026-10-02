@@ -297,10 +297,15 @@
                     // a notch down -- or, once the floor is reached, back up,
                     // but never up into the wall. A wall turns him round at
                     // the bottom of it; a stone is stepped past.
+                    // Already outside that band, he heads back into it: a bounce
+                    // there would send him on away from it, off the screen.
                     const ceil = congaCeil(), floor = Math.max(CONGA_FLOOR, ceil + CONGA_DROP);
                     if (lead.cy < ceil) conga.vdir = 1;
-                    const next = lead.cy + conga.vdir * CONGA_DROP;
-                    if (next > floor || next < ceil) conga.vdir = -conga.vdir;
+                    else if (lead.cy > floor) conga.vdir = -1;
+                    else {
+                        const next = lead.cy + conga.vdir * CONGA_DROP;
+                        if (next > floor || next < ceil) conga.vdir = -conga.vdir;
+                    }
                     conga.drop = CONGA_DROP;
                     conga.flip = !!wall;
                 } else lead.cx = to;
@@ -372,6 +377,10 @@
             return;
         }
         if (conga.turnT > 0) return;
+        // Not while any of them is still coming on, off the screen or up in the
+        // wall: the back would lead from out there, and nobody could reach it.
+        const ceil = congaCeil();
+        if (line.some(x => x.cy < ceil - 1 || x.cx < bw / 2 - 1 || x.cx > LW - bw / 2 + 1)) return;
         // anyone else: the whole line turns round, and the back is the front.
         // The path they are standing on turns round with them: the stretch
         // from the back one to the front one, end for end.
