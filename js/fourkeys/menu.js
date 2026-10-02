@@ -88,10 +88,12 @@
     const MENU_PAD_KEY = 'brandon2.paddle';
     // the line under the field: in the town there is nothing to serve
     const M_HINT = 'move to slide brandon · hold to walk him';
-    // the rack, in the order the gates walk through it: the one you start with,
-    // then the one each level is guarding, then the souvenir
-    // (a level's paddle the count also buys keeps its level's place)
-    const MENU_PADS = [...new Set(['standard'].concat(MENU_LEVELS.map(l => l.pad), MENU_LAST.pad, MENU_SOUVENIR,
+    // the rack, in the order the gates walk through it: the original, the one
+    // you start with, then the one each level is guarding (a level's paddle the
+    // count also buys keeps its level's place). The souvenir leads even though
+    // it is earned later; the order is only how they are laid out, not when
+    // they unlock.
+    const MENU_PADS = [...new Set([MENU_SOUVENIR, 'standard'].concat(MENU_LEVELS.map(l => l.pad), MENU_LAST.pad,
                                                       MENU_SLAIN_PADS.map(s => s[1])))];
 
     let menu = null;                 // the hub outlives a stage: see menuWatch
