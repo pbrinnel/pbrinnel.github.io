@@ -27,6 +27,17 @@
     // every LAMP_MET_EVERY with all of them cold, and not at all with all of
     // them lit -- lighting lamps disarms him as well as opening him, without
     // the meteor going quiet for most of the fight, when most lamps are lit.
+    // It burns white-hot inside a dark edge, where a head off MAGMA burns
+    // orange, so the two never read as one when they cross.
+    //
+    // Below LAMP_SPRAY_AT of his health he spits as well, on a clock of his
+    // own so the meteor and the swoop come as often as they did: three gobs
+    // of the same white-hot fire swell in his mouth while three marks on your
+    // line follow you, then all of them fly at once, LAMP_SPRAY_GAP apart
+    // where they land -- room to stand between two. Each one that meets you
+    // is a helping of SLUGGISH. It is the one attack lighting every lamp does
+    // not stop (LAMP_SPRAY_OPEN), so the second half of the fight never goes
+    // quiet while he is open.
     //
     // A ball can't be aimed at the one cold lamp, so the lit ones point the
     // way. Mostly that is the logs' own lean, LAMP_LEAN: the inner one faces
@@ -85,6 +96,14 @@
     let LAMP_MET_SIZE  = 1.7; // ...and how big it is, of a head
     let LAMP_BURN_SECS = 0.5; // seconds the ground burns where it lands
     let LAMP_BURN_W    = 130; // ...px wide
+    let LAMP_SPRAY_AT    = 0.5;  // share of his health under which he spits
+    let LAMP_SPRAY_EVERY = 7;    // seconds between spits
+    let LAMP_SPRAY_OPEN  = 1;    // 1: he spits while he is open too; 0: only while a lamp is cold
+    let LAMP_SPRAY_WIND  = 0.9;  // seconds the gobs swell in his mouth, which is the tell
+    let LAMP_SPRAY_LOCK  = 0.6;  // ...share of that the marks follow you for, before they stop
+    let LAMP_SPRAY_FLY   = 0.75; // seconds the gobs take to land
+    let LAMP_SPRAY_GAP   = 190;  // px between gobs where they land
+    let LAMP_SPRAY_SIZE  = 0.75; // how big a gob is, of a head: smaller than a head, so it never looks like one
     let LAMP_SWOOP_AT  = 0.75; // share of his health under which he swoops on his lamps
     let LAMP_SWOOP_EVERY = 12; // seconds between swoops
     let LAMP_SWOOP_DIVE  = 1.5; // seconds down to the lamp, which is the time to knock him away
@@ -107,6 +126,7 @@
                    'LAMP_SPARKS', 'LAMP_COOL', 'LAMP_STEAL', 'LAMP_MOTES', 'LAMP_MOTE_SECS',
                    'LAMP_MET_EVERY', 'LAMP_MET_KEEP', 'LAMP_MET_WIND', 'LAMP_MET_LOCK', 'LAMP_MET_FALL', 'LAMP_MET_SIZE',
                    'LAMP_BURN_SECS', 'LAMP_BURN_W',
+                   'LAMP_SPRAY_AT', 'LAMP_SPRAY_EVERY', 'LAMP_SPRAY_OPEN', 'LAMP_SPRAY_WIND', 'LAMP_SPRAY_LOCK', 'LAMP_SPRAY_FLY', 'LAMP_SPRAY_GAP', 'LAMP_SPRAY_SIZE',
                    'LAMP_SWOOP_AT', 'LAMP_SWOOP_EVERY', 'LAMP_SWOOP_DIVE', 'LAMP_SWOOP_DRINK', 'LAMP_SWOOP_BACK', 'LAMP_SWOOP_DMG',
                    'LAMP_DIE_FLARE', 'LAMP_DIE_BURN', 'LAMP_DIE_ASH',
                    'LAMP_LAUGH_MIN', 'LAMP_LAUGH_MAX', 'LAMP_WORRY_GAP');
@@ -130,6 +150,7 @@
                      motes: [], sink: 0, fx: 1,
                      met: null, metT: LAMP_MET_EVERY * 0.6, burns: [], metN: 0, metHits: 0,
                      swoop: null, swoopT: LAMP_SWOOP_EVERY * 0.5, swoops: 0, knocked: 0, drunk: 0,
+                     spray: null, sprayT: LAMP_SPRAY_EVERY * 0.3, sprayN: 0, sprayHits: 0,
                      smug: 0, smugAt: lampLaughAt(), worryAt: -Infinity, laughs: 0, worries: 0 };
             lampBox(b);
         },
@@ -160,6 +181,7 @@
             const want = 1 - lamp.lamps.reduce((s, l) => s + lampHeld(l), 0) / lamp.lamps.length;
             lamp.heat += Math.max(-dt / LAMP_COOL, Math.min(dt / LAMP_COOL, want - lamp.heat));
             lampMeteorStep(dt);
+            lampSprayStep(b, dt);
             lampStealStep(dt);
             lampSparkStep(b, dt);
             lampBox(b);
@@ -268,7 +290,7 @@
             const done = b.hp <= 1e-6;
             award(BOSS_PTS * (done ? 5 : 1), cx, cy);
             if (done) {
-                lamp.met = null; lamp.burns = []; lamp.swoop = null;
+                lamp.met = null; lamp.burns = []; lamp.swoop = null; lamp.spray = null;
                 b.alive = false;
                 clearStage();
                 bossFall = shatter(lamp.x, lamp.y, LAMP_BOSS_W, A_DIE_T);
@@ -304,7 +326,7 @@
                      line: on + ' of ' + lamp.lamps.length + ' lit' +
                            (on === lamp.lamps.length ? ' · he is open, ' + soon.toFixed(1) + ' s left'
                             : ' · he cannot be touched') + ' · ' + lamp.windows + ' windows · meteors ' +
-                           lamp.metN + ' (' + lamp.metHits + ' on you) · swoops ' + lamp.swoops + ', knocked ' +
+                           lamp.metN + ' (' + lamp.metHits + ' on you) · spits ' + lamp.sprayN + ' (' + lamp.sprayHits + ' gobs on you) · swoops ' + lamp.swoops + ', knocked ' +
                            lamp.knocked + ', drunk ' + lamp.drunk + ' · laughs ' + lamp.laughs + ', MY LAMPS ' + lamp.worries + (lamp.swoop ? ' · swooping: ' + lamp.swoop.st : '') };
         }
     };
@@ -366,9 +388,71 @@
         if (lamp.swoop) return;              // one thing at a time
         const pace = lampOpen() ? 0 : LAMP_MET_KEEP + (1 - LAMP_MET_KEEP) * lamp.heat;
         if ((lamp.metT -= dt * pace) > 0) return;
+        // a spit in the air holds it back rather than costing it its turn
+        if (lamp.spray) { lamp.metT = 0; return; }
         lamp.metT = LAMP_MET_EVERY;
         lamp.met = { st: 'wind', t: 0, tx: segs()[0].cx };
         lamp.metN++;
+    }
+
+    // where his mouth is: LAMP_BOSS_W * 0.36 along from his middle, on the side he faces
+    function lampMouth() {
+        return { x: lamp.x + lamp.fx * LAMP_BOSS_W * 0.36, y: lamp.y - LAMP_BOSS_W / SHAPE_ASPECT * 0.1 };
+    }
+    // How big a gob is, across.
+    const lampGobW = () => BALL_RX * 2 * LAMP_SPRAY_SIZE;
+    // where a spit's three gobs land: on you and either side of you, kept on the field
+    function lampSprayXs(s) {
+        const r = lampGobW() / 2;
+        return [-1, 0, 1].map(i => Math.max(r, Math.min(LW - r, s.cx + i * LAMP_SPRAY_GAP)));
+    }
+    // ...and where gob x is in its flight: straight at its mark, faster as it goes
+    function lampGobAt(s, x) {
+        const k = Math.min(1, s.t / LAMP_SPRAY_FLY), e = k * (0.6 + 0.4 * k);
+        const ty = padY() - padH() / 2 - lampGobW() * 0.3;
+        return { x: s.x0 + (x - s.x0) * e, y: s.y0 + (ty - s.y0) * e };
+    }
+
+    // The spit: below LAMP_SPRAY_AT, its own clock, a swell in his mouth while
+    // the marks follow you, and three gobs flying at once.
+    function lampSprayStep(b, dt) {
+        if (phase !== 'play') { lamp.spray = null; return; }
+        const s = lamp.spray;
+        if (s) {
+            s.t += dt;
+            if (s.st === 'wind') {
+                if (s.t < LAMP_SPRAY_WIND * LAMP_SPRAY_LOCK) {
+                    s.cx = segs().reduce((p, q) => Math.abs(q.cx - s.cx) < Math.abs(p.cx - s.cx) ? q : p).cx;
+                }
+                if (s.t >= LAMP_SPRAY_WIND) {
+                    const m = lampMouth();
+                    s.st = 'fly'; s.t = 0; s.x0 = m.x; s.y0 = m.y;
+                }
+                return;
+            }
+            if (s.t < LAMP_SPRAY_FLY) return;
+            // down: each that meets you is a helping
+            const py = padY() - padH() / 2, r = lampGobW() / 2;
+            for (const x of lampSprayXs(s)) {
+                const sg = padNear(x, py, r * 0.8, padH() / 2);
+                if (sg) { addDrag(sg, x); lamp.sprayHits++; }
+                rings.push({ x, y: py, t: 0.6 });
+                for (let i = 0; i < 9; i++) {
+                    lamp.sparks.push({ x: x + (Math.random() - 0.5) * r * 2, y: py, vx: (Math.random() - 0.5) * 180,
+                                       vy: -60 - Math.random() * 150, t: 0, life: 0.4 + Math.random() * 0.4,
+                                       s: 2 + Math.random() * 2, ink: Math.random() < 0.4 ? MAGMA_RIM : MAGMA_INK, ph: Math.random() * 6.28 });
+                }
+            }
+            lamp.spray = null;
+            return;
+        }
+        if (b.hp >= b.maxHp * LAMP_SPRAY_AT || (!LAMP_SPRAY_OPEN && lampOpen())) return;
+        if ((lamp.sprayT -= dt) > 0) return;
+        // one thing at a time: it waits out a meteor or a swoop, and keeps its turn
+        if (lamp.met || lamp.swoop) { lamp.sprayT = 0; return; }
+        lamp.sprayT = LAMP_SPRAY_EVERY;
+        lamp.spray = { st: 'wind', t: 0, cx: segs()[0].cx };
+        lamp.sprayN++;
     }
 
     // where the meteor is while it falls: on a curve, gathering speed
@@ -390,6 +474,7 @@
             lamp.fx += Math.max(-dt * 3, Math.min(dt * 3, 1 - lamp.fx));
             if (phase !== 'play' || b.hp >= b.maxHp * LAMP_SWOOP_AT || lamp.met) return;
             if ((lamp.swoopT -= dt) > 0) return;
+            if (lamp.spray) { lamp.swoopT = 0; return; }    // after the spit, not instead of it
             const lit = lamp.lamps.filter(l => l.on > 0);
             if (!lit.length) return;          // goes as soon as there is one to drink
             lamp.swoopT = LAMP_SWOOP_EVERY;
@@ -511,61 +596,126 @@
         lampDrawSparks();
     }
 
-    // his fire coming down: the mark on your line while he rears, the
-    // meteor as it falls, and the ground burning after
+    // His fire as a thing thrown: a head w across, molten -- his face as
+    // heat, its shadows red, its middle tones orange and its highlights pale
+    // gold -- inside a dark edge LAMP_HOT_EDGE px thick, in his glow. A head
+    // off MAGMA is his photo washed orange, so this differs from it in how
+    // bright it is and in its edge, not only in size, and his face still
+    // reads in it: a flat fill would be a potato.
+    const LAMP_HOT_EDGE = 2.5;
+    // baked once, from composites alone: reading the photo's pixels would
+    // fail from file:// and the game must look the same there as online
+    function lampHotSprite() {
+        if (spriteCache.has('lampHot')) return spriteCache.get('lampHot');
+        if (!ready(ballImg)) return null;
+        const w = ballImg.naturalWidth * 2, h = ballImg.naturalHeight * 2;
+        const canvasOf = () => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+        // the photo in grey through `filter`, times `ink`, cut to his outline
+        const layer = (filter, ink) => {
+            const c = canvasOf(), g = c.getContext('2d');
+            g.filter = filter;
+            g.drawImage(ballImg, 0, 0, w, h);
+            g.filter = 'none';
+            g.globalCompositeOperation = 'multiply';
+            g.fillStyle = ink;
+            g.fillRect(0, 0, w, h);
+            g.globalCompositeOperation = 'destination-in';
+            g.drawImage(ballImg, 0, 0, w, h);
+            return c;
+        };
+        const c = canvasOf(), g = c.getContext('2d');
+        g.drawImage(ballImg, 0, 0, w, h);
+        g.globalCompositeOperation = 'source-in';
+        g.fillStyle = '#5a1006';
+        g.fillRect(0, 0, w, h);
+        g.globalCompositeOperation = 'lighter';
+        g.drawImage(layer('grayscale(1) contrast(1.4)', '#f06418'), 0, 0);
+        g.drawImage(layer('grayscale(1) contrast(2.6) brightness(0.9)', '#ffe48a'), 0, 0);
+        spriteCache.set('lampHot', c);
+        return c;
+    }
+    function lampHotHead(x, y, w, sc, rot) {
+        const hot = lampHotSprite(), edge = headSprite2('flat', '#2a120b');
+        if (!hot || !edge) return;
+        const W = w * sc, H = W * (BALL_RY / BALL_RX), o = LAMP_HOT_EDGE * Math.min(1, sc * 2);
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.7 * sc;
+        ctx.drawImage(padGlow(MAGMA_INK), x - w * 1.3 * sc, y - w * 1.3 * sc, w * 2.6 * sc, w * 2.6 * sc);
+        ctx.restore();
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(rot);
+        ctx.drawImage(edge, -W / 2 - o, -H / 2 - o, W + o * 2, H + o * 2);
+        ctx.drawImage(hot, -W / 2, -H / 2, W, H);
+        ctx.restore();
+    }
+
+    // a column of his light standing on your line where something will land,
+    // cw wide, growing in once (e 0 -> 1) and steady after, never blinking
+    function lampMark(x, cw, e) {
+        const py = padY() - padH() / 2;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        const g = ctx.createLinearGradient(0, py + padH(), 0, py - 170);
+        g.addColorStop(0, MAGMA_RIM);
+        g.addColorStop(1, 'rgba(226,104,58,0)');
+        ctx.globalAlpha = 0.12 + 0.3 * e;
+        ctx.fillStyle = g;
+        ctx.fillRect(x - cw / 2, py - 170, cw, 170 + padH());
+        ctx.globalAlpha = 0.35 + 0.4 * e;
+        ctx.fillStyle = MAGMA_INK;
+        ctx.beginPath();
+        ctx.ellipse(x, py + padH() / 2, cw * (0.5 + 0.2 * e), 9, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+
+    // a tail of glow behind something thrown, back along where it came from,
+    // so it reads as falling fire
+    function lampTail(at, w) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        for (const [back, a] of [[0.12, 0.25], [0.06, 0.45]]) {
+            const p = at(back);
+            ctx.globalAlpha = a;
+            ctx.drawImage(padGlow(MAGMA_RIM), p.x - w, p.y - w, w * 2, w * 2);
+        }
+        ctx.restore();
+    }
+
+    // his fire coming down: the marks on your line while he rears or swells,
+    // the meteor or the gobs as they fly, and the ground burning after
     function lampDrawMeteor() {
         if (lampLater(lampDrawMeteor)) return;
-        const m = lamp.met, w = lampMetW(), hh = w * (BALL_RY / BALL_RX);
-        const tint = headSprite2('flat', MAGMA_INK);
-        const head = (x, y, sc, rot) => {
-            ctx.save();
-            ctx.globalCompositeOperation = 'lighter';
-            ctx.globalAlpha = 0.7 * sc;
-            ctx.drawImage(padGlow(MAGMA_INK), x - w * 1.3 * sc, y - w * 1.3 * sc, w * 2.6 * sc, w * 2.6 * sc);
-            ctx.restore();
-            ctx.save();
-            ctx.translate(x, y);
-            ctx.rotate(rot);
-            ctx.drawImage(ballImg, -w * sc / 2, -hh * sc / 2, w * sc, hh * sc);
-            ctx.globalAlpha = 0.65;
-            ctx.drawImage(tint, -w * sc / 2, -hh * sc / 2, w * sc, hh * sc);
-            ctx.restore();
-        };
+        const m = lamp.met, w = lampMetW();
         if (m) {
-            const py = padY() - padH() / 2;
-            // the mark: a column of his light standing on your line where it
-            // will land, growing in once and steady after, never blinking
-            const e = m.st === 'wind' ? Math.min(1, m.t / LAMP_MET_WIND) : 1, cw = w * 0.9;
-            ctx.save();
-            ctx.globalCompositeOperation = 'lighter';
-            const g = ctx.createLinearGradient(0, py + padH(), 0, py - 170);
-            g.addColorStop(0, MAGMA_RIM);
-            g.addColorStop(1, 'rgba(226,104,58,0)');
-            ctx.globalAlpha = 0.12 + 0.3 * e;
-            ctx.fillStyle = g;
-            ctx.fillRect(m.tx - cw / 2, py - 170, cw, 170 + padH());
-            ctx.globalAlpha = 0.35 + 0.4 * e;
-            ctx.fillStyle = MAGMA_INK;
-            ctx.beginPath();
-            ctx.ellipse(m.tx, py + padH() / 2, cw * (0.5 + 0.2 * e), 9, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
-            if (m.st === 'wind') head(lamp.x, lamp.y + LAMP_BOSS_W / SHAPE_ASPECT * 0.35, 0.3 + 0.7 * e, clock * 2);
+            const e = m.st === 'wind' ? Math.min(1, m.t / LAMP_MET_WIND) : 1;
+            lampMark(m.tx, w * 0.9, e);
+            if (m.st === 'wind') lampHotHead(lamp.x, lamp.y + LAMP_BOSS_W / SHAPE_ASPECT * 0.35, w, 0.3 + 0.7 * e, clock * 2);
             else {
-                // a tail of itself behind it, so it reads as falling fire
                 const k = m.t;
-                for (const [back, a] of [[0.12, 0.25], [0.06, 0.45]]) {
-                    m.t = Math.max(0, k - back);
-                    const p = lampMetAt(m);
-                    ctx.save();
-                    ctx.globalCompositeOperation = 'lighter';
-                    ctx.globalAlpha = a;
-                    ctx.drawImage(padGlow(MAGMA_RIM), p.x - w, p.y - w, w * 2, w * 2);
-                    ctx.restore();
-                }
-                m.t = k;
+                lampTail(back => { m.t = Math.max(0, k - back); const p = lampMetAt(m); m.t = k; return p; }, w);
                 const at = lampMetAt(m);
-                head(at.x, at.y, 1, clock * 6);
+                lampHotHead(at.x, at.y, w, 1, clock * 6);
+            }
+        }
+        const s = lamp.spray;
+        if (s) {
+            const g = lampGobW(), xs = lampSprayXs(s);
+            if (s.st === 'wind') {
+                const e = Math.min(1, s.t / LAMP_SPRAY_WIND), mo = lampMouth();
+                for (const x of xs) lampMark(x, g * 1.1, e);
+                // the three swelling in his mouth, already fanned the way they will fly
+                for (const i of [-1, 0, 1]) lampHotHead(mo.x + i * g * 0.9 * e, mo.y + g * 0.4 * e, g, 0.3 + 0.7 * e, clock * 3 + i);
+            } else {
+                for (const x of xs) lampMark(x, g * 1.1, 1);
+                const k = s.t;
+                for (const [i, x] of xs.entries()) {
+                    lampTail(back => { s.t = Math.max(0, k - back); const p = lampGobAt(s, x); s.t = k; return p; }, g);
+                    const at = lampGobAt(s, x);
+                    lampHotHead(at.x, at.y, g, 1, clock * 7 + i * 2);
+                }
             }
         }
         // the ground alight: a row of flames along your line, dying down

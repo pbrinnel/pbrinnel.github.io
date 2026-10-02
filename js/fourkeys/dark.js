@@ -107,6 +107,14 @@
             out.push({ x: m.tx, y: padY(), r: DARK_MET_R * 0.7 * e });
             if (m.st === 'fall') { const p = lampMetAt(m); out.push({ x: p.x, y: p.y, r: DARK_MET_R }); }
         }
+        const s = lamp.spray;
+        if (s) {
+            const e = s.st === 'wind' ? Math.min(1, s.t / LAMP_SPRAY_WIND) : 1;
+            for (const x of lampSprayXs(s)) {
+                out.push({ x, y: padY(), r: DARK_MET_R * 0.5 * e });
+                if (s.st === 'fly') { const p = lampGobAt(s, x); out.push({ x: p.x, y: p.y, r: DARK_MET_R * 0.6 }); }
+            }
+        }
         for (const p of lamp.burns) out.push({ x: p.x, y: padY(), r: DARK_MET_R * (1 - p.t / LAMP_BURN_SECS) });
         if (DARK_PAD || LAB.pad === 'magma') {
             for (const sg of segs()) out.push({ x: sg.cx, y: padY(), r: DARK_PAD_R });
