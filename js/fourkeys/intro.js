@@ -24,9 +24,16 @@
     let introSince = -1;              // when it came up, on the page's clock
 
     function introUp() { return introAt < INTRO_CARDS.length; }
-    function introSkip() { introAt = INTRO_CARDS.length; }
+    // The line under the field is the town's, so it waits for the town. Hidden
+    // rather than taken out, or the field would grow and shrink around it.
+    function introHint() {
+        const el = document.querySelector('.hint');
+        if (el) el.style.visibility = introUp() ? 'hidden' : '';
+    }
+    function introSkip() { introAt = INTRO_CARDS.length; introHint(); }
     // from the top again, under the splash: what erasing your save does
-    function introRestart() { introAt = 0; introSince = -1; }
+    function introRestart() { introAt = 0; introSince = -1; introHint(); }
+    introHint();
 
     function introNext(e) {
         if (!introUp() || !splash.hidden) return;
@@ -35,7 +42,7 @@
         if (introSince < 0 || performance.now() - introSince < INTRO_WAIT * 1000) return;
         introAt++;
         introSince = performance.now();
-        if (!introUp()) menuArrive();
+        if (!introUp()) { introHint(); menuArrive(); }
     }
     addEventListener('pointerdown', introNext, true);
     addEventListener('keydown', e => {
