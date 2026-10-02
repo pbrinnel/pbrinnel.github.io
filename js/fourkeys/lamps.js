@@ -310,10 +310,10 @@
     };
 
     // A bubble under him, riding along as he sweeps; null text is his BRANDON!
-    // A line of his own replaces whatever he was saying, so MY LAMPS! cuts
-    // the laugh off and two laughs never stack.
+    // Every line replaces whatever he was saying, since they all sit in one
+    // spot: MY LAMPS! cuts the laugh off, and no two bubbles ever stack.
     function lampSay(text) {
-        if (text) labShouts = [];
+        labShouts = [];
         const at = () => ({ x: lamp.x, y: lamp.y + LAMP_BOSS_W / SHAPE_ASPECT / 2 + 8 });
         const p = at();
         labShout(p.x, p.y, text, null, at);
