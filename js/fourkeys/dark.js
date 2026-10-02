@@ -11,7 +11,8 @@
     //   2  the same with a band of ember where color meets dark, like paper
     //      catching
     // What burns is drawn over all of it as it is (lampLater in lamps.js), and
-    // so is what has to stay readable: his health, capsules, anything said.
+    // so is what has to stay readable: his health, capsules, anything said,
+    // and the halo piece a first win lets go.
     //
     // His own fire lights the whole of him however little is left, down to
     // 1 / DARK_SELF of it; less fire only shrinks the light he throws. With
@@ -258,6 +259,8 @@
         lamp.emitNow = false;
         // and what has to be read over the dark, drawn again on top
         drawRings();
+        // the Angel's piece glows his sky, so the dark never has it
+        if (typeof memShardDraw === 'function') memShardDraw();
         drawCapsule();
         drawShout();
         if (typeof labDrawShouts === 'function') labDrawShouts();

@@ -301,6 +301,9 @@
                 lamp.met = null; lamp.burns = []; lamp.swoop = null; lamp.spray = null;
                 b.alive = false;
                 clearStage();
+                // his box is the whole row, so the halo piece clearStage let
+                // go from its middle comes out of him instead
+                if (typeof memShard !== 'undefined' && memShard) { memShard.x = lamp.x; memShard.y = lamp.y; }
                 bossFall = shatter(lamp.x, lamp.y, LAMP_BOSS_W, A_DIE_T);
                 if (impact) { impact.x = lamp.x; impact.y = lamp.y; impact.w = LAMP_BOSS_W; }
                 return;
