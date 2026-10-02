@@ -4906,7 +4906,8 @@
     // most LORE_ROWS rows, shrinking from LORE_SIZE until it fits, so the hud's
     // phone scale-up can't push it into a third row. Returns the rows and size
     // without drawing, so a screen can make room for them first.
-    const LORE_SIZE = 14, LORE_ROWS = 2, LORE_W = LW - 120, LORE_PITCH = 1.3;
+    const LORE_SIZE = 12, LORE_ROWS = 2, LORE_W = LW - 120, LORE_PITCH = 1.3;
+    const LORE_INK = '#635e56';    // darker than the caption over it, so it reads last
     function loreFont(size) { return 'italic ' + size + 'px "Fira Sans", "Trebuchet MS", sans-serif'; }
     function loreWrap(str, w) {
         const rows = [''];
@@ -4941,7 +4942,7 @@
     function drawLore(lay, y) {
         ctx.font = loreFont(lay.size);
         ctx.textAlign = 'center';
-        ctx.fillStyle = '#b8ae9c';
+        ctx.fillStyle = LORE_INK;
         lay.rows.forEach((row, i) => ctx.fillText(row, LW / 2, y + i * lay.size * LORE_PITCH));
     }
     let loreNow = '';              // the line the pause or READY screen up now drew
