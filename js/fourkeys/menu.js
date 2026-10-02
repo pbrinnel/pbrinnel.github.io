@@ -1759,8 +1759,6 @@
         menuDrawPush();
         if (k < 1 || menuMotion()) return;
         menuPadPeek();
-        menuDrawGateNote(-1);
-        menuDrawGateNote(1);
         menuDrawLine();
         // every level's best added up, along the floor under him, once there is one
         const total = menuBestTotal();
@@ -2470,13 +2468,17 @@
     // the town and running off the edge on the other, drawn like the buildings
     // -- a flat dark shape with a rim of that paddle's color, slate while he is
     // out in the town and lighting as he walks toward the wall. The name reads
-    // along it, and the note beside it names the paddle while he stands in
-    // front of it; a chevron at the top points the way out. With only the one paddle there is nowhere
-    // for a gate to lead, so there are no gates until a second is won.
+    // along it under a chevron that points the way out. Only the name: what a
+    // paddle does is the unlock screen's to tell, and BRANDONS's. With only the
+    // one paddle there is nowhere for a gate to lead, so there are no gates
+    // until a second is won.
     const M_GATE = { w: 24, y: 470, h: 118 };
     const M_GATE_TALL = 86;                  // its foot on the floor, and no taller: the space over it belongs to the FARM and the VOLCANO
     const M_GATE_TOP = M_GATE.y + M_GATE.h - M_GATE_TALL;
-    const M_GATE_NAME_Y = M_GATE_TOP + M_GATE_TALL / 2 + 6;
+    const M_GATE_CHEV_Y = M_GATE_TOP + 13;
+    const M_GATE_NAME_Y = (M_GATE_CHEV_Y + 9 + M_GATE.y + M_GATE.h - 5) / 2;   // between the chevron and the foot
+    const M_GATE_NAME_ROOM = M_GATE.y + M_GATE.h - 5 - (M_GATE_CHEV_Y + 9);    // a longer name shrinks to it
+    const GATE_NEAR = 240;           // px from the wall where a gate starts to light
     const M_GATE_ROUND = 12;
     function menuTabPath(side, y0, y1) {
         const w = M_GATE.w, r = M_GATE_ROUND;
@@ -2516,7 +2518,7 @@
         menuTabPath(side, y0, y1);
         ctx.strokeStyle = col; ctx.lineWidth = on ? 2 : 1 + near * 0.5; ctx.stroke();
         // the chevron, pointing out through the wall
-        const cy = y0 + 15;
+        const cy = M_GATE_CHEV_Y;
         ctx.strokeStyle = col; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
         ctx.beginPath(); ctx.moveTo(cx - side * 2, cy - 5); ctx.lineTo(cx + side * 3, cy); ctx.lineTo(cx - side * 2, cy + 5); ctx.stroke();
         ctx.lineCap = 'butt';
@@ -2525,39 +2527,15 @@
         ctx.translate(cx, M_GATE_NAME_Y);
         ctx.rotate(side < 0 ? -Math.PI / 2 : Math.PI / 2);
         ctx.textBaseline = 'middle';
-        text(p.name, 0, 0, 11, on ? '#f2efe9' : M_WORD_REST, 'center');
+        ctx.font = '11px "Fira Sans", "Trebuchet MS", sans-serif';   // as text() sets it
+        const fit = Math.min(11, 11 * M_GATE_NAME_ROOM / ctx.measureText(p.name).width);
+        text(p.name, 0, 0, fit, on ? '#f2efe9' : M_WORD_REST, 'center');
         ctx.restore();
         ctx.textBaseline = 'alphabetic';
     }
 
-    // Beside each gate, what the paddle through it would change: his name and
-    // the unlock screen's blurb, a bullet to each ' · ' part. It comes up as he
-    // walks toward that wall, so the far gate never says anything and the
-    // floor is empty while he is out in the middle.
-    const GATE_NEAR = 240;           // px from the wall where it starts to show
-    function menuDrawGateNote(side) {
-        if (menu.sw || menu.lift > 1) return;
-        const to = menuNextPad(side);
-        const p = to && LAB_PAD[to];
-        if (!p) return;
-        const hs = halfSpan();
-        const d = side < 0 ? paddle.x - hs : LW - hs - paddle.x;
-        const a = Math.max(0, Math.min(1, 1 - d / GATE_NEAR));
-        if (a <= 0) return;
-        const x = side < 0 ? M_GATE.w + 10 : LW - M_GATE.w - 10;
-        const align = side < 0 ? 'left' : 'right';
-        ctx.globalAlpha = a * a;
-        // packed into the strip between the near building and his head, which
-        // at the wall is right under it
-        text(p.name, x, M_GATE.y + 2, 13, p.ink || p.rim || '#f2efe9', align);
-        (p.blurb ? p.blurb.split(' · ') : []).forEach((b, i) =>
-            text('• ' + b, x, M_GATE.y + 17 + i * 13, 11, '#b8b2a8', align));
-        ctx.globalAlpha = 1;
-    }
-
     // one line under the town, and only when something has just happened.
-    // Leaning on a gate says nothing here: the gate and the note beside it
-    // already name the paddle.
+    // Leaning on a gate says nothing here: the gate already names the paddle.
     function menuDrawLine() {
         if (menu.sw || menu.going || menu.sayT <= 0) return;
         ctx.globalAlpha = Math.min(1, menu.sayT / 0.4);
