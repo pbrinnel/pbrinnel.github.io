@@ -142,7 +142,7 @@
                  mems: (saved && saved.mems) || {}, memFrom: (saved && saved.memFrom) || {},
                  slain: (saved && saved.slain) || 0,
                  dusting: null, sel: 1, say: null, sayT: 0,
-                 cards: [], run: null, side: 0, hold: 0, spent: 0, sw: null,
+                 cards: [], run: null, side: 0, hold: 0, spent: 0, gate: { '-1': 1, '1': 1 }, sw: null,
                  march: false, lift: 0, lastX: 0, into: null, walk: 0, gait: 0, arriveT: -1,
                  going: null, screen: null, press: null,
                  shows: [], showT: 0, a0: 1, padNext: null };
@@ -403,6 +403,7 @@
         menu.side = 0;
         menu.hold = 0;
         menu.spent = 0;
+        menu.gate = { '-1': 1, '1': 1 };
         menu.march = false;
         menu.lift = 0;
         menu.into = null;
@@ -1293,17 +1294,19 @@
     // standing on it or not.
     //
     // The hold is what keeps it from firing every time a walk ends in a corner.
-    // A gate goes through once a lean: to go again you step off the wall by
-    // SWAP_BACKOFF and lean again. Holding still would otherwise flip through
+    // A gate goes through once a lean: to go again you step back off the
+    // wall by SWAP_BACKOFF and lean again. Holding still would otherwise flip through
     // the rack, or stall on the first shorter paddle, whose end no longer
-    // reaches where the hand is.
+    // reaches where the hand is. The spent gate slides back out through its
+    // wall, and slides in again once it can be leaned on.
     // Leaning while walking up the town does nothing: the gates are at home.
     const SWAP_HOLD = 0.85;          // pinned against the wall before he goes
     const SWAP_OUT = 0.26;           // him walking off
     const SWAP_IN = 0.34;            // the next one arriving
     const SWAP_PEEK = 52;            // how far in the next one noses while you hold
     const SWAP_CLEAR = 12;           // and how far past the wall they go
-    const SWAP_BACKOFF = 24;         // px the hand comes off the wall to lean on a gate again
+    const SWAP_BACKOFF = 24;         // px the hand comes back off where it leaned before that gate opens again
+    const GATE_SLIDE = 0.32;         // a spent gate going, or coming back
 
     function menuNextPad(side) {
         const owned = MENU_PADS.filter(k => menu.pads[k]);
@@ -1313,6 +1316,10 @@
     }
 
     function menuSwapStep(dt) {
+        for (const side of [-1, 1]) {
+            const to = menu.spent === side ? 0 : 1, v = menu.gate[side];
+            menu.gate[side] = to > v ? Math.min(1, v + dt / GATE_SLIDE) : Math.max(0, v - dt / GATE_SLIDE);
+        }
         const hs = halfSpan();
         if (menu.sw) {
             const s = menu.sw;
@@ -1337,8 +1344,12 @@
         // decides you are leaning on the wall.
         const side = paddle.tx <= hs + 1 ? -1 : paddle.tx >= LW - hs - 1 ? 1 : 0;
         if (menu.spent) {
-            const off = menu.spent < 0 ? paddle.tx - hs : LW - hs - paddle.tx;
-            if (off >= SWAP_BACKOFF) menu.spent = 0;
+            // measured from where the hand was as well as from the wall: a
+            // shorter paddle moves the wall's reach out from under a hand held
+            // still, and a longer one pushes a hand pressed on the wall inward
+            menu.spentX = menu.spent < 0 ? Math.min(menu.spentX, paddle.tx) : Math.max(menu.spentX, paddle.tx);
+            const off = (paddle.tx - menu.spentX) * -menu.spent;
+            if (off >= SWAP_BACKOFF && side !== menu.spent) menu.spent = 0;
             else { menu.side = 0; menu.hold = 0; return; }
         }
         if (side !== menu.side) { menu.side = side; menu.hold = 0; }
@@ -1347,6 +1358,7 @@
         menu.sw = { side, to: menuNextPad(side), from: paddle.x, t: 0, out: true };
         menu.hold = 0;
         menu.spent = side;
+        menu.spentX = paddle.tx;
     }
 
     // The next one, nosing in off the wall while you lean. Drawn over the one
@@ -1749,8 +1761,18 @@
         ctx.save(); menuCamera(M_NEAR_GROUND);
         ctx.globalAlpha = k;
         menu.a0 = k;
-        menuDrawGate(-1);
-        menuDrawGate(1);
+        for (const side of [-1, 1]) {
+            // in from off the wall with a little overshoot, and out the same way backwards
+            const v = menu.gate[side];
+            if (v <= 0) continue;
+            const c1 = 1.70158, e = 1 + (c1 + 1) * Math.pow(v - 1, 3) + c1 * Math.pow(v - 1, 2);
+            ctx.save();
+            ctx.translate(side * (M_GATE.w + 6) * (1 - e), 0);
+            menu.a0 = k * Math.min(1, v * 2); ctx.globalAlpha = menu.a0;
+            menuDrawGate(side);
+            ctx.restore();
+        }
+        menu.a0 = k; ctx.globalAlpha = k;
         ctx.restore();
         ctx.globalAlpha = 1;
         menu.a0 = 1;
