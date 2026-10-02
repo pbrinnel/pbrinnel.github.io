@@ -16,6 +16,10 @@
     // Their numbers are lets so the lab's panel can reach them and Paul can
     // tune them live.
 
+    // A score with its thousands marked, so five digits can be read at a glance.
+    // Done by hand rather than toLocaleString so it reads the same on every machine.
+    function fmtScore(n) { return String(n).replace(/\B(?=(\d{3})+$)/g, ','); }
+
     const LAB_KNOBS = [];         // every tunable name, each file adding its own
     const LAB_BOSS = {};          // who can take the boss stage
     const LAB_MINI = {};          // ...and who can ride an ordinary one

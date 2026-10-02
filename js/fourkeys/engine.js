@@ -5158,7 +5158,7 @@
             // right-aligned, so 9 and 10 end in the same column
             text(String(i + 1), LW / 2 - 128 * k, y, size, col, 'right');
             text(r.ini, LW / 2 - 60 * k, y, size, col);
-            text(String(r.score), LW / 2 + 160 * k, y, size, col, 'right');
+            text(fmtScore(r.score), LW / 2 + 160 * k, y, size, col, 'right');
             // the paddle the run was played with, level with the row's letters,
             // dark if it is not yours yet (menuBoardPadIcon)
             if (r.pad) {

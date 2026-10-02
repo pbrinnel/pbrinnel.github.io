@@ -1108,7 +1108,7 @@
     // a level finished: the key always, the paddle only if you never continued
     function menuBeat(clean, n) {
         menuLoad();
-        if (n === M_RUSH) { menuSay('BOSS RUSH · ' + score); return true; }
+        if (n === M_RUSH) { menuSay('BOSS RUSH · ' + fmtScore(score)); return true; }
         const which = n || menu.sel || 1;
         const level = MENU_ALL.find(l => l.n === which);
         if (!level) return false;
@@ -1942,7 +1942,7 @@
         const turn = c.turn || 0;
         if (big) MENU_LEVELS.forEach((o, i) => menuSigil(o.n, c.x - 45 + i * 30, ky, M_KEY_SMALL, ink(o), turn));
         else menuSigil(l.n, c.x, ky, M_KEY, ink(l), turn);
-        if (got) text('BEST ' + st.best, c.x, y + c.h * 0.9, 11, st.aimed ? '#f2efe9' : M_WORD_REST, 'center');
+        if (got) text('BEST ' + fmtScore(st.best), c.x, y + c.h * 0.9, 11, st.aimed ? '#f2efe9' : M_WORD_REST, 'center');
     }
     const M_KEY = 40, M_KEY_SMALL = 24;   // a sigil's size on its own level, and in the CASTLE's row
 
@@ -2238,7 +2238,7 @@
         ctx.restore();
         if (key === 'memories') menuCrow(c, st, true);
         // BOSS RUSH's best hangs under its sign, once it has one
-        if (key === 'rush' && menu.best[M_RUSH] > 0) text('BEST ' + menu.best[M_RUSH], c.x, G.y0 + c.h + 13, 10, menuSignInk(st), 'center');
+        if (key === 'rush' && menu.best[M_RUSH] > 0) text('BEST ' + fmtScore(menu.best[M_RUSH]), c.x, G.y0 + c.h + 13, 10, menuSignInk(st), 'center');
     }
 
     function menuDrawClean(c) {
@@ -2508,7 +2508,7 @@
         // the still black eye its name is in
         ctx.beginPath(); ctx.ellipse(c.x, c.y + 3, rx * 0.56, ry * 0.5, 0, 0, Math.PI * 2); ctx.fillStyle = '#000'; ctx.fill();
         text(l.name, c.x, c.y + 6, 17, aimed ? '#f2efe9' : '#8d877d', 'center');
-        if (menu.best[l.n] > 0) text('BEST ' + menu.best[l.n], c.x, c.y + 21, 10, aimed ? '#f2efe9' : '#8d877d', 'center');
+        if (menu.best[l.n] > 0) text('BEST ' + fmtScore(menu.best[l.n]), c.x, c.y + 21, 10, aimed ? '#f2efe9' : '#8d877d', 'center');
     }
 
     // A gate on each wall, standing where he stands, naming the paddle it
