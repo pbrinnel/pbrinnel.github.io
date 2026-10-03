@@ -92,6 +92,12 @@ touches it.
   rather than `engine.js`, so the two engines will drift — repoint it when that starts to
   matter.
 
+## Test/agent-sim/
+
+A separate project (Agent Sim Test), public at paulbrinnel.com/Test/agent-sim/. Its own
+rules are in `Test/agent-sim/CLAUDE.md`; read that before working there. It shares nothing
+with the games.
+
 ## Comments
 
 - A comment says why the code is the way it is now.

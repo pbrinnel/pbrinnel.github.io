@@ -1,0 +1,21 @@
+
+Agents:
+Bunny
+Wolf
+Grass
+
+
+Agent Dynamic Vars (Things that change over time): Name | Driving Mechanism
+Fullness | Eat Food
+Stamina | 
+Age | 
+Lifestage | Baby/Adult Driven by "Time to Master" Static Var
+Dead | Fulness = 0 or HP = 0
+HP | Clock ticking makes them heal HP
+
+Agent Static Vars(Things that don't change): Name
+MoveSpeed
+StaminaRefill
+Stamina Max
+Food
+TimeToMature

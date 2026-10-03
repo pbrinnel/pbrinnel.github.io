@@ -1,0 +1,8 @@
+Setting,Value,Notes
+WorldWidth,300,Tiles
+WorldHeight,200,Tiles
+StartBunnies,150,Placed at random on empty tiles
+StartWolves,12,Placed at random on empty tiles
+StartGrass,40%,Share of tiles that start as a blade; scattered at random
+StartGrassAge,0,Days; every starting blade is a sprout at Age 0 and Size 0
+Seed,,Blank = new random seed each run; the seed used is shown on screen so you can paste it here to replay that start
