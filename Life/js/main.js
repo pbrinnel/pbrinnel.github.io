@@ -13,6 +13,8 @@
   const MAX_FRAME_S = 0.1;
   // The HUD's "running at" figure is measured over about this long.
   const ACHIEVED_WINDOW_S = 1;
+  // A tap within this many tiles of an animal's drawn center picks it.
+  const PICK_RADIUS = 0.75;
   // The inspector refreshes this often; a new selection shows at once.
   const INSPECT_EVERY_MS = 100;
 
@@ -72,21 +74,37 @@
   const marks = AS.Marks(T);
   graph = AS.Graph(T);
 
-  cam.attach((tx, ty) => {
+  // A tap picks an animal by where its glyph is drawn: mid-step it's between the tile it
+  // left and the one it already occupies, and people tap what they see. Blades and
+  // corpses don't move, so they're picked by tile.
+  cam.attach((tx, ty, fx, fy) => {
     const W = sim.W;
-    if (tx < 0) { sel = null; return; }
-    const t = W.tile(tx, ty);
-    if (tool === 'corpse-bunny' || tool === 'corpse-wolf') {
-      AS.debugDropCorpse(sim, t, tool === 'corpse-bunny' ? AS.SPECIES.BUNNY : AS.SPECIES.WOLF);
+    if (tx >= 0 && (tool === 'corpse-bunny' || tool === 'corpse-wolf')) {
+      AS.debugDropCorpse(sim, W.tile(tx, ty), tool === 'corpse-bunny' ? AS.SPECIES.BUNNY : AS.SPECIES.WOLF);
       return;
     }
-    const k = W.kind[t];
-    if (k === AS.KIND.EMPTY) sel = null;
-    else if (k === AS.KIND.BUNNY || k === AS.KIND.WOLF) {
-      const s = W.aSlot[t];
-      sel = { tile: t, serial: W.aSerial[s], slot: s };
-    } else sel = { tile: t, serial: W.serial[t], slot: -1 };
+    const s = animalDrawnNear(W, fx, fy);
+    if (s >= 0) { sel = { tile: W.aTile[s], serial: W.aSerial[s], slot: s }; return; }
+    if (tx < 0) { sel = null; return; }
+    const t = W.tile(tx, ty), k = W.kind[t];
+    sel = k === AS.KIND.GRASS || k === AS.KIND.CORPSE ? { tile: t, serial: W.serial[t], slot: -1 } : null;
   });
+
+  // The animal whose drawn center is nearest (fx, fy), in tiles, within PICK_RADIUS; or -1.
+  function animalDrawnNear(W, fx, fy) {
+    const alpha = SPEEDS[speedIndex] === Infinity ? 1 : acc / AS.DT;
+    let best = -1, bestD2 = PICK_RADIUS * PICK_RADIUS;
+    for (let s = 0, hi = W.aHigh; s < hi; s++) {
+      if (!W.aAlive[s]) continue;
+      const p = AS.glideProgress(W.aStepLeft[s], W.aStepDur[s], alpha);
+      const ax = W.tx(W.aFrom[s]), ay = W.ty(W.aFrom[s]);
+      const dx = ax + (W.tx(W.aTile[s]) - ax) * p + 0.5 - fx;
+      const dy = ay + (W.ty(W.aTile[s]) - ay) * p + 0.5 - fy;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < bestD2) { bestD2 = d2; best = s; }
+    }
+    return best;
+  }
 
   // A selection follows its agent, and clears when the agent is gone.
   function liveSelection() {

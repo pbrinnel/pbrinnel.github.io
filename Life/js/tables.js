@@ -221,6 +221,11 @@
       if (s.ElderAt != null && s.Lifespan && s.TimeToMature != null && s.ElderAt * s.Lifespan < s.TimeToMature) {
         warnings.push(`species.csv, ${Sp}: ElderAt comes before TimeToMature, so a ${Sp.toLowerCase()} goes straight from baby to elder.`);
       }
+      // An animal stops eating once it isn't hungry; if that's below what mating needs,
+      // it can never get full enough to breed (how wolves died out in tuning).
+      if (s.HungryAt != null && s.MateFullness != null && s.HungryAt < s.MateFullness) {
+        warnings.push(`species.csv, ${Sp}: HungryAt is below MateFullness, so a ${Sp.toLowerCase()} stops eating before it's full enough to mate.`);
+      }
       if (s.MateCost != null && s.MateFullness != null && s.MateCost > s.MateFullness) {
         warnings.push(`species.csv, ${Sp}: MateCost is more than MateFullness, so mating can leave a parent starving.`);
       }

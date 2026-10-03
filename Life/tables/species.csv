@@ -11,7 +11,7 @@ StarveDamage,HP per s,1,1,,HP lost while Fullness = 0
 HPMax,points,20,60,,
 HealRate,HP per s,0.5,0.5,,Only while Fullness > HealAbove
 HealAbove,% of FullnessMax,50,50,,Healing needs at least this much Fullness
-HungryAt,% of FullnessMax,70,60,,Below this an animal looks for food
+HungryAt,% of FullnessMax,70,80,,Below this an animal looks for food
 RestBelow,% of StaminaMax,30,30,,Below this it stops to rest
 RestUntil,% of StaminaMax,100,100,,A resting animal gets up at this Stamina
 SprintRange,tiles,,3,,A hunting wolf sprints once its prey is this close

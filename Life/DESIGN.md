@@ -132,7 +132,8 @@ watching the sim run. Everything else in this doc is decided.
   screen is capped, so 20× speed can't turn into flicker (see the photosensitivity note
   under Performance). A bunny grazing makes a smaller, fainter mark; wolf bites, births
   and deaths always win the per-second cap over grazing.
-- **Inspector:** click or tap an agent to select it. A panel shows every variable from
+- **Inspector:** click or tap an agent to select it. An animal is picked where its glyph
+  is drawn, even mid-step between two tiles. A panel shows every variable from
   `variables.csv`, live, and the selection follows the agent as it moves. Clicking empty
   ground clears it. Live values only, no life history.
 - **Counts:** live totals of bunnies, wolves, blades and corpses.
@@ -213,10 +214,17 @@ Each one ends with something to watch. ✓ = done (3 Oct 2026).
 8. **Tuning pass** (in progress). Adjust the CSV numbers until the populations cycle
    instead of collapsing. Paul tunes in the tuning lab (`Life/_lab/`, local only; see
    `Life/MAP.md`), which runs the sim across many seeds and saves numbers he likes back
-   into `tables/`. Found so far: grass spreading at 30%/day walled bunnies in and hid them
-   from wolves (now 10%/day, starting at 15%); wolves die out because they don't replace
-   themselves (8 days to grow up, 3 pregnant, 10 before breeding again, litters of 1–2,
-   40-day lives), and starting with more wolves only delays it.
+   into `tables/`. Found so far:
+   - Grass spreading at 30%/day walled bunnies in and hid them from wolves; now 10%/day,
+     starting at 15%.
+   - **Wolves never mated:** they stopped hunting at `HungryAt` 60% but needed
+     `MateFullness` 70% to mate, so 0–1 matings happened in 40 days and the wolf breeding
+     numbers made no difference at all (a coarse screen of 30 numbers showed it). Wolf
+     `HungryAt` is now 80 and `StartWolves` 48: wolves now breed and last ~44 days instead
+     of ~30 (4 seeds × 80 days). The loader now warns when `HungryAt` < `MateFullness`.
+   - The next collapse: bunnies still peak around 5,000 and eat the grass bare by about
+     day 40. More grass hides bunnies and starves wolves sooner; smaller bunny litters
+     starve them too. That balance is where tuning goes next.
 9. **Release as `/life.html`.** The page already lives at the site root (unlisted, see
    "Platform and scale"); release is the point where Paul is happy with the tuning and
    pushes it.

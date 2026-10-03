@@ -210,8 +210,10 @@
           const r = rect0();
           const t = cam.screenToTile(e.clientX - r.left, e.clientY - r.top);
           const tx = Math.floor(t.x), ty = Math.floor(t.y);
-          if (tx < 0 || ty < 0 || tx >= W.w || ty >= W.h) onTap(-1, -1);
-          else onTap(tx, ty);
+          // Whole tiles for things that sit on a tile; the exact point (in tiles) too, for
+          // picking an animal by where its glyph is drawn mid-step.
+          if (tx < 0 || ty < 0 || tx >= W.w || ty >= W.h) onTap(-1, -1, t.x, t.y);
+          else onTap(tx, ty, t.x, t.y);
         }
       }
       canvas.addEventListener('pointerup', e => release(e, false));

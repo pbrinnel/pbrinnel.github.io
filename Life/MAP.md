@@ -135,7 +135,15 @@ graph, ui, bench) only reads.
 | `node Life/_tools/profile-tick.js` | where tick time goes at a few world sizes |
 | `node Life/_tools/run-bench.js desktop\|phone\|capped30` | the in-page benchmark in a real windowed Chrome (throwaway profile); prints results, saves a screenshot to `.claude/life-shots/` |
 | `node Life/_tools/shoot.js desktop\|phone out.png [setup.js] [?query]` | screenshot of the live page in Chrome after running `setup.js` in it (async JS; `AS.app` is the running sim) |
-| `node Life/_tools/browser-keys-check.js`, `browser-touch-check.js` | real key and touch input through Chrome |
+| `node Life/_tools/browser-keys-check.js`, `browser-touch-check.js`, `browser-pick-check.js` | real key, touch and click input through Chrome (picking an animal mid-step) |
+| `node Life/_tools/lab-screen.js cfg.json out.json` | coarse screen: each number alone at extreme multiples (e.g. ¼× and 4×), a few short seeds, ranked by effect. Start here when tuning: it finds which numbers matter |
+| `node Life/_tools/lab-compare.js cfg.json [out.json]` | a few named sets of changes side by side on the same seeds; check a combination before saving it |
+| `node Life/_tools/lab-search.js cfg.json out.json` | the lab's Search, headless, plus a re-check of the best on fresh seeds; fine-tuning, once the screen has found what matters |
+
+`chrome.js` is the shared helper behind every browser tool: a throwaway-profile Chrome
+window driven over the DevTools protocol. The lab tools need the lab server running
+(`LAB_URL`, default `http://localhost:8920/Life/_lab/`); their configs are JSON files,
+usually kept in `.claude/life-shots/`.
 
 The browser tools need the page served (`LIFE_URL`, default
 `http://localhost:8914/life.html`) and Google Chrome at its standard macOS path.

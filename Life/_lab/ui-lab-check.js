@@ -8,6 +8,10 @@ const fs = require('fs'), path = require('path');
 const ui = LAB.ui;
 const dir = path.resolve(__dirname, '../tables');
 const texts = {}; for (const n of ['species', 'variables', 'states', 'settings']) texts[n] = fs.readFileSync(path.join(dir, n + '.csv'), 'utf8');
+// Pin the cells these checks change to known values, so the checks hold whatever the
+// tables are tuned to.
+for (const [file, row, col, v] of [['species', 'LitterSize', 'Wolf', '1-2'], ['settings', 'StartWolves', 'Value', '12'],
+  ['species', 'SeedChance', 'Grass', '10%'], ['species', 'WalkSpeed', 'Bunny', '2']]) texts[file] = LAB.setCell(texts[file], row, col, v);
 const tun = LAB.tunables(texts);
 const fields = {}; for (const t of tun) fields[ui.key(t)] = t.text;
 
