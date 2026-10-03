@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Sim Tuning Lab</title>
+<link rel="stylesheet" href="lab.css?v=1">
+</head>
+<body>
+<header>
+  <h1>Agent Sim Tuning Lab</h1>
+  <p class="dim">Try numbers across many seeds, then save the ones you like to the tables.</p>
+</header>
+<div id="app">
+  <aside id="numbers" aria-label="Numbers">
+    <h2>Numbers</h2>
+    <div class="bar">
+      <input id="filter" type="search" placeholder="Find a row, e.g. litter" aria-label="Filter rows">
+      <button id="resetAll" type="button">Reset all</button>
+    </div>
+    <div id="numberList"></div>
+  </aside>
+  <main>
+    <section id="runPanel" aria-label="Runs">
+      <h2>Runs</h2>
+      <div class="fields">
+        <label>Seeds <input id="rSeeds" type="number" min="1" max="64" value="8"></label>
+        <label>Days <input id="rDays" type="number" min="1" max="2000" value="100"></label>
+        <label>Bunny cap <input id="rCap" type="number" min="0" value="20000"></label>
+        <label>First seed <input id="rFirst" type="number" min="0" value="1"></label>
+        <button id="runBtn" type="button" class="primary">Run</button>
+        <button id="stopBtn" type="button" disabled>Stop</button>
+      </div>
+      <p id="runStatus" class="dim" role="status"></p>
+      <p id="summary" class="summary"></p>
+      <div id="grid"></div>
+      <div id="detail" hidden></div>
+      <h3>Earlier runs</h3>
+      <ol id="history" class="history"></ol>
+    </section>
+    <section id="searchPanel" aria-label="Search">
+      <h2>Search</h2>
+      <div id="searchNA" class="dim" hidden>Not available yet.</div>
+      <div id="searchBody">
+        <p class="dim">Tick the box beside the numbers you want searched. Each ticked number gets a range to stay inside.</p>
+        <div id="searchParams" class="dim"></div>
+        <div class="fields">
+          <label>Tries <input id="sTries" type="number" min="1" value="60"></label>
+          <label>Seeds per try <input id="sSeeds" type="number" min="1" value="4"></label>
+          <label>Days <input id="sDays" type="number" min="1" value="60"></label>
+          <button id="sStart" type="button" class="primary">Start</button>
+          <button id="sStop" type="button" disabled>Stop</button>
+        </div>
+        <p id="sStatus" class="dim" role="status"></p>
+        <ol id="sBest" class="cands"></ol>
+      </div>
+    </section>
+    <section id="savePanel" aria-label="Save">
+      <h2>Save</h2>
+      <button id="saveBtn" type="button" disabled>Save to tables</button>
+      <div id="saveConfirm" hidden>
+        <p>Write these to the tables?</p>
+        <ul id="saveList"></ul>
+        <button id="saveYes" type="button" class="primary">Save</button>
+        <button id="saveNo" type="button">Cancel</button>
+      </div>
+      <p id="saveMsg" role="status"></p>
+    </section>
+  </main>
+</div>
+<script src="lab-tables.js?v=1"></script>
+<script src="lab-model.js?v=1"></script>
+<script src="lab-pool.js?v=1"></script>
+<script src="lab-search.js?v=1" onerror="this.remove()"></script>
+<script src="lab-ui.js?v=1"></script>
+</body>
+</html>

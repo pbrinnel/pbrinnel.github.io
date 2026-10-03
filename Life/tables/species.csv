@@ -9,12 +9,19 @@ FullnessMax,points,100,100,,
 HungerRate,per s,2,1.2,,Bunny empty in ~2.5 days; wolf in ~4
 StarveDamage,HP per s,1,1,,HP lost while Fullness = 0
 HPMax,points,20,60,,
-HealRate,HP per s,0.5,0.5,,Only while Fullness > 50%
+HealRate,HP per s,0.5,0.5,,Only while Fullness > HealAbove
+HealAbove,% of FullnessMax,50,50,,Healing needs at least this much Fullness
+HungryAt,% of FullnessMax,70,60,,Below this an animal looks for food
+RestBelow,% of StaminaMax,30,30,,Below this it stops to rest
+RestUntil,% of StaminaMax,100,100,,A resting animal gets up at this Stamina
+SprintRange,tiles,,3,,A hunting wolf sprints once its prey is this close
+WanderRun,tiles,1-3,4-10,,Steps taken in one direction before turning while wandering or prowling
+DecidePerSec,per s,4,4,,How often an animal re-picks its state; it moves every tick
 Diet,,Grass,Bunny (live),Corpses (nearby),Wolves don't scavenge
 BiteDamage,HP,,8,,Bunny dies on the 3rd bite
 BiteCooldown,s,1,0.5,,Time between bites
 BiteFood,Fullness per bite,15,10,,What the eater gains
-BiteSize,Size per bite,0.25,,,How much of a blade one bunny bite removes
+BiteSize,Size per bite,0.25,0.5,,How much of a blade one bite removes; a wolf chews through grass this way but gains no food
 TimeToMature,days,3,8,1,Grass: days to reach full Size and start seeding
 Lifespan,days,20,40,10,
 ElderAt,% of Lifespan,80,80,,
@@ -27,7 +34,8 @@ MateCost,% of FullnessMax,30,30,,Fullness each parent loses at mating
 BabySpeed,% of adult,50,50,,
 ElderSpeed,% of adult,75,75,,
 GrowthRate,Size per day,,,1,Grass Size runs 0 to 1
-SeedChance,per day,,,30%,Mature blade seeds one empty 4-neighbor tile
+SproutSize,Size,,,0.1,Size a new blade starts at; above 0 so even a sprout feeds a little
+SeedChance,per day,,,10%,Mature blade seeds one empty 4-neighbor tile
 CorpseNutrient,per body,10,30,,How long and how hard a corpse feeds grass
 CorpseDecay,days,3,5,,Corpse disappears after this
 CorpseRadius,tiles,3,3,,Grass inside grows and seeds faster

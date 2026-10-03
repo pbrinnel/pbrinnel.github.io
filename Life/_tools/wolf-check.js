@@ -1,0 +1,273 @@
+'use strict';
+// Milestone 6: wolves. Hand-built worlds, then the real world for 60 days (twice).
+const fs = require('fs'), path = require('path'), vm = require('vm');
+const { SIM_FILES, editCSV } = require('./harness.js');
+const ROOT = path.resolve(__dirname, '..');
+let bad = 0;
+function ok(c, m) { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) bad++; }
+const near = (a, b, tol) => Math.abs(a - b) <= tol;
+
+function loadAS() {
+  const ctx = vm.createContext({ console, crypto: globalThis.crypto });
+  vm.runInContext('globalThis.AS = { V: 0 };', ctx);
+  const files = SIM_FILES.includes('wolf') ? SIM_FILES : SIM_FILES.concat('wolf');
+  for (const f of files) {
+    const file = path.join(ROOT, 'js', f + '.js');
+    vm.runInContext(fs.readFileSync(file, 'utf8'), ctx, { filename: file });
+  }
+  const texts = {};
+  for (const f of ['species', 'variables', 'states', 'settings']) texts[f] = fs.readFileSync(path.join(ROOT, 'tables', f + '.csv'), 'utf8');
+  return { AS: ctx.AS, texts };
+}
+function make(size, seed = 1, hunger = false, edit) {
+  const { AS, texts } = loadAS();
+  let s = editCSV(texts.settings, 'WorldWidth', 'Value', String(size));
+  s = editCSV(s, 'WorldHeight', 'Value', String(size));
+  s = editCSV(s, 'StartGrass', 'Value', '0%');
+  s = editCSV(s, 'StartBunnies', 'Value', '0');
+  s = editCSV(s, 'StartWolves', 'Value', '0');
+  texts.settings = s;
+  if (!hunger) {
+    texts.species = editCSV(texts.species, 'HungerRate', 'Bunny', '0');
+    texts.species = editCSV(texts.species, 'HungerRate', 'Wolf', '0');
+  }
+  texts.species = editCSV(texts.species, 'SeedChance', 'Grass', '0%');
+  texts.species = editCSV(texts.species, 'GrowthRate', 'Grass', '0');
+  if (edit) edit(texts);
+  const { T, errors } = AS.parseTables(texts);
+  if (errors.length) throw new Error(errors.join('\n'));
+  const sim = AS.Sim(T, seed);
+  const events = [], emit = sim.emit;
+  sim.emit = (type, tile) => { events.push([type, tile, sim.tickCount]); emit(type, tile); };
+  return { AS, T, sim, W: sim.W, B: T.bunny, Wf: T.wolf, events };
+}
+const at = (W, x, y) => y * W.w + x;
+const tick = (sim, n = 1) => { for (let i = 0; i < n; i++) sim.tick(); };
+const secs = (AS, s) => Math.round(s * AS.TICK_HZ);
+const days = (AS, d) => Math.round(d * AS.TICK_HZ * AS.DAY_SECONDS);
+const sname = (sim, s, key) => sim.W.aState[s] === 255 ? 'none' : sim.T.states[key][sim.W.aState[s]].name;
+const M = 0, F = 1;
+function animal(AS, sim, sp, x, y, sex, o = {}) {
+  const W = sim.W, s = AS.spawnStarting(sim, sp, at(W, x, y));
+  W.aSex[s] = sex;
+  W.aAge[s] = o.age ?? 10;
+  if (o.full != null) W.aFullness[s] = o.full;
+  if (o.stamina != null) W.aStamina[s] = o.stamina;
+  W.aDecideLeft[s] = 0;
+  return s;
+}
+const wolf = (AS, sim, x, y, o = {}) => animal(AS, sim, AS.SPECIES.WOLF, x, y, o.sex ?? M, o);
+const bun = (AS, sim, x, y, o = {}) => animal(AS, sim, AS.SPECIES.BUNNY, x, y, o.sex ?? M, { age: 5, ...o });
+const d2 = (W, a, b) => (W.tx(a) - W.tx(b)) ** 2 + (W.ty(a) - W.ty(b)) ** 2;
+
+// --- the chase, the bites, the kill; bunny side: flee, winded walk, wounds ---
+{
+  const { AS, sim, W, B, Wf, events } = make(60, 1);
+  const w = wolf(AS, sim, 30, 30, { full: 30 });
+  const b = bun(AS, sim, 32, 30);
+  const bSer = W.aSerial[b];
+  let sprintFar = 0, bunnySprint = 0, bunnyWindedWalk = true, bunnyWinded = false, sawFlee = false, caught = -1, hpAfterFirst = null;
+  let fullBefore = W.aFullness[w];
+  const biteTicks = [], fullAtBite = [];
+  for (let i = 0; i < secs(AS, 40) && caught < 0; i++) {
+    const nb0 = events.length;
+    const dist2 = W.aAlive[b] ? d2(W, W.aTile[w], W.aTile[b]) : 0;
+    tick(sim);
+    if (W.aSprint[w] && dist2 > (Wf.SprintRange + 1.5) ** 2) sprintFar++;
+    if (W.aAlive[b]) {
+      if (sname(sim, b, 'bunny') === 'FLEE') sawFlee = true;
+      if (W.aSprint[b]) bunnySprint++;
+      if (W.aWinded[b]) { bunnyWinded = true; if (W.aSprint[b]) bunnyWindedWalk = false; }
+    }
+    for (let k = nb0; k < events.length; k++) if (events[k][0] === AS.EV.BITE) { biteTicks.push(events[k][2]); fullAtBite.push(W.aFullness[w]); if (biteTicks.length === 1) hpAfterFirst = W.aHP[b]; }
+    if (!W.aAlive[b]) caught = i;
+  }
+  ok(sawFlee && bunnySprint > 0, `bunny: FLEE fires and sprints (${bunnySprint} sprint ticks)`);
+  ok(bunnyWindedWalk, `bunny: never sprints while winded (winded seen: ${bunnyWinded})`);
+  ok(caught >= 0, `chase: the wolf catches the bunny (${(caught / AS.TICK_HZ).toFixed(1)} s)`);
+  ok(sprintFar === 0, `chase: sprints only near SprintRange (${sprintFar} far ticks)`);
+  ok(biteTicks.length === 3, `bites: bunny dies on bite ${biteTicks.length} (BiteDamage ${Wf.BiteDamage}, HPMax ${B.HPMax})`);
+  const gaps = biteTicks.slice(1).map((t, i) => t - biteTicks[i]);
+  ok(gaps.every(g => g >= Wf.BiteCooldown * AS.TICK_HZ - 1), `bites: never closer than ${Wf.BiteCooldown}s (gaps ${gaps} ticks; a fleeing bunny stretches them)`);
+  ok(near(hpAfterFirst, B.HPMax - Wf.BiteDamage, 0.1), `bites: first bite leaves bunny at ${hpAfterFirst.toFixed(2)} HP`);
+  ok(near(W.aFullness[w], 30 + 3 * Wf.BiteFood, 1e-3), `bites: wolf gained BiteFood per bite (${W.aFullness[w]})`);
+  ok(W.aKills[w] === 1 && W.cCount === 1 && W.cSpecies[W.cList[0]] === AS.SPECIES.BUNNY, 'kill: Kills = 1, one bunny corpse');
+  ok(events.filter(e => e[0] === AS.EV.BITE).length === 3 && events.some(e => e[0] === AS.EV.DEATH), 'kill: BITE and DEATH events');
+}
+{
+  // wounds: survive, heal above HealAbove, no heal below it
+  const { AS, sim, W, B, Wf } = make(20, 2);
+  const w = wolf(AS, sim, 5, 5), b = bun(AS, sim, 6, 5);
+  W.aBiteLeft[w] = 0;
+  AS.biteAnimal(sim, w, b);
+  ok(W.aAlive[b] && near(W.aHP[b], B.HPMax - Wf.BiteDamage, 1e-3), 'wound: one bite leaves HPMax - BiteDamage');
+  W.aStepLeft[b] = 1e6; // hold still to heal in place
+  W.aFullness[b] = 100;
+  const h0 = W.aHP[b];
+  W.aStepLeft[w] = 1e6; W.aFullness[w] = 100;
+  tick(sim, secs(AS, 4));
+  ok(near(W.aHP[b] - h0, 4 * B.HealRate, 0.1), `wound: heals HealRate above HealAbove (+${(W.aHP[b] - h0).toFixed(2)} in 4 s)`);
+  W.aFullness[b] = B.HealAbove * B.FullnessMax - 5;
+  const h1 = W.aHP[b];
+  // HungerRate is 0 here, so Fullness holds
+  tick(sim, secs(AS, 3));
+  ok(W.aHP[b] === h1, 'wound: no healing below HealAbove');
+}
+// --- ignores, sight ---
+{
+  const { AS, sim, W, events } = make(40, 3);
+  const w = wolf(AS, sim, 20, 20, { full: 100 }), b = bun(AS, sim, 23, 20);
+  W.aStepLeft[b] = 1e6;
+  tick(sim, secs(AS, 6));
+  ok(sname(sim, w, 'wolf') !== 'HUNT' && !events.some(e => e[0] === AS.EV.BITE), 'fed wolf ignores a bunny in view');
+}
+{
+  const { AS, sim, W, events } = make(40, 3);
+  for (let y = 0; y < 40; y++) W.addGrass(at(W, 22, y), 1, 3);
+  const w = wolf(AS, sim, 20, 20, { full: 20 }), b = bun(AS, sim, 24, 20);
+  W.aStepLeft[b] = 1e6;
+  tick(sim, secs(AS, 2));
+  ok(sname(sim, w, 'wolf') !== 'HUNT', 'a bunny behind a grass wall is unseen: no HUNT');
+}
+// --- give up ---
+{
+  const { AS, sim, W, Wf, events } = make(60, 4);
+  const w = wolf(AS, sim, 30, 30, { full: 20, stamina: 4 });
+  const b = bun(AS, sim, 33, 30);
+  let gave = false, bit = false;
+  for (let i = 0; i < secs(AS, 5); i++) { tick(sim); if (sname(sim, w, 'wolf') === 'GIVE_UP') gave = true; }
+  ok(gave && W.aWinded[w], 'give up: a wolf that runs out of Stamina mid-chase enters GIVE_UP');
+  let stillRest = true;
+  while (W.aStamina[w] < Wf.RestUntil * Wf.StaminaMax - 5 && sim.tickCount < days(AS, 2)) {
+    tick(sim);
+    if (sname(sim, w, 'wolf') !== 'GIVE_UP') { stillRest = false; break; }
+  }
+  ok(stillRest, `give up: it stays in GIVE_UP until Stamina reaches RestUntil (${W.aStamina[w].toFixed(1)})`);
+  ok(!events.some(e => e[0] === AS.EV.BITE) && W.aAlive[b] && W.aHP[b] === 20, 'give up: the bunny got away unbitten');
+  tick(sim, secs(AS, 3));
+  ok(sname(sim, w, 'wolf') !== 'GIVE_UP' && !W.aWinded[w], `give up: back to normal after rest (${sname(sim, w, 'wolf')})`);
+}
+// --- prowl ---
+{
+  const { AS, sim, W, events } = make(40, 5);
+  for (let y = 0; y < 40; y++) W.addGrass(at(W, 12, y), 1, 3);
+  const w = wolf(AS, sim, 10, 20, { full: 100 });
+  W.aDecideLeft[w] = 0;
+  tick(sim, 2);
+  W.aRunDir[w] = 1; W.aRunLeft[w] = 8;
+  W.aStepLeft[w] = 0;
+  let chewed = false;
+  // run east into the wall; it must turn, not chew
+  for (let i = 0; i < secs(AS, 4); i++) { tick(sim); if (events.some(e => e[0] === AS.EV.GRAZE)) chewed = true; if (i === 0) { W.aRunDir[w] = 1; W.aRunLeft[w] = 8; } }
+  ok(!chewed, 'prowl: turns at grass in open country, no chewing');
+  ok(sname(sim, w, 'wolf') === 'PROWL', 'prowl: state PROWL for a fed wolf');
+}
+{
+  const { AS, sim, W, Wf, events } = make(20, 6);
+  const t = at(W, 10, 10);
+  for (const [x, y] of [[10, 9], [11, 10], [10, 11], [9, 10]]) W.addGrass(at(W, x, y), 1, 3);
+  const w = wolf(AS, sim, 10, 10, { full: 100 });
+  const full0 = W.aFullness[w];
+  let leftAt = -1;
+  for (let i = 0; i < secs(AS, 6) && leftAt < 0; i++) { tick(sim); if (W.aTile[w] !== t) leftAt = i; }
+  const grazes = events.filter(e => e[0] === AS.EV.GRAZE);
+  ok(leftAt >= 0, `prowl: walled in, it chews its way out (${(leftAt / AS.TICK_HZ).toFixed(1)} s)`);
+  ok(grazes.length >= 2 && new Set(grazes.map(e => e[1])).size === 1, `prowl: keeps to one blade (${grazes.length} GRAZE marks)`);
+  ok(W.aFullness[w] === full0, 'prowl: chewing feeds nothing');
+  ok(grazes.length === Math.ceil(1 / Wf.BiteSize), `prowl: a blade takes ceil(1/BiteSize) bites (${grazes.length})`);
+}
+// --- chew toward visible prey ---
+{
+  const { AS, sim, W, events } = make(30, 7);
+  const bt = at(W, 9, 9);
+  // The west blade is the cheap one; north, east and (7,9) cost a full second to chew, and
+  // sight from (8,8) to the bunny stays clear.
+  W.addGrass(at(W, 8, 9), 0.3, 3);
+  for (const [x, y] of [[9, 8], [10, 9], [7, 9]]) W.addGrass(at(W, x, y), 1, 3);
+  for (let x = 2; x <= 8; x++) W.addGrass(at(W, x, 10), 1, 3);
+  const w = wolf(AS, sim, 7, 7, { full: 20 }), b = bun(AS, sim, 9, 9);
+  W.aStepLeft[b] = 1e6;
+  W.aHP[b] = 1000; W.aSprint[b] = 0;
+  let firstBite = -1;
+  for (let i = 0; i < secs(AS, 8) && firstBite < 0; i++) { tick(sim); W.aStepLeft[b] = 1e6; if (events.some(e => e[0] === AS.EV.BITE)) firstBite = i; }
+  for (let i = 0; i < secs(AS, 5); i++) { tick(sim); W.aStepLeft[b] = 1e6; }
+  const bt2 = events.filter(e => e[0] === AS.EV.BITE).map(e => e[2]);
+  ok(bt2.length >= 4 && bt2.slice(1).every((t, i) => near(t - bt2[i], 0.5 * AS.TICK_HZ, 1)), `bites: a held-still bunny is bitten every BiteCooldown (${bt2.slice(1).map((t, i) => t - bt2[i])} ticks)`);
+  const grazes = events.filter(e => e[0] === AS.EV.GRAZE);
+  ok(grazes.length > 0 && grazes.every(e => e[1] === at(W, 8, 9)), 'chew-through: hunting wolf chews a 1-blade gap next to the prey');
+  ok(firstBite >= 0 && firstBite < secs(AS, 4), `chew-through: bites within ${(firstBite / AS.TICK_HZ).toFixed(1)} s (the detour is 10+ tiles)`);
+}
+{
+  const { AS, sim, W, events } = make(10, 8);
+  W.addGrass(at(W, 1, 0), 1, 3); W.addGrass(at(W, 0, 1), 1, 3);
+  const w = wolf(AS, sim, 0, 0, { full: 20 }), b = bun(AS, sim, 1, 1);
+  W.aStepLeft[b] = 1e6; W.aHP[b] = 1000;
+  for (let i = 0; i < secs(AS, 8); i++) { tick(sim); W.aStepLeft[b] = 1e6; }
+  ok(events.some(e => e[0] === AS.EV.GRAZE) && events.some(e => e[0] === AS.EV.BITE), 'chew-through: wolf boxed in a corner by grass chews out and bites visible prey');
+}
+// --- mating and births ---
+{
+  const { AS, sim, W, Wf, events } = make(40, 9);
+  const m = wolf(AS, sim, 15, 20, { sex: M }), f = wolf(AS, sim, 21, 20, { sex: F });
+  const mSer = W.aSerial[m], fSer = W.aSerial[f];
+  let t = 0;
+  while (W.aLitter[f] === 0 && t < secs(AS, 30)) { tick(sim); t++; }
+  ok(W.aLitter[f] > 0, `wolves find each other and mate (${(t / AS.TICK_HZ).toFixed(1)} s)`);
+  ok(W.aLitter[f] >= Wf.LitterSize.min && W.aLitter[f] <= Wf.LitterSize.max && near(W.aPregnant[f], Wf.PregnancyDays, 0.01), `mating: litter ${W.aLitter[f]} in ${Wf.LitterSize.min}-${Wf.LitterSize.max}, pregnant ${W.aPregnant[f].toFixed(3)} d`);
+  ok(near(W.aFullness[m], 100 - Wf.MateCost * Wf.FullnessMax, 1e-3), 'mating: both pay MateCost');
+  const litter = W.aLitter[f];
+  while (W.aLitter[f] > 0 && t < days(AS, 4)) { tick(sim); t++; }
+  const kids = [];
+  for (let s = 0; s < W.aHigh; s++) if (W.aAlive[s] && W.aParentA[s] === fSer) kids.push(s);
+  ok(kids.length === litter && kids.every(s => W.aSpecies[s] === AS.SPECIES.WOLF && W.aParentB[s] === mSer), `birth: ${litter} wolf cub(s) with both parents`);
+  ok(events.filter(e => e[0] === AS.EV.BIRTH).length === litter && W.aChildren[f] === litter && W.aChildren[m] === litter, 'birth: BIRTH events and Children counts');
+  ok(near(W.aMateCd[f], Wf.MateCooldown, 0.05), `birth: MateCooldown ${W.aMateCd[f].toFixed(2)} d starts at birth`);
+}
+
+// --- real world, 60 days ---
+function realRun() {
+  const { AS, texts } = loadAS();
+  const { T, errors } = AS.parseTables(texts);
+  if (errors.length) throw new Error(errors.join('\n'));
+  const c = { bBite: 0, bStarve: 0, bOld: 0, wStarve: 0, wOld: 0, bBirth: 0, wBirth: 0, kills: 0 };
+  let inBite = false;
+  const kill = AS.killAnimal, bite = AS.biteAnimal;
+  AS.biteAnimal = (sim, s, p) => { inBite = true; try { return bite(sim, s, p); } finally { inBite = false; } };
+  AS.killAnimal = (sim, s) => {
+    const W = sim.W, S = AS.speciesStats(sim, s), isB = W.aSpecies[s] === AS.SPECIES.BUNNY;
+    if (inBite) { c.bBite++; c.kills++; }
+    else if (W.aAge[s] >= S.Lifespan) isB ? c.bOld++ : c.wOld++;
+    else isB ? c.bStarve++ : c.wStarve++;
+    kill(sim, s);
+  };
+  const sim = AS.Sim(T, 12345), W = sim.W;
+  const emit = sim.emit;
+  sim.emit = (ty, t) => { if (ty === AS.EV.BIRTH) W.kind[t] === AS.KIND.BUNNY ? c.bBirth++ : c.wBirth++; emit(ty, t); };
+  const names = T.states.wolf.map(s => s.name);
+  const lines = ['day  bunnies  wolves  bBirths  wBirths  kills  bBite  bStarve  bOld  wStarve  wOld  fullB  fullW  ' + names.map(n => n.padEnd(7)).join(' ')];
+  lines.push(`  0  ${String(W.bunnies).padStart(7)}  ${String(W.wolves).padStart(6)}`);
+  const dayTicks = AS.TICK_HZ * AS.DAY_SECONDS;
+  for (let d = 1; d <= 60; d++) {
+    for (let i = 0; i < dayTicks; i++) sim.tick();
+    if (d % 5) continue;
+    let nb = 0, nw = 0, fb = 0, fw = 0; const sc = new Array(names.length).fill(0);
+    for (let s = 0; s < W.aHigh; s++) if (W.aAlive[s]) {
+      if (W.aSpecies[s] === AS.SPECIES.BUNNY) { nb++; fb += W.aFullness[s]; }
+      else { nw++; fw += W.aFullness[s]; if (W.aState[s] !== 255) sc[W.aState[s]]++; }
+    }
+    const p = (v, n) => String(v).padStart(n);
+    lines.push(`${p(d, 3)}  ${p(nb, 7)}  ${p(nw, 6)}  ${p(c.bBirth, 7)}  ${p(c.wBirth, 7)}  ${p(c.kills, 5)}  ${p(c.bBite, 5)}  ${p(c.bStarve, 7)}  ${p(c.bOld, 4)}  ${p(c.wStarve, 7)}  ${p(c.wOld, 4)}  ${(fb / Math.max(1, nb)).toFixed(1).padStart(5)}  ${(fw / Math.max(1, nw)).toFixed(1).padStart(5)}  ` + sc.map(x => ((100 * x / Math.max(1, nw)).toFixed(0) + '%').padEnd(7)).join(' '));
+  }
+  return { AS, sim, lines };
+}
+{
+  const a = realRun();
+  console.log('\nreal world, 60 days\n' + a.lines.join('\n'));
+  const b = realRun();
+  ok(a.lines.join('\n') === b.lines.join('\n'), 'real: same seed, same 60-day output');
+  const h = require('./harness.js');
+  h.audit(a.AS, a.sim, 'wolf-check');
+  ok(h.failures.length === 0, 'real: grid/store audit clean ' + h.failures.slice(0, 3).join('; '));
+}
+console.log(bad ? `\nFAIL (${bad})` : '\nALL PASS');
+process.exit(bad ? 1 : 0);

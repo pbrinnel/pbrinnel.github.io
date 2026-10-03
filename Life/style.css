@@ -1,0 +1,273 @@
+/* The font ships with the page so glyphs and text look the same on every machine. */
+@font-face {
+  font-family: 'AgentSimMono';
+  src: url('fonts/dejavu-sans-mono.woff2') format('woff2');
+  font-display: block;
+}
+
+:root {
+  --bg: #0a0c0a;
+  --fg: #d8d4c8;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'AgentSimMono', monospace;
+}
+
+/* The map fills the window; the camera owns every gesture on it. */
+#map {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+
+/* ---- HUD ---- */
+:root {
+  --hud-bg: rgba(10, 12, 10, 0.78);
+  --hud-line: #2a2f28;
+  --hud-dim: #8a8d80;
+  --hud-on: #e6d9a8;
+  --hud-h: 32px; /* minimum tap target */
+  /* The inspector holds dim text that must stay readable over a bright meadow. */
+  --insp-bg: rgba(10, 12, 10, 0.95);
+}
+
+/* The wrapper lets gestures through to the map; only the strip and the warning list catch them. */
+#hud {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 10;
+  pointer-events: none;
+  font-size: 13px;
+  line-height: 1.2;
+}
+.hud-strip, .hud-warnlist {
+  pointer-events: auto;
+  box-sizing: border-box;
+  background: var(--hud-bg);
+  border-bottom: 1px solid var(--hud-line);
+}
+.hud-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+  padding: calc(env(safe-area-inset-top) + 4px) calc(env(safe-area-inset-right) + 8px) 4px calc(env(safe-area-inset-left) + 8px);
+}
+.hud-speeds { display: flex; gap: 4px; }
+.hud-info { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; min-height: var(--hud-h); color: var(--hud-dim); }
+.hud-counts { display: inline-flex; gap: 12px; color: var(--fg); }
+.hud-glyph { color: var(--hud-dim); margin-right: 5px; }
+.hud-day { color: var(--fg); }
+.hud-status { color: var(--hud-on); }
+.hud-status:empty { display: none; }
+.hud-seednum { user-select: all; -webkit-user-select: all; color: var(--fg); cursor: text; }
+.hud-tools { display: inline-flex; gap: 4px; }
+
+.hud-btn, .hud-warn {
+  font: inherit;
+  color: var(--hud-dim);
+  background: transparent;
+  border: 1px solid var(--hud-line);
+  border-radius: 3px;
+  min-height: var(--hud-h);
+  min-width: 40px;
+  padding: 0 10px;
+  cursor: pointer;
+}
+.hud-btn:hover, .hud-warn:hover { color: var(--fg); border-color: #4a5046; }
+.hud-btn.on { color: var(--bg); background: var(--hud-on); border-color: var(--hud-on); }
+.hud-warn { min-width: 0; padding: 0 8px; border-style: dashed; font-size: 12px; }
+.hud-warn[hidden], .hud-warnlist[hidden] { display: none; }
+.hud-warnlist {
+  margin: 0;
+  padding: 6px calc(env(safe-area-inset-right) + 12px) 6px calc(env(safe-area-inset-left) + 28px);
+  max-height: 40vh;
+  overflow-y: auto;
+  color: var(--hud-dim);
+  font-size: 12px;
+}
+.hud-warnlist li { margin: 3px 0; }
+
+/* Phone: speeds share the first row evenly, everything else wraps under them. */
+@media (max-width: 600px) {
+  #hud { font-size: 12px; }
+  .hud-strip { gap: 2px 0; }
+  .hud-speeds { width: 100%; }
+  .hud-speeds .hud-btn { flex: 1; min-width: 0; padding: 0 2px; }
+  .hud-info { width: 100%; gap: 2px 10px; min-height: 0; }
+  .hud-counts { gap: 8px; }
+  .hud-tools .hud-btn { min-width: 0; padding: 0 6px; }
+}
+
+/* ---- Table errors: replaces the whole page ---- */
+#errors {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background: var(--bg);
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+#errors[hidden] { display: none; }
+.err-page { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; line-height: 1.5; font-size: 14px; }
+.err-page h1 { font-size: 20px; font-weight: normal; color: var(--hud-on); margin: 0 0 8px; }
+.err-page h2 { font-size: 16px; font-weight: normal; color: var(--hud-dim); margin: 28px 0 8px; }
+.err-list { margin: 12px 0; padding-left: 20px; overflow-wrap: anywhere; }
+.err-list li { margin: 6px 0; }
+.err-warns { color: var(--hud-dim); }
+.err-foot { margin-top: 28px; color: var(--hud-dim); }
+
+/* ---- Inspector ---- */
+/* JS sets --hud-bottom to the strip's current height. */
+#inspector {
+  position: fixed;
+  z-index: 9;
+  box-sizing: border-box;
+  background: var(--insp-bg);
+  border: 1px solid var(--hud-line);
+  color: var(--fg);
+  font-size: 13px;
+  line-height: 1.3;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  top: calc(var(--hud-bottom, 40px) + 8px);
+  right: calc(env(safe-area-inset-right) + 8px);
+  width: 280px;
+  max-height: calc(100% - var(--hud-bottom, 40px) - 16px);
+  padding: 4px 10px 8px;
+}
+#inspector[hidden] { display: none; }
+.insp-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.insp-title { color: var(--hud-on); overflow-wrap: anywhere; }
+.insp-close { flex: none; min-width: var(--hud-h); padding: 0; font-size: 18px; }
+.insp-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 2px 0; border-top: 1px solid var(--hud-line); }
+.insp-name { color: var(--hud-dim); }
+.insp-cell { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.insp-value { color: var(--fg); }
+.insp-range { display: block; color: var(--hud-dim); font-size: 10px; }
+.insp-range:empty { display: none; }
+
+/* Phone: a bottom sheet across the width. */
+@media (max-width: 600px) {
+  #inspector {
+    top: auto; left: 0; right: 0; bottom: 0;
+    width: auto;
+    max-height: 40%;
+    padding: 4px calc(env(safe-area-inset-right) + 12px) calc(env(safe-area-inset-bottom) + 8px) calc(env(safe-area-inset-left) + 12px);
+    border-width: 1px 0 0;
+    font-size: 12px;
+  }
+}
+/* The close button stays in reach while the rows scroll. */
+.insp-head { position: sticky; top: -4px; background: var(--bg); padding-top: 4px; }
+
+/* ---- Benchmark ---- */
+.hud-bench {
+  font: inherit;
+  color: var(--hud-dim);
+  background: transparent;
+  border: 1px solid var(--hud-line);
+  border-radius: 3px;
+  min-height: var(--hud-h);
+  padding: 0 10px;
+  cursor: pointer;
+}
+.hud-bench:hover { color: var(--fg); border-color: #4a5046; }
+.hud-btn:disabled, .hud-bench:disabled { opacity: 0.4; cursor: default; }
+.hud-btn:disabled:hover, .hud-bench:disabled:hover { color: var(--hud-dim); border-color: var(--hud-line); }
+@media (max-width: 600px) { .hud-bench { padding: 0 6px; } }
+
+/* Swallows pointer and wheel input while the benchmark runs. It paints nothing: every
+   overlay costs compositing time, and that time is what is being measured. */
+.bench-block { position: fixed; inset: 0; z-index: 30; touch-action: none; }
+.bench-progress {
+  position: fixed;
+  z-index: 31;
+  left: 0; right: 0;
+  bottom: calc(env(safe-area-inset-bottom) + 8px);
+  text-align: center;
+  font-size: 12px;
+  color: var(--hud-on);
+  pointer-events: none;
+}
+.bench-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 32;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  background: var(--insp-bg);
+  color: var(--fg);
+  font-size: 13px;
+  line-height: 1.4;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+.bench-card { max-width: 480px; margin: 0 auto; padding: 24px 16px 40px; box-sizing: border-box; }
+.bench-card.bench-wide { max-width: 900px; }
+.bench-confirm { display: flex; align-items: center; }
+.bench-confirm .bench-card { padding-top: 16px; }
+.bench-title { font-size: 18px; font-weight: normal; color: var(--hud-on); margin: 0 0 12px; }
+.bench-sum { margin: 8px 0; }
+.bench-tablewrap { overflow-x: auto; margin: 16px 0 8px; border: 1px solid var(--hud-line); }
+.bench-table { border-collapse: collapse; font-size: 11px; white-space: nowrap; font-variant-numeric: tabular-nums; width: 100%; }
+.bench-table th, .bench-table td { padding: 3px 8px; text-align: right; border-top: 1px solid var(--hud-line); }
+.bench-table th { color: var(--hud-dim); font-weight: normal; border-top: 0; }
+.bench-table .bench-group { text-align: center; color: var(--hud-on); }
+.bench-table .bench-gstart { border-left: 1px solid var(--hud-line); }
+.bench-good { color: var(--hud-on); }
+.bench-bad { color: var(--hud-dim); text-decoration: line-through; }
+.bench-note { color: var(--hud-dim); font-size: 11px; margin: 8px 0; }
+.bench-device { color: var(--hud-dim); font-size: 11px; margin: 12px 0; overflow-wrap: anywhere; }
+.bench-buttons { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; }
+.bench-status { color: var(--hud-dim); font-size: 12px; }
+.bench-text { display: block; width: 100%; box-sizing: border-box; margin-top: 12px; background: var(--bg); color: var(--fg); border: 1px solid var(--hud-line); font: 11px/1.3 'AgentSimMono', monospace; }
+.bench-subtitle { font-size: 14px; font-weight: normal; color: var(--hud-on); margin: 20px 0 0; }
+
+/* ---- Population graph ---- */
+.hud-graph.on { color: var(--bg); background: var(--hud-on); border-color: var(--hud-on); }
+/* JS sets --hud-bottom to the strip's current height, as for the inspector. */
+#graph {
+  position: fixed;
+  z-index: 9;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  background: var(--insp-bg);
+  border: 1px solid var(--hud-line);
+  color: var(--fg);
+  font-size: 13px;
+  left: calc(env(safe-area-inset-left) + 8px);
+  top: calc(var(--hud-bottom, 40px) + 8px);
+  bottom: 8px;
+  width: 420px;
+  padding: 4px 8px 8px;
+}
+#graph[hidden] { display: none; }
+.graph-head { display: flex; align-items: center; gap: 8px; }
+.graph-title { color: var(--hud-on); flex: 1; }
+.graph-close { min-width: var(--hud-h); padding: 0; font-size: 18px; }
+.graph-whole { font-size: 12px; }
+.graph-canvas { flex: 1; min-height: 0; width: 100%; display: block; touch-action: none; }
+
+/* Phone: full width from under the strip to about half the screen, above the inspector's sheet. */
+@media (max-width: 600px) {
+  #graph {
+    left: 0; right: 0; width: auto;
+    top: var(--hud-bottom, 80px);
+    bottom: 50%;
+    border-width: 0 0 1px;
+  }
+  .graph-whole { padding: 0 6px; }
+}

@@ -1,0 +1,10 @@
+Setting,Value,Notes
+WorldWidth,300,Tiles
+WorldHeight,200,Tiles
+StartBunnies,150,Placed at random on empty tiles
+StartWolves,12,Placed at random on empty tiles
+StartGrass,15%,Share of tiles that start as a blade; scattered at random
+StartGrassAge,0,Days; every starting blade is a sprout at this Age (0 = a new sprout at SproutSize)
+Seed,,Blank = new random seed each run; the seed used is shown on screen so you can paste it here to replay that start
+MarksPerSecond,20,Most event marks that can start in one real second at any speed
+MarkFade,1,Seconds (real time) a mark takes to fade in and out

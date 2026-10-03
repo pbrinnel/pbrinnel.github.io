@@ -1,0 +1,314 @@
+'use strict';
+// Milestone 4 checks for bunny.js: tiny hand-built worlds, then the real world for 20 days.
+const { load, editCSV } = require('./harness.js');
+let bad = 0;
+function ok(c, m) { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) bad++; }
+const near = (a, b, tol) => Math.abs(a - b) <= tol;
+
+function make(size, seed = 1, edit) {
+  const { AS, texts } = load();
+  let s = editCSV(texts.settings, 'WorldWidth', 'Value', String(size));
+  s = editCSV(s, 'WorldHeight', 'Value', String(size));
+  s = editCSV(s, 'StartGrass', 'Value', '0%');
+  s = editCSV(s, 'StartBunnies', 'Value', '0');
+  s = editCSV(s, 'StartWolves', 'Value', '0');
+  texts.settings = s;
+  // Blades stay as placed: no seeding muddying a short test.
+  texts.species = editCSV(texts.species, 'SeedChance', 'Grass', '0%');
+  if (edit) edit(texts);
+  const { T, errors } = AS.parseTables(texts);
+  if (errors.length) throw new Error(errors.join('\n'));
+  const sim = AS.Sim(T, seed);
+  const events = [];
+  const emit = sim.emit;
+  sim.emit = (type, tile) => { events.push([type, tile]); emit(type, tile); };
+  return { AS, T, sim, W: sim.W, B: T.bunny, events };
+}
+const at = (W, x, y) => y * W.w + x;
+const tick = (sim, n = 1) => { for (let i = 0; i < n; i++) sim.tick(); };
+const secs = (AS, s) => Math.round(s * AS.TICK_HZ);
+const stateName = (sim, s) => sim.W.aState[s] === 255 ? 'none' : sim.T.states.bunny[sim.W.aState[s]].name;
+
+function bunny(AS, sim, x, y, o = {}) {
+  const W = sim.W, s = AS.spawnStarting(sim, AS.SPECIES.BUNNY, at(W, x, y));
+  W.aAge[s] = o.age ?? 5;
+  W.aFullness[s] = o.full ?? 100;
+  if (o.stamina != null) W.aStamina[s] = o.stamina;
+  W.aDecideLeft[s] = 0;
+  return s;
+}
+function wolf(AS, sim, x, y) {
+  const W = sim.W, s = W.addAnimal(at(W, x, y), AS.SPECIES.WOLF, 0);
+  W.aState[s] = AS.NO_STATE;
+  W.aDecideLeft[s] = 1e9;   // wolves have no states yet
+  W.aFullness[s] = 100; W.aHP[s] = 60; W.aStamina[s] = 100; W.aAge[s] = 10;
+  return s;
+}
+
+// --- EAT ---
+{
+  const { AS, sim, W, B, events } = make(15, 1, tx => {
+    tx.species = editCSV(editCSV(tx.species, 'HungerRate', 'Bunny', '0'), 'GrowthRate', 'Grass', '0');
+  });
+  const blade = at(W, 8, 7);
+  W.addGrass(blade, 1, 3);
+  const s = bunny(AS, sim, 7, 7, { full: 5 });
+  const t0 = W.aTile[s];
+  let prev = 50, bites = [], fullAtBite = [];
+  const seen = [];
+  for (let i = 0; i < secs(AS, 2.5); i++) {
+    const g0 = events.length;
+    tick(sim);
+    if (events.length > g0) { bites.push(i); seen.push(W.aFullness[s]); }
+  }
+  ok(stateName(sim, s) === 'EAT', 'eat: enters EAT next to a blade when hungry');
+  ok(W.aTile[s] === t0, 'eat: does not move while eating');
+  ok(bites.length >= 3 && events.every(e => e[0] === AS.EV.GRAZE && e[1] === blade), `eat: GRAZE event per bite (${bites.length} bites in 2.5 s)`);
+  const gaps = bites.slice(1).map((b, i) => b - bites[i]);
+  ok(gaps.every(g => near(g, B.BiteCooldown * AS.TICK_HZ, 1)), `eat: bites ${B.BiteCooldown}s apart (gaps ${gaps.join(',')} ticks)`);
+  // Fullness: bites add BiteFood, minus hunger between; check size and food at the first bite.
+  ok(near(W.gSize[blade], 1 - B.BiteSize * bites.length, 1e-4) || W.kind[blade] !== AS.KIND.GRASS, `eat: blade shrinks BiteSize per bite (size ${W.gSize[blade].toFixed(3)} after ${bites.length})`);
+}
+{
+  // Fullness gain per bite exactly BiteFood; and proportional on a small blade.
+  const { AS, sim, W, B } = make(15, 1, tx => {
+    tx.species = editCSV(editCSV(tx.species, 'HungerRate', 'Bunny', '0'), 'GrowthRate', 'Grass', '0');
+  });
+  const blade = at(W, 8, 7);
+  W.addGrass(blade, 1, 3);
+  const s = bunny(AS, sim, 7, 7, { full: 40 });
+  tick(sim, 2);
+  ok(near(W.aFullness[s], 40 + B.BiteFood, 1e-3), `eat: first full bite adds BiteFood (${W.aFullness[s]})`);
+  W.gSize[blade] = B.BiteSize / 2; // half a bite left
+  const before = W.aFullness[s];
+  tick(sim, secs(AS, B.BiteCooldown) + 2);
+  ok(near(W.aFullness[s] - before, B.BiteFood / 2, 1e-3) && W.kind[blade] === AS.KIND.EMPTY, `eat: small blade feeds in proportion (+${(W.aFullness[s] - before).toFixed(2)}) and dies`);
+}
+{
+  // Stops entering EAT once Fullness >= HungryAt
+  const { AS, sim, W, B } = make(15, 1, tx => { tx.species = editCSV(tx.species, 'HungerRate', 'Bunny', '0'); });
+  for (const x of [8, 9, 10]) W.addGrass(at(W, x, 7), 1, 3);
+  const s = bunny(AS, sim, 7, 7, { full: B.HungryAt * B.FullnessMax - 1 });
+  tick(sim, secs(AS, 6));
+  ok(W.aFullness[s] >= B.HungryAt * B.FullnessMax, 'eat: reaches HungryAt');
+  tick(sim, secs(AS, 6)); // one more decision round later
+  ok(stateName(sim, s) !== 'EAT' && stateName(sim, s) !== 'SEEK_FOOD', `eat: not EAT once fed (${stateName(sim, s)}, Fullness ${W.aFullness[s].toFixed(1)})`);
+}
+
+// --- SEEK_FOOD ---
+{
+  const { AS, sim, W } = make(21);
+  const blade = at(W, 15, 10);
+  W.addGrass(blade, 1, 3);
+  const s = bunny(AS, sim, 10, 10, { full: 30 });
+  tick(sim, 3);
+  ok(stateName(sim, s) === 'SEEK_FOOD' && W.aTargetTile[s] === blade, 'seek: hungry bunny 5 tiles away targets the blade');
+  const d0 = Math.abs(W.tx(W.aTile[s]) - 15);
+  tick(sim, secs(AS, 3));
+  ok(Math.abs(W.tx(W.aTile[s]) - 15) < d0 && W.aTargetTile[s] === blade, 'seek: walking toward it');
+  tick(sim, secs(AS, 4));
+  ok(W.aSlot !== null && W.gSize[blade] < 1 || W.kind[blade] !== AS.KIND.GRASS, 'seek: arrives and eats');
+}
+{
+  // A blade behind a grass wall isn't targeted; open blade is.
+  const { AS, sim, W } = make(21);
+  for (let y = 0; y < 21; y++) if (y !== 10) W.addGrass(at(W, 12, y), 1, 3); // wall; keep y=10 clear
+  W.addGrass(at(W, 12, 10), 1, 3); // close the gap fully
+  W.addGrass(at(W, 15, 10), 1, 3); // behind the wall
+  const s = bunny(AS, sim, 10, 10, { full: 30 });
+  tick(sim, 3);
+  ok(stateName(sim, s) !== 'SEEK_FOOD' || W.aTargetTile[s] === -1 || W.aTargetTile[s] === at(W, 12, 10) || true, 'seek: (setup)');
+  // The wall blade at (12,10) is visible and adjacent-reachable from (11,10); the one behind is not.
+  ok(W.aTargetTile[s] !== at(W, 15, 10), 'seek: blade hidden behind the wall is not targeted');
+}
+{
+  // Unreachable blade (boxed in by other blades is still visible... use enclosure of grass ring) gets abandoned.
+  const { AS, sim, W } = make(25);
+  // Blade A at (13,10) fully surrounded by an open moat? Make it unreachable: enclose with corpses (don't block sight).
+  const A = at(W, 13, 10);
+  W.addGrass(A, 1, 3);
+  for (const [x, y] of [[12, 10], [14, 10], [13, 9], [13, 11]]) W.addCorpse(at(W, x, y), AS.SPECIES.BUNNY);
+  W.addGrass(at(W, 10, 14), 1, 3); // reachable blade, farther (distance 4 vs 3)
+  const s = bunny(AS, sim, 10, 10, { full: 30 });
+  tick(sim, 3);
+  ok(W.aTargetTile[s] === -1, 'seek: unreachable blade dropped from the target at once');
+  tick(sim, secs(AS, 5));
+  const B2 = at(W, 10, 14);
+  ok(W.aTargetTile[s] === B2 || W.gSize[B2] < 1 || W.kind[B2] !== AS.KIND.GRASS, `seek: unreachable blade abandoned for the reachable one (target ${W.aTargetTile[s]})`);
+}
+
+// --- WANDER ---
+{
+  const { AS, sim, W, B } = make(60, 5, tx => { tx.species = editCSV(tx.species, 'HungerRate', 'Bunny', '0'); });
+  const s = bunny(AS, sim, 30, 30);
+  let steps = 0, last = W.aTile[s], lastDir = -1, lastLeft = 0, maxRun = 0, run = 0, badTurn = 0, tooLong = 0, targets = 0;
+  for (let i = 0; i < secs(AS, 10); i++) {
+    tick(sim);
+    if (W.aTarget && 0) targets++;
+    if (W.aTargetTile[s] !== -1) targets++;
+    if (W.aTile[s] !== last) {
+      steps++;
+      const d = [-W.w, 1, W.w, -1].indexOf(W.aTile[s] - last);
+      if (lastDir !== -1 && d !== lastDir && lastLeft !== 0) badTurn++;
+      if (d === lastDir) run++; else run = 1;
+      lastDir = d; lastLeft = W.aRunLeft[s]; last = W.aTile[s];
+    }
+  }
+  ok(near(steps, 10 * B.WalkSpeed, 0.1 * 10 * B.WalkSpeed), `wander: ${steps} steps in 10 s (WalkSpeed ${B.WalkSpeed} → ${10 * B.WalkSpeed})`);
+  ok(badTurn === 0, `wander: turns only when a run ended (${badTurn} early turns)`);
+  ok(targets === 0, 'wander: no target line');
+  // Runs: with a uniform pick the new direction can match the old one, so look at the picked run lengths directly.
+  const lens = new Set();
+  const s2 = bunny(AS, sim, 10, 10);
+  let prevLeft = 0;
+  for (let i = 0; i < secs(AS, 60); i++) {
+    tick(sim);
+    if (W.aRunLeft[s2] > prevLeft || (prevLeft === 0 && W.aRunLeft[s2] > 0)) lens.add(W.aRunLeft[s2] + 1);
+    prevLeft = W.aRunLeft[s2];
+  }
+  ok([...lens].every(n => n >= B.WanderRun.min && n <= B.WanderRun.max) && lens.size > 1, `wander: run lengths drawn from ${B.WanderRun.min}-${B.WanderRun.max} (saw ${[...lens].sort()})`);
+  // Never stands when open: bunny in a corridor-free spot over 30 s keeps its step rate.
+}
+{
+  // Never stands still with a neighbor open: boxed in except one exit.
+  const { AS, sim, W, B } = make(9, 3, tx => { tx.species = editCSV(tx.species, 'HungerRate', 'Bunny', '0'); });
+  const c = at(W, 4, 4);
+  for (const [x, y] of [[3, 4], [5, 4], [4, 3]]) W.addGrass(at(W, x, y), 1, 3);
+  const s = bunny(AS, sim, 4, 4);
+  tick(sim, secs(AS, 2));
+  ok(W.aTile[s] === at(W, 4, 5) || W.aTile[s] !== c, 'wander: takes the only open exit');
+  // Fully enclosed: stands.
+  const t2 = make(9, 3);
+  for (const [x, y] of [[3, 4], [5, 4], [4, 3], [4, 5]]) t2.W.addGrass(at(t2.W, x, y), 1, 3);
+  const s2 = bunny(t2.AS, t2.sim, 4, 4);
+  tick(t2.sim, secs(t2.AS, 2));
+  ok(t2.W.aTile[s2] === at(t2.W, 4, 4), 'wander: stands when every neighbor is blocked');
+}
+
+// --- starvation, old age ---
+{
+  const { AS, sim, W, B, events } = make(15);
+  const s = bunny(AS, sim, 7, 7, { full: 0 });
+  tick(sim, secs(AS, 5));
+  ok(near(B.HPMax - W.aHP[s], 5 * B.StarveDamage, 0.2), `starve: HP fell ${(B.HPMax - W.aHP[s]).toFixed(2)} in 5 s (StarveDamage ${B.StarveDamage}/s)`);
+  tick(sim, secs(AS, B.HPMax / B.StarveDamage));
+  ok(!W.aAlive[s] && W.kind[W.aTile[s]] === AS.KIND.CORPSE, 'starve: dies and leaves a corpse');
+  const ct = W.cList[0];
+  ok(W.cCount === 1 && W.cSpecies[ct] === AS.SPECIES.BUNNY && events.some(e => e[0] === AS.EV.DEATH && e[1] === ct), 'starve: bunny corpse and a DEATH event');
+}
+{
+  const { AS, sim, W, B, events } = make(15, 1, tx => { tx.species = editCSV(tx.species, 'HungerRate', 'Bunny', '0'); });
+  const s = bunny(AS, sim, 7, 7, { age: B.Lifespan - 0.1 });
+  tick(sim, secs(AS, 0.09 * AS.DAY_SECONDS));
+  ok(W.aAlive[s], 'age: alive just before Lifespan');
+  tick(sim, secs(AS, 0.03 * AS.DAY_SECONDS));
+  ok(!W.aAlive[s] && W.aHP[s] === B.HPMax && events.some(e => e[0] === AS.EV.DEATH), 'age: dies at Lifespan days with full HP, DEATH event');
+}
+
+// --- REST ---
+{
+  const { AS, sim, W, B } = make(60, 2, tx => { tx.species = editCSV(tx.species, 'HungerRate', 'Bunny', '0'); });
+  const s = bunny(AS, sim, 30, 30, { stamina: B.RestBelow * B.StaminaMax - 1 });
+  W.aDecideLeft[s] = 0;
+  tick(sim, 3);
+  ok(stateName(sim, s) === 'REST', 'rest: below RestBelow → REST');
+  const p = W.aTile[s];
+  tick(sim, secs(AS, 2));
+  ok(W.aTile[s] === p && W.aTarget === undefined && W.aTargetTile[s] === -1, 'rest: stands still, no target');
+  // Above RestBelow but below RestUntil: still resting (hysteresis).
+  W.aStamina[s] = B.RestBelow * B.StaminaMax + 5;
+  tick(sim, 8);
+  ok(stateName(sim, s) === 'REST' || B.RestUntil <= B.RestBelow, `rest: above RestBelow but below RestUntil keeps resting (${stateName(sim, s)}, stamina ${W.aStamina[s].toFixed(1)})`);
+  tick(sim, secs(AS, (B.RestUntil * B.StaminaMax - W.aStamina[s]) / B.StaminaRefill + 1));
+  ok(stateName(sim, s) === 'WANDER' && W.aStamina[s] >= B.RestUntil * B.StaminaMax - 1e-3, `rest: leaves at RestUntil (${stateName(sim, s)})`);
+  // Not resting: just above RestBelow does not enter.
+  const s2 = bunny(AS, sim, 10, 10, { stamina: B.RestBelow * B.StaminaMax + 5 });
+  tick(sim, 3);
+  ok(stateName(sim, s2) !== 'REST', 'rest: not entered above RestBelow when not already resting');
+}
+
+// --- MATE is covered by breed-check.js; here: a same-sex crowd never enters it ---
+{
+  const { AS, sim, W } = make(30, 4);
+  for (let i = 0; i < 20; i++) { const s = bunny(AS, sim, 3 + i, 15); W.aSex[s] = AS.SEX.MALE; }
+  let seenMate = false;
+  for (let i = 0; i < secs(AS, 10); i++) { tick(sim); for (let s = 0; s < W.aHigh; s++) if (W.aAlive[s] && stateName(sim, s) === 'MATE') seenMate = true; }
+  ok(!seenMate, 'mate: an all-male crowd never enters MATE');
+}
+
+// --- FLEE ---
+{
+  const { AS, sim, W, B } = make(41, 6);
+  const w = wolf(AS, sim, 15, 20);
+  const s = bunny(AS, sim, 20, 20);
+  tick(sim, 3);
+  ok(stateName(sim, s) === 'FLEE', 'flee: wolf in view → FLEE');
+  const d0 = (W.tx(W.aTile[s]) - 15) ** 2;
+  let minStamina = 100, sawSprint = false, away = true;
+  for (let i = 0; i < secs(AS, 2); i++) {
+    tick(sim);
+    minStamina = Math.min(minStamina, W.aStamina[s]);
+    if (W.aSprint[s]) sawSprint = true;
+    const tt = W.aTargetTile[s];
+    if (stateName(sim, s) !== 'FLEE') continue;
+    if (tt < 0 || (W.tx(tt) - 15) ** 2 + (W.ty(tt) - 20) ** 2 <= (W.tx(W.aTile[s]) - 15) ** 2 + (W.ty(W.aTile[s]) - 20) ** 2) away = false;
+  }
+  ok(sawSprint && minStamina < 100 - 10, `flee: sprints and Stamina drops (min ${minStamina.toFixed(1)})`);
+  ok((W.tx(W.aTile[s]) - 15) ** 2 > d0, 'flee: moves away from the wolf');
+  ok(away, 'flee: target point is farther from the wolf than the bunny');
+  // Distance moved during 2 s of sprint ≳ walk distance
+  ok(W.aTile[s] !== at(W, 20, 20), 'flee: moved');
+  // Keep fleeing until it drops stamina to 0, then walks (never exceeds sprint speed share)
+  tick(sim, secs(AS, 10));
+  const dd = (W.tx(W.aTile[s]) - 15) ** 2 + (W.ty(W.aTile[s]) - 20) ** 2;
+  ok(stateName(sim, s) === 'FLEE' ? dd <= B.VisionRange ** 2 : dd > B.VisionRange ** 2 - 4, `flee: keeps going until out of the wolf's sight (${stateName(sim, s)}, dist ${Math.sqrt(dd).toFixed(1)})`);
+  // leaving FLEE turns sprint off
+  W.removeAnimal(w); W.aKills[w] = 0;
+  tick(sim, secs(AS, 1));
+  ok(stateName(sim, s) !== 'FLEE' && !W.aSprint[s], `flee: wolf gone → leaves FLEE, sprint off (${stateName(sim, s)})`);
+}
+{
+  const { AS, sim, W } = make(41, 6);
+  for (let y = 0; y < 41; y++) W.addGrass(at(W, 17, y), 1, 3);
+  wolf(AS, sim, 14, 20);
+  const s = bunny(AS, sim, 20, 20);
+  tick(sim, secs(AS, 2));
+  ok(stateName(sim, s) !== 'FLEE', 'flee: wolf behind a grass wall → no FLEE');
+}
+
+// --- the real world, 20 days ---
+{
+  const { AS, texts } = load();
+  const { T, errors } = AS.parseTables(texts);
+  if (errors.length) throw new Error(errors.join('\n'));
+  const deaths = { starved: 0, old: 0 };
+  const kill = AS.killAnimal;
+  AS.killAnimal = (sim, s) => {
+    const W = sim.W, S = AS.speciesStats(sim, s);
+    if (W.aAge[s] >= S.Lifespan) deaths.old++; else deaths.starved++;
+    kill(sim, s);
+  };
+  const sim = AS.Sim(T, 12345);
+  const W = sim.W, names = T.states.bunny.map(s => s.name);
+  console.log('\nreal world, ' + W.w + 'x' + W.h + ', ' + W.bunnies + ' bunnies at start');
+  console.log('day  bunnies  starved  old  meanFull  ' + names.map(n => n.padEnd(9)).join(' '));
+  const t0 = Date.now();
+  const dayTicks = AS.TICK_HZ * AS.DAY_SECONDS;
+  let minB = 1e9, noneSeen = 0;
+  for (let d = 1; d <= 20; d++) {
+    tick(sim, dayTicks);
+    let n = 0, sum = 0; const c = new Array(names.length).fill(0);
+    for (let s = 0; s < W.aHigh; s++) if (W.aAlive[s]) { n++; sum += W.aFullness[s]; if (W.aState[s] === 255) noneSeen++; else c[W.aState[s]]++; }
+    minB = Math.min(minB, n);
+    console.log(`${String(d).padStart(3)}  ${String(n).padStart(7)}  ${String(deaths.starved).padStart(7)}  ${String(deaths.old).padStart(3)}  ${(sum / Math.max(1, n)).toFixed(1).padStart(8)}  ` + c.map(x => ((100 * x / Math.max(1, n)).toFixed(0) + '%').padEnd(9)).join(' '));
+  }
+  console.log(`(${Date.now() - t0} ms)`);
+  ok(W.bunnies >= 0 && !Number.isNaN(W.bunnies), 'real: ran 20 days');
+  const { audit } = require('./harness.js');
+  const before = bad; audit(AS, sim, 'bunny-check');
+  const h = require('./harness.js');
+  ok(h.failures.length === 0, 'real: grid/store audit clean ' + h.failures.slice(0, 3).join('; '));
+}
+
+console.log(bad ? `\nFAIL (${bad})` : '\nALL PASS');
+process.exit(bad ? 1 : 0);

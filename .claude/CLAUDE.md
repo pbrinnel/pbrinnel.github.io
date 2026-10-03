@@ -92,11 +92,13 @@ touches it.
   rather than `engine.js`, so the two engines will drift — repoint it when that starts to
   matter.
 
-## Test/agent-sim/
+## life.html and Life/
 
-A separate project (Agent Sim Test), public at paulbrinnel.com/Test/agent-sim/. Its own
-rules are in `Test/agent-sim/CLAUDE.md`; read that before working there. It shares nothing
-with the games.
+A separate project, the Life simulation (bunnies, wolves, grass), at
+paulbrinnel.com/life.html; its code lives in `Life/`. Unlisted like brandon.html: found by
+direct URL only, never indexed or linked. Its own rules are in `Life/CLAUDE.md` and its
+code map in `Life/MAP.md`; read both before working there. It shares nothing with the
+games.
 
 ## Comments
 
