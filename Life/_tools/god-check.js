@@ -19,6 +19,12 @@ const sim = AS.Sim(T, 7), W = sim.W, K = AS.KIND;
 const DAY = AS.TICK_HZ * AS.DAY_SECONDS;
 const days = n => { for (let i = 0; i < n * DAY; i++) sim.tick(); };
 days(4);
+// A few blades of our own in the blast, so the test never depends on where this seed's
+// meadows happen to fall.
+for (const [x, y] of [[72, 47], [78, 53], [70, 52]]) {
+  const t = W.tile(x, y);
+  if (W.kind[t] === K.EMPTY && !W.hole[t] && !(W.scorch[t] > 0)) W.addGrass(t, 1, 0);
+}
 // Corpses from nowhere in the blast and outside it, so both are exercised.
 const center = W.tile(75, 50);
 for (const [x, y] of [[75, 50], [80, 55], [100, 50], [20, 20]]) {

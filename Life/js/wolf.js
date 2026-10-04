@@ -87,6 +87,41 @@
   // going around. Returns false when no path exists (the caller lets the next decision choose).
   // `exact` walks onto the tile itself instead of to a tile touching it (HUNT's search, where
   // nothing is there to bite).
+  // A ready wolf hears and scents a ready mate well beyond sight (MateRange; blank = sight
+  // only), as real wolves find each other by howling and scent, so wolves thinned out to a
+  // scattered few can still pair up. The nearest visible partner wins if there is one.
+  function nearestPartner(sim, s) {
+    const W = sim.W, S = AS.speciesStats(sim, s);
+    const near = AS.nearestVisible(sim, W.aTile[s], S.VisionRange, isPartner);
+    if (near >= 0 || !(S.MateRange > S.VisionRange)) return near;
+    const t0 = W.aTile[s], x0 = t0 % W.w, y0 = (t0 / W.w) | 0, r2 = S.MateRange * S.MateRange;
+    let best = -1, bestD = Infinity;
+    for (let a = 0, hi = W.aHigh; a < hi; a++) {
+      if (!W.aAlive[a] || a === s || W.aSpecies[a] !== W.aSpecies[s]) continue;
+      const t = W.aTile[a], dx = t % W.w - x0, dy = ((t / W.w) | 0) - y0, d = dx * dx + dy * dy;
+      if (d <= r2 && d < bestD && isPartner(t)) { best = t; bestD = d; }
+    }
+    return best;
+  }
+
+  // One step toward a goal beyond the pathfinder's reach (it searches only VisionRange):
+  // to the open or chewable 4-neighbor that most shortens the straight-line distance.
+  const farNb = new Int32Array(4);
+  function headToward(sim, s, goal) {
+    const W = sim.W, t = W.aTile[s], gx = goal % W.w, gy = (goal / W.w) | 0;
+    const d2 = u => (u % W.w - gx) ** 2 + (((u / W.w) | 0) - gy) ** 2;
+    let best = -1, bestD = d2(t);
+    for (let i = 0, k = W.neighbors4(t, farNb); i < k; i++) {
+      const u = farNb[i];
+      if ((W.kind[u] !== K.EMPTY && W.kind[u] !== K.GRASS) || (W.hole && W.hole[u])) continue;
+      const d = d2(u);
+      if (d < bestD) { best = u; bestD = d; }
+    }
+    if (best < 0) return false;
+    AS.chewOrStep(sim, s, best);
+    return true;
+  }
+
   function walkToward(sim, s, goalTile, exact) {
     const W = sim.W;
     mSim = sim; mW = W; mSelf = s; mGoal = goalTile; mFrom = W.aTile[s];
@@ -321,7 +356,7 @@
         if (!AS.canMate(sim, s)) return false;
         const W = sim.W;
         mSim = sim; mW = W; mSelf = s;
-        const t = AS.nearestVisible(sim, W.aTile[s], AS.speciesStats(sim, s).VisionRange, isPartner);
+        const t = nearestPartner(sim, s);
         if (t < 0) return false;
         const m = mem(W), p = W.aSlot[t];
         m.mate[s] = p;
@@ -342,7 +377,10 @@
         W.aTargetSerial[s] = W.aSerial[p];
         if (adjacent(W, W.aTile[s], pt)) { AS.mate(sim, s, p); return; }
         if (W.aStepLeft[s] > 0) return;
-        if (!walkToward(sim, s, pt)) {
+        const S = AS.speciesStats(sim, s), t = W.aTile[s];
+        const dx = pt % W.w - t % W.w, dy = ((pt / W.w) | 0) - ((t / W.w) | 0);
+        const far = dx * dx + dy * dy > S.VisionRange * S.VisionRange;
+        if (far ? !headToward(sim, s, pt) : !walkToward(sim, s, pt)) {
           W.aTargetTile[s] = -1; W.aTargetSlot[s] = -1;
           m.mateSerial[s] = 0;
           prowlStep(sim, s);

@@ -55,6 +55,7 @@
     ['MateCooldown', 'num', ANIMALS],
     ['MateFullness', 'frac', ANIMALS],
     ['MateCost', 'frac', ANIMALS],
+    ['MateRange', 'num', []],        // blank = a mate must be in sight
     ['PackLimit', 'num', []],        // blank = no territory rule
     ['TerritoryRange', 'num', []],
     ['BabySpeed', 'ratio', ANIMALS],

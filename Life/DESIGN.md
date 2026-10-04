@@ -129,6 +129,10 @@ watching the sim run. Everything else in this doc is decided.
   wandering), so crowded colonies and packs leak into empty land. A fleeing bunny with no
   hole in reach picks the escape direction that gains distance without running into a
   wall or corner.
+- **Wolves find mates far beyond sight** (Paul, 4 Oct 2026): a ready wolf senses a ready
+  mate within `MateRange` (howling and scent) and travels straight toward it, so wolves
+  thinned to a scattered few can still pair up. Wolf litters are 3–5, nearer real wolves'
+  4–6 pups.
 - **Wolf territories** (Paul, 4 Oct 2026): crowded wolves don't breed. A female wolf
   mates only if no more than `PackLimit` other adult wolves are within `TerritoryRange`
   tiles of her (a square). Nothing else about territories exists: wolves still go
@@ -363,6 +367,11 @@ seeds and saves numbers back into `tables/`. What's been found, in order:
   0.4 (was 1): 3 of 3 seeds for 30 days with wolves at 95–96, against 2 of 3 with the old
   rules; each piece alone kept 3 of 3 but with fewer wolves (61–92). Paul rejected letting
   wolves eat unseen "small game" as phony.
+- Wolves stayed fragile at low numbers while bunnies and grass bounced back (Paul).
+  Wolf `LitterSize` 3–5 (was 1–2) and `MateRange` 80: quick test (3 seeds × 30 days) kept
+  3 of 3 either way; litters alone gave the most wolves (1.17× their start), both together
+  boomed higher (peak 208) and were falling by day 30 (0.90×). Committed together for
+  Paul's long runs; mate range is for scattered survivors, which 30 days can't show.
 - **Wolves remembering where a bunny hid** (`TrackSeconds`) helped over 50 days (wolves
   1.35× their start instead of 1.1× at the old food, 3.7× instead of 3.2× at `BiteFood`
   20) but not over 200: with `BiteFood` 20, 15 s of memory kept 10 of 12 fresh seeds
