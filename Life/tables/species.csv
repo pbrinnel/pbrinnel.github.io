@@ -7,7 +7,9 @@ StaminaRefill,per s,8,4,,While not sprinting
 SprintCost,per s,25,20,,
 FullnessMax,points,100,100,,
 HungerRate,per s,2,0.9,,Bunny empty in ~2.5 days; wolf in ~5.6
-StarveDamage,HP per s,1,1,,HP lost while Fullness = 0
+StarveDamage,HP per s,1,0.4,,HP lost while Fullness = 0; wolf lasts ~7 days on an empty stomach
+RestHunger,× HungerRate,0.5,0.5,,Hunger while standing still (resting, hiding, eating in place)
+SprintHunger,× HungerRate,1.5,1.5,,Hunger while sprinting; walking burns HungerRate
 HPMax,points,20,60,,
 HealRate,HP per s,0.5,0.5,,Only while Fullness > HealAbove
 HealAbove,% of FullnessMax,50,50,,Healing needs at least this much Fullness

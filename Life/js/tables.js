@@ -26,6 +26,8 @@
     ['FullnessMax', 'pos', ANIMALS],
     ['HungerRate', 'num', ANIMALS],
     ['StarveDamage', 'num', ANIMALS],
+    ['RestHunger', 'num', ANIMALS],
+    ['SprintHunger', 'num', ANIMALS],
     ['HPMax', 'pos', ANIMALS],
     ['HealRate', 'num', ANIMALS],
     ['HealAbove', 'frac', ANIMALS],

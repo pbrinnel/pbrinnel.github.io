@@ -187,7 +187,10 @@
 
       // Body.
       W.aAge[s] += AS.DT_DAYS;
-      let full = W.aFullness[s] - S.HungerRate * dt;
+      // Activity sets the burn: standing still (resting, hiding, eating in place) costs
+      // RestHunger times HungerRate, sprinting SprintHunger times, walking HungerRate.
+      const burn = W.aSprint[s] ? S.SprintHunger : W.aStepLeft[s] > 0 ? 1 : S.RestHunger;
+      let full = W.aFullness[s] - S.HungerRate * burn * dt;
       if (full < 0) full = 0;
       W.aFullness[s] = full;
       let hp = W.aHP[s];

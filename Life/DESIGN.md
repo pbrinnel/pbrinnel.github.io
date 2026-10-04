@@ -102,7 +102,11 @@ watching the sim run. Everything else in this doc is decided.
   bodies lingered too long; a quicker rot also leaves wolves less to scavenge). (One-bite kills that fed the wolf on the
   spot failed: a wolf's stomach holds 100 and it hunts below 80, so most of a big meal was
   wasted.)
-- Starving: at Fullness 0 an animal loses HP each second and dies when HP reaches 0.
+- **Hunger follows activity** (Paul, 4 Oct 2026): standing still (resting, hiding,
+  eating in place) burns `RestHunger` times `HungerRate`, sprinting `SprintHunger` times,
+  walking `HungerRate`. Animals that find no food rest more and so starve slower.
+- Starving: at Fullness 0 an animal loses `StarveDamage` HP each second and dies when HP
+  reaches 0. Wolves last about a week on an empty stomach, as real wolves can.
 - Death leaves a corpse on the tile, which blocks movement like anything else.
 - No genetics yet. Every animal of a species has the same stats. Inheritance comes later.
 - **Wolves bite bunnies, and that's the only fighting.** Bunnies never fight back and
@@ -339,6 +343,11 @@ seeds and saves numbers back into `tables/`. What's been found, in order:
 - Wandering toward room (`RoomPreference` 1) against random wandering, 3 seeds × 30 days:
   same seeds survived (2 of 3), but wolves held up a little better (0.68× their start
   against 0.60×) and lasted longer on the seed that lost them (day 26 against day 20).
+- With wandering toward room, runs reached ~500 days (Paul), limited by wolves dying out.
+  Activity-based hunger (`RestHunger` 0.5, `SprintHunger` 1.5) plus wolf `StarveDamage`
+  0.4 (was 1): 3 of 3 seeds for 30 days with wolves at 95–96, against 2 of 3 with the old
+  rules; each piece alone kept 3 of 3 but with fewer wolves (61–92). Paul rejected letting
+  wolves eat unseen "small game" as phony.
 - **Wolves remembering where a bunny hid** (`TrackSeconds`) helped over 50 days (wolves
   1.35× their start instead of 1.1× at the old food, 3.7× instead of 3.2× at `BiteFood`
   20) but not over 200: with `BiteFood` 20, 15 s of memory kept 10 of 12 fresh seeds
