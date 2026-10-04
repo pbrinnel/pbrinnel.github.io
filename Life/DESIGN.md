@@ -119,6 +119,12 @@ watching the sim run. Everything else in this doc is decided.
   sometimes digs a new one (`DigChance` per day, `DigSeconds` to dig) within
   `WarrenRadius` of its warren, or founds a new warren where no hole is near. A hole no
   bunny has used for `CollapseDays` falls in, so warrens grow and die with their colony.
+- **Animals spread toward room** (Paul, 4 Oct 2026: they stayed clumped and got pinned in
+  corners while empty land went unused). When a wandering animal picks a direction it
+  leans toward the one with fewer of its own kind ahead (`RoomPreference`; 0 = random
+  wandering), so crowded colonies and packs leak into empty land. A fleeing bunny with no
+  hole in reach picks the escape direction that gains distance without running into a
+  wall or corner.
 - **Wolf territories** (Paul, 4 Oct 2026): crowded wolves don't breed. A female wolf
   mates only if no more than `PackLimit` other adult wolves are within `TerritoryRange`
   tiles of her (a square). Nothing else about territories exists: wolves still go
@@ -330,6 +336,9 @@ seeds and saves numbers back into `tables/`. What's been found, in order:
   `TimeToMature` 15 days. Quick test (3 seeds × 30 days): wolves lower early on (0.6× their
   start against 0.7×), all three species on 2 of 3 seeds; adding `MateCooldown` 20 was too
   much (1 of 3). Thirty days is too short to see the overshoot; Paul analyzes longer runs.
+- Wandering toward room (`RoomPreference` 1) against random wandering, 3 seeds × 30 days:
+  same seeds survived (2 of 3), but wolves held up a little better (0.68× their start
+  against 0.60×) and lasted longer on the seed that lost them (day 26 against day 20).
 - **Wolves remembering where a bunny hid** (`TrackSeconds`) helped over 50 days (wolves
   1.35× their start instead of 1.1× at the old food, 3.7× instead of 3.2× at `BiteFood`
   20) but not over 200: with `BiteFood` 20, 15 s of memory kept 10 of 12 fresh seeds

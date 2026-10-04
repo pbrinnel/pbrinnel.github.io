@@ -8,6 +8,14 @@
 
   // How far ahead, in tiles, the flee intent line points from the bunny.
   const FLEE_LOOKAHEAD = 4;
+  // The escape directions FLEE weighs, as [cos, sin] of the turn from straight away from the
+  // wolf: straight first (it wins ties), then 45 and 90 degrees to either side.
+  const FLEE_TURNS = [[1, 0], [Math.SQRT1_2, Math.SQRT1_2], [Math.SQRT1_2, -Math.SQRT1_2], [0, 1], [0, -1]];
+  // A tile of the escape path this near the edge of the world, or off it, counts as wall...
+  const FLEE_WALL_MARGIN = 2;
+  // ...and costs this many tiles of distance gained from the wolf, so a bunny turns along
+  // a wall once running on would put several path tiles against it.
+  const FLEE_WALL_COST = 1.5;
   // A blade a bunny couldn't path to is left out of its choices for this long (sim
   // seconds), so it tries a different blade instead of re-picking the same one every
   // decision. BAD_N such blades are remembered per bunny.
@@ -93,6 +101,39 @@
     return dx * dx + dy * dy === 1;
   };
 
+  // ---- wandering toward room ---------------------------------------------------------------
+
+  // A new run's direction, chosen from dirs[0..n) (open directions) with a lean away from
+  // crowds of the animal's own kind: each direction is weighted exp(-RoomPreference * c /
+  // (L / 2)), where c counts same-kind animals in the box L tiles long (L = VisionRange,
+  // rounded) and L + 1 wide, starting next to the animal and reaching out along that
+  // direction, and L / 2 is "a crowd" for any vision range. Runs only when a run starts, and
+  // reads the grid's occupancy (W.kind) rather than any list. RoomPreference 0 keeps the
+  // plain uniform draw, so a table with 0 replays exactly as before.
+  const roomW = new Float64Array(4);
+  function pickRoomDir(sim, s, kind, dirs, n) {
+    const rp = AS.speciesStats(sim, s).RoomPreference;
+    if (!(rp > 0) || n === 1) return n === 1 ? dirs[0] : dirs[sim.rng.int(n)];
+    const W = sim.W, w = W.w, h = W.h, t = W.aTile[s], tx = t % w, ty = (t / w) | 0;
+    const L = Math.max(1, Math.round(AS.speciesStats(sim, s).VisionRange)), half = L >> 1;
+    let sum = 0;
+    for (let i = 0; i < n; i++) {
+      const d = dirs[i], dx = DX[d], dy = DY[d];
+      let x0 = dx ? Math.min(tx + dx, tx + dx * L) : tx - half, x1 = dx ? Math.max(tx + dx, tx + dx * L) : tx + half;
+      let y0 = dy ? Math.min(ty + dy, ty + dy * L) : ty - half, y1 = dy ? Math.max(ty + dy, ty + dy * L) : ty + half;
+      if (x0 < 0) x0 = 0; if (y0 < 0) y0 = 0; if (x1 >= w) x1 = w - 1; if (y1 >= h) y1 = h - 1;
+      let c = 0;
+      for (let y = y0; y <= y1; y++) {
+        const row = y * w;
+        for (let x = x0; x <= x1; x++) if (W.kind[row + x] === kind) c++;
+      }
+      sum += roomW[i] = Math.exp(-rp * c / (L / 2));
+    }
+    let r = sim.rng.next() * sum;
+    for (let i = 0; i < n - 1; i++) { r -= roomW[i]; if (r < 0) return dirs[i]; }
+    return dirs[n - 1];
+  }
+
   // The tile one step from t in direction d, or -1 off the world.
   function dirTile(W, t, d) {
     const x = (t % W.w) + DX[d], y = ((t / W.w) | 0) + DY[d];
@@ -131,7 +172,7 @@
       if (nt >= 0 && W.kind[nt] === K.EMPTY) open[n++] = d;
     }
     if (n === 0) return;
-    const d = open[sim.rng.int(n)];
+    const d = pickRoomDir(sim, s, K.BUNNY, open, n);
     W.aRunDir[s] = d;
     W.aRunLeft[s] = sim.rng.inRange(AS.speciesStats(sim, s).WanderRun);
     if (AS.stepTo(sim, s, dirTile(W, t, d))) W.aRunLeft[s]--;
@@ -163,7 +204,7 @@
     },
 
     // "Sprint to the nearest free hole it can see; with none in reach sprint away from the
-    // nearest wolf; walk when out of Stamina."
+    // nearest wolf, bending along a wall instead of into it; walk when out of Stamina."
     FLEE: {
       enter(sim, s) {
         const W = sim.W, S = AS.speciesStats(sim, s);
@@ -193,25 +234,59 @@
           if (step >= 0) { AS.stepTo(sim, s, step); return; }
         }
 
-        // The intent line points a few tiles straight away from the wolf, kept inside the world.
+        // The escape point is FLEE_LOOKAHEAD tiles out along the best of a few directions:
+        // straight away from the wolf, or turned by FLEE_TURNS, scored by how far it ends
+        // from the wolf minus FLEE_WALL_COST for each tile of the way that is off the world or
+        // within FLEE_WALL_MARGIN of its edge. Straight away is tried first and a turn must
+        // score strictly higher, so with no wall near the bunny runs straight as it always has.
+        // A turn must also start on an open tile. The intent line points at the chosen point.
         let ax = tx - wx, ay = ty - wy;
         const len = Math.sqrt(ax * ax + ay * ay) || 1;
-        let ex = Math.round(tx + ax / len * FLEE_LOOKAHEAD), ey = Math.round(ty + ay / len * FLEE_LOOKAHEAD);
-        ex = ex < 0 ? 0 : ex >= w ? w - 1 : ex;
-        ey = ey < 0 ? 0 : ey >= W.h ? W.h - 1 : ey;
-        W.aTargetTile[s] = ey * w + ex;
+        ax /= len; ay /= len;
+        let bestC = -1, bestScore = -Infinity, bex = 0, bey = 0;
+        // Far enough from every edge that no tile of any path can count as wall: straight away.
+        const far = FLEE_WALL_MARGIN + FLEE_LOOKAHEAD + 1;
+        const clear = tx >= far && ty >= far && tx < w - far && ty < W.h - far;
+        for (let c = 0; c < (clear ? 1 : FLEE_TURNS.length); c++) {
+          const cs = FLEE_TURNS[c][0], sn = FLEE_TURNS[c][1];
+          const cx = ax * cs - ay * sn, cy = ax * sn + ay * cs;
+          let near = 0;
+          for (let i = 1; i <= FLEE_LOOKAHEAD && !clear; i++) {
+            const px = Math.round(tx + cx * i), py = Math.round(ty + cy * i);
+            if (px < FLEE_WALL_MARGIN || py < FLEE_WALL_MARGIN || px >= w - FLEE_WALL_MARGIN || py >= W.h - FLEE_WALL_MARGIN) near++;
+          }
+          let ex = Math.round(tx + cx * FLEE_LOOKAHEAD), ey = Math.round(ty + cy * FLEE_LOOKAHEAD);
+          ex = ex < 0 ? 0 : ex >= w ? w - 1 : ex;
+          ey = ey < 0 ? 0 : ey >= W.h ? W.h - 1 : ey;
+          if (c > 0) {
+            const fx = Math.round(tx + cx), fy = Math.round(ty + cy);
+            if (!W.inside(fx, fy) || W.kind[fy * w + fx] !== K.EMPTY) continue;
+          }
+          const score = Math.sqrt((ex - wx) * (ex - wx) + (ey - wy) * (ey - wy)) - FLEE_WALL_COST * near;
+          if (score > bestScore) { bestScore = score; bestC = c; bex = ex; bey = ey; }
+          // Nothing near a wall on the straight path: no turn can beat it, so skip them.
+          if (c === 0 && near === 0) break;
+        }
+        W.aTargetTile[s] = bey * w + bex;
         W.aTargetSlot[s] = -1;
 
         if (W.aStepLeft[s] > 0) return;
-        // The open neighbor that gets farthest from the wolf; stand if none gets farther
-        // than where it is (cornered).
+        // Straight away: the open neighbor that gets farthest from the wolf. A turn: the open
+        // neighbor nearest the escape point. Either way it must get farther from the wolf than
+        // where it is, or it stands (cornered).
         const k = W.neighbors4(t, nb);
-        let best = -1, bestD = (tx - wx) * (tx - wx) + (ty - wy) * (ty - wy);
+        const d0 = (tx - wx) * (tx - wx) + (ty - wy) * (ty - wy);
+        let best = -1, bestD = bestC === 0 ? d0 : Infinity;
         for (let i = 0; i < k; i++) {
           const n = nb[i];
           if (W.kind[n] !== K.EMPTY) continue;
           const dx = (n % w) - wx, dy = ((n / w) | 0) - wy, d2 = dx * dx + dy * dy;
-          if (d2 > bestD) { bestD = d2; best = n; }
+          if (bestC === 0) {
+            if (d2 > bestD) { bestD = d2; best = n; }
+          } else if (d2 > d0) {
+            const ex = (n % w) - bex, ey = ((n / w) | 0) - bey, e2 = ex * ex + ey * ey;
+            if (e2 < bestD) { bestD = e2; best = n; }
+          }
         }
         if (best >= 0) AS.stepTo(sim, s, best);
       },

@@ -38,6 +38,7 @@
     ['DigChance', 'frac', ['Bunny']],
     ['DigSeconds', 'num', ['Bunny']],
     ['WanderRun', 'range', ANIMALS],
+    ['RoomPreference', 'num', ANIMALS],
     ['DecidePerSec', 'pos', ANIMALS],
     ['Diet', 'text', []],
     ['BiteDamage', 'num', ['Wolf']],

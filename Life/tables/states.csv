@@ -1,6 +1,6 @@
 Species,Priority,State,Enter when,Does
 Bunny,1,HIDE,On a hole and a wolf is within VisionRange,Stay still in the hole; a wolf can't bite it there or hunt it
-Bunny,2,FLEE,A wolf is within VisionRange,Sprint to the nearest free hole within HoleRange that it can see; with none in reach sprint away from the nearest wolf; walk when out of Stamina
+Bunny,2,FLEE,A wolf is within VisionRange,Sprint to the nearest free hole within HoleRange that it can see; with none in reach sprint away from the nearest wolf, bending along a wall or around a corner instead of into it; walk when out of Stamina
 Bunny,3,EAT,Hungry (Fullness < HungryAt) and a blade is on a 4-neighbor tile,Bite the blade every BiteCooldown
 Bunny,4,SEEK_FOOD,Hungry and no blade adjacent,Walk toward the nearest visible blade
 Bunny,5,MATE,Adult; Fullness ≥ MateFullness; female's cooldown 0; not pregnant,Walk to nearest eligible bunny of the other sex; adjacent → mate

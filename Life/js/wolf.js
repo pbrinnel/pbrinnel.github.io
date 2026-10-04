@@ -97,6 +97,39 @@
     return true;
   }
 
+  // ---- wandering toward room ---------------------------------------------------------------
+
+  // A new run's direction, chosen from dirs[0..n) (open directions) with a lean away from
+  // crowds of the animal's own kind: each direction is weighted exp(-RoomPreference * c /
+  // (L / 2)), where c counts same-kind animals in the box L tiles long (L = VisionRange,
+  // rounded) and L + 1 wide, starting next to the animal and reaching out along that
+  // direction, and L / 2 is "a crowd" for any vision range. Runs only when a run starts, and
+  // reads the grid's occupancy (W.kind) rather than any list. RoomPreference 0 keeps the
+  // plain uniform draw, so a table with 0 replays exactly as before.
+  const roomW = new Float64Array(4);
+  function pickRoomDir(sim, s, kind, dirs, n) {
+    const rp = AS.speciesStats(sim, s).RoomPreference;
+    if (!(rp > 0) || n === 1) return n === 1 ? dirs[0] : dirs[sim.rng.int(n)];
+    const W = sim.W, w = W.w, h = W.h, t = W.aTile[s], tx = t % w, ty = (t / w) | 0;
+    const L = Math.max(1, Math.round(AS.speciesStats(sim, s).VisionRange)), half = L >> 1;
+    let sum = 0;
+    for (let i = 0; i < n; i++) {
+      const d = dirs[i], dx = DX[d], dy = DY[d];
+      let x0 = dx ? Math.min(tx + dx, tx + dx * L) : tx - half, x1 = dx ? Math.max(tx + dx, tx + dx * L) : tx + half;
+      let y0 = dy ? Math.min(ty + dy, ty + dy * L) : ty - half, y1 = dy ? Math.max(ty + dy, ty + dy * L) : ty + half;
+      if (x0 < 0) x0 = 0; if (y0 < 0) y0 = 0; if (x1 >= w) x1 = w - 1; if (y1 >= h) y1 = h - 1;
+      let c = 0;
+      for (let y = y0; y <= y1; y++) {
+        const row = y * w;
+        for (let x = x0; x <= x1; x++) if (W.kind[row + x] === kind) c++;
+      }
+      sum += roomW[i] = Math.exp(-rp * c / (L / 2));
+    }
+    let r = sim.rng.next() * sum;
+    for (let i = 0; i < n - 1; i++) { r -= roomW[i]; if (r < 0) return dirs[i]; }
+    return dirs[n - 1];
+  }
+
   // PROWL's step: runs of WanderRun tiles. With no destination, a blocked run turns to an
   // open direction if there is one and chews only when walled in (DESIGN.md "World").
   function prowlStep(sim, s) {
@@ -124,7 +157,7 @@
       W.aRunLeft[s] = 0;
     }
     let d;
-    if (nOpen > 0) d = open[sim.rng.int(nOpen)];
+    if (nOpen > 0) d = pickRoomDir(sim, s, K.WOLF, open, nOpen);
     else if (nGrass > 0) d = grassDirs[sim.rng.int(nGrass)];
     else return;
     W.aRunDir[s] = d;

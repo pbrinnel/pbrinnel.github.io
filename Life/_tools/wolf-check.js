@@ -225,6 +225,35 @@ const d2 = (W, a, b) => (W.tx(a) - W.tx(b)) ** 2 + (W.ty(a) - W.ty(b)) ** 2;
   tick(sim, secs(AS, 3));
   ok(sname(sim, w, 'wolf') !== 'GIVE_UP' && !W.aWinded[w], `give up: back to normal after rest (${sname(sim, w, 'wolf')})`);
 }
+// --- prowl toward room ---
+{
+  // New runs from beside a pack of wolves to the east: count the directions picked.
+  function dirsPicked(pref) {
+    const { AS, sim, W } = make(100, 11, false, tx => {
+      tx.species = editCSV(editCSV(tx.species, 'RoomPreference', 'Wolf', String(pref)), 'StaminaRefill', 'Wolf', '0');
+    });
+    // The pack is out of Stamina and never refills, so it rests where it is.
+    for (let y = 30; y < 70; y += 3) for (let x = 53; x < 70; x += 3) wolf(AS, sim, x, y, { stamina: 0 });
+    const s = wolf(AS, sim, 50, 50, { full: 100 });
+    const prowl = sim.T.states.wolf.findIndex(x => x.name === 'PROWL');
+    const counts = [0, 0, 0, 0];
+    for (let i = 0; i < 300; i++) {
+      W.aRunLeft[s] = 0; W.aStepLeft[s] = 0;
+      W.aState[s] = prowl; W.aDecideLeft[s] = 1e9;
+      const t0 = W.aTile[s];
+      tick(sim);
+      const d = [-W.w, 1, W.w, -1].indexOf(W.aTile[s] - t0);
+      if (d >= 0) counts[d]++;
+      if (W.aTile[s] !== t0) W.moveAnimal(s, t0);
+    }
+    return counts;
+  }
+  const crowd = dirsPicked(1), flat = dirsPicked(0);
+  const rest = crowd[0] + crowd[2] + crowd[3];
+  ok(crowd[1] * 3 < rest, `prowl room: pack to the east, runs go east ${crowd[1]} vs elsewhere ${rest} (up/right/down/left ${crowd})`);
+  ok(Math.min(...flat) > 0.18 * flat.reduce((a, b) => a + b, 0), `prowl room: RoomPreference 0 is uniform (${flat})`);
+}
+
 // --- prowl ---
 {
   const { AS, sim, W, events } = make(40, 5);

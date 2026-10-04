@@ -185,6 +185,54 @@ function wolf(AS, sim, x, y) {
   ok(t2.W.aTile[s2] === at(t2.W, 4, 4), 'wander: stands when every neighbor is blocked');
 }
 
+// --- wandering toward room, and fleeing along walls ---
+{
+  // New runs from beside a crowd of bunnies to the east: count the directions picked.
+  function dirsPicked(pref) {
+    const { AS, sim, W } = make(60, 11, tx => {
+      tx.species = editCSV(editCSV(tx.species, 'HungerRate', 'Bunny', '0'), 'RoomPreference', 'Bunny', String(pref));
+      tx.species = editCSV(tx.species, 'StaminaRefill', 'Bunny', '0');
+    });
+    // The crowd is out of Stamina and never refills, so it rests where it is.
+    for (let y = 20; y < 40; y++) for (let x = 33; x < 38; x++) bunny(AS, sim, x, y, { stamina: 0 });
+    const s = bunny(AS, sim, 30, 30);
+    const wander = sim.T.states.bunny.findIndex(x => x.name === 'WANDER');
+    const counts = [0, 0, 0, 0];
+    for (let i = 0; i < 600; i++) {
+      // A fresh run each trial: the first step of a new run is the pick.
+      W.aRunLeft[s] = 0; W.aStepLeft[s] = 0;
+      W.aState[s] = wander; W.aDecideLeft[s] = 1e9;
+      const t0 = W.aTile[s];
+      tick(sim);
+      const d = [-W.w, 1, W.w, -1].indexOf(W.aTile[s] - t0);
+      if (d >= 0) counts[d]++;
+      if (W.aTile[s] !== t0) W.moveAnimal(s, t0);
+    }
+    return counts;
+  }
+  const crowd = dirsPicked(1), flat = dirsPicked(0);
+  const rest = crowd[0] + crowd[2] + crowd[3];
+  ok(crowd[1] * 3 < rest, `room: crowd to the east, runs go east ${crowd[1]} vs elsewhere ${rest} (up/right/down/left ${crowd})`);
+  ok(Math.min(...flat) > 0.18 * flat.reduce((a, b) => a + b, 0), `room: RoomPreference 0 is uniform (${flat})`);
+}
+{
+  // Fleeing: a wall behind the escape, a corner, and open ground.
+  function flee(bx, by, wx, wy, size = 41) {
+    const { AS, sim, W } = make(size, 6);
+    wolf(AS, sim, wx, wy);
+    const s = bunny(AS, sim, bx, by);
+    const t0 = W.aTile[s];
+    tick(sim, 23);
+    return { dx: W.tx(W.aTile[s]) - W.tx(t0), dy: W.ty(W.aTile[s]) - W.ty(t0), state: stateName(sim, s) };
+  }
+  const wall = flee(20, 2, 20, 6);
+  ok(wall.state === 'FLEE' && Math.abs(wall.dx) >= 2 && wall.dy >= -1, `flee: wolf south, wall north: runs along the wall (moved ${wall.dx},${wall.dy})`);
+  const corner = flee(2, 2, 6, 2);
+  ok(corner.dy >= 2, `flee: wolf east, corner behind: runs down the west wall (moved ${corner.dx},${corner.dy})`);
+  const open = flee(20, 20, 16, 20);
+  ok(open.dx >= 3 && Math.abs(open.dy) <= 1, `flee: in the open, straight away (moved ${open.dx},${open.dy})`);
+}
+
 // --- starvation, old age ---
 {
   const { AS, sim, W, B, events } = make(15);
