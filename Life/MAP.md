@@ -38,8 +38,9 @@ load time: every file reads other files' `AS.*` inside functions, at call time.
 | `breed.js` | mating and births, shared by both species | `canMate`, `mate`, `tryBirth` |
 | `bunny.js`, `wolf.js` | each species' states, by the names in `states.csv` | (register via `AS.registerStates`) |
 | `glyphs.js` | glyph ids, palette, life stage, the pre-rendered glyph sheet | `GLYPH`, `COLORS`, `CELL_COLOR`, `GlyphSheet`, `stageOf`, … |
+| `sprites.js` | the 8×8 pixel-art sprites (bunny, wolf, corpse, grass) as bitmaps, the walk/idle pose rule, per-slot facing, and the pre-rendered sprite sheet | `SpriteSheet`, `spritePose`, `spriteIndex`, `SpriteFacing`, … |
 | `camera.js` | pan/zoom/pinch/wheel/keys, tap → tile | `Camera` |
-| `render.js` | draw: visible tiles from the sheet, or cell mode zoomed out; animals glide; intent lines; selection | `Renderer`, `CELL_PX`, `glideProgress` |
+| `render.js` | draw: visible tiles from the sprite sheet, or cell mode zoomed out (its brighter far-view colors live at the top of render.js); animals glide; intent lines; selection | `Renderer`, `CELL_PX`, `glideProgress` |
 | `marks.js` | event marks: reads `sim.events`, rations per real second, fades | `Marks` |
 | `inspect.js` | `variables.csv` → the inspector's rows for a selection | `describe`, `inspectWarnings` |
 | `graph.js` | the population graph panel (from `sim.history`) | `Graph`, `graphMath` |
@@ -120,7 +121,8 @@ graph, ui, bench) only reads.
 ## Colors
 
 - **Map:** glyphs.js palette (black ground, greens for grass by size, tan bunnies,
-  gray-blue wolves, bone corpses; sexes two shades, elders dimmer).
+  gray-blue wolves, bone corpses; sexes two shades, elders dimmer) is the base for the
+  sprites (sprites.js). The zoomed-out far view has its own brighter colors in render.js.
 - **Charts** (graph panel, lab): grass `#199e70`, bunnies `#d95926`, wolves `#3987e5`.
   Validated as a set for color-blind readers on the `#0a0c0a` background (the map's own
   colors failed that check). Text in charts uses text colors, never series colors.

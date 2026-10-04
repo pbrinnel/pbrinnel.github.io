@@ -6,7 +6,7 @@ The goal is a self-sustaining ecosystem (DESIGN.md, top).
 
 ## Start here
 
-1. `DESIGN.md`: the spec, and the status of each milestone. Everything in it is decided
+1. `DESIGN.md`: the spec, the milestones (all done) and the tuning notes. Everything in it is decided
    by Paul. Don't change a decision without asking him.
 2. `MAP.md`: the code map: files, load order, data layout, who writes what, the tick,
    the tools. Read it before opening code; keep it true when you change structure.

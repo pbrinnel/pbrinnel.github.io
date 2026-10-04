@@ -68,13 +68,13 @@
   sim = AS.Sim(T, seed);
   const canvas = document.getElementById('map');
   const cam = AS.Camera(canvas, sim.W);
-  const sheet = AS.GlyphSheet(AS.FONT, T);
+  const sheet = AS.SpriteSheet(T);
   const renderer = AS.Renderer(canvas);
   // Marks follow the sim on their own: a swapped-in world restarts their event cursor.
   const marks = AS.Marks(T);
   graph = AS.Graph(T);
 
-  // A tap picks an animal by where its glyph is drawn: mid-step it's between the tile it
+  // A tap picks an animal by where its sprite is drawn: mid-step it's between the tile it
   // left and the one it already occupies, and people tap what they see. Blades and
   // corpses don't move, so they're picked by tile.
   cam.attach((tx, ty, fx, fy) => {

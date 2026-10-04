@@ -30,7 +30,8 @@ watching the sim run. Everything else in this doc is decided.
 - A simulation you watch. The player's only tool is the inspector: select an agent and
   read all of its properties live.
 - Pause, plus run-speed control.
-- Minimal graphics, early Dwarf Fortress style: one Unicode glyph per agent.
+- Minimal graphics: small 8×8 pixel sprites, one per agent (Paul chose them over the
+  original font glyphs, 3 Oct 2026).
 - No terrain besides grass, no day/night, no seasons.
 
 ### World
@@ -97,7 +98,7 @@ watching the sim run. Everything else in this doc is decided.
   is full.
 
 **Grass (░ ▒ ▓)**
-- Each tile of grass is one blade. The glyph shows its Size in thirds.
+- Each tile of grass is one blade. Its sprite shows its Size in thirds.
 - A blade grows from sprout to full Size, then can seed a new blade on an empty
   4-neighbor tile, and dies of old age at its `Lifespan`.
 - **Grass can sprout by itself** (Paul): each empty tile has a small `SproutChance` per day
@@ -121,22 +122,26 @@ watching the sim run. Everything else in this doc is decided.
 - The boost reaches a circle of `CorpseRadius` tiles.
 
 ### What the screen shows
-- **Glyphs:** α bunny, Ω wolf, ░▒▓ grass by Size, † corpse. The font ships with the page,
-  so glyphs look the same on every machine.
-- **Zoomed far out,** once tiles are too small for a glyph to read, each tile becomes a
-  solid square in its glyph's color. Glyphs come back as you zoom in.
+- **Sprites:** 8×8 pixel art drawn in code, no image files: a bunny, a wolf (pointed
+  ears, long snout, amber eye), grass as tufts in three heights by Size, bones for a
+  corpse. Animals face the way they last stepped sideways.
+- **Animals move like animals.** Bunnies stretch and hop a pixel mid-step; wolves stride
+  and bob a pixel. Standing animals now and then flick an ear or wag the tail, each on
+  its own timer so they never move in unison. Frames change with movement, at walking
+  pace, so nothing blinks. Planned next: a wolf's bite, sprinting, a bunny eating,
+  resting, falling over at death, a pregnant female's rounder belly, a birth, mating.
+- **Zoomed far out,** once tiles are too small for a sprite to read, each tile becomes a
+  solid square: grass shaded by height on dark ground, animals in brighter colors so
+  herds and hunters stand out. Sprites come back as you zoom in.
 - **Animals glide between tiles.** The sim moves them a whole tile at a time; drawing
-  slides the glyph across during each step.
+  slides the sprite across during each step.
 - **Life stage and sex on the map:** babies are drawn smaller and elders in a dimmer
   color; males and females are two shades of their species color.
 - **Intent lines:** a faint line from each animal to whatever it's after: wolf → prey,
   bunny → blade, animal → mate, and a line away from the threat for a fleeing bunny.
-- **Event marks:** brief marks where bites, births and deaths happen, so they're
-  visible at speed. These fade in and out rather than strobing, and the total number on
-  screen is capped, so 20× speed can't turn into flicker (see the photosensitivity note
-  under Performance). A bunny grazing makes a smaller, fainter mark; wolf bites, births
-  and deaths always win the per-second cap over grazing.
-- **Inspector:** click or tap an agent to select it. An animal is picked where its glyph
+- **No event marks** (Paul, 3 Oct 2026): once the sprites act out bites, eating, births
+  and deaths themselves, the fading marks that flag them today come out.
+- **Inspector:** click or tap an agent to select it. An animal is picked where its sprite
   is drawn, even mid-step between two tiles. A panel shows every variable from
   `variables.csv`, live, and the selection follows the agent as it moves. Clicking empty
   ground clears it. Live values only, no life history.
@@ -198,14 +203,16 @@ with more than a few thousand animals matters.
   Still a web page.
 - Neither is enough, or you want a desktop game → Godot. That's a real port.
 
-**Photosensitivity.** Event marks never flash full-screen and never strobe. There's a
-fixed cap on how many marks can appear per second, whatever the speed.
+**Photosensitivity.** Nothing flashes full-screen or strobes. Animation frames change
+only with what an animal is doing (a step, a bite), and every pose lasts at least a
+quarter of a second of real time, whatever the speed.
 
 ---
 
 ## Milestones
 
-Each one ends with something to watch. ✓ = done (3 Oct 2026).
+All done (3 Oct 2026). Paul retired the last two, tuning and release, as milestones: the
+page is live at its unlisted URL, and tuning and polish carry on as ordinary work.
 
 1. ✓ **Grid + grass.** Blades grow, seed and age; pan, zoom, pause, speed.
 2. ✓ **Inspector.** Select a blade or corpse and see its live variables.
@@ -215,43 +222,48 @@ Each one ends with something to watch. ✓ = done (3 Oct 2026).
 6. ✓ **Wolves.** Hunting, sprinting and stamina, biting, healing.
 7. ✓ **Benchmark again** with animals, then the platform decision (Canvas 2D stays).
    Added along the way: the population graph.
-8. **Tuning pass** (in progress). Adjust the CSV numbers until the populations cycle
-   instead of collapsing. Paul tunes in the tuning lab (`Life/_lab/`, local only; see
-   `Life/MAP.md`), which runs the sim across many seeds and saves numbers he likes back
-   into `tables/`. Found so far:
-   - Grass spreading at 30%/day walled bunnies in and hid them from wolves; now 10%/day,
-     starting at 15%.
-   - **Wolves never mated:** they stopped hunting at `HungryAt` 60% but needed
-     `MateFullness` 70% to mate, so 0–1 matings happened in 40 days and the wolf breeding
-     numbers made no difference at all (a coarse screen of 30 numbers showed it). Wolf
-     `HungryAt` is now 80 and `StartWolves` 48: wolves now breed and last ~44 days instead
-     of ~30 (4 seeds × 80 days). The loader now warns when `HungryAt` < `MateFullness`.
-   - Then wolves starved for lack of prey early on: more bunnies at the start
-     (`StartBunnies` 450) made them grow instead of crash, and wolves that need less food
-     (`HungerRate` 0.6), breed young (`TimeToMature` 3), live long (`Lifespan` 120) and
-     see far (`VisionRange` 24) grew fast enough to matter.
-   - Then bunnies boomed past 10,000 and ate the grass bare by about day 17. Bunnies
-     living 7 days instead of 20 (litters unchanged at 2–4) slowed the boom enough:
-     6 of 6 seeds kept all three species for 90 days, and on 12 fresh seeds every one
-     passed 80 days (shortest 95, average 115; 2 went the full 150). Today's numbers before
-     these changes lost their wolves by day 11–15 on the same seeds.
-   - Past about day 100 the cycles grow until wolves over-hunt the bunnies to zero or
-     crash after them. Damping the wolves helped most: `HungerRate` 0.9 and `VisionRange`
-     16 (from 0.6 and 24) kept all three species 162 of 200 days on average on 12 fresh
-     seeds (3 reached 200), against 137 days (2 reached 200) before. Bunny and grass
-     numbers have become touchy: halving or doubling any of them breaks the balance.
-   - The real trap was grass: once bunnies stripped it, it could only come back from the
-     blades left, so bunnies starved and wolves followed. Letting empty tiles sprout on
-     their own (`SproutChance`) fixed most of that, but only when it's rare: on 12 fresh
-     seeds 9 of 12 kept all three species for 200 days (average 190 days), against 3 of
-     12 (162 days) without it. 0.05% and 0.2% did nearly as well (6 and 9 of 12). From
-     0.5% up, grass refills the open ground faster than bunnies can clear it, walls the
-     wolves off from their prey, and wolves die out (by day 20 at 2%).
-   - The remaining failures are bunnies eaten to zero or wolves dying out late (days
-     145–180), and some survivors end with only a handful of wolves.
-   - Method that works (Paul): quick gross tests, judged by direction. Wolves not
-     increasing means a bad run; runs stop as soon as their direction is clear.
-9. **Release as `/life.html`.** The page already lives at the site root (unlisted, see
-   "Platform and scale"); release is the point where Paul is happy with the tuning and
-   pushes it.
 
+## Tuning notes
+
+The CSV numbers are tuned toward populations that cycle instead of collapsing, in the
+tuning lab (`Life/_lab/`, local only; see `Life/MAP.md`), which runs the sim across many
+seeds and saves numbers back into `tables/`. What's been found, in order:
+
+- Grass spreading at 30%/day walled bunnies in and hid them from wolves; now 10%/day,
+  starting at 15%.
+- **Wolves never mated:** they stopped hunting at `HungryAt` 60% but needed
+  `MateFullness` 70% to mate, so 0–1 matings happened in 40 days and the wolf breeding
+  numbers made no difference at all (a coarse screen of 30 numbers showed it). Wolf
+  `HungryAt` is now 80 and `StartWolves` 48: wolves now breed and last ~44 days instead
+  of ~30 (4 seeds × 80 days). The loader now warns when `HungryAt` < `MateFullness`.
+- Then wolves starved for lack of prey early on: more bunnies at the start
+  (`StartBunnies` 450) made them grow instead of crash, and wolves that need less food
+  (`HungerRate` 0.6), breed young (`TimeToMature` 3), live long (`Lifespan` 120) and
+  see far (`VisionRange` 24) grew fast enough to matter.
+- Then bunnies boomed past 10,000 and ate the grass bare by about day 17. Bunnies
+  living 7 days instead of 20 (litters unchanged at 2–4) slowed the boom enough:
+  6 of 6 seeds kept all three species for 90 days, and on 12 fresh seeds every one
+  passed 80 days (shortest 95, average 115; 2 went the full 150). Today's numbers before
+  these changes lost their wolves by day 11–15 on the same seeds.
+- Past about day 100 the cycles grow until wolves over-hunt the bunnies to zero or
+  crash after them. Damping the wolves helped most: `HungerRate` 0.9 and `VisionRange`
+  16 (from 0.6 and 24) kept all three species 162 of 200 days on average on 12 fresh
+  seeds (3 reached 200), against 137 days (2 reached 200) before. Bunny and grass
+  numbers have become touchy: halving or doubling any of them breaks the balance.
+- The real trap was grass: once bunnies stripped it, it could only come back from the
+  blades left, so bunnies starved and wolves followed. Letting empty tiles sprout on
+  their own (`SproutChance`) fixed most of that, but only when it's rare: on 12 fresh
+  seeds 9 of 12 kept all three species for 200 days (average 190 days), against 3 of
+  12 (162 days) without it. 0.05% and 0.2% did nearly as well (6 and 9 of 12). From
+  0.5% up, grass refills the open ground faster than bunnies can clear it, walls the
+  wolves off from their prey, and wolves die out (by day 20 at 2%).
+- The remaining failures are bunnies eaten to zero or wolves dying out late (days
+  145–180), and some survivors end with only a handful of wolves.
+- Method that works (Paul): quick gross tests, judged by direction. Wolves not
+  increasing means a bad run; runs stop as soon as their direction is clear.
+- **Wolves were starving among plenty of bunnies,** not failing to catch them: from about
+  day 12, 5–14 wolves starved every 3 days while bunnies tripled. Faster sprints and more
+  stamina changed almost nothing; food per bite did. Wolf `BiteFood` 20 (from 10) kept
+  all three species for 200 days on 11 of 12 fresh seeds (average 197 days, wolves ending
+  around 100 instead of a handful), against 9 of 12. Harder bites made it worse: a bunny
+  that dies in fewer bites feeds a wolf less.
