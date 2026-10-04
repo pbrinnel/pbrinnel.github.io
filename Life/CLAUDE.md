@@ -31,8 +31,8 @@ The goal is a self-sustaining ecosystem (DESIGN.md, top).
   - Screenshots and scratch go in the repo's `.claude/` (git-ignored), e.g.
     `.claude/life-shots/`.
 - **Unlisted, always.** `life.html` keeps `<meta name="robots" content="noindex, nofollow">`,
-  has no `og:`/`twitter:` tags and no analytics unless Paul asks, and nothing on the site
-  links to it. People find it by direct URL only.
+  has no `og:`/`twitter:` tags, loads Google Analytics only on paulbrinnel.com (Paul asked,
+  4 Oct 2026), and nothing on the site links to it. People find it by direct URL only.
 - Stay inside `life.html` and `Life/`. The rest of the repo is Paul's site and games;
   other sessions work there at the same time. Don't touch it.
 - Paul pushes. Commit when he asks, only your own files (`git status` and `git diff`

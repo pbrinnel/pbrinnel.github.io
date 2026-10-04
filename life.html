@@ -1,6 +1,21 @@
 <!doctype html>
 <html lang="en">
 <head>
+<!-- Google tag (gtag.js). Only on paulbrinnel.com: tests and the labs load this
+     page from localhost, and those visits must not count. GA4 groups its default
+     report by title, so the page names itself for the report. -->
+<script>
+    if (/(^|\.)paulbrinnel\.com$/.test(location.hostname)) {
+        const s = document.createElement('script');
+        s.async = true;
+        s.src = 'https://www.googletagmanager.com/gtag/js?id=G-2ZPJKVJDMD';
+        document.head.appendChild(s);
+        window.dataLayer = window.dataLayer || [];
+        window.gtag = function () { dataLayer.push(arguments); };
+        gtag('js', new Date());
+        gtag('config', 'G-2ZPJKVJDMD', { page_title: 'Life (sim)' });
+    }
+</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <!-- Unlisted by design (Paul): found by direct URL only. No indexing, no link-preview
@@ -8,7 +23,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>Life</title>
 <link rel="preload" href="Life/fonts/dejavu-sans-mono.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="Life/style.css?v=18">
+<link rel="stylesheet" href="Life/style.css?v=19">
 </head>
 <body>
 <canvas id="map"></canvas>
@@ -18,29 +33,29 @@
 <div id="errors" hidden></div>
 <!-- V is the cache-busting version: bump it and every ?v= below together (Life/CLAUDE.md).
      BASE is where the project's files live, relative to this page. -->
-<script>window.AS = { V: 18, BASE: 'Life/', FONT: 'AgentSimMono' };</script>
-<script src="Life/js/tables.js?v=18"></script>
-<script src="Life/js/rng.js?v=18"></script>
-<script src="Life/js/world.js?v=18"></script>
-<script src="Life/js/grass.js?v=18"></script>
-<script src="Life/js/corpse.js?v=18"></script>
-<script src="Life/js/warren.js?v=18"></script>
-<script src="Life/js/sim.js?v=18"></script>
-<script src="Life/js/god.js?v=18"></script>
-<script src="Life/js/start.js?v=18"></script>
-<script src="Life/js/sight.js?v=18"></script>
-<script src="Life/js/animals.js?v=18"></script>
-<script src="Life/js/breed.js?v=18"></script>
-<script src="Life/js/bunny.js?v=18"></script>
-<script src="Life/js/wolf.js?v=18"></script>
-<script src="Life/js/glyphs.js?v=18"></script>
-<script src="Life/js/sprites.js?v=18"></script>
-<script src="Life/js/camera.js?v=18"></script>
-<script src="Life/js/render.js?v=18"></script>
-<script src="Life/js/inspect.js?v=18"></script>
-<script src="Life/js/graph.js?v=18"></script>
-<script src="Life/js/bench.js?v=18"></script>
-<script src="Life/js/ui.js?v=18"></script>
-<script src="Life/js/main.js?v=18"></script>
+<script>window.AS = { V: 19, BASE: 'Life/', FONT: 'AgentSimMono' };</script>
+<script src="Life/js/tables.js?v=19"></script>
+<script src="Life/js/rng.js?v=19"></script>
+<script src="Life/js/world.js?v=19"></script>
+<script src="Life/js/grass.js?v=19"></script>
+<script src="Life/js/corpse.js?v=19"></script>
+<script src="Life/js/warren.js?v=19"></script>
+<script src="Life/js/sim.js?v=19"></script>
+<script src="Life/js/god.js?v=19"></script>
+<script src="Life/js/start.js?v=19"></script>
+<script src="Life/js/sight.js?v=19"></script>
+<script src="Life/js/animals.js?v=19"></script>
+<script src="Life/js/breed.js?v=19"></script>
+<script src="Life/js/bunny.js?v=19"></script>
+<script src="Life/js/wolf.js?v=19"></script>
+<script src="Life/js/glyphs.js?v=19"></script>
+<script src="Life/js/sprites.js?v=19"></script>
+<script src="Life/js/camera.js?v=19"></script>
+<script src="Life/js/render.js?v=19"></script>
+<script src="Life/js/inspect.js?v=19"></script>
+<script src="Life/js/graph.js?v=19"></script>
+<script src="Life/js/bench.js?v=19"></script>
+<script src="Life/js/ui.js?v=19"></script>
+<script src="Life/js/main.js?v=19"></script>
 </body>
 </html>
