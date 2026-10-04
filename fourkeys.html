@@ -1,6 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <!-- Google tag (gtag.js). Only on paulbrinnel.com: tests and the labs load this
+         page from localhost, and those visits must not count. GA4 groups its default
+         report by title, so the page names itself for the report. -->
+    <script>
+        if (/(^|\.)paulbrinnel\.com$/.test(location.hostname)) {
+            const s = document.createElement('script');
+            s.async = true;
+            s.src = 'https://www.googletagmanager.com/gtag/js?id=G-2ZPJKVJDMD';
+            document.head.appendChild(s);
+            window.dataLayer = window.dataLayer || [];
+            window.gtag = function () { dataLayer.push(arguments); };
+            gtag('js', new Date());
+            gtag('config', 'G-2ZPJKVJDMD', { page_title: 'Four Keys (game)' });
+        }
+    </script>
     <meta charset="UTF-8">
     <!-- viewport-fit=cover lets the field run under the notch and the home
          indicator; the padding below hands that space back where it matters -->
@@ -531,36 +546,36 @@ if (new URLSearchParams(location.search).has('reset')) {
     history.replaceState(null, '', location.pathname);
 }
 </script>
-<script src="js/fourkeys/runtime.js?v=130"></script>
-<script src="js/fourkeys/headless.js?v=130"></script>
-<script src="js/fourkeys/idol.js?v=130"></script>
-<script src="js/fourkeys/windmill.js?v=130"></script>
-<script src="js/fourkeys/twins.js?v=130"></script>
-<script src="js/fourkeys/gleeok.js?v=130"></script>
-<script src="js/fourkeys/agahnim.js?v=130"></script>
-<script src="js/fourkeys/lamps.js?v=130"></script>
-<script src="js/fourkeys/dark.js?v=130"></script>
-<script src="js/fourkeys/dodongo.js?v=130"></script>
-<script src="js/fourkeys/lucifer.js?v=130"></script>
-<script src="js/fourkeys/storm.js?v=130"></script>
-<script src="js/fourkeys/mole.js?v=130"></script>
-<script src="js/fourkeys/conga.js?v=130"></script>
-<script src="js/fourkeys/pong.js?v=130"></script>
-<script src="js/fourkeys/boot.js?v=130"></script>
-<script src="js/fourkeys/splitter.js?v=130"></script>
-<script src="js/fourkeys/armos.js?v=130"></script>
-<script src="js/fourkeys/guard.js?v=130"></script>
-<script src="js/fourkeys/pillars.js?v=130"></script>
-<script src="js/fourkeys/chain.js?v=130"></script>
-<script src="js/fourkeys/paddles.js?v=130"></script>
-<script src="js/fourkeys/powers.js?v=130"></script>
-<script src="js/fourkeys/levels.js?v=130"></script>
-<script src="js/fourkeys/menu.js?v=130"></script>
-<script src="js/fourkeys/debug.js?v=130"></script>
-<script src="js/fourkeys/intro.js?v=130"></script>
-<script src="js/fourkeys/memory.js?v=130"></script>
-<script src="js/fourkeys/lore.js?v=130"></script>
-<script src="js/fourkeys/engine.js?v=130"></script>
-<script src="js/fourkeys/start.js?v=130"></script>
+<script src="js/fourkeys/runtime.js?v=131"></script>
+<script src="js/fourkeys/headless.js?v=131"></script>
+<script src="js/fourkeys/idol.js?v=131"></script>
+<script src="js/fourkeys/windmill.js?v=131"></script>
+<script src="js/fourkeys/twins.js?v=131"></script>
+<script src="js/fourkeys/gleeok.js?v=131"></script>
+<script src="js/fourkeys/agahnim.js?v=131"></script>
+<script src="js/fourkeys/lamps.js?v=131"></script>
+<script src="js/fourkeys/dark.js?v=131"></script>
+<script src="js/fourkeys/dodongo.js?v=131"></script>
+<script src="js/fourkeys/lucifer.js?v=131"></script>
+<script src="js/fourkeys/storm.js?v=131"></script>
+<script src="js/fourkeys/mole.js?v=131"></script>
+<script src="js/fourkeys/conga.js?v=131"></script>
+<script src="js/fourkeys/pong.js?v=131"></script>
+<script src="js/fourkeys/boot.js?v=131"></script>
+<script src="js/fourkeys/splitter.js?v=131"></script>
+<script src="js/fourkeys/armos.js?v=131"></script>
+<script src="js/fourkeys/guard.js?v=131"></script>
+<script src="js/fourkeys/pillars.js?v=131"></script>
+<script src="js/fourkeys/chain.js?v=131"></script>
+<script src="js/fourkeys/paddles.js?v=131"></script>
+<script src="js/fourkeys/powers.js?v=131"></script>
+<script src="js/fourkeys/levels.js?v=131"></script>
+<script src="js/fourkeys/menu.js?v=131"></script>
+<script src="js/fourkeys/debug.js?v=131"></script>
+<script src="js/fourkeys/intro.js?v=131"></script>
+<script src="js/fourkeys/memory.js?v=131"></script>
+<script src="js/fourkeys/lore.js?v=131"></script>
+<script src="js/fourkeys/engine.js?v=131"></script>
+<script src="js/fourkeys/start.js?v=131"></script>
 </body>
 </html>

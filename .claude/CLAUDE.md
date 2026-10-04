@@ -34,7 +34,9 @@ The sequel, under a codename. `brandon.html` is the released game and sequel wor
 touches it.
 
 - **Unlisted, like brandon.html**: `noindex, nofollow`, not linked from anywhere, and no
-  `og:`/`twitter:` tags at all, so a pasted link shows nothing. Its bests are its own,
+  `og:`/`twitter:` tags at all, so a pasted link shows nothing. It carries the site's Google
+  tag, which loads only on paulbrinnel.com so local tests don't count; copies and labs
+  remove it all the same, like brandon.html's. Its bests are its own,
   one per level, kept with the town's progress (`menuBestIs` in `menu.js`).
 - **Its leaderboards are live and public, and separate from brandon's.** `BOARD_URL` in
   `engine.js` points at the `brandon2-board` worker (source in
