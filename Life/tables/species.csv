@@ -26,7 +26,7 @@ BiteDamage,HP,,20,,At or above a bunny's HPMax one bite kills; the bite itself g
 BiteCooldown,s,1,0.5,,Time between bites
 BiteFood,Fullness per bite,15,20,,What the eater gains per bite of a blade; a wolf gains it per mouthful of a carcass
 BiteSize,Size per bite,0.25,0.5,,How much of a blade one bite removes; a wolf chews through grass this way but gains no food
-TimeToMature,days,3,3,1,Grass: days to reach full Size and start seeding
+TimeToMature,days,3,15,1,Grass: days to reach full Size and start seeding
 Lifespan,days,7,120,10,
 ElderAt,% of Lifespan,80,80,,
 VisionRange,tiles,8,16,,

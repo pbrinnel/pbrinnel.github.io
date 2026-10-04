@@ -325,6 +325,11 @@ seeds and saves numbers back into `tables/`. What's been found, in order:
   colonies, 112 wolves in 7 packs) kept all three species on 3 of 3 seeds for 30 days,
   against 1 of 3 in the 300×200 world; territories on top kept more bunnies and lost no
   seeds (2 of 3 without). Wolves still drift down from their large start (to 65–104).
+- **Wolves bred as fast as bunnies** (both matured in 3 days), so wolf numbers chased
+  every bunny boom and overshot; real wolves take years to mature, rabbits months. Wolf
+  `TimeToMature` 15 days. Quick test (3 seeds × 30 days): wolves lower early on (0.6× their
+  start against 0.7×), all three species on 2 of 3 seeds; adding `MateCooldown` 20 was too
+  much (1 of 3). Thirty days is too short to see the overshoot; Paul analyzes longer runs.
 - **Wolves remembering where a bunny hid** (`TrackSeconds`) helped over 50 days (wolves
   1.35× their start instead of 1.1× at the old food, 3.7× instead of 3.2× at `BiteFood`
   20) but not over 200: with `BiteFood` 20, 15 s of memory kept 10 of 12 fresh seeds

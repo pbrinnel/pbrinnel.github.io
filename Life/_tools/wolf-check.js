@@ -50,14 +50,17 @@ const M = 0, F = 1;
 function animal(AS, sim, sp, x, y, sex, o = {}) {
   const W = sim.W, s = AS.spawnStarting(sim, sp, at(W, x, y));
   W.aSex[s] = sex;
-  W.aAge[s] = o.age ?? 10;
+  // Default: midway through adulthood, from the tables, so retuning maturity or lifespan
+  // can't turn a test's adult into a pup or an elder.
+  const S = sim.T[AS.SPECIES_KEY[sp]];
+  W.aAge[s] = o.age ?? (S.TimeToMature + S.ElderAt * S.Lifespan) / 2;
   if (o.full != null) W.aFullness[s] = o.full;
   if (o.stamina != null) W.aStamina[s] = o.stamina;
   W.aDecideLeft[s] = 0;
   return s;
 }
 const wolf = (AS, sim, x, y, o = {}) => animal(AS, sim, AS.SPECIES.WOLF, x, y, o.sex ?? M, o);
-const bun = (AS, sim, x, y, o = {}) => animal(AS, sim, AS.SPECIES.BUNNY, x, y, o.sex ?? M, { age: 5, ...o });
+const bun = (AS, sim, x, y, o = {}) => animal(AS, sim, AS.SPECIES.BUNNY, x, y, o.sex ?? M, o);
 const d2 = (W, a, b) => (W.tx(a) - W.tx(b)) ** 2 + (W.ty(a) - W.ty(b)) ** 2;
 
 // --- the chase, the bites, the kill; bunny side: flee, winded walk, wounds ---
