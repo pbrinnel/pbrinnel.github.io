@@ -80,6 +80,17 @@
       cSlot: new Int32Array(n).fill(-1),
       cCount: 0,
 
+      // Warren holes, by tile. A hole is ground, not an occupant: the tile's `kind` stays
+      // EMPTY (or a bunny, or a corpse that died there), so one-thing-per-tile is untouched.
+      // Only bunnies may stand on one (stepTo, tryBirth, moveAnimal), and no blade grows on
+      // one. holeUsedAt is the sim second a bunny last stood there; warren.js writes it.
+      // hList holds the holes densely, hSlot is each tile's place in it.
+      hole: new Uint8Array(n),
+      holeUsedAt: new Float64Array(n),
+      hList: new Int32Array(n),
+      hSlot: new Int32Array(n).fill(-1),
+      hCount: 0,
+
       // The corpse tile that boosts each tile's grass, or -1. Written only by corpse.js.
       boostSrc: new Int32Array(n).fill(-1),
 
@@ -126,6 +137,7 @@
     }
 
     W.addGrass = function (t, size, age) {
+      if (W.hole[t]) throw new Error(`tile ${t} is a warren hole; no grass grows there`);
       claim(t, KIND.GRASS);
       W.serial[t] = W.nextSerial++;
       W.gSize[t] = size;
@@ -144,6 +156,27 @@
       W.serial[t] = 0;
       W.gSize[t] = 0;
       W.gAge[t] = 0;
+    };
+
+    // Digs a hole on tile t. Bare ground only: no blade on it, and no wolf standing there.
+    W.addHole = function (t, usedAt) {
+      if (W.hole[t]) throw new Error(`tile ${t} is already a hole`);
+      if (W.kind[t] === KIND.GRASS || W.kind[t] === KIND.WOLF) throw new Error(`tile ${t} can't be dug (kind ${W.kind[t]})`);
+      W.hole[t] = 1;
+      W.holeUsedAt[t] = usedAt || 0;
+      W.hSlot[t] = W.hCount;
+      W.hList[W.hCount++] = t;
+    };
+
+    // A collapsed hole is bare ground again. Whatever stands on it stays.
+    W.removeHole = function (t) {
+      if (!W.hole[t]) throw new Error(`no hole on tile ${t}`);
+      const i = W.hSlot[t], last = W.hList[--W.hCount];
+      W.hList[i] = last;
+      W.hSlot[last] = i;
+      W.hSlot[t] = -1;
+      W.hole[t] = 0;
+      W.holeUsedAt[t] = 0;
     };
 
     // species is AS.SPECIES.*; the corpse's Nutrient, decay and boost come from that species.
@@ -173,6 +206,7 @@
 
     // Returns the new slot. The caller fills in the rest of the animal's fields.
     W.addAnimal = function (t, species, sex) {
+      if (species === SP.WOLF && W.hole[t]) throw new Error(`tile ${t} is a warren hole; wolves can't enter`);
       claim(t, species === SP.BUNNY ? KIND.BUNNY : KIND.WOLF);
       let s = W.aFree.length ? W.aFree.pop() : W.aHigh++;
       if (s >= W.aCap) growAnimals(W.aCap * 2);
@@ -203,6 +237,7 @@
     // Steps an animal to an empty tile. The caller times the step (aStepLeft, aStepDur).
     W.moveAnimal = function (s, t2) {
       const t = W.aTile[s];
+      if (W.hole[t2] && W.aSpecies[s] === SP.WOLF) throw new Error(`tile ${t2} is a warren hole; wolves can't enter`);
       claim(t2, W.kind[t]);
       W.kind[t] = KIND.EMPTY;
       W.aSlot[t] = -1;

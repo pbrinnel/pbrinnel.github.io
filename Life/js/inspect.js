@@ -17,13 +17,14 @@
   const POINT_DECIMALS = 1;   // Fullness, Stamina, HP, Nutrient
 
   // What "Applies to" may say. Anything else is a typo and matches nothing.
-  const TOKENS = ['all', 'bunny', 'wolf', 'grass', 'corpse', 'female'];
+  const TOKENS = ['all', 'bunny', 'wolf', 'grass', 'corpse', 'female', 'hole'];
 
   // The kinds of selectable thing. 'bunnyF' is a female bunny, and so on, so the "female"
   // token can be decided once per kind instead of once per row.
   const THING_TOKENS = {
     grass: ['all', 'grass'],
     corpse: ['all', 'corpse'],
+    hole: ['hole'],   // a hole has no age, stage or life to show
     bunny: ['all', 'bunny'],
     wolf: ['all', 'wolf'],
     bunnyF: ['all', 'bunny', 'female'],
@@ -114,6 +115,9 @@
     },
     Children: (sim, c) => count(sim.W.aChildren[c.s]),
     Kills: (sim, c) => count(sim.W.aKills[c.s]),
+    InHole: (sim, c) => sim.W.hole[c.t] ? 'Yes' : 'No',
+    // How long since a bunny last stood on it; it collapses at CollapseDays.
+    LastUsed: (sim, c) => days(sim.simSeconds / AS.DAY_SECONDS - sim.W.holeUsedAt[c.t] / AS.DAY_SECONDS) + ' days ago',
     Meat: (sim, c) => outOf(sim.W.cMeat[c.t], sim.T[AS.SPECIES_KEY[sim.W.cSpecies[c.t]]].MeatOnBody),
     Nutrient: (sim, c) => outOf(sim.W.cNut[c.t], sim.T[AS.SPECIES_KEY[sim.W.cSpecies[c.t]]].CorpseNutrient),
   };
@@ -173,6 +177,9 @@
       if (k === KIND.CORPSE) {
         thing = 'corpse';
         title = speciesName(W.cSpecies[t]) + ' corpse #' + serial(W.serial[t]);
+      } else if (k === KIND.EMPTY && W.hole[t]) {
+        thing = 'hole';
+        title = 'Warren hole';
       } else {
         thing = 'grass';
         title = 'Blade of grass #' + serial(W.serial[t]);

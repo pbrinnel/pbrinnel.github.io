@@ -19,7 +19,7 @@ const allValues = [];
 const names = d => d.rows.map(r => r.name).join(',');
 const val = (d, n) => d.rows.find(r => r.name === n).value;
 const sim = A.Sim(T, 7), W = sim.W, K = A.KIND;
-const empties = []; for (let t = 0; t < W.n && empties.length < 20; t++) if (W.kind[t] === K.EMPTY) empties.push(t);
+const empties = []; for (let t = 0; t < W.n && empties.length < 20; t++) if (W.kind[t] === K.EMPTY && !W.hole[t]) empties.push(t);
 const grassT = W.gList[0];
 check(A.describe(sim, null) === null, 'null selection -> null');
 
@@ -78,8 +78,8 @@ const bm = mk(empties[2], 0, 0), bf = mk(empties[3], 0, 1), wm = mk(empties[4], 
 const R = 'Fullness,Stamina,HP,Age,Lifestage,Dead,State,Target,Position,Sex,';
 const dbm = A.describe(sim, selA(bm)), dbf = A.describe(sim, selA(bf)), dwm = A.describe(sim, selA(wm)), dwf = A.describe(sim, selA(wf));
 allValues.push(dbm, dbf, dwm, dwf);
-check(names(dbm) === R + 'Parents,Children', 'male bunny: ' + names(dbm));
-check(names(dbf) === R + 'Pregnant,MateCooldown,Parents,Children', 'female bunny: ' + names(dbf));
+check(names(dbm) === R + 'Parents,Children,InHole', 'male bunny: ' + names(dbm));
+check(names(dbf) === R + 'Pregnant,MateCooldown,Parents,Children,InHole', 'female bunny: ' + names(dbf));
 check(names(dwm) === R + 'Parents,Children,Kills', 'male wolf: ' + names(dwm));
 check(names(dwf) === R + 'Pregnant,MateCooldown,Parents,Children,Kills', 'female wolf: ' + names(dwf));
 check(dbf.title.startsWith('Female bunny #') && dwm.title.startsWith('Male wolf #'), 'titles ' + dbf.title + ' / ' + dwm.title);
@@ -96,6 +96,17 @@ check(val(d2, 'Pregnant') === '1.30 days left' && val(d2, 'MateCooldown') === '0
 check(val(d2, 'Parents') === '#5 and #1234' && val(dbm, 'Parents') === 'None (first generation)' && val(d2, 'Children') === '12,345', 'parents/children');
 W.aAge[bf] = 0.5; check(val(A.describe(sim, selA(bf)), 'Lifestage') === 'Baby', 'baby');
 W.aAge[bf] = 19; check(val(A.describe(sim, selA(bf)), 'Lifestage') === 'Elder', 'elder');
+// holes: a bare hole is selectable and shows its own rows; a bunny says whether it is in one
+const ht = empties[10];
+W.addHole(ht, 0);
+const hsel = { tile: ht, serial: W.serial[ht], slot: -1, hole: true };
+const dh = A.describe(sim, hsel); allValues.push(dh);
+check(dh.title === 'Warren hole' && names(dh) === 'Position,LastUsed', 'hole rows: ' + dh.title + ' / ' + names(dh));
+W.holeUsedAt[ht] = sim.simSeconds - 1.5 * A.DAY_SECONDS;
+check(val(A.describe(sim, hsel), 'LastUsed') === '1.50 days ago', 'hole LastUsed ' + val(A.describe(sim, hsel), 'LastUsed'));
+check(val(dbm, 'InHole') === 'No', 'bunny InHole off a hole');
+W.addHole(W.aTile[bm], 0);
+check(val(A.describe(sim, selA(bm)), 'InHole') === 'Yes', 'bunny InHole on a hole');
 // targets
 check(val(dbm, 'Target') === 'None', 'target none');
 W.aTargetTile[bm] = W.aTile[wm]; W.aTargetSlot[bm] = wm; W.aTargetSerial[bm] = W.aSerial[wm];

@@ -75,6 +75,7 @@
   AS.stepTo = function (sim, s, t2) {
     const W = sim.W;
     if (W.aStepLeft[s] > 0 || W.kind[t2] !== KIND.EMPTY) return false;
+    if (W.hole[t2] && W.aSpecies[s] === AS.SPECIES.WOLF) return false;   // a hole is a wall to wolves
     const v = AS.speedOf(sim, s);
     if (!(v > 0)) return false;
     const dur = 1 / v;
@@ -115,6 +116,7 @@
   AS.biteAnimal = function (sim, s, prey) {
     const W = sim.W;
     if (W.aBiteLeft[s] > 0 || !W.aAlive[prey]) return false;
+    if (W.hole[W.aTile[prey]]) return false;   // safe in a hole
     const S = AS.speciesStats(sim, s);
     W.aBiteLeft[s] = S.BiteCooldown;
     const t = W.aTile[prey];

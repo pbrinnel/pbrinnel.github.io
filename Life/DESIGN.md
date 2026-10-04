@@ -110,6 +110,14 @@ watching the sim run. Everything else in this doc is decided.
 - Pregnancy doesn't slow a female down.
 - **Winded:** an animal that runs its Stamina to 0 can't sprint again until its Stamina
   is full.
+- **Warren holes** (Paul, 4 Oct 2026): bunnies' refuge from wolves, keeping one animal
+  per tile. A hole is ground (no grass grows on it) that only bunnies may enter; to a
+  wolf it's a wall, and a bunny in one can't be bitten or hunted. A fleeing bunny sprints
+  for a free hole within `HoleRange` and hides there while a wolf is in sight; hunger
+  brings it back out. Each Meadows colony starts with `HolesPerColony` holes. A fed adult
+  sometimes digs a new one (`DigChance` per day, `DigSeconds` to dig) within
+  `WarrenRadius` of its warren, or founds a new warren where no hole is near. A hole no
+  bunny has used for `CollapseDays` falls in, so warrens grow and die with their colony.
 - **A hunting wolf remembers where it last saw its bunny** (Paul, 4 Oct 2026). Grass
   blocks sight, so a bunny can duck out of view; the wolf then walks to the spot where it
   last saw it, picks the chase back up if the bunny reappears, and gives up when it

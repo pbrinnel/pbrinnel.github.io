@@ -16,6 +16,9 @@ RestBelow,% of StaminaMax,30,30,,Below this it stops to rest
 RestUntil,% of StaminaMax,100,100,,A resting animal gets up at this Stamina
 SprintRange,tiles,,3,,A hunting wolf sprints once its prey is this close
 TrackSeconds,s,,0,,How long a hunting wolf keeps heading for where it last saw its bunny after losing sight of it; 0 = forgets at once
+HoleRange,tiles,8,,,A bunny that sees a wolf runs for a free warren hole this close; also how far from any hole it must be to found a new warren
+DigChance,per day,10%,,,Chance per day that a fed adult with no wolf in sight digs a warren hole; 0% = never
+DigSeconds,s,8,,,How long a digging bunny stands still before the hole opens
 WanderRun,tiles,1-3,4-10,,Steps taken in one direction before turning while wandering or prowling
 DecidePerSec,per s,4,4,,How often an animal re-picks its state; it moves every tick
 Diet,,Grass,Bunny (killed; eats the carcass),Corpses (nearby),A wolf kills a bunny and then eats the carcass; bunnies only graze

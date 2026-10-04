@@ -94,7 +94,9 @@
     if (s >= 0) { sel = { tile: W.aTile[s], serial: W.aSerial[s], slot: s }; return; }
     if (tx < 0) { sel = null; return; }
     const t = W.tile(tx, ty), k = W.kind[t];
-    sel = k === AS.KIND.GRASS || k === AS.KIND.CORPSE ? { tile: t, serial: W.serial[t], slot: -1 } : null;
+    // A hole with nothing on it is selectable too (it has no serial, so `hole` marks it).
+    const bareHole = k === AS.KIND.EMPTY && W.hole[t] === 1;
+    sel = k === AS.KIND.GRASS || k === AS.KIND.CORPSE || bareHole ? { tile: t, serial: W.serial[t], slot: -1, hole: bareHole } : null;
   });
 
   // The animal whose drawn center is nearest (fx, fy), in tiles, within PICK_RADIUS; or -1.
@@ -120,7 +122,7 @@
     if (sel.slot >= 0) {
       if (!W.aAlive[sel.slot] || W.aSerial[sel.slot] !== sel.serial) return (sel = null);
       sel.tile = W.aTile[sel.slot];
-    } else if (W.serial[sel.tile] !== sel.serial) return (sel = null);
+    } else if (W.serial[sel.tile] !== sel.serial || (sel.hole && (!W.hole[sel.tile] || W.kind[sel.tile] !== AS.KIND.EMPTY))) return (sel = null);
     return sel;
   }
 

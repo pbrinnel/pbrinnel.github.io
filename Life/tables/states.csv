@@ -1,10 +1,12 @@
 Species,Priority,State,Enter when,Does
-Bunny,1,FLEE,A wolf is within VisionRange,Sprint away from the nearest wolf; walk when out of Stamina
-Bunny,2,EAT,Hungry (Fullness < HungryAt) and a blade is on a 4-neighbor tile,Bite the blade every BiteCooldown
-Bunny,3,SEEK_FOOD,Hungry and no blade adjacent,Walk toward the nearest visible blade
-Bunny,4,MATE,Adult; Fullness ≥ MateFullness; female's cooldown 0; not pregnant,Walk to nearest eligible bunny of the other sex; adjacent → mate
-Bunny,5,REST,Stamina < RestBelow,Stand still until Stamina reaches RestUntil
-Bunny,6,WANDER,Otherwise,Walk a run of WanderRun tiles in a random direction
+Bunny,1,HIDE,On a hole and a wolf is within VisionRange,Stay still in the hole; a wolf can't bite it there or hunt it
+Bunny,2,FLEE,A wolf is within VisionRange,Sprint to the nearest free hole within HoleRange that it can see; with none in reach sprint away from the nearest wolf; walk when out of Stamina
+Bunny,3,EAT,Hungry (Fullness < HungryAt) and a blade is on a 4-neighbor tile,Bite the blade every BiteCooldown
+Bunny,4,SEEK_FOOD,Hungry and no blade adjacent,Walk toward the nearest visible blade
+Bunny,5,MATE,Adult; Fullness ≥ MateFullness; female's cooldown 0; not pregnant,Walk to nearest eligible bunny of the other sex; adjacent → mate
+Bunny,6,DIG,Adult; not hungry (Fullness ≥ HungryAt); no wolf in sight; a roll of DigChance per day comes up (or already digging),Dig a hole on a bare 4-neighbor tile for DigSeconds; the tile must be within WarrenRadius of an existing hole or no hole is within HoleRange (a new warren); stands still while it digs
+Bunny,7,REST,Stamina < RestBelow,Stand still until Stamina reaches RestUntil
+Bunny,8,WANDER,Otherwise,Walk a run of WanderRun tiles in a random direction
 Wolf,1,FEED,Hungry (Fullness < HungryAt) and a carcass with meat is in sight; or already feeding and not yet full (Fullness < FullnessMax),Walk to the carcass; eat BiteFood from it every BiteCooldown until full or the meat is gone
 Wolf,2,HUNT,Hungry (Fullness < HungryAt) and sees a bunny; after losing sight it keeps going to the last-seen spot until it arrives or TrackSeconds pass,Walk toward it; sprint within SprintRange; bite when adjacent
 Wolf,3,GIVE_UP,Stamina 0 mid-chase,Stop and rest until Stamina reaches RestUntil; the bunny gets away

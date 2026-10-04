@@ -51,7 +51,8 @@
   // Matchers, goals and costs are created once and read these instead of closing over a call.
   let mSim = null, mW = null, mSelf = 0, mGoal = 0, mFrom = 0, mInvSpeed = 0;
   const isGoalTile = t => t === mGoal;
-  const isBunny = t => mW.kind[t] === K.BUNNY;
+  // A bunny on a warren hole is safe, so it isn't prey.
+  const isBunny = t => mW.kind[t] === K.BUNNY && !mW.hole[t];
   const hasMeat = t => mW.kind[t] === K.CORPSE && mW.cMeat[t] > 0;
   const isPartner = t => {
     if (mW.kind[t] !== K.WOLF) return false;
@@ -61,14 +62,14 @@
   // Grass costs its bites on top of the step; anything else that occupies a tile can't be entered.
   const cost = t => {
     const k = mW.kind[t];
-    if (k === K.EMPTY) return mInvSpeed;
+    if (k === K.EMPTY) return mW.hole[t] ? Infinity : mInvSpeed;   // a hole is a wall to wolves
     if (k === K.GRASS) return mInvSpeed + AS.chewSeconds(mSim, mSelf, t);
     return Infinity;
   };
   // A tile the wolf can bite its goal from: touching the goal tile, and either where it
   // stands or one it can occupy once any blade on it is chewed away.
   const touchesGoal = t => {
-    if (t !== mFrom && mW.kind[t] !== K.EMPTY && mW.kind[t] !== K.GRASS) return false;
+    if (t !== mFrom && ((mW.kind[t] !== K.EMPTY && mW.kind[t] !== K.GRASS) || mW.hole[t])) return false;
     const w = mW.w, dx = (t % w) - (mGoal % w), dy = ((t / w) | 0) - ((mGoal / w) | 0);
     return dx * dx + dy * dy === 1;
   };
@@ -106,12 +107,12 @@
     for (let d = 0; d < 4; d++) {
       const nt = dirTile(W, t, d);
       if (nt < 0) continue;
-      if (W.kind[nt] === K.EMPTY) open[nOpen++] = d;
+      if (W.kind[nt] === K.EMPTY && !W.hole[nt]) open[nOpen++] = d;
       else if (W.kind[nt] === K.GRASS) grassDirs[nGrass++] = d;
     }
     if (W.aRunLeft[s] > 0) {
       const ahead = dirTile(W, t, W.aRunDir[s]);
-      if (ahead >= 0 && W.kind[ahead] === K.EMPTY) {
+      if (ahead >= 0 && W.kind[ahead] === K.EMPTY && !W.hole[ahead]) {
         if (AS.stepTo(sim, s, ahead)) W.aRunLeft[s]--;
         return;
       }
@@ -216,6 +217,7 @@
         if (cur !== HUNT || !(S.TrackSeconds > 0)) return false;
         const p = m.prey[s];
         if (!W.aAlive[p] || W.aSerial[p] !== m.preySerial[s]) return false;
+        if (W.hole[W.aTile[p]]) return false;   // it ducked into a hole: the hunt is over
         if (W.aTile[s] === m.seenTile[s]) return false;
         return sim.simSeconds - m.seenAt[s] < S.TrackSeconds;
       },
@@ -229,6 +231,12 @@
           return;
         }
         const pt = W.aTile[p], t = W.aTile[s];
+        if (W.hole[pt]) {
+          // Into a hole: out of reach. Wait for the next decision to end the hunt.
+          W.aTargetTile[s] = -1; W.aTargetSlot[s] = -1;
+          AS.setSprint(sim, s, false);
+          return;
+        }
         if (S.TrackSeconds > 0) {
           // Between decisions the wolf knows only what it sees, so out of sight it heads for
           // the last-seen tile instead of reading the bunny's real position.

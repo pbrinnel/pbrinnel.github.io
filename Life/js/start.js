@@ -1,7 +1,8 @@
 // How the world looks on day 0 when settings.csv's StartLayout is Meadows: grass in
 // meadows of every size with open ground between (the look of temperate grassland from the
 // air), old in the middle of a meadow and younger toward its edge; bunnies in a few colonies
-// just outside meadow edges; wolves in small packs out in the open, away from the colonies.
+// just outside meadow edges, each colony with a few warren holes dug around it before its
+// bunnies settle; wolves in small packs out in the open, away from the colonies.
 // Paul chose this over scattering everything evenly, which reads as a random, empty world.
 //
 // Uses only sim.rng, so a seed replays the same start in the page, the harness and the lab.
@@ -102,8 +103,24 @@
       if (!W.inside(x, y)) continue;
       const t = W.tile(x, y);
       if (W.kind[t] !== K.EMPTY) continue;
+      if (species === AS.SPECIES.WOLF && W.hole[t]) continue;   // a hole is a wall to wolves
       AS.spawnStarting(sim, species, t, bodies);
       placed++;
+    }
+  }
+  // `count` warren holes scattered (gaussian, `spread` tiles) around a colony's center, on
+  // bare ground. Dug before the bunnies settle, so some start standing on one.
+  function digHoles(sim, c, count, spread) {
+    const { W, rng } = sim;
+    let dug = 0;
+    for (let tries = 0; dug < count && tries < count * 60; tries++) {
+      const r = spread * Math.sqrt(-2 * Math.log(1 - rng.next())), a = rng.next() * Math.PI * 2;
+      const x = Math.round(c.x + r * Math.cos(a)), y = Math.round(c.y + r * Math.sin(a));
+      if (!W.inside(x, y)) continue;
+      const t = W.tile(x, y);
+      if (W.kind[t] !== K.EMPTY || W.hole[t]) continue;
+      W.addHole(t, 0);
+      dug++;
     }
   }
   // `total` split as evenly as possible over `groups`.
@@ -121,6 +138,7 @@
     if (AS.speciesReady('bunny') && S.StartBunnies > 0) {
       const nearEdge = t => vals[t] < th && vals[t] > th - EDGE_BAND;
       out.colonies = pickSpots(sim, Math.max(1, S.BunnyColonies), COLONY_GAP, nearEdge);
+      for (const c of out.colonies) digHoles(sim, c, S.HolesPerColony, COLONY_SPREAD);
       out.colonies.forEach((c, i) => settle(sim, AS.SPECIES.BUNNY, c, share(S.StartBunnies, out.colonies.length, i), COLONY_SPREAD, opts.bodies));
     }
     if (AS.speciesReady('wolf') && S.StartWolves > 0) {

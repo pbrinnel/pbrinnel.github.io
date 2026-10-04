@@ -67,7 +67,9 @@
     const W = sim.W, rng = sim.rng, n = W.aLitter[s];
     const k = W.neighbors4(W.aTile[s], nb);
     let room = 0;
-    for (let i = 0; i < k; i++) if (W.kind[nb[i]] === K.EMPTY) free[room++] = nb[i];
+    // A hole is a wall to wolves, so a wolf's litter is never born onto one.
+    const wolf = W.aSpecies[s] === AS.SPECIES.WOLF;
+    for (let i = 0; i < k; i++) if (W.kind[nb[i]] === K.EMPTY && !(wolf && W.hole[nb[i]])) free[room++] = nb[i];
     if (room < n) return;
 
     const species = W.aSpecies[s], S = AS.speciesStats(sim, s);

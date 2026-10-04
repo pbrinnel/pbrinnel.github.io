@@ -31,7 +31,7 @@
     return (0xff000000 | (b << 16) | (g << 8) | r) >>> 0;
   }
   const FAR_GRASS = ['#2c4a2c', '#3f7040', '#62a457'].map(abgr);
-  const FAR_CORPSE = abgr('#6a6250'), FAR_GROUND = abgr('#121410');
+  const FAR_CORPSE = abgr('#6a6250'), FAR_GROUND = abgr('#121410'), FAR_HOLE = abgr('#3d2e20');
   const FAR_ANIMAL = [['#e0a868', '#f2cc96'], ['#8fb2e0', '#c0d6f2']].map(r => r.map(abgr));   // [species][sex]
 
   // Real time an event holds a pose, whatever the speed, so nothing flickers (DESIGN.md,
@@ -183,13 +183,13 @@
       }
       const px = cell.px, kind = W.kind, size = W.gSize;
       const bg = FAR_GROUND, g0 = FAR_GRASS[0], g1 = FAR_GRASS[1], g2 = FAR_GRASS[2];
-      const corpse = FAR_CORPSE;
+      const corpse = FAR_CORPSE, holeAt = W.hole;
       const lo = 1 / 3, hi = 2 / 3;
       for (let t = 0, n = W.n; t < n; t++) {
         const k = kind[t];
         if (k === KIND.GRASS) { const z = size[t]; px[t] = z < lo ? g0 : z < hi ? g1 : g2; }
         else if (k === KIND.CORPSE) px[t] = corpse;
-        else px[t] = bg;   // empty, or an animal that the loop below paints
+        else px[t] = holeAt[t] ? FAR_HOLE : bg;   // empty ground (or a hole), or an animal that the loop below paints
       }
       for (let s = 0, hiSlot = W.aHigh; s < hiSlot; s++) {
         if (W.aAlive[s]) px[W.aTile[s]] = FAR_ANIMAL[W.aSpecies[s]][W.aSex[s]];
@@ -214,6 +214,12 @@
         for (let tx = v.x0; tx <= v.x1; tx++) {
           const k = kind[row + tx];
           let id;
+          if (W.hole[row + tx]) {
+            // The hole is ground: it goes under a corpse that lies on it, and under any animal.
+            const dx = Math.round(tx * s - ox), dw = Math.round((tx + 1) * s - ox) - dx;
+            const hid = AS.spriteHole();
+            ctx.drawImage(img, sh.sx(hid), sh.sy(hid), px, px, dx, dy, dw, dh);
+          }
           if (k === KIND.GRASS) {
             const third = AS.grassGlyph(size[row + tx]) - AS.GLYPH.GRASS_0;
             id = AS.grassLeans(tx, ty, nowMs / 1000) ? AS.spriteGrassLean(third) : AS.spriteGrass(third);
@@ -263,10 +269,15 @@
         const stepMs = stepSpeed > 0 ? W.aStepDur[a] * 1000 / stepSpeed : Infinity;
         AS.spritePose(sp, moving, W.aSprint[a] === 1, restState[sp][st] === 1, W.aWinded[a] === 1,
           W.aPregnant[a] > 0, hold, stepMs, p, clock + AS.spriteIdleOffset(serial), posed);
-        const id = AS.spriteIndex(sp, W.aSex[a], stageOf(sim, a, W), facing.left(a), posed[0]);
+        // A bunny that has reached a hole shows only its ears and eyes (arriving or leaving, it
+        // is drawn whole, gliding over the hole).
+        const peeking = sp === 0 && !moving && W.hole[W.aTile[a]] === 1;
+        const id = peeking
+          ? AS.spritePeek(W.aSex[a])
+          : AS.spriteIndex(sp, W.aSex[a], stageOf(sim, a, W), facing.left(a), posed[0]);
         // Lift in whole sprite pixels, so the body hops in the art's own grid.
         ctx.drawImage(img, sh.sx(id), sh.sy(id), px, px,
-          Math.round(ax * s - ox), Math.round(ay * s - oy) - Math.round(posed[1] * unit), px, px);
+          Math.round(ax * s - ox), Math.round(ay * s - oy) - Math.round((peeking ? 0 : posed[1]) * unit), px, px);
       }
       ctx.imageSmoothingEnabled = true;
     }

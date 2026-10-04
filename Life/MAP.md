@@ -31,6 +31,7 @@ load time: every file reads other files' `AS.*` inside functions, at call time.
 | `rng.js` | seeded randomness (mulberry32); the only source the sim may use | `makeRng`, `newSeed` |
 | `world.js` | the grid and every store (typed arrays) + the only code that changes occupancy | `World`, `KIND`, `SPECIES`, `SPECIES_KEY`, `SEX` |
 | `grass.js` | growth every tick; age, seeding, sprouting on empty tiles, old age in hourly slices; bites | `grassTick`, `grassBite`, `grassStage` |
+| `warren.js` | warren holes' clocks: marks a hole used while a bunny stands on it, collapses holes unused for `CollapseDays` (hourly); `holeWithin` | `warrenTick`, `holeWithin` |
 | `corpse.js` | decay, and the boost field grass drinks from | `corpseTick`, `corpseAdded`, `corpseBoost` |
 | `sim.js` | the fixed tick, populate, events ring, population history | `Sim`, `TICK_HZ`, `DT`, `DAY_SECONDS`, `TICKS_PER_HOUR`, `EV`, `debugDropCorpse` |
 | `start.js` | the Meadows day-0 layout (`StartLayout`): meadow grass aged by depth, bunny colonies at meadow edges, wolf packs in the open; uses only `sim.rng` | `startMeadows` |
@@ -58,6 +59,7 @@ WOLF) is the truth about who is where. Tiles are `t = y * W.w + x`.
 
 - **Blades** are indexed by tile (they never move): `gSize`, `gAge` (days), plus a dense
   list `gList[0..gCount)` with `gSlot[t]` for O(1) removal.
+- **Warren holes**, by tile: `hole` (1 = a hole), `holeUsedAt` (sim seconds a bunny last stood there), dense `hList`/`hSlot`/`hCount`. A hole is *ground*, not an occupant: the tile's `kind` stays EMPTY (or BUNNY, or a corpse that died there), so one-thing-per-tile is untouched. Only bunnies may enter one (`stepTo`, `tryBirth`, `moveAnimal` and `addAnimal` refuse a wolf; wolf pathing costs it `Infinity`), nothing grows on one (`addGrass` throws; grass.js skips holes), and a bunny on one can't be bitten (`biteAnimal`) or picked as prey (wolf.js `isBunny`). `addHole`/`removeHole` are world.js's; `holeUsedAt` is written by warren.js and by DIG/start. Bunnies HIDE on one while a wolf is in sight, FLEE runs to a free one within `HoleRange`, DIG makes new ones on bare ground.
 - **Corpses**, by tile: `cNut`, `cMeat` (Fullness left on the body, set from `MeatOnBody` by `addCorpse`, eaten down by wolf.js's FEED, zeroed with the corpse), `cAge`, `cSpecies`, dense `cList`/`cSlot`/`cCount`;
   `boostSrc[t]` = the corpse tile boosting tile t, or −1.
 - **Animals** live in stable slots (`0..aHigh`, free list `aFree`, never compacted), so a
@@ -68,7 +70,7 @@ WOLF) is the truth about who is where. Tiles are `t = y * W.w + x`.
   and checks the serial before trusting it (selection, targets, fathers).
 
 **Who writes what.** Only `world.js`'s add/remove/move functions change `kind`, `aSlot` or
-the dense lists. Grass fields: grass.js. Corpse fields and `boostSrc`: corpse.js (`cMeat` also wolf.js, FEED). Animal
+the dense lists. Grass fields: grass.js. Hole fields: world.js (`addHole`/`removeHole`), `holeUsedAt` also warren.js. Corpse fields and `boostSrc`: corpse.js (`cMeat` also wolf.js, FEED). Animal
 fields: animals.js, breed.js, bunny.js, wolf.js. Everything else (render, inspect,
 graph, ui, bench) only reads.
 
@@ -76,7 +78,7 @@ graph, ui, bench) only reads.
 
 - **Tick:** fixed `AS.DT` = 1/30 s of sim time (`TICK_HZ`); a day is `DAY_SECONDS` = 20 s.
   `sim.tick()` does, in order: record history at the start of each in-world hour →
-  `corpseTick` → `grassTick` → `animalsTick`.
+  `corpseTick` → `grassTick` → `warrenTick` → `animalsTick`.
 - **Grass:** growth every tick; age/seed/sprout/old-age once per in-world hour, spread over
   `TICKS_PER_HOUR` ticks by tile (`t % TICKS_PER_HOUR`).
 - **Animals:** body every tick (age, hunger, starve/heal, stamina + winded, timers), decide
@@ -151,7 +153,7 @@ zoom-in. Holds never flash: see DESIGN.md, Photosensitivity.
 | `node Life/_tools/check-all.js` | every headless check below; run before and after changes |
 | `Life/_tools/life-local.command` (shortcut: `Life/_▶ DOUBLE-CLICK TO RUN LIFE LOCALLY.command`) | Paul's way to try his working copy: double-click in Finder (or run it); starts the lab server (repo root, no caching) on 8920 and opens `life.html` |
 | `node Life/_tools/harness.js [days] [seed]` | runs a seed, audits grid ↔ stores every day, checks same seed → same world. `require('./harness.js')` gives `load()`, `run()`, `editCSV()`, `SIM_FILES` to other scripts |
-| `*-check.js` | one per module (tables, grass, sight, bunny, breed, wolf, inspect, camera, render, ui, graph, bench). Each loads the real files in a Node VM |
+| `*-check.js` | one per module (tables, grass, sight, bunny, breed, wolf, warren, inspect, camera, render, ui, graph, bench). Each loads the real files in a Node VM |
 | `node Life/_tools/profile-tick.js` | where tick time goes at a few world sizes |
 | `node Life/_tools/run-bench.js desktop\|phone\|capped30` | the in-page benchmark in a real windowed Chrome (throwaway profile); prints results, saves a screenshot to `.claude/life-shots/` |
 | `node Life/_tools/shoot.js desktop\|phone out.png [setup.js] [?query]` | screenshot of the live page in Chrome after running `setup.js` in it (async JS; `AS.app` is the running sim) |

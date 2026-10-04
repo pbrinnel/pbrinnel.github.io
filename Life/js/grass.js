@@ -53,7 +53,7 @@
       // An empty tile can grow a blade by itself (SproutChance), so grass can come back to
       // land it has lost; a nearby corpse speeds that up like it speeds seeding.
       if (W.kind[t] === AS.KIND.EMPTY) {
-        if (sproutRate > 0) {
+        if (sproutRate > 0 && !W.hole[t]) {
           const ps = 1 - Math.exp(-sproutRate * (boostSrc[t] >= 0 ? AS.corpseBoost(sim, t) : 1));
           if (rng.chance(ps)) W.addGrass(t, g.SproutSize, 0);
         }
@@ -73,7 +73,7 @@
       if (p < 1 && !rng.chance(p)) continue;
       const k = W.neighbors4(t, nb);
       let free = 0;
-      for (let j = 0; j < k; j++) if (W.kind[nb[j]] === AS.KIND.EMPTY) nb[free++] = nb[j];
+      for (let j = 0; j < k; j++) if (W.kind[nb[j]] === AS.KIND.EMPTY && !W.hole[nb[j]]) nb[free++] = nb[j];
       if (free) W.addGrass(nb[rng.int(free)], g.SproutSize, 0);
     }
   };

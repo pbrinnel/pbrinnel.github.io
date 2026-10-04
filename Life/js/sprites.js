@@ -65,9 +65,14 @@
   // A gust leans a tuft: its top LEAN_ROWS rows shift one pixel right, the roots stay put.
   const LEAN_ROWS = 4;
   const GRASS_LEAN = GRASS_BITMAPS.map(m => m.map((row, j) => (j < LEAN_ROWS ? '.' + row.slice(0, SIZE - 1) : row)));
-  const BITMAPS = { bunny: BUNNY, wolf: WOLF, carcass: CARCASS_BITMAPS, skull: SKULL_BITMAPS, grass: GRASS_BITMAPS, grassLean: GRASS_LEAN };
+  // A warren hole: a dark opening in a rim of lighter dirt (r rim, o opening), earthy on
+  // purpose so it never reads as an animal. The peeking bunny is the same hole with ears and eyes
+  // up out of it, in the bunny's own colors (x body, d inner ear, e eye).
+  const HOLE_BITMAP = ['........', '..rrrr..', '.rroorr.', 'rroooorr', 'rroooorr', '.rroorr.', '..rrrr..', '........'];
+  const PEEK_BITMAP = ['..x..x..', '..d..d..', '.rxxxxr.', 'rrxexexr', 'rroooorr', '.rroorr.', '..rrrr..', '........'];
+  const BITMAPS = { hole: [HOLE_BITMAP], peek: [PEEK_BITMAP], bunny: BUNNY, wolf: WOLF, carcass: CARCASS_BITMAPS, skull: SKULL_BITMAPS, grass: GRASS_BITMAPS, grassLean: GRASS_LEAN };
   AS.SPRITE_BITMAPS = BITMAPS;
-  AS.SPRITE_CODES = 'xdweynfp';
+  AS.SPRITE_CODES = 'xdweynfpro';
   AS.SPRITE_SIZE = SIZE;
 
   // ---- palette ----------------------------------------------------------------------
@@ -76,6 +81,7 @@
   // A carcass is its species' color at this brightness, so it never reads as a live animal.
   const CARCASS_BRIGHTNESS = 0.65;
   const ELDER_BRIGHTNESS = 0.72;
+  const HOLE_RIM = '#8a6a45', HOLE_DARK = '#150f0a';
   const EYE = '#141210', AMBER = '#e8b84a', NOSE = '#1a1a1e', FANG = '#f2ece0', TONGUE = '#d99a9a';
   // Babies and corpses are drawn smaller than a tile, bottom-centered.
   const BABY_SCALE = 0.6, CORPSE_SCALE = 0.8;
@@ -142,9 +148,11 @@
 
   // ---- sheet layout -----------------------------------------------------------------
   // Animals: ((((species*2+sex)*3+stage)*2+faceLeft)*FRAMES+frame), then each species'
-  // skull, the three grass thirds, the three leaning ones, and each species' carcass.
+  // skull, the three grass thirds, the three leaning ones, each species' carcass, the hole,
+  // and the bunny peeking out of it (by sex).
   const ANIMAL_SPRITES = 2 * 2 * 3 * 2 * FRAMES;
-  const SKULL0 = ANIMAL_SPRITES, GRASS0 = SKULL0 + 2, LEAN0 = GRASS0 + 3, CARCASS0 = LEAN0 + 3, COUNT = CARCASS0 + 2;
+  const SKULL0 = ANIMAL_SPRITES, GRASS0 = SKULL0 + 2, LEAN0 = GRASS0 + 3, CARCASS0 = LEAN0 + 3;
+  const HOLE0 = CARCASS0 + 2, PEEK0 = HOLE0 + 1, COUNT = PEEK0 + 2;
   const SHEET_COLS = 19;
   AS.SPRITE_COUNT = COUNT;
   AS.SPRITE_FRAMES = FRAMES;
@@ -152,6 +160,8 @@
   AS.spriteGrass = third => GRASS0 + third;
   AS.spriteGrassLean = third => LEAN0 + third;
   AS.spriteCarcass = species => CARCASS0 + species;
+  AS.spriteHole = () => HOLE0;
+  AS.spritePeek = sex => PEEK0 + sex;   // a bunny in a hole, by sex
 
   // Wind: now and then a band sweeps diagonally across the meadow and tufts in it lean.
   // `clock` is real seconds, so a gust looks the same at any sim speed. Grass otherwise
@@ -197,7 +207,7 @@
     const off = ox + Math.floor((px - b) / 2), top = oy + px - b;
     const col = {
       x: base, d: shade(base, SHADE_DARK), w: shade(base, SHADE_LIGHT),
-      e: EYE, y: AMBER, n: NOSE, f: FANG, p: TONGUE,
+      e: EYE, y: AMBER, n: NOSE, f: FANG, p: TONGUE, r: HOLE_RIM, o: HOLE_DARK,
     };
     if (dim) for (const k of Object.keys(col)) col[k] = shade(col[k], dim);
     for (let j = 0; j < SIZE; j++) for (let i = 0; i < SIZE; i++) {
@@ -238,6 +248,10 @@
         const base = AS.COLORS[AS.animalGlyph(sp, 0, AS.STAGE.ADULT)];
         at(CARCASS0 + sp, (x, y) => paint(g, x, y, px, CARCASS_BITMAPS[sp], base, false, 1, CARCASS_BRIGHTNESS));
         at(SKULL0 + sp, (x, y) => paint(g, x, y, px, SKULL_BITMAPS[sp], AS.COLORS[AS.GLYPH.CORPSE], false, CORPSE_SCALE));
+      }
+      at(HOLE0, (x, y) => paint(g, x, y, px, HOLE_BITMAP, HOLE_RIM, false, 1));
+      for (let sx2 = 0; sx2 < 2; sx2++) {
+        at(PEEK0 + sx2, (x, y) => paint(g, x, y, px, PEEK_BITMAP, AS.COLORS[AS.animalGlyph(0, sx2, AS.STAGE.ADULT)], false, 1));
       }
       for (let i = 0; i < 3; i++) {
         at(GRASS0 + i, (x, y) => paint(g, x, y, px, GRASS_BITMAPS[i], GRASS_COLORS[i], false, 1));

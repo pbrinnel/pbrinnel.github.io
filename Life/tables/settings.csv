@@ -9,4 +9,7 @@ StartLayout,Meadows,Meadows = meadows with open ground between, bunnies in colon
 MeadowSize,48,Tiles; roughly how wide the largest meadows are
 BunnyColonies,6,Meadows only: how many colonies the starting bunnies live in
 WolfPacks,3,Meadows only: how many packs the starting wolves run in
+HolesPerColony,6,Meadows only: warren holes dug at each colony before its bunnies settle; Scatter has none
+WarrenRadius,4,A new hole is dug only within this many tiles of an existing hole (unless no hole is within HoleRange)
+CollapseDays,3,A hole no bunny has stood on for this long collapses into bare ground
 Seed,,Blank = new random seed each run; the seed used is shown on screen so you can paste it here to replay that start

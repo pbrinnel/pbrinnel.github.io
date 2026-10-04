@@ -72,6 +72,7 @@
       if (sim.tickCount % AS.TICKS_PER_HOUR === 0) history.push(W.gCount, W.bunnies, W.wolves);
       AS.corpseTick(sim);
       AS.grassTick(sim);
+      AS.warrenTick(sim);
       AS.animalsTick(sim);
       sim.tickCount++;
     };

@@ -20,6 +20,7 @@ const CHECKS = [
   [path.join(TOOLS, 'bunny-check.js'), [], []],
   [path.join(TOOLS, 'breed-check.js'), [], []],
   [path.join(TOOLS, 'wolf-check.js'), [], []],
+  [path.join(TOOLS, 'warren-check.js'), [], []],
   [path.join(TOOLS, 'inspect-check.js'), [], []],
   [path.join(TOOLS, 'camera-check.js'), [], []],
   [path.join(TOOLS, 'render-check.js'), [], []],

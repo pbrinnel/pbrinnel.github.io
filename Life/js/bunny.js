@@ -13,6 +13,8 @@
   // decision. BAD_N such blades are remembered per bunny.
   const BAD_SECONDS = 10;
   const BAD_N = 4;
+  // A dig timer within this of 0 is done (1/30 s has no exact binary value).
+  const DIG_EPS = 1e-9;
 
   // Direction d = 0 up, 1 right, 2 down, 3 left. aRunDir holds one, because W.neighbors4
   // drops off-world neighbors and so can't give a direction a stable number.
@@ -33,6 +35,9 @@
       m.mate = grow(m.mate, Int32Array, 1);        // MATE's partner slot
       m.mateSerial = grow(m.mateSerial, Uint32Array, 1);
       m.wolf = grow(m.wolf, Int32Array, 1);        // the wolf's tile at the last decision
+      m.hole = grow(m.hole, Int32Array, 1);        // FLEE's hole; -1 none (set at every decision)
+      m.digTile = grow(m.digTile, Int32Array, 1);  // DIG's tile; -1 none (a state that isn't DIG never reads it)
+      m.digLeft = grow(m.digLeft, Float64Array, 1); // seconds of digging left
       m.badTile = grow(m.badTile, Int32Array, BAD_N);
       m.badUntil = grow(m.badUntil, Int32Array, BAD_N);   // sim tick the entry expires at
       m.badOwner = grow(m.badOwner, Uint32Array, BAD_N);  // serial, so a reused slot starts clean
@@ -42,11 +47,18 @@
     return m;
   }
 
-  // The state indices come from the CSV order, so find REST by name once per table set.
-  let idxT = null, restIdx = -1;
-  function restIndex(T) {
-    if (idxT !== T) { idxT = T; restIdx = T.states.bunny.findIndex(st => st.name === 'REST'); }
-    return restIdx;
+  // The state indices come from the CSV order, so find REST and DIG by name once per table
+  // set. digHazard turns DigChance (per day) into a rate, the way grass.js does SeedChance, so a
+  // roll at each decision adds up to DigChance a day however often decisions come.
+  let idxT = null, restIdx = -1, digIdx = -1, digPerDecision = 0;
+  function indices(T) {
+    if (idxT !== T) {
+      idxT = T;
+      restIdx = T.states.bunny.findIndex(st => st.name === 'REST');
+      digIdx = T.states.bunny.findIndex(st => st.name === 'DIG');
+      const c = T.bunny.DigChance, perDay = T.bunny.DecidePerSec * AS.DAY_SECONDS;
+      digPerDecision = c >= 1 ? 1 : c > 0 ? 1 - Math.exp(Math.log(1 - c) / perDay) : 0;
+    }
   }
 
   // ---- shared pieces ---------------------------------------------------------------------
@@ -57,6 +69,10 @@
   // Matchers and goals are created once; they read these instead of closing over a call.
   let mW = null, mMem = null, mSim = null, mSelf = 0, mGoalTile = 0;
   const isWolf = t => mW.kind[t] === K.WOLF;
+  const isFreeHole = t => mW.hole[t] === 1 && mW.kind[t] === K.EMPTY;
+  const isHoleTile = t => t === mGoalTile;
+  // Bare ground a bunny can dig: nothing on it and not already a hole.
+  const isBare = (W, t) => W.kind[t] === K.EMPTY && W.hole[t] === 0;
   const isFreshBlade = t => {
     if (mW.kind[t] !== K.GRASS) return false;
     const base = mSelf * BAD_N, now = mSim.tickCount, owner = mW.aSerial[mSelf];
@@ -130,14 +146,33 @@
   // ---- the states -------------------------------------------------------------------------
 
   AS.registerStates('bunny', {
-    // "Sprint away from the nearest wolf; walk when out of Stamina."
-    FLEE: {
+    // "Stay still in the hole." Wolves can't bite a bunny on a hole or hunt it (wolf.js), so the
+    // bunny simply waits; once no wolf is in sight the next decision lets it get on with life.
+    HIDE: {
       enter(sim, s) {
         const W = sim.W;
+        if (!W.hole[W.aTile[s]]) return false;
         mW = W;
-        const wolf = AS.nearestVisible(sim, W.aTile[s], AS.speciesStats(sim, s).VisionRange, isWolf);
+        return AS.nearestVisible(sim, W.aTile[s], AS.speciesStats(sim, s).VisionRange, isWolf) >= 0;
+      },
+      start: calmStart,
+      act(sim, s) {
+        AS.setSprint(sim, s, false);
+        sim.W.aTargetTile[s] = -1;
+      },
+    },
+
+    // "Sprint to the nearest free hole it can see; with none in reach sprint away from the
+    // nearest wolf; walk when out of Stamina."
+    FLEE: {
+      enter(sim, s) {
+        const W = sim.W, S = AS.speciesStats(sim, s);
+        mW = W;
+        const wolf = AS.nearestVisible(sim, W.aTile[s], S.VisionRange, isWolf);
         if (wolf < 0) return false;
-        mem(W).wolf[s] = wolf;
+        const m = mem(W);
+        m.wolf[s] = wolf;
+        m.hole[s] = S.HoleRange > 0 && W.hCount > 0 ? AS.nearestVisible(sim, W.aTile[s], S.HoleRange, isFreeHole) : -1;
         return true;
       },
       start(sim, s) { sim.W.aRunLeft[s] = 0; },
@@ -145,6 +180,18 @@
         const W = sim.W, w = W.w, t = W.aTile[s], wolf = mem(W).wolf[s];
         const tx = t % w, ty = (t / w) | 0, wx = wolf % w, wy = (wolf / w) | 0;
         AS.setSprint(sim, s, true);   // refuses at 0 Stamina, so it walks then
+
+        // A hole in reach beats running away: head for it. If it was taken or the way is
+        // blocked, run away as below.
+        const h = mem(W).hole[s];
+        if (h >= 0 && W.hole[h] && (W.kind[h] === K.EMPTY || h === t)) {
+          W.aTargetTile[s] = h;
+          W.aTargetSlot[s] = -1;
+          if (h === t || W.aStepLeft[s] > 0) return;   // on it: HIDE takes over at the next decision
+          mW = W; mGoalTile = h;
+          const step = AS.pathNext(sim, t, isHoleTile, AS.speciesStats(sim, s).HoleRange);
+          if (step >= 0) { AS.stepTo(sim, s, step); return; }
+        }
 
         // The intent line points a few tiles straight away from the wolf, kept inside the world.
         let ax = tx - wx, ay = ty - wy;
@@ -280,11 +327,59 @@
       },
     },
 
+    // "Dig a hole on a bare 4-neighbor tile for DigSeconds." The roll is made first, because
+    // it is the cheap test and nearly always says no. A fed adult only: a hungry one has
+    // better things to do, and FLEE and HIDE outrank this whenever a wolf is in sight.
+    DIG: {
+      enter(sim, s) {
+        const W = sim.W, m = mem(W), S = AS.speciesStats(sim, s), t = W.aTile[s];
+        indices(sim.T);
+        // Already digging: carry on while the tile is still bare (act() abandons it if not).
+        if (W.aState[s] === digIdx && m.digTile[s] >= 0 && isBare(W, m.digTile[s])) return true;
+        if (AS.stageOfSlot(sim, s) !== AS.STAGE.ADULT || AS.isHungry(sim, s)) return false;
+        if (!(digPerDecision > 0) || !(digPerDecision >= 1 || sim.rng.chance(digPerDecision))) return false;
+        // Which neighbors may take a hole: within WarrenRadius of one, or, when no hole is
+        // within HoleRange, any (this bunny founds a warren).
+        const k = W.neighbors4(t, nb);
+        const founds = !AS.holeWithin(W, t, S.HoleRange);
+        let n = 0;
+        for (let i = 0; i < k; i++) {
+          const c = nb[i];
+          if (isBare(W, c) && (founds || AS.holeWithin(W, c, sim.T.world.WarrenRadius))) open[n++] = c;
+        }
+        if (n === 0) return false;
+        m.digTile[s] = open[sim.rng.int(n)];
+        m.digLeft[s] = S.DigSeconds;
+        return true;
+      },
+      start: calmStart,
+      act(sim, s) {
+        const W = sim.W, m = mem(W), tile = m.digTile[s];
+        AS.setSprint(sim, s, false);
+        if (tile < 0 || !isBare(W, tile)) {
+          // Something else took the tile: give up and let the next decision choose.
+          m.digTile[s] = -1;
+          W.aTargetTile[s] = -1;
+          W.aDecideLeft[s] = 0;
+          return;
+        }
+        W.aTargetTile[s] = tile;
+        W.aTargetSlot[s] = -1;
+        m.digLeft[s] -= AS.DT;
+        if (m.digLeft[s] > DIG_EPS) return;
+        W.addHole(tile, sim.simSeconds);
+        m.digTile[s] = -1;
+        W.aTargetTile[s] = -1;
+        W.aDecideLeft[s] = 0;
+      },
+    },
+
     // Hysteresis: it rests below RestBelow and stays down until RestUntil.
     REST: {
       enter(sim, s) {
         const W = sim.W, S = AS.speciesStats(sim, s);
-        const limit = (W.aState[s] === restIndex(sim.T) ? S.RestUntil : S.RestBelow) * S.StaminaMax;
+        indices(sim.T);
+        const limit = (W.aState[s] === restIdx ? S.RestUntil : S.RestBelow) * S.StaminaMax;
         return W.aStamina[s] < limit;
       },
       start: calmStart,

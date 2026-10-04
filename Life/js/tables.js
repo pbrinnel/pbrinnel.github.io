@@ -34,6 +34,9 @@
     ['RestUntil', 'frac', ANIMALS],
     ['SprintRange', 'num', ['Wolf']],
     ['TrackSeconds', 'num', ['Wolf']],
+    ['HoleRange', 'num', ['Bunny']],
+    ['DigChance', 'frac', ['Bunny']],
+    ['DigSeconds', 'num', ['Bunny']],
     ['WanderRun', 'range', ANIMALS],
     ['DecidePerSec', 'pos', ANIMALS],
     ['Diet', 'text', []],
@@ -79,6 +82,9 @@
     ['MeadowSize', 'pos'],
     ['BunnyColonies', 'count'],
     ['WolfPacks', 'count'],
+    ['HolesPerColony', 'count'],
+    ['WarrenRadius', 'num'],
+    ['CollapseDays', 'num'],
     ['Seed', 'seed'],
   ];
   // How the world is laid out on day 0 (sim.js populate, start.js).
