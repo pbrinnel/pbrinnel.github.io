@@ -97,7 +97,8 @@ watching the sim run. Everything else in this doc is decided.
 - **Wolves eat the carcass.** A bunny's body holds `MeatOnBody`, whatever killed it. A
   hungry wolf that sees a carcass with meat walks to it and eats `BiteFood` every
   `BiteCooldown`, and keeps eating until it's full or the meat is gone. What's left stays
-  for it or another wolf until the corpse rots. (One-bite kills that fed the wolf on the
+  for it or another wolf until the corpse rots, which for a bunny is within a day (Paul:
+  bodies lingered too long; a quicker rot also leaves wolves less to scavenge). (One-bite kills that fed the wolf on the
   spot failed: a wolf's stomach holds 100 and it hunts below 80, so most of a big meal was
   wasted.)
 - Starving: at Fullness 0 an animal loses HP each second and dies when HP reaches 0.

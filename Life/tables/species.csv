@@ -39,7 +39,7 @@ SproutSize,Size,,,0.1,Size a new blade starts at; above 0 so even a sprout feeds
 SeedChance,per day,,,10%,Mature blade seeds one empty 4-neighbor tile
 SproutChance,per day,,,0.1%,Chance an empty tile grows a blade by itself (grass can return to bare land); 0% = off
 CorpseNutrient,per body,10,30,,How long and how hard a corpse feeds grass
-CorpseDecay,days,3,5,,Corpse disappears after this
+CorpseDecay,days,1,5,,Corpse disappears after this
 MeatOnBody,Fullness,60,0,,Food on a body for wolves to eat; a carcass keeps it until eaten or until the corpse rots
 CorpseRadius,tiles,3,3,,Grass inside grows and seeds faster
 CorpseBoost,× multiplier,3,3,,Applied to GrowthRate and SeedChance in radius

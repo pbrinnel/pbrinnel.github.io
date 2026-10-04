@@ -149,6 +149,7 @@ zoom-in. Holds never flash: see DESIGN.md, Photosensitivity.
 | Command | What it does |
 |---|---|
 | `node Life/_tools/check-all.js` | every headless check below; run before and after changes |
+| `Life/_tools/life-local.command` (shortcut: `Life/_▶ DOUBLE-CLICK TO RUN LIFE LOCALLY.command`) | Paul's way to try his working copy: double-click in Finder (or run it); starts the lab server (repo root, no caching) on 8920 and opens `life.html` |
 | `node Life/_tools/harness.js [days] [seed]` | runs a seed, audits grid ↔ stores every day, checks same seed → same world. `require('./harness.js')` gives `load()`, `run()`, `editCSV()`, `SIM_FILES` to other scripts |
 | `*-check.js` | one per module (tables, grass, sight, bunny, breed, wolf, inspect, camera, render, ui, graph, bench). Each loads the real files in a Node VM |
 | `node Life/_tools/profile-tick.js` | where tick time goes at a few world sizes |

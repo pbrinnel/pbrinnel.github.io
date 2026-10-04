@@ -41,8 +41,10 @@ The goal is a self-sustaining ecosystem (DESIGN.md, top).
   `fetch`, carry `?v=N` (the CSV one through `AS.V`). Bump `AS.V` and every `?v=` together
   on every commit that changes `life.html` or anything in `Life/` the page loads. Pages
   caches for ten minutes, and a half-updated set of files breaks the page.
-- **Serve it to test.** The `site` preview config in `.claude/launch.json` serves the repo
-  root on port 8912 (often taken; `site-auto` picks a free one), so the sim is at
+- **Serve it to test.** Paul double-clicks `_tools/life-local.command`, which serves the
+  repo with the lab's server on 8920 and opens `life.html`. For agents, the `site` preview
+  config in `.claude/launch.json` serves the repo root on port 8912 (often taken;
+  `site-auto` picks a free one), so the sim is at
   `http://localhost:<port>/life.html`. The browser tools in `_tools/` default to
   `http://localhost:8914/life.html`; set `LIFE_URL` to point them elsewhere.
 - **The browser pane throttles when hidden.** If the Claude app's browser pane isn't on

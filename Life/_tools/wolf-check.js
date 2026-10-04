@@ -305,7 +305,11 @@ const d2 = (W, a, b) => (W.tx(a) - W.tx(b)) ** 2 + (W.ty(a) - W.ty(b)) ** 2;
 }
 {
   // Hungry wolf, carcass in sight: walks to it and eats BiteFood per BiteCooldown, past HungryAt.
-  const { AS, sim, W, B, Wf, events } = make(40, 23, false, tx => { tx.species = editCSV(tx.species, 'MeatOnBody', 'Bunny', '1000'); });
+  // The carcass is pinned big and slow to rot, so it outlasts the meal whatever the tables say.
+  const { AS, sim, W, B, Wf, events } = make(40, 23, false, tx => {
+    tx.species = editCSV(tx.species, 'MeatOnBody', 'Bunny', '1000');
+    tx.species = editCSV(tx.species, 'CorpseDecay', 'Bunny', '10');
+  });
   const ct = at(W, 20, 20);
   W.addCorpse(ct, AS.SPECIES.BUNNY); AS.corpseAdded(sim, ct);
   const w = wolf(AS, sim, 26, 20, { full: 10 });
