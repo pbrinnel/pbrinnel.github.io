@@ -16,8 +16,8 @@
   // How much of the way an elder's color is pulled toward the background.
   const ELDER_DIM = 0.4;
 
-  // DESIGN.md "What the screen shows". The CSV Glyph column holds the same characters; the
-  // sheet takes the table when it is given one and falls back to these.
+  // The original font glyphs. The page draws sprites now (sprites.js); these remain for
+  // GlyphSheet and the ids and colors other files still share.
   const GRASS_CHARS = ['░', '▒', '▓'];
   const BUNNY_CHAR = 'α', WOLF_CHAR = 'Ω', CORPSE_CHAR = '†';
 

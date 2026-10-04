@@ -19,7 +19,6 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
     ['SeedChance', 'Grass', '30%'], ['ElderAt', 'Bunny', '80'], ['LitterSize', 'Bunny', '2-4'],
     ['HungryAt', 'Bunny', '70'], ['HungryAt', 'Wolf', '60'], ['WanderRun', 'Wolf', '4-10'],
     ['HealAbove', 'Bunny', '50'], ['BabySpeed', 'Bunny', '50'], ['SprintRange', 'Bunny', ''],
-    ['Glyph', 'Grass', '░ ▒ ▓'],
   ];
   let kt = sp;
   for (const [row, col, v] of known) kt = editCSV(kt, row, col, v);
@@ -30,7 +29,6 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
     ['bunny.LitterSize 2-4 → {2,4}', eq(T.bunny.LitterSize, { min: 2, max: 4 }), T.bunny.LitterSize],
     ['world.StartGrass 40% → 0.4', Math.abs(T.world.StartGrass - 0.4) < 1e-12, T.world.StartGrass],
     ['world.Seed blank → null', T.world.Seed === null, T.world.Seed],
-    ['grass.Glyph → three glyphs', eq(T.grass.Glyph, ['░', '▒', '▓']), T.grass.Glyph],
     ['bunny.HungryAt 70 → 0.7', T.bunny.HungryAt === 0.7, T.bunny.HungryAt],
     ['wolf.HungryAt 60 → 0.6', T.wolf.HungryAt === 0.6, T.wolf.HungryAt],
     ['bunny.SprintRange blank → null', T.bunny.SprintRange === null, T.bunny.SprintRange],
@@ -66,8 +64,6 @@ bad('duplicate WalkSpeed row', { species: sp + '\nWalkSpeed,tiles/s,9,9,,' }, ['
 bad('Wolf column header renamed', { species: sp.replace('Stat,Unit,Bunny,Wolf', 'Stat,Unit,Bunny,Wulf') }, ['Wolf']);
 bad('RestUntil < RestBelow (Bunny 20 vs 30)', sE('RestUntil', 'Bunny', '20'), ['RestUntil', 'RestBelow', 'unny']);
 bad('CorpseBoost 0.5 Bunny', sE('CorpseBoost', 'Bunny', '0.5'), ['CorpseBoost', 'unny']);
-bad('Grass Glyph two glyphs', sE('Glyph', 'Grass', '░ ▒'), ['Glyph', 'Grass']);
-bad('Grass Glyph four glyphs', sE('Glyph', 'Grass', '░ ▒ ▓ █'), ['Glyph', 'Grass']);
 bad('WorldWidth 0', wE('WorldWidth', '0'), ['settings.csv', 'WorldWidth']);
 bad('WorldWidth 2.5', wE('WorldWidth', '2.5'), ['WorldWidth']);
 bad('WorldWidth 5000', wE('WorldWidth', '5000'), ['WorldWidth']);
@@ -98,7 +94,6 @@ bad('Grass Lifespan 0', sE('Lifespan', 'Grass', '0'), ['Lifespan', 'Grass']);
 bad('Bunny SprintSpeed "5 %" (percent on plain number)', sE('SprintSpeed', 'Bunny', '5%'), ['SprintSpeed', 'Bunny']);
 bad('species missing Stat column', { species: sp.replace('Stat,Unit', 'Name,Unit') }, ['Stat']);
 bad('states missing "Enter when" column', { states: st.replace('Enter when', 'Enter') }, ['Enter when']);
-bad('Bunny Glyph blank', sE('Glyph', 'Bunny', ''), ['Glyph', 'Bunny']);
 bad('Grass TimeToMature blank', sE('TimeToMature', 'Grass', ''), ['TimeToMature', 'Grass']);
 bad('StartGrass 40 (bare 40, meaning 40%)', wE('StartGrass', '40'), ['StartGrass']);
 bad('Seed "1e3"? (scientific) -- reported only', wE('Seed', '1e99'), ['Seed']);
@@ -153,8 +148,6 @@ same('Seed " " (spaces only)', wE('Seed', '  '));
 same('Header with spaces " Stat , Unit "', { species: sp.replace('Stat,Unit,', ' Stat , Unit ,') });
 same('Columns reordered (Notes first)', { species: sp.split('\n').map(l => { const c = l.split(','); return [c[5], ...c.slice(0, 5)].join(','); }).join('\n') });
 same('Rows shuffled (species reversed after header)', { species: (l => [l[0], ...l.slice(1).reverse()].join('\n'))(sp.trim().split('\n')) });
-sameAs('Glyph Grass separated by tabs / multiple spaces', sE('Glyph', 'Grass', '░  ▒\t▓'), sE('Glyph', 'Grass', '░ ▒ ▓'));
-sameAs('Glyph Grass with no spaces "░▒▓" (reported)', sE('Glyph', 'Grass', '░▒▓'), sE('Glyph', 'Grass', '░ ▒ ▓'));
 { const r = parse(wE('Seed', '12345')); out(!!r.T && r.T.world.Seed === 12345, 'OK: Seed "12345" reads as 12345', r.errors); }
 same('upper/lowercase species names in states ("bunny")', { states: st.replace(/^Bunny,/gm, 'bunny,') });
 same('states Priority " 1 " with spaces', { states: st.replace('Bunny,1,FLEE', 'Bunny, 1 ,FLEE') });
@@ -241,8 +234,6 @@ probe('Percent sign fullwidth "70％"', sE('HungryAt', 'Bunny', '70％'), T => T
 probe('Bunny Wolf-only SprintRange filled in', sE('SprintRange', 'Bunny', '3'), T => T.bunny.SprintRange);
 probe('Wolf BiteSize filled in (non-needed)', sE('BiteSize', 'Wolf', '1'), T => T.wolf.BiteSize);
 probe('Grass WalkSpeed filled in', sE('WalkSpeed', 'Grass', '1'), T => T.grass.WalkSpeed);
-probe('Glyph two chars for Bunny "αα"', sE('Glyph', 'Bunny', 'αα'), T => T.bunny.Glyph);
-probe('Glyph multi-codepoint grass emoji', sE('Glyph', 'Grass', '🌱 🌿 🌳'), T => T.grass.Glyph);
 probe('states: Grass with number Priority', { states: st.replace('Grass,—,GROW', 'Grass,1,GROW') }, T => T.states.grass.map(s => [s.name, s.priority]));
 probe('states: species typo "Bunnny"', { states: st.replace('Bunny,6,WANDER', 'Bunnny,6,WANDER') }, T => Object.keys(T.states));
 probe('states: Wolf has no states at all', { states: st.split('\n').filter(l => !l.startsWith('Wolf')).join('\n') }, T => Object.keys(T.states));

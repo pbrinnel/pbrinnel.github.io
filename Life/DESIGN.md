@@ -245,7 +245,7 @@ Built this way from day one so we don't have to rewrite later:
   once per in-world hour, not every tick.
 - **Animal decisions are staggered.** Each animal re-decides its state a few times a
   second; it moves every tick.
-- **Only visible tiles are drawn.** Glyphs are pre-rendered once into an image sheet, and
+- **Only visible tiles are drawn.** Sprites are pre-rendered once into an image sheet, and
   the screen draws by copying from it, so zooming out doesn't slow the simulation down.
 - **Pathfinding is local.** Because grass blocks, animals need to route around it.
   They path within their `VisionRange` only, never across the whole map.

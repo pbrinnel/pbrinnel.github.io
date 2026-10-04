@@ -21,17 +21,20 @@
   const TARGET_TICKS = 6;         // about this many x ticks across the plot
 
   // Colors validated against #0a0c0a for color-blind safety; text never uses them.
+  // Series icons in the legend, live labels and readout, CSS px, and the gap after one.
+  const ICON_PX = 12, ICON_GAP = 4;
   const COLORS = { grass: '#199e70', bunnies: '#d95926', wolves: '#3987e5' };
   const TEXT = '#d8d4c8', DIM = '#8a8d80', GRID = '#1f241d', AXIS = '#3a4036';
   const LINE_W = 2;
   const FONT_PX = 11;
-  const MARGIN = { left: 40, right: 58, top: 40, bottom: 22 };  // top holds legend and readout
+  // top holds legend and readout; right holds the live labels (tick, icon, up to "999,999")
+  const MARGIN = { left: 40, right: 90, top: 40, bottom: 22 };
   const POS_KEY = 'life-graph-pos';   // the window's remembered { x, y }, CSS px from the viewport's top-left
   const LABEL_GAP = 12;           // direct labels are kept at least this far apart, in px
   const SERIES = [
-    { key: 'grass', glyph: '░', name: 'grass' },
-    { key: 'bunnies', glyph: 'α', name: 'bunnies' },
-    { key: 'wolves', glyph: 'Ω', name: 'wolves' },
+    { key: 'grass', name: 'grass' },
+    { key: 'bunnies', name: 'bunnies' },
+    { key: 'wolves', name: 'wolves' },
   ];
 
   // ---- pure math ----
@@ -380,7 +383,8 @@
         for (const e of ends) {
           ctx.strokeStyle = COLORS[e.s.key]; ctx.lineWidth = LINE_W;
           ctx.beginPath(); ctx.moveTo(r.x1 + 3, e.ly); ctx.lineTo(r.x1 + 10, e.ly); ctx.stroke();
-          ctx.fillStyle = TEXT; ctx.fillText(`${e.s.glyph} ${fmtInt(e.v)}`, r.x1 + 13, e.ly);
+          const ix = r.x1 + 13 + icon(e.s.key, r.x1 + 13, e.ly);
+          ctx.fillStyle = TEXT; ctx.fillText(fmtInt(e.v), ix, e.ly);
         }
       }
 
@@ -390,8 +394,9 @@
       for (const s of SERIES) {
         ctx.strokeStyle = COLORS[s.key]; ctx.lineWidth = LINE_W;
         ctx.beginPath(); ctx.moveTo(lx, 10); ctx.lineTo(lx + 14, 10); ctx.stroke();
-        ctx.fillStyle = TEXT; const t = `${s.glyph} ${s.name}`; ctx.fillText(t, lx + 19, 10);
-        lx += 19 + ctx.measureText(t).width + 16;
+        const ix = lx + 19 + icon(s.key, lx + 19, 10);
+        ctx.fillStyle = TEXT; ctx.fillText(s.name, ix, 10);
+        lx = ix + ctx.measureText(s.name).width + 16;
       }
 
       // Crosshair and readout of the hour under the pointer.
@@ -408,11 +413,24 @@
           ctx.fillStyle = COLORS[s.key]; ctx.beginPath(); ctx.arc(x, Y(v), 3, 0, Math.PI * 2); ctx.fill();
           ctx.strokeStyle = COLORS[s.key]; ctx.lineWidth = LINE_W;
           ctx.beginPath(); ctx.moveTo(rx, 28); ctx.lineTo(rx + 8, 28); ctx.stroke();
-          const t = `${s.glyph} ${fmtInt(v)}`;
-          ctx.fillStyle = TEXT; ctx.fillText(t, rx + 12, 28); rx += 12 + ctx.measureText(t).width + 12;
+          const t = fmtInt(v), ix = rx + 12 + icon(s.key, rx + 12, 28);
+          ctx.fillStyle = TEXT; ctx.fillText(t, ix, 28); rx = ix + ctx.measureText(t).width + 12;
         }
       }
     }
+
+    // Each series is labeled with the sprite the world draws for it (main.js supplies
+    // them once the sprite sheet exists). Draws it centered on y; returns the width used.
+    let icons = null;
+    function icon(key, x, y) {
+      const cv = icons && icons[key];
+      if (!cv) return 0;
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(cv, x, Math.round(y - ICON_PX / 2), ICON_PX, ICON_PX);
+      return ICON_PX + ICON_GAP;
+    }
+    // icons: { grass, bunnies, wolves } → canvases (any size; drawn at ICON_PX).
+    g.setIcons = m => { icons = m; };
 
     return g;
   };

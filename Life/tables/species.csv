@@ -1,5 +1,4 @@
 Stat,Unit,Bunny,Wolf,Grass,Notes
-Glyph,,α,Ω,░ ▒ ▓,Grass glyph shows its Size in thirds; corpse is †
 WalkSpeed,tiles/s,2,2.5,,Free movement
 SprintSpeed,tiles/s,6,7,,Costs Stamina
 StaminaMax,points,100,100,,

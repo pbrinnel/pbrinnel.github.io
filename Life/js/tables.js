@@ -17,7 +17,6 @@
   //   range "a-b" or a single whole number → {min, max}
   //   text  kept as written
   const SPECIES_SCHEMA = [
-    ['Glyph', 'text', ALL],
     ['WalkSpeed', 'num', ANIMALS],
     ['SprintSpeed', 'num', ANIMALS],
     ['StaminaMax', 'pos', ANIMALS],
@@ -222,13 +221,6 @@
     }
     for (const stat of byStat.keys()) {
       if (!known.has(stat)) warnings.push(`species.csv: "${stat}" isn't used by the sim yet.`);
-    }
-    // Grass's glyph cell lists one glyph per third of its Size, with or without spaces.
-    if (typeof out.grass.Glyph === 'string') {
-      const txt = out.grass.Glyph;
-      const g = /\s/.test(txt.trim()) ? txt.split(/\s+/).filter(Boolean) : [...txt.trim()];
-      if (g.length !== 3) errors.push(`species.csv, Glyph, Grass: needs three glyphs, smallest first (like ░ ▒ ▓).`);
-      out.grass.Glyph = Object.freeze(g);
     }
     for (const Sp of ANIMALS) {
       const s = out[Sp.toLowerCase()];

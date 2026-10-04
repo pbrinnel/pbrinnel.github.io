@@ -37,10 +37,11 @@
   const FALLBACK_RUN_INDEX = 1;
   const DEBUG_TOOLS = [
     ['select', 'Select', 'Click to inspect'],
-    ['corpse-bunny', 'Drop α†', 'Click a tile to drop a bunny corpse'],
-    ['corpse-wolf', 'Drop Ω†', 'Click a tile to drop a wolf corpse'],
+    ['corpse-bunny', 'Drop bunny body', 'Click a tile to drop a bunny corpse'],
+    ['corpse-wolf', 'Drop wolf body', 'Click a tile to drop a wolf corpse'],
   ];
-  // Counts in HUD order: glyph, key in the counts object, tooltip.
+  // Counts in HUD order: a stand-in label (empty: the sprite icon replaces it once the sheet
+  // exists, see setIcons), key in the counts object, tooltip.
   // The tabs, in bar order: key, label, tooltip.
   const TABS = [
     ['info', 'Info', 'Live counts and the population graph'],
@@ -48,10 +49,10 @@
     ['god', 'God', 'Powers over the world'],
   ];
   const COUNTS = [
-    ['α', 'bunnies', 'bunnies'],
-    ['Ω', 'wolves', 'wolves'],
-    ['░', 'blades', 'blades of grass'],
-    ['†', 'corpses', 'corpses'],
+    ['', 'bunnies', 'bunnies'],
+    ['', 'wolves', 'wolves'],
+    ['', 'blades', 'blades of grass'],
+    ['', 'corpses', 'corpses'],
   ];
 
   const fmtInt = n => Math.round(n).toLocaleString('en-US');
@@ -116,7 +117,8 @@
     hideBtn.type = 'button';
     hideBtn.title = 'Hide everything but the world (H brings it back)';
     hideBtn.addEventListener('click', () => { setHidden(true); hideBtn.blur(); });
-    strip.append(speedBox, status, dayEl, tabBox, hideBtn);
+    // The behind-speed note comes after the tabs, so its coming and going moves nothing.
+    strip.append(speedBox, dayEl, tabBox, status, hideBtn);
 
     // The small faint button that brings the UI back; CSS shows it only while hidden.
     const showBtn = el('button', 'hud-show', 'Show UI');
@@ -132,7 +134,7 @@
       const c = el('span', 'hud-count');
       c.title = tip;
       glyphEls[key] = c.appendChild(el('span', 'hud-glyph', glyph));
-      countEls[key] = el('span', 'hud-num', '');
+      countEls[key] = el('span', `hud-num hud-num-${key}`, '');
       c.appendChild(countEls[key]);
       countsBox.appendChild(c);
     }

@@ -59,7 +59,7 @@
     },
   });
 
-  try { await document.fonts.load(`32px ${AS.FONT}`, 'αΩ░▒▓†'); } catch (e) { /* draws with a fallback */ }
+  try { await document.fonts.load(`32px ${AS.FONT}`); } catch (e) { /* draws with a fallback */ }
 
   // Opened from disk, a browser refuses to fetch the CSVs; say how to serve it instead of
   // reporting four load failures as table problems (DESIGN.md: the page must be served).
@@ -95,7 +95,7 @@
     blades: AS.spriteGrass(2),
     corpses: AS.spriteSkull(AS.SPECIES.BUNNY),
   };
-  ui.setIcons((key, cv) => {
+  function drawIcon(key, cv) {
     // A whole number of device pixels per sprite pixel keeps the pixel art crisp.
     const px = AS.SPRITE_SIZE * Math.max(1, Math.ceil(ICON_CSS_PX * (window.devicePixelRatio || 1) / AS.SPRITE_SIZE));
     const sh = sheet.get(px), i = ICON_SPRITE[key];
@@ -103,9 +103,14 @@
     const g = cv.getContext('2d');
     g.imageSmoothingEnabled = false;
     g.drawImage(sh.canvas, sh.sx(i), sh.sy(i), px, px, 0, 0, px, px);
-  });
+    return cv;
+  }
+  ui.setIcons(drawIcon);
   const renderer = AS.Renderer(canvas);
   graph = AS.Graph(T);
+  graph.setIcons({ grass: drawIcon('blades', document.createElement('canvas')),
+    bunnies: drawIcon('bunnies', document.createElement('canvas')),
+    wolves: drawIcon('wolves', document.createElement('canvas')) });
 
   // A tap picks an animal by where its sprite is drawn: mid-step it's between the tile it
   // left and the one it already occupies, and people tap what they see. Blades and

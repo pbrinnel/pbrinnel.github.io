@@ -70,7 +70,7 @@ const input = { speedIndex: 1, achieved: 1, day: 3.24, seed: 1234567, counts: { 
 }
 { const { ui, ids } = build(true);
   const tools = ids.hud.all(e => e.className.split(' ').includes('hud-tool'));
-  assert.deepStrictEqual(tools.map(t => t.textContent), ['Select', 'Drop α†', 'Drop Ω†']); ok('debug tools exist');
+  assert.deepStrictEqual(tools.map(t => t.textContent), ['Select', 'Drop bunny body', 'Drop wolf body']); ok('debug tools exist');
 }
 { const { tools, ids } = (() => { const r = build(true); return { tools: r.tools, ids: r.ids }; })();
   const t = ids.hud.all(e => e.className.split(' ').includes('hud-tool')); t[1].fire('click'); t[2].fire('click');

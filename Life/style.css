@@ -102,7 +102,11 @@ body.ui-off #hud, body.ui-off #inspector, body.ui-off #graph { display: none; }
 body.nuke-armed #map { cursor: crosshair; }
 .hud-glyph { color: var(--hud-dim); margin-right: 5px; }
 .hud-icon { width: 16px; height: 16px; margin-right: 5px; vertical-align: -3px; image-rendering: pixelated; }
-.hud-day { color: var(--fg); }
+.hud-day { color: var(--fg); display: inline-block; min-width: 10ch; }
+/* Numbers hold a fixed width (room for the largest count each can reach) so a new digit
+   never shifts the controls after them. */
+.hud-num { display: inline-block; font-variant-numeric: tabular-nums; min-width: 6ch; }
+.hud-num-blades { min-width: 7ch; }
 .hud-status { color: var(--hud-on); }
 .hud-status:empty { display: none; }
 .hud-seednum { user-select: all; -webkit-user-select: all; color: var(--fg); cursor: text; }
