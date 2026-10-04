@@ -128,8 +128,15 @@ watching the sim run. Everything else in this doc is decided.
 - **Animals move like animals.** Bunnies stretch and hop a pixel mid-step; wolves stride
   and bob a pixel. Standing animals now and then flick an ear or wag the tail, each on
   its own timer so they never move in unison. Frames change with movement, at walking
-  pace, so nothing blinks. Planned next: a wolf's bite, sprinting, a bunny eating,
-  resting, falling over at death, a pregnant female's rounder belly, a birth, mating.
+  pace, so nothing blinks.
+- **Animals act out what they do:** a wolf lunges with its jaw open when it bites and the
+  bunny flinches; a bunny puts its head down for each mouthful; sprinters gallop with
+  ears back; resting animals lie down, and a winded wolf pants; a dying animal falls on
+  its side for a moment before it turns to bones; a pregnant female has a rounder belly;
+  a newborn hops; a mating pair turns to face each other.
+- **Wind** (Paul, 3 Oct 2026): every 25 seconds of real time a gust a few tiles wide rolls
+  diagonally across the meadow and the tufts it passes lean a pixel; the rest of the time
+  grass is still, so the animals stay the only things moving.
 - **Zoomed far out,** once tiles are too small for a sprite to read, each tile becomes a
   solid square: grass shaded by height on dark ground, animals in brighter colors so
   herds and hunters stand out. Sprites come back as you zoom in.
@@ -137,10 +144,12 @@ watching the sim run. Everything else in this doc is decided.
   slides the sprite across during each step.
 - **Life stage and sex on the map:** babies are drawn smaller and elders in a dimmer
   color; males and females are two shades of their species color.
-- **Intent lines:** a faint line from each animal to whatever it's after: wolf → prey,
+- **Intent lines:** a faint line from an animal to whatever it's after: wolf → prey,
   bunny → blade, animal → mate, and a line away from the threat for a fleeing bunny.
-- **No event marks** (Paul, 3 Oct 2026): once the sprites act out bites, eating, births
-  and deaths themselves, the fading marks that flag them today come out.
+  Off by default (Paul found them ugly); a Lines button in the HUD shows them for every
+  animal, and the selected animal's own line always shows.
+- **No event marks** (Paul, 3 Oct 2026): the sprites act out bites, eating, births and
+  deaths themselves, so the fading marks that used to flag them are gone.
 - **Inspector:** click or tap an agent to select it. An animal is picked where its sprite
   is drawn, even mid-step between two tiles. A panel shows every variable from
   `variables.csv`, live, and the selection follows the agent as it moves. Clicking empty
@@ -204,8 +213,10 @@ with more than a few thousand animals matters.
 - Neither is enough, or you want a desktop game → Godot. That's a real port.
 
 **Photosensitivity.** Nothing flashes full-screen or strobes. Animation frames change
-only with what an animal is doing (a step, a bite), and every pose lasts at least a
-quarter of a second of real time, whatever the speed.
+only with what an animal is doing (a step, a bite). A pose for an event (a bite, a
+mouthful, a flinch, a death) holds for at least a quarter of a second of real time,
+whatever the speed, and when the sim runs so fast that steps would flicker, animals
+glide in their standing pose instead of cycling their legs.
 
 ---
 

@@ -19,6 +19,7 @@ const B = AS.SPRITE_BITMAPS;
 B.bunny.forEach((m, i) => maps.push([`bunny ${i}`, m]));
 B.wolf.forEach((m, i) => maps.push([`wolf ${i}`, m]));
 maps.push(['corpse', B.corpse]);
+B.grassLean.forEach((m, i) => maps.push([`grass lean ${i}`, m]));
 B.grass.forEach((m, i) => maps.push([`grass ${i}`, m]));
 check(B.bunny.length === AS.SPRITE_FRAMES && B.wolf.length === AS.SPRITE_FRAMES, 'every species has SPRITE_FRAMES frames');
 check(B.grass.length === 3, 'three grass bitmaps');
@@ -42,43 +43,84 @@ for (let sp = 0; sp < 2; sp++) for (let sx = 0; sx < 2; sx++) for (let st = 0; s
   for (let fl = 0; fl < 2; fl++) for (let fr = 0; fr < AS.SPRITE_FRAMES; fr++)
     add(AS.spriteIndex(sp, sx, st, fl, fr), `sp${sp} sex${sx} stage${st} left${fl} frame${fr}`);
 add(AS.SPRITE_CORPSE, 'corpse');
+for (let t = 0; t < 3; t++) add(AS.spriteGrassLean(t), `grass lean ${t}`);
 for (let t = 0; t < 3; t++) add(AS.spriteGrass(t), `grass ${t}`);
 check(seen.size === AS.SPRITE_COUNT, `every index used once (${seen.size} of ${AS.SPRITE_COUNT})`);
 
-// Pose rule. The idle window is found by scanning the clock, not by assuming its numbers.
+// Pose rule. Arguments: species, moving, sprinting, resting, winded, pregnant, hold, stepMs, p, clock.
+const F = AS.SPRITE_FRAME, H = AS.SPRITE_HOLD, FAST = AS.SPRITE_MIN_STEP_MS - 1, SLOW = 1000;
+const pose = (sp, mv, spr, rest, wi, preg, hold, ms, p, clock) => {
+  AS.spritePose(sp, mv, spr, rest, wi, preg, hold, ms, p, clock, out);
+  return [out[0], out[1]];
+};
+const eq = (got, f, l, m) => check(got[0] === f && got[1] === l, `${m}: got frame ${got[0]} lift ${got[1]}, want ${f} ${l}`);
+check(F.STAND === 0 && Object.values(F).length === AS.SPRITE_FRAMES, 'every frame has a named slot');
+// Standing: the idle window is found by scanning the clock, not by assuming its numbers.
 const out = new Float64Array(2);
 for (const sp of [0, 1]) {
   const name = sp ? 'wolf' : 'bunny';
-  let idleFrame = -1, idleAt = -1, standAt = -1;
+  let idleAt = -1, standAt = -1;
   for (let c = 0; c < 20; c += 0.01) {
-    AS.spritePose(sp, false, 0, c, out);
-    check(out[1] === 0, `${name} standing never lifts (clock ${c.toFixed(2)})`);
-    if (out[0] !== 0 && idleAt < 0) { idleAt = c; idleFrame = out[0]; }
-    if (out[0] === 0 && standAt < 0) standAt = c;
-    check(out[0] === 0 || out[0] === idleFrame, `${name} standing uses frame 0 or the one idle frame`);
+    const [f, l] = pose(sp, false, false, false, false, false, H.NONE, SLOW, 0, c);
+    check(l === 0, `${name} standing never lifts (clock ${c.toFixed(2)})`);
+    check(f === F.STAND || f === F.IDLE, `${name} standing uses stand or idle`);
+    if (f === F.IDLE && idleAt < 0) idleAt = c;
+    if (f === F.STAND && standAt < 0) standAt = c;
   }
   check(idleAt >= 0 && standAt >= 0, `${name} both stands and fidgets`);
-  AS.spritePose(sp, false, 0, idleAt, out);
-  check(out[0] === idleFrame && out[1] === 0, `${name} idle window shows the idle frame, no lift`);
-  AS.spritePose(sp, false, 0, standAt + 0.0001, out);
-  check(out[0] === 0 && out[1] === 0, `${name} outside the window: frame 0, no lift`);
-  // Across a step the frames come from the cycle; every one is a real frame, lift small.
-  const frames = [];
+  // Walking changes pose across a step; frames are real, lift whole pixels.
+  const seq = [];
   for (let p = 0; p <= 1; p += 0.01) {
-    AS.spritePose(sp, true, p, 0, out);
-    check(out[0] >= 0 && out[0] < AS.SPRITE_FRAMES, `${name} step frame in range`);
-    check(Number.isInteger(out[1]) && out[1] >= 0, `${name} lift is whole sprite pixels`);
-    frames.push(out[0] + ':' + out[1]);
+    const [f, l] = pose(sp, true, false, false, false, false, H.NONE, SLOW, p, 0);
+    check(f >= 0 && f < AS.SPRITE_FRAMES && Number.isInteger(l) && l >= 0, `${name} walk frame and lift valid`);
+    seq.push(f + ':' + l);
   }
-  const runs = frames.filter((f, i) => i === 0 || f !== frames[i - 1]);
-  check(new Set(runs).size > 1, `${name} walking changes pose across a step`);
-  AS.spritePose(sp, true, 0, 0, out);
-  const first = out[0] + ':' + out[1];
-  AS.spritePose(sp, true, 1, 0, out);
-  check(first !== out[0] + ':' + out[1] || runs.length > 2, `${name} step starts and ends differently`);
-  AS.spritePose(sp, true, 0.5, 0, out); const mid = out[0];
-  AS.spritePose(sp, true, 0.5, 1.5, out);
-  check(out[0] === mid, `${name} idle clock doesn't affect a step`);
+  check(new Set(seq).size > 1, `${name} walking changes pose across a step`);
+  check(pose(sp, true, false, false, false, false, H.NONE, SLOW, 0.5, 0)[0] === pose(sp, true, false, false, false, false, H.NONE, SLOW, 0.5, 1.5)[0], `${name} idle clock doesn't affect a step`);
+  // Sprint: run frames, lift 1 then 0.
+  eq(pose(sp, true, true, false, false, false, H.NONE, SLOW, 0.1, 0), F.RUN_A, 1, `${name} sprint first half`);
+  eq(pose(sp, true, true, false, false, false, H.NONE, SLOW, 0.9, 0), F.RUN_B, 0, `${name} sprint second half`);
+  // Sprinting without moving is just standing.
+  check(pose(sp, false, true, false, false, false, H.NONE, SLOW, 0, standAt)[0] === F.STAND, `${name} sprint flag alone does nothing`);
+  // Rest, pregnant, in priority order.
+  eq(pose(sp, false, false, true, false, false, H.NONE, SLOW, 0, 0), F.REST, 0, `${name} resting`);
+  eq(pose(sp, false, false, false, false, true, H.NONE, SLOW, 0, standAt), F.PREGNANT, 0, `${name} pregnant standing`);
+  eq(pose(sp, false, false, true, false, true, H.NONE, SLOW, 0, 0), F.REST, 0, `${name} rest beats pregnant`);
+  const pw = pose(sp, true, false, false, false, true, H.NONE, SLOW, 0.1, 0);
+  check(pw[0] === pose(sp, true, false, false, false, false, H.NONE, SLOW, 0.1, 0)[0], `${name} pregnant still walks the walk cycle`);
+  // Holds beat everything.
+  eq(pose(sp, true, true, true, true, true, H.ACTION, SLOW, 0.5, 0), F.ACT, 0, `${name} action beats sprint, rest, pregnant`);
+  eq(pose(sp, true, true, true, true, true, H.FLINCH, SLOW, 0.5, 0), F.RUN_A, 0, `${name} flinch shows runA`);
+  const bh = pose(sp, false, false, false, false, false, H.BIRTH, SLOW, 0, 0);
+  check(bh[1] === 1, `${name} birth hop lifts`);
+  // Fast steps glide standing; holds still show.
+  eq(pose(sp, true, false, false, false, false, H.NONE, FAST, 0.5, 0), F.STAND, 0, `${name} fast walk glides standing`);
+  eq(pose(sp, true, true, false, false, false, H.NONE, 0, 0.5, 0), F.STAND, 0, `${name} max speed sprint glides standing`);
+  eq(pose(sp, true, true, false, false, false, H.ACTION, FAST, 0.5, 0), F.ACT, 0, `${name} fast: action hold still shows`);
+  eq(pose(sp, true, false, false, false, true, H.NONE, FAST, 0.5, 0), F.PREGNANT, 0, `${name} fast pregnant glides in pregnant pose`);
+  check(pose(sp, true, false, false, false, false, H.NONE, Infinity, 0.5, 0).length === 2, 'paused (infinite step) still poses');
+}
+// Winded is the wolf's only.
+eq(pose(1, false, false, true, true, false, H.NONE, SLOW, 0, 0), F.WINDED, 0, 'winded wolf resting');
+eq(pose(1, false, false, false, true, false, H.NONE, SLOW, 0, 0), F.WINDED, 0, 'winded wolf standing');
+eq(pose(0, false, false, true, true, false, H.NONE, SLOW, 0, 0), F.REST, 0, 'bunny never shows winded');
+// Lean bitmaps: top rows shifted right by one, the rest unchanged.
+B.grass.forEach((m, i) => m.forEach((row, j) => {
+  const want = j < 4 ? '.' + row.slice(0, 7) : row;
+  check(B.grassLean[i][j] === want, `grass lean ${i} row ${j}`);
+}));
+// Gust band: one gust per period; inside the band leans, outside doesn't, between gusts none.
+{
+  const x = 40, y = 10, every = 25, speed = 18, width = 5;
+  // The front reaches this tile at tIn and the band's tail clears it at tOut.
+  const pos = x + y * 0.5, tIn = pos / speed, tOut = (pos + width) / speed;
+  check(AS.grassLeans(x, y, tIn + 0.01), 'tile inside the gust band leans');
+  check(!AS.grassLeans(x, y, tOut + 0.01), 'tile behind the band does not lean');
+  check(!AS.grassLeans(x, y, tIn - 0.05), 'tile ahead of the band does not lean');
+  check(AS.grassLeans(x, y, tIn + 0.01 + every), 'the gust repeats each period');
+  let leaning = 0;
+  for (let c = 0; c < every; c += 0.05) if (AS.grassLeans(x, y, c)) leaning++;
+  check(leaning > 0 && leaning * 0.05 < 2 * (width / speed) + 0.2, `a tile leans only briefly per period (${leaning * 0.05}s)`);
 }
 // Idle offsets spread over the period.
 const offs = new Set();

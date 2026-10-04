@@ -21,7 +21,7 @@ class El {
   fire(t, e = {}) { (this.listeners[t] || []).forEach(f => f(e)); }
   all(p, out = []) { if (p(this)) out.push(this); this.children.forEach(c => c.all(p, out)); return out; }
 }
-function build(debug) {
+function build(debug, extra = {}) {
   const ids = { hud: new El('div'), errors: new El('div'), inspector: new El('aside'), graph: new El('aside') };
   ids.graph._hidden = true;
   ids.errors._hidden = true; ids.inspector._hidden = true;
@@ -32,7 +32,7 @@ function build(debug) {
   vm.runInContext(fs.readFileSync(require('path').join(__dirname, '../js/ui.js'), 'utf8'), ctx);
   const calls = [], tools = [];
   const speeds = [0, 1, 2, 5, 20, Infinity];
-  const ui = ctx.AS.UI({ debug, speeds, onSpeed: i => calls.push(i), onDebugTool: m => tools.push(m), onCloseInspector: () => calls.push('closed'), onBench: () => calls.push('bench'), onGraph: () => calls.push('graph') });
+  const ui = ctx.AS.UI({ debug, speeds, onSpeed: i => calls.push(i), onDebugTool: m => tools.push(m), onCloseInspector: () => calls.push('closed'), onBench: () => calls.push('bench'), onGraph: () => calls.push('graph'), ...extra });
   return { ui, ids, doc, calls, tools };
 }
 const btns = (ids) => ids.hud.all(e => e.tagName === 'BUTTON' && e.className.includes('hud-btn') && !e.className.split(' ').includes('hud-tool'));
@@ -148,5 +148,15 @@ const input = { speedIndex: 1, achieved: 1, day: 3.24, seed: 1234567, counts: { 
   const w = writes; ids.graph._hidden = true; ui.hud(input); assert.strictEqual(writes, w); ok('Graph state read causes no writes when unchanged');
   ui.lock(true); assert(g.disabled === true); calls.length = 0; g.fire('click'); assert.strictEqual(calls.length, 0); ok('Graph button disabled and inert when locked');
   ui.lock(false); assert(g.disabled === false);
+}
+{ const { ids, calls } = build(false, { onLines: on => calls.push('lines:' + on) });
+  const l = ids.hud.all(e => e.className.split(' ').includes('hud-lines'))[0];
+  assert(l && l.textContent === 'Lines'); assert(!l.classList.contains('on')); ok('Lines button starts off when lines is not set');
+  l.fire('click'); assert(l.classList.contains('on')); l.fire('click'); assert(!l.classList.contains('on'));
+  assert.deepStrictEqual(calls, ['lines:true', 'lines:false']); ok('Lines button toggles and reports its state');
+}
+{ const { ids } = build(false, { onLines() {}, lines: true });
+  const l = ids.hud.all(e => e.className.split(' ').includes('hud-lines'))[0];
+  assert(l.classList.contains('on')); ok('Lines button starts on when the saved choice is on');
 }
 console.log('all passed');

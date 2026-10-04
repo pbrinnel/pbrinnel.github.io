@@ -1,6 +1,7 @@
 // The HUD strip over the map, and the page that replaces the sim when the tables are bad.
 //
-// AS.UI({ debug, speeds, onSpeed(i), onDebugTool(mode), onBench(), onGraph() }) → ui
+// AS.UI({ debug, speeds, onSpeed(i), onDebugTool(mode), onBench(), onGraph(),
+//         lines (initial on/off), onLines(on) }) → ui
 //   ui.hud({ speedIndex, achieved, day, seed, counts: { bunnies, wolves, blades, corpses } })
 //   ui.errors(errors, warnings)   the sim didn't start; show why
 //   ui.warnings(warnings)         the sim started; say quietly what the CSVs have extra
@@ -50,7 +51,7 @@
   }
 
   AS.UI = function (opts) {
-    const { debug, speeds, onSpeed, onDebugTool, onCloseInspector, onBench, onGraph } = opts;
+    const { debug, speeds, onSpeed, onDebugTool, onCloseInspector, onBench, onGraph, onLines } = opts;
     const hudEl = document.getElementById('hud');
     const errorsEl = document.getElementById('errors');
     const inspEl = document.getElementById('inspector');
@@ -107,6 +108,21 @@
       graphBtn.title = 'Population over the whole run';
       graphBtn.addEventListener('click', () => { if (!locked) onGraph(); graphBtn.blur(); });
       info.appendChild(graphBtn);
+    }
+
+    // Unlike Graph, the button owns its state: nothing else changes it.
+    let linesBtn = null;
+    if (onLines) {
+      let linesOn = !!opts.lines;
+      linesBtn = el('button', 'hud-bench hud-lines', 'Lines');
+      linesBtn.type = 'button';
+      linesBtn.title = 'Show every animal\'s line to what it is after (the selected animal\'s always shows)';
+      linesBtn.classList.toggle('on', linesOn);
+      linesBtn.addEventListener('click', () => {
+        if (!locked) { linesOn = !linesOn; linesBtn.classList.toggle('on', linesOn); onLines(linesOn); }
+        linesBtn.blur();
+      });
+      info.appendChild(linesBtn);
     }
 
     const warnBtn = el('button', 'hud-warn', '');
@@ -295,7 +311,7 @@
     // Disabling the buttons also dims them; the handlers check `locked` as well.
     function lock(on) {
       locked = !!on;
-      for (const b of [...buttons, benchBtn, graphBtn, ...toolButtons]) {
+      for (const b of [...buttons, benchBtn, graphBtn, linesBtn, ...toolButtons]) {
         if (b) b.disabled = locked;
       }
     }

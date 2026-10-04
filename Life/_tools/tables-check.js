@@ -90,7 +90,6 @@ bad('empty states file', { states: '' }, ['states.csv']);
 bad('empty variables file', { variables: '' }, ['variables.csv']);
 bad('Seed 4294967296', wE('Seed', '4294967296'), ['Seed']);
 bad('StartBunnies 1.5', wE('StartBunnies', '1.5'), ['StartBunnies']);
-bad('MarkFade 0', wE('MarkFade', '0'), ['MarkFade']);
 bad('settings row StartWolves deleted', { settings: dropRow(se, 'StartWolves') }, ['StartWolves']);
 bad('Bunny WanderRun "a-b"', sE('WanderRun', 'Bunny', 'a-b'), ['WanderRun', 'Bunny']);
 bad('Bunny HungryAt 150', sE('HungryAt', 'Bunny', '150'), ['HungryAt', 'Bunny']);
@@ -218,7 +217,6 @@ probe('StartBunnies 0, Wolves 0', { settings: editCSV(wE('StartBunnies', '0').se
 probe('StartGrass 0', wE('StartGrass', '0'), T => T.world.StartGrass);
 probe('StartGrass 100%, tiny overflow', wE('StartGrass', '100%'), T => T.world.StartGrass);
 probe('StartGrassAge > Lifespan 500', wE('StartGrassAge', '500'), T => T.world.StartGrassAge);
-probe('MarksPerSecond 0', wE('MarksPerSecond', '0'), T => T.world.MarksPerSecond);
 probe('WorldWidth 3 height 3 too tiny for animals', { settings: editCSV(wE('WorldWidth', '3').settings, 'WorldHeight', 'Value', '3') }, T => T.world);
 probe('Seed 0', wE('Seed', '0'), T => T.world.Seed);
 probe('Seed "0012"', wE('Seed', '0012'), T => T.world.Seed);

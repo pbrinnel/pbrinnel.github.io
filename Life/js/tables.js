@@ -74,8 +74,6 @@
     ['StartGrass', 'frac'],
     ['StartGrassAge', 'num'],
     ['Seed', 'seed'],
-    ['MarksPerSecond', 'num'],
-    ['MarkFade', 'pos'],
   ];
 
   // RFC 4180-style: quoted fields, doubled quotes, CRLF, and the BOM a spreadsheet may add.

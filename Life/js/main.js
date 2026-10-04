@@ -17,6 +17,7 @@
   const PICK_RADIUS = 0.75;
   // The inspector refreshes this often; a new selection shows at once.
   const INSPECT_EVERY_MS = 100;
+  const LINES_KEY = 'life-intent-lines';
 
   const debug = new URLSearchParams(location.search).has('debug');
   let speedIndex = START_SPEED;
@@ -29,6 +30,9 @@
   let inspected = 0, inspectedAt = 0;   // serial last shown in the inspector, and when
   let tool = 'select';
   let sel = null;
+  // Intent lines are the viewer's choice, kept per browser; off when storage is unavailable.
+  let linesOn = false;
+  try { linesOn = localStorage.getItem(LINES_KEY) === '1'; } catch (e) { /* stays off */ }
   let graph = null;   // made once the tables load; the HUD button may exist before that
 
   const ui = AS.UI({
@@ -39,6 +43,11 @@
     onCloseInspector: () => { sel = null; },
     onBench: () => AS.runBench(AS.app),
     onGraph: () => { if (graph) graph.toggle(); },
+    lines: linesOn,
+    onLines: on => {
+      linesOn = on;
+      try { localStorage.setItem(LINES_KEY, on ? '1' : '0'); } catch (e) { /* the choice just isn't kept */ }
+    },
   });
 
   try { await document.fonts.load(`32px ${AS.FONT}`, 'αΩ░▒▓†'); } catch (e) { /* draws with a fallback */ }
@@ -70,8 +79,6 @@
   const cam = AS.Camera(canvas, sim.W);
   const sheet = AS.SpriteSheet(T);
   const renderer = AS.Renderer(canvas);
-  // Marks follow the sim on their own: a swapped-in world restarts their event cursor.
-  const marks = AS.Marks(T);
   graph = AS.Graph(T);
 
   // A tap picks an animal by where its sprite is drawn: mid-step it's between the tile it
@@ -160,7 +167,8 @@
     const alpha = speed === Infinity ? 1 : acc / AS.DT;
     const t1 = performance.now();
     const live = liveSelection();
-    renderer.draw(sim, cam, sheet, live, alpha, marks, now);
+    renderer.setIntentLines(linesOn);
+    renderer.draw(sim, cam, sheet, live, alpha, now, speed);
     const shown = live ? live.serial : 0;
     if (shown !== inspected || now - inspectedAt >= INSPECT_EVERY_MS) {
       ui.inspector(AS.describe(sim, live));

@@ -51,8 +51,9 @@ The goal is a self-sustaining ecosystem (DESIGN.md, top).
   `_tools/run-bench.js`, which drive a real windowed Chrome.
 - Verify on a phone-sized viewport as well as desktop; phone is a target. Paul's phone is an
   iPhone; Safari is the browser to judge it by (Firefox on iOS caps pages at 30 fps).
-- Event marks (bites, births, deaths, grazing) fade and are capped per second. Never strobe
-  or flash.
+- Never strobe or flash. Event poses (a bite, a mouthful, a death) hold for a minimum of
+  real time, and legs stop cycling when the sim runs too fast to show steps (DESIGN.md,
+  "Photosensitivity").
 - Colors in charts are validated for color-blind readers (MAP.md, "Colors"); don't swap
   them by eye.
 - American spelling in text and comments.

@@ -11,9 +11,8 @@
   AS.TICKS_PER_HOUR = AS.TICK_HZ * AS.DAY_SECONDS / 24;
   if (!Number.isInteger(AS.TICKS_PER_HOUR)) throw new Error('TICK_HZ × DAY_SECONDS must divide into 24 hours');
 
-  // Event marks, written by the sim, read by marks.js. A ring: readers keep their own cursor.
-  // GRAZE is a bunny biting grass: marked smaller and fainter, and the first dropped when
-  // marks are rationed (DESIGN.md).
+  // Events, written by the sim, read by render.js (which acts them out as poses). A ring:
+  // readers keep their own cursor. GRAZE is a bunny biting grass, or a wolf chewing it.
   AS.EV = Object.freeze({ BITE: 1, BIRTH: 2, DEATH: 3, GRAZE: 4 });
   const EVENT_RING = 4096;
 

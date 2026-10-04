@@ -15,8 +15,8 @@
   // Animals this far outside the view still draw, so one gliding in is never cut off.
   const VIEW_MARGIN = 1;
 
-  // Faint lines from each animal to what it is after (sprite mode only).
-  const INTENT_LINES = true;
+  // Faint lines from each animal to what it is after (sprite mode only). Off until the
+  // viewer turns them on; the selected animal's own line shows either way.
   const INTENT_ALPHA = 0.5;
   // Drawn twice, a wider background-colored stroke under the colored one, so a line reads
   // over bright grass as well as black ground.
@@ -34,7 +34,15 @@
   const FAR_CORPSE = abgr('#6a6250'), FAR_GROUND = abgr('#121410');
   const FAR_ANIMAL = [['#e0a868', '#f2cc96'], ['#8fb2e0', '#c0d6f2']].map(r => r.map(abgr));   // [species][sex]
 
-  const KIND = AS.KIND;
+  // Real time an event holds a pose, whatever the speed, so nothing flickers (DESIGN.md,
+  // Photosensitivity): a death's fallen sprite, a bite's flinch, a mouthful or bite, a birth's hop.
+  const DEATH_HOLD_MS = 700, FLINCH_HOLD_MS = 300, ACTION_HOLD_MS = 300, BIRTH_HOLD_MS = 400;
+  // Events this many tiles outside the view are skipped: nobody sees them.
+  const EVENT_MARGIN = 2;
+  // A bite timer that rose by more than this since the last frame means a bite landed.
+  const BITE_RISE = 1e-6;
+
+  const KIND = AS.KIND, EV = AS.EV, HOLD = AS.SPRITE_HOLD, FRAME = AS.SPRITE_FRAME;
 
   // How far through its current step an animal is, 0–1. alpha is how far real time is
   // between the last tick and the next, so a step glides smoothly at any speed.
@@ -51,6 +59,94 @@
     let clock = 0;                     // this frame's sim time in seconds, for the idle fidget
     const posed = new Float64Array(2); // scratch for spritePose: frame, lift
     const facing = AS.SpriteFacing();
+    let intentLines = false;
+    let stepSpeed = 1;                 // sim seconds per real second this frame (0 = paused)
+    // Per-slot event holds, in real ms: which pose, until when, for which animal (serial).
+    let holdKind = new Uint8Array(0), holdUntil = new Float64Array(0), holdSerial = new Uint32Array(0);
+    // Per-slot memory for spotting a bite: the timer last frame, and the last frame the
+    // animal was drawn (a gap means the timer is stale, so it can't count as a bite).
+    let prevBite = new Float64Array(0), seenFrame = new Int32Array(0), seenSerial = new Uint32Array(0);
+    let frameNo = 0;
+    // When each tile's death pose ends, real ms; the corpse there shows the fallen animal until then.
+    let deathUntil = new Float64Array(0);
+    let evSim = null, evCursor = 0;
+    // State ids by species, from states.csv names, for the poses that depend on what it is doing.
+    let statesFor = null;
+    const restState = [new Uint8Array(256), new Uint8Array(256)];
+    const mateState = [new Uint8Array(256), new Uint8Array(256)];
+
+    function growSlots(W) {
+      if (holdKind.length >= W.aCap) return;
+      const n = W.aCap;
+      const grow = (old, C) => { const a = new C(n); a.set(old); return a; };
+      holdKind = grow(holdKind, Uint8Array); holdUntil = grow(holdUntil, Float64Array);
+      holdSerial = grow(holdSerial, Uint32Array); prevBite = grow(prevBite, Float64Array);
+      seenFrame = grow(seenFrame, Int32Array); seenSerial = grow(seenSerial, Uint32Array);
+    }
+
+    function startHold(W, a, kind, nowMs, ms) {
+      holdKind[a] = kind; holdUntil[a] = nowMs + ms; holdSerial[a] = W.aSerial[a];
+    }
+
+    function buildStates(T) {
+      statesFor = T;
+      for (let sp = 0; sp < 2; sp++) {
+        restState[sp].fill(0); mateState[sp].fill(0);
+        const list = T.states[AS.SPECIES_KEY[sp]];
+        for (let i = 0; i < list.length; i++) {
+          if (list[i].name === 'REST' || list[i].name === 'GIVE_UP') restState[sp][i] = 1;
+          if (list[i].name === 'MATE') mateState[sp][i] = 1;
+        }
+      }
+    }
+
+    // The animal on tile `t` next to `tile` whose bite timer is running and whose target is
+    // `tile`: who just bit or grazed there. Catches bites that a fast frame's timer misses.
+    const nbAt = new Int32Array(4);
+    function markBiter(W, tile, species, nowMs) {
+      const k = W.neighbors4(tile, nbAt);
+      for (let i = 0; i < k; i++) {
+        const n = nbAt[i];
+        if (W.kind[n] !== (species ? KIND.WOLF : KIND.BUNNY)) continue;
+        const a = W.aSlot[n];
+        if (W.aTargetTile[a] === tile && W.aBiteLeft[a] > 0) startHold(W, a, HOLD.ACTION, nowMs, ACTION_HOLD_MS);
+      }
+    }
+
+    // Reads the sim's new events into holds. A different sim (benchmark, reload) restarts
+    // the cursor, and an overrun of the ring reads only what is left of it.
+    function consumeEvents(sim, cam, nowMs) {
+      const W = sim.W, ev = sim.events;
+      growSlots(W);
+      if (evSim !== sim || ev.written < evCursor) {
+        evSim = sim;
+        evCursor = ev.written;
+        holdKind.fill(0); seenFrame.fill(0);
+        deathUntil = new Float64Array(W.n);
+        return;
+      }
+      if (ev.written - evCursor > ev.size) evCursor = ev.written - ev.size;
+      const v = cam.visible();
+      for (; evCursor < ev.written; evCursor++) {
+        const i = evCursor % ev.size, tile = ev.tile[i];
+        const x = tile % W.w, y = (tile / W.w) | 0;
+        if (x < v.x0 - EVENT_MARGIN || x > v.x1 + EVENT_MARGIN ||
+            y < v.y0 - EVENT_MARGIN || y > v.y1 + EVENT_MARGIN) continue;
+        switch (ev.type[i]) {
+          case EV.DEATH: deathUntil[tile] = nowMs + DEATH_HOLD_MS; break;
+          case EV.BITE:
+            if (W.kind[tile] === KIND.BUNNY) startHold(W, W.aSlot[tile], HOLD.FLINCH, nowMs, FLINCH_HOLD_MS);
+            markBiter(W, tile, 1, nowMs);
+            break;
+          case EV.GRAZE: markBiter(W, tile, 0, nowMs); break;
+          case EV.BIRTH:
+            if (W.kind[tile] === KIND.BUNNY || W.kind[tile] === KIND.WOLF) {
+              startHold(W, W.aSlot[tile], HOLD.BIRTH, nowMs, BIRTH_HOLD_MS);
+            }
+            break;
+        }
+      }
+    }
 
     function sizeCanvas() {
       const dpr = window.devicePixelRatio || 1;
@@ -101,7 +197,7 @@
       cell.ctx.putImageData(cell.img, 0, 0);
     }
 
-    function drawSprites(sim, cam, sheet, dpr) {
+    function drawSprites(sim, cam, sheet, sel, dpr, nowMs) {
       const W = sim.W, v = cam.visible();
       if (v.x1 < v.x0 || v.y1 < v.y0) return;
       const s = cam.scale * dpr;
@@ -118,26 +214,52 @@
         for (let tx = v.x0; tx <= v.x1; tx++) {
           const k = kind[row + tx];
           let id;
-          if (k === KIND.GRASS) id = AS.spriteGrass(AS.grassGlyph(size[row + tx]) - AS.GLYPH.GRASS_0);
-          else if (k === KIND.CORPSE) id = AS.SPRITE_CORPSE;
-          else continue;   // empty, or an animal (own pass)
+          if (k === KIND.GRASS) {
+            const third = AS.grassGlyph(size[row + tx]) - AS.GLYPH.GRASS_0;
+            id = AS.grassLeans(tx, ty, nowMs / 1000) ? AS.spriteGrassLean(third) : AS.spriteGrass(third);
+          }
+          else if (k === KIND.CORPSE) {
+            // A fresh death shows the animal fallen, in place of the bones.
+            id = nowMs < deathUntil[row + tx]
+              ? AS.spriteIndex(W.cSpecies[row + tx], 0, AS.STAGE.ADULT, 0, FRAME.DEAD) : AS.SPRITE_CORPSE;
+          } else continue;   // empty, or an animal (own pass)
           const dx = Math.round(tx * s - ox), dw = Math.round((tx + 1) * s - ox) - dx;
           ctx.drawImage(img, sh.sx(id), sh.sy(id), px, px, dx, dy, dw, dh);
         }
       }
-      if (INTENT_LINES) drawIntent(sim, v, s, ox, oy, dpr);
+      if (intentLines) drawIntent(sim, v, s, ox, oy, dpr, -1);
+      else if (sel && sel.slot >= 0 && W.aAlive[sel.slot]) drawIntent(sim, v, s, ox, oy, dpr, sel.slot);
       // Animals, over the ground. Slots are stable, so this is one pass over the used range.
       const aAlive = W.aAlive, alpha = curAlpha;
       const unit = px / AS.SPRITE_SIZE;   // one sprite pixel, in device px
+      const serials = W.aSerial, aState = W.aState, biteLeft = W.aBiteLeft;
       for (let a = 0, hiSlot = W.aHigh; a < hiSlot; a++) {
         if (!aAlive[a]) continue;
         animalPos(W, a, alpha, pos);
         const ax = pos[0], ay = pos[1];
         if (ax < v.x0 - VIEW_MARGIN || ax > v.x1 + VIEW_MARGIN ||
             ay < v.y0 - VIEW_MARGIN || ay > v.y1 + VIEW_MARGIN) continue;
-        const sp = W.aSpecies[a];
+        const sp = W.aSpecies[a], serial = serials[a];
         const p = AS.glideProgress(W.aStepLeft[a], W.aStepDur[a], alpha);
-        AS.spritePose(sp, W.aTile[a] !== W.aFrom[a] && p < 1, p, clock + AS.spriteIdleOffset(W.aSerial[a]), posed);
+        const moving = W.aTile[a] !== W.aFrom[a] && p < 1;
+        // A bite timer that rose since the last frame is a bite or a mouthful.
+        if (seenFrame[a] === frameNo - 1 && seenSerial[a] === serial && biteLeft[a] > prevBite[a] + BITE_RISE) {
+          startHold(W, a, HOLD.ACTION, nowMs, ACTION_HOLD_MS);
+        }
+        seenFrame[a] = frameNo; seenSerial[a] = serial; prevBite[a] = biteLeft[a];
+        const st = aState[a];
+        // Mating partners face each other.
+        if (!moving && mateState[sp][st]) {
+          const tt = W.aTargetTile[a];
+          if (tt >= 0) {
+            const dx = tt % W.w - W.aTile[a] % W.w, dy = ((tt / W.w) | 0) - ((W.aTile[a] / W.w) | 0);
+            if (dx * dx + dy * dy === 1 && dx !== 0) facing.turn(a, dx < 0 ? 1 : 0);
+          }
+        }
+        const hold = holdSerial[a] === serial && nowMs < holdUntil[a] ? holdKind[a] : HOLD.NONE;
+        const stepMs = stepSpeed > 0 ? W.aStepDur[a] * 1000 / stepSpeed : Infinity;
+        AS.spritePose(sp, moving, W.aSprint[a] === 1, restState[sp][st] === 1, W.aWinded[a] === 1,
+          W.aPregnant[a] > 0, hold, stepMs, p, clock + AS.spriteIdleOffset(serial), posed);
         const id = AS.spriteIndex(sp, W.aSex[a], stageOf(sim, a, W), facing.left(a), posed[0]);
         // Lift in whole sprite pixels, so the body hops in the art's own grid.
         ctx.drawImage(img, sh.sx(id), sh.sy(id), px, px,
@@ -147,14 +269,15 @@
     }
 
     // One path per species-and-sex color, one stroke each: there may be thousands of lines.
-    function drawIntent(sim, v, s, ox, oy, dpr) {
+    // only >= 0 draws just that slot's line.
+    function drawIntent(sim, v, s, ox, oy, dpr, only) {
       const W = sim.W, alpha = curAlpha, half = s / 2;
       const line = INTENT_CSS_PX * dpr, halo = INTENT_HALO_CSS_PX * dpr;
       ctx.globalAlpha = INTENT_ALPHA;
       for (let grp = 0; grp < 4; grp++) {
         ctx.beginPath();
         let any = false;
-        for (let a = 0, hiSlot = W.aHigh; a < hiSlot; a++) {
+        for (let a = only >= 0 ? only : 0, hiSlot = only >= 0 ? only + 1 : W.aHigh; a < hiSlot; a++) {
           if (!W.aAlive[a] || (W.aSpecies[a] << 1 | W.aSex[a]) !== grp) continue;
           const tt = W.aTargetTile[a];
           if (tt < 0) continue;
@@ -196,10 +319,18 @@
     }
 
     return {
-      // sel: null or { tile, serial, slot }; alpha: 0–1 through the current tick.
-      // marks (optional): an AS.Marks; nowMs: real time (performance.now()), for the marks.
-      draw(sim, cam, sheet, sel, alpha, marks, nowMs) {
+      setIntentLines(on) { intentLines = !!on; },
+      get intentLines() { return intentLines; },
+      // sel: null or { tile, serial, slot }; alpha: 0–1 through the current tick; nowMs: real
+      // time (performance.now()), which the event holds run on; speed: the sim speed asked
+      // for (0 paused, Infinity max), to tell when steps are too short to animate.
+      draw(sim, cam, sheet, sel, alpha, nowMs, speed) {
         const dpr = sizeCanvas();
+        nowMs = nowMs || 0;
+        stepSpeed = speed === undefined ? 1 : speed;
+        if (statesFor !== sim.T) buildStates(sim.T);
+        frameNo++;
+        consumeEvents(sim, cam, nowMs);
         curAlpha = alpha;
         clock = (sim.tickCount + alpha) * AS.DT;
         facing.update(sim.W);
@@ -207,7 +338,7 @@
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         const s = cam.scale * dpr;
         if (cam.scale >= CELL_PX) {
-          drawSprites(sim, cam, sheet, dpr);
+          drawSprites(sim, cam, sheet, sel, dpr, nowMs);
         } else {
           fillCells(sim);
           const W = sim.W;
@@ -215,7 +346,6 @@
           ctx.drawImage(cell.canvas, 0, 0, W.w, W.h, -cam.x * s, -cam.y * s, W.w * s, W.h * s);
           ctx.imageSmoothingEnabled = true;
         }
-        if (marks) { marks.consume(sim, nowMs, cam); marks.draw(ctx, sim, cam, dpr, nowMs); }
         if (sel) drawSelection(sim, cam, sel, dpr);
       },
     };

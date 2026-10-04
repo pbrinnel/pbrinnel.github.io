@@ -5,7 +5,7 @@
 //
 // Bitmaps face right; a left-facing sprite is painted mirrored into its own sheet slot, so
 // the renderer never flips at draw time. Codes: x base color, d darker (shade), w lighter
-// (highlight), e eye, y amber eye, n nose, f fang. Colors come from AS.COLORS (glyphs.js),
+// (highlight), e eye, y amber eye, n nose, f fang, p pink (tongue). Colors come from AS.COLORS (glyphs.js),
 // so the species and sexes still read the same as the HUD.
 //
 // The sheet is DOM-free until a canvas is asked for, so Node checks can load this file for
@@ -16,17 +16,34 @@
   const SIZE = 8;   // bitmap rows and columns
 
   // ---- bitmaps ----------------------------------------------------------------------
-  // Bunny: sit (standing), stretch (mid-hop), ear (idle fidget).
+  // Frames, in the order every species lists them (FRAME below names the slots): stand,
+  // walk, idle fidget, act (bunny eats, wolf bites), runA, runB, rest, winded, dead,
+  // pregnant. A bunny never shows winded, so its slot repeats rest and the sheet keeps one
+  // shape for both species.
+  const BUNNY_REST = ['........', '........', '........', '....xxx.', '.xxxxxxx', 'wxxxxxex', 'xxxxxxxx', '.d....d.'];
   const BUNNY = [
     ['.....x..', '.....xx.', '.....xx.', '..xxxxxx', '.xxxxxex', 'wxxxxxx.', '.xxxxxx.', '..d..dd.'],
     ['......x.', '.....xx.', '.....xx.', '.xxxxxxx', 'wxxxxxex', '.xxxxxx.', 'dd....dd', '........'],
     ['......x.', '.....x..', '.....xx.', '..xxxxxx', '.xxxxxex', 'wxxxxxx.', '.xxxxxx.', '..d..dd.'],
+    ['........', '........', '..xxxx..', '.xxxxxxx', 'wxxxxxxx', '.xxxxxex', '.xxxxxxn', '..d..dd.'],
+    ['........', '...xx...', '....xx..', '.xxxxxxx', 'wxxxxxex', '.xxxxxx.', 'd.....dd', '........'],
+    ['........', '...xx...', '....xx..', '.xxxxxxx', 'wxxxxxex', '.xxxxxx.', '..dd.d..', '...d.d..'],
+    BUNNY_REST,
+    BUNNY_REST,
+    ['........', '........', '..d..d..', '.xxxxxx.', 'wxxxxxxx', '.xxxxxxx', '......xx', '........'],
+    ['.....x..', '.....xx.', '.....xx.', '..xxxxxx', '.xxxxxex', 'wxxxxxxx', 'xxwwwwx.', '.dd..dd.'],
   ];
-  // Wolf: stand, stride (legs apart), wag (tail up, idle).
   const WOLF = [
     ['.....x.x', '.....xxx', 'd...xxyx', '.dxxxxxn', '..xxxxx.', '..xwwxx.', '..d.d.d.', '..d.d.d.'],
     ['.....x.x', '.....xxx', 'd...xxyx', '.dxxxxxn', '..xxxxx.', '..xwwxx.', '.d..d..d', 'd...d...'],
     ['.....x.x', 'd....xxx', '.d..xxyx', '..xxxxxn', '..xxxxx.', '..xwwxx.', '..d.d.d.', '..d.d.d.'],
+    ['........', '.....x.x', 'd....xxx', '.dxxxxyx', '..xxxxxn', '..xwwx.f', '.d..d..d', 'd....d..'],
+    ['........', '....xx..', 'd...xxyx', 'dxxxxxxn', '.xxxxxx.', '.xwwxx..', 'dd....dd', '........'],
+    ['........', '....xx..', 'd...xxyx', 'dxxxxxxn', '.xxxxxx.', '.xwwxx..', '..ddd...', '..d.d...'],
+    ['........', '........', '........', '.....x.x', '.....xxx', 'd...xxyx', 'dxxxxxxn', '.xxxxxdd'],
+    ['........', '........', '........', '.....x.x', '.....xxx', 'd...xxyx', 'dxxxxxxn', '.xxxxxdp'],
+    ['........', '........', '..d.d.d.', '.xxxxxx.', 'dxxxxxxx', '.xwwxxxx', '.....xdx', '.....x.x'],
+    ['.....x.x', '.....xxx', 'd...xxyx', '.dxxxxxn', '.xxxxxx.', '.xwwwwx.', '..d.d.d.', '..d.d.d.'],
   ];
   const CORPSE_BITMAP =
     ['........', '........', '.x....x.', 'xx....xx', '.xxxxxx.', 'xx....xx', '.x....x.', '........'];
@@ -36,16 +53,19 @@
     ['........', '........', '..x..x..', '...x.x..', '.x.x.x..', '..xx.xx.', '..xxxx..', '...dd...'],
     ['.x...x..', '..x.x..x', 'x.x.x.x.', '.xx.xxx.', '.x.xx.x.', 'xx.xx.xx', '.xxxxxx.', '..dddd..'],
   ];
-  const BITMAPS = { bunny: BUNNY, wolf: WOLF, corpse: CORPSE_BITMAP, grass: GRASS_BITMAPS };
+  // A gust leans a tuft: its top LEAN_ROWS rows shift one pixel right, the roots stay put.
+  const LEAN_ROWS = 4;
+  const GRASS_LEAN = GRASS_BITMAPS.map(m => m.map((row, j) => (j < LEAN_ROWS ? '.' + row.slice(0, SIZE - 1) : row)));
+  const BITMAPS = { bunny: BUNNY, wolf: WOLF, corpse: CORPSE_BITMAP, grass: GRASS_BITMAPS, grassLean: GRASS_LEAN };
   AS.SPRITE_BITMAPS = BITMAPS;
-  AS.SPRITE_CODES = 'xdweynf';
+  AS.SPRITE_CODES = 'xdweynfp';
   AS.SPRITE_SIZE = SIZE;
 
   // ---- palette ----------------------------------------------------------------------
   const GRASS_COLORS = ['#4f7a3c', '#5e9a46', '#7fc06a'];
   const SHADE_DARK = 0.6, SHADE_LIGHT = 1.35;
   const ELDER_BRIGHTNESS = 0.72;
-  const EYE = '#141210', AMBER = '#e8b84a', NOSE = '#1a1a1e', FANG = '#f2ece0';
+  const EYE = '#141210', AMBER = '#e8b84a', NOSE = '#1a1a1e', FANG = '#f2ece0', TONGUE = '#d99a9a';
   // Babies and corpses are drawn smaller than a tile, bottom-centered.
   const BABY_SCALE = 0.6, CORPSE_SCALE = 0.8;
   // Smallest edge of a scaled sprite, in px, so it never vanishes at tiny tile sizes.
@@ -59,45 +79,76 @@
   }
 
   // ---- animation --------------------------------------------------------------------
-  // Per species: the frame shown across each equal slice of a step (cycle), how many sprite
-  // pixels the body rises in that slice (lift), and the frame used while fidgeting (idle).
-  // Frame 0 is the standing pose.
+  const FRAME = AS.SPRITE_FRAME = Object.freeze({
+    STAND: 0, WALK: 1, IDLE: 2, ACT: 3, RUN_A: 4, RUN_B: 5, REST: 6, WINDED: 7, DEAD: 8, PREGNANT: 9,
+  });
+  // What an event is holding an animal in, set by the renderer and lasting a fixed span of
+  // real time: a flinch from a bite, a mouthful or a bite of its own, a birth's hop.
+  const HOLD = AS.SPRITE_HOLD = Object.freeze({ NONE: 0, FLINCH: 1, ACTION: 2, BIRTH: 3 });
+  // Per species: the frame shown across each equal slice of a walking step (cycle), how many
+  // sprite pixels the body rises in that slice (lift), and the frame used while fidgeting.
   const ANIM = [
-    { cycle: [1, 1, 0], lift: [1, 1, 0], idle: 2 },          // bunny: hops
-    { cycle: [1, 1, 0, 0], lift: [0, 1, 0, 0], idle: 2 },    // wolf: strides, bobs once
+    { cycle: [1, 1, 0], lift: [1, 1, 0], idle: FRAME.IDLE },          // bunny: hops
+    { cycle: [1, 1, 0, 0], lift: [0, 1, 0, 0], idle: FRAME.IDLE },    // wolf: strides, bobs once
   ];
-  const FRAMES = 3;                 // frames per species in the sheet
+  // A sprint's step is two halves: legs out and airborne, then gathered.
+  const RUN_CYCLE = [FRAME.RUN_A, FRAME.RUN_B], RUN_LIFT = [1, 0];
+  const FRAMES = 10;                // frames per species in the sheet
   const IDLE_PERIOD = 4;            // seconds between an idle animal's fidgets
   const IDLE_LEN = 0.35;            // seconds each fidget lasts
   const HASH_MUL = 2654435761;      // Knuth's multiplicative hash, to spread serials
+  // A step shorter than this in real time (fast speeds) would flicker the legs, so the
+  // animal glides in its standing pose instead (DESIGN.md, Photosensitivity).
+  const MIN_STEP_REAL_MS = AS.SPRITE_MIN_STEP_MS = 180;
 
   // Each animal's idle clock starts at its own offset, so a crowd doesn't fidget in unison.
   AS.spriteIdleOffset = serial => ((Math.imul(serial, HASH_MUL) >>> 0) / 4294967296) * IDLE_PERIOD;
 
-  // Which frame and how many sprite pixels of lift for an animal of `species` that is (or
-  // isn't) mid-step, p (0-1) of the way through it, at idle clock `clock` seconds. Writes
-  // out[0] = frame, out[1] = lift.
-  AS.spritePose = function (species, moving, p, clock, out) {
+  // Which frame and how many sprite pixels of lift for an animal, by priority: an event's
+  // hold, then a sprint's run cycle, then a walk, then (standing) winded, resting,
+  // pregnant, an idle fidget, plain standing. stepMs is how long the current step lasts in
+  // real time (Infinity when paused); p (0-1) is how far through it; clock is the idle
+  // clock in seconds. Writes out[0] = frame, out[1] = lift. (A death is drawn by the
+  // renderer from the corpse, since the animal is gone by then.)
+  AS.spritePose = function (species, moving, sprinting, resting, winded, pregnant, hold, stepMs, p, clock, out) {
     const a = ANIM[species];
-    if (moving) {
-      const n = a.cycle.length, k = Math.min(n - 1, Math.floor(p * n));
-      out[0] = a.cycle[k]; out[1] = a.lift[k];
-    } else {
-      out[0] = clock % IDLE_PERIOD < IDLE_LEN ? a.idle : 0;
-      out[1] = 0;
+    out[1] = 0;
+    if (hold === HOLD.FLINCH) { out[0] = FRAME.RUN_A; return; }
+    if (hold === HOLD.ACTION) { out[0] = FRAME.ACT; return; }
+    if (hold === HOLD.BIRTH) { out[0] = FRAME.WALK; out[1] = 1; return; }
+    if (moving && stepMs >= MIN_STEP_REAL_MS) {
+      const cycle = sprinting ? RUN_CYCLE : a.cycle, lift = sprinting ? RUN_LIFT : a.lift;
+      const n = cycle.length, k = Math.min(n - 1, Math.floor(p * n));
+      out[0] = cycle[k]; out[1] = lift[k];
+      return;
     }
+    if (moving) { out[0] = pregnant ? FRAME.PREGNANT : FRAME.STAND; return; }
+    if (species === 1 && winded) { out[0] = FRAME.WINDED; return; }
+    if (resting) { out[0] = FRAME.REST; return; }
+    if (pregnant) { out[0] = FRAME.PREGNANT; return; }
+    out[0] = clock % IDLE_PERIOD < IDLE_LEN ? a.idle : FRAME.STAND;
   };
 
   // ---- sheet layout -----------------------------------------------------------------
   // Animals: ((((species*2+sex)*3+stage)*2+faceLeft)*FRAMES+frame), then the corpse, then
   // the three grass thirds.
   const ANIMAL_SPRITES = 2 * 2 * 3 * 2 * FRAMES;
-  const CORPSE = ANIMAL_SPRITES, GRASS0 = CORPSE + 1, COUNT = GRASS0 + 3;
+  const CORPSE = ANIMAL_SPRITES, GRASS0 = CORPSE + 1, LEAN0 = GRASS0 + 3, COUNT = LEAN0 + 3;
   const SHEET_COLS = 19;
   AS.SPRITE_COUNT = COUNT;
   AS.SPRITE_FRAMES = FRAMES;
   AS.SPRITE_CORPSE = CORPSE;
   AS.spriteGrass = third => GRASS0 + third;
+  AS.spriteGrassLean = third => LEAN0 + third;
+
+  // Wind: now and then a band sweeps diagonally across the meadow and tufts in it lean.
+  // `clock` is real seconds, so a gust looks the same at any sim speed. Grass otherwise
+  // stands still, so only animals draw the eye.
+  const GUST_EVERY = 25, GUST_SPEED = 18, GUST_WIDTH = 5;   // seconds, tiles/s, tiles
+  AS.grassLeans = function (x, y, clock) {
+    const front = (clock % GUST_EVERY) * GUST_SPEED - GUST_WIDTH, d = x + y * 0.5 - front;
+    return d >= 0 && d < GUST_WIDTH;
+  };
   AS.spriteIndex = (species, sex, stage, faceLeft, frame) =>
     (((species * 2 + sex) * 3 + stage) * 2 + faceLeft) * FRAMES + frame;
 
@@ -121,6 +172,9 @@
         }
       },
       left: a => left[a],
+      // Turns an animal toward whoever it is facing (a mate); it keeps that side until it
+      // steps sideways.
+      turn(a, toLeft) { left[a] = toLeft; },
     };
   };
 
@@ -131,7 +185,7 @@
     const off = ox + Math.floor((px - b) / 2), top = oy + px - b;
     const col = {
       x: base, d: shade(base, SHADE_DARK), w: shade(base, SHADE_LIGHT),
-      e: EYE, y: AMBER, n: NOSE, f: FANG,
+      e: EYE, y: AMBER, n: NOSE, f: FANG, p: TONGUE,
     };
     for (let j = 0; j < SIZE; j++) for (let i = 0; i < SIZE; i++) {
       const c = map[j][i];
@@ -168,7 +222,10 @@
         }
       }
       at(CORPSE, (x, y) => paint(g, x, y, px, CORPSE_BITMAP, AS.COLORS[AS.GLYPH.CORPSE], false, CORPSE_SCALE));
-      for (let i = 0; i < 3; i++) at(GRASS0 + i, (x, y) => paint(g, x, y, px, GRASS_BITMAPS[i], GRASS_COLORS[i], false, 1));
+      for (let i = 0; i < 3; i++) {
+        at(GRASS0 + i, (x, y) => paint(g, x, y, px, GRASS_BITMAPS[i], GRASS_COLORS[i], false, 1));
+        at(LEAN0 + i, (x, y) => paint(g, x, y, px, GRASS_LEAN[i], GRASS_COLORS[i], false, 1));
+      }
       return { canvas, px, sx: i => sx(i) * px, sy: i => sy(i) * px };
     }
 

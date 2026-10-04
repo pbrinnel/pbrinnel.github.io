@@ -236,7 +236,7 @@ html, body {
 .bench-subtitle { font-size: 14px; font-weight: normal; color: var(--hud-on); margin: 20px 0 0; }
 
 /* ---- Population graph ---- */
-.hud-graph.on { color: var(--bg); background: var(--hud-on); border-color: var(--hud-on); }
+.hud-graph.on, .hud-lines.on { color: var(--bg); background: var(--hud-on); border-color: var(--hud-on); }
 /* JS sets --hud-bottom to the strip's current height, as for the inspector. */
 #graph {
   position: fixed;

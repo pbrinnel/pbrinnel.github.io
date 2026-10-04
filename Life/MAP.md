@@ -38,10 +38,9 @@ load time: every file reads other files' `AS.*` inside functions, at call time.
 | `breed.js` | mating and births, shared by both species | `canMate`, `mate`, `tryBirth` |
 | `bunny.js`, `wolf.js` | each species' states, by the names in `states.csv` | (register via `AS.registerStates`) |
 | `glyphs.js` | glyph ids, palette, life stage, the pre-rendered glyph sheet | `GLYPH`, `COLORS`, `CELL_COLOR`, `GlyphSheet`, `stageOf`, … |
-| `sprites.js` | the 8×8 pixel-art sprites (bunny, wolf, corpse, grass) as bitmaps, the walk/idle pose rule, per-slot facing, and the pre-rendered sprite sheet | `SpriteSheet`, `spritePose`, `spriteIndex`, `SpriteFacing`, … |
+| `sprites.js` | the 8×8 pixel-art sprites (bunny, wolf, corpse, grass) as bitmaps (ten frames per animal: stand, walk, idle, eat/bite, runA, runB, rest, winded, dead, pregnant), the pose-priority rule (`spritePose`, pure), per-slot facing, and the pre-rendered sprite sheet | `SpriteSheet`, `spritePose`, `spriteIndex`, `SpriteFacing`, `SPRITE_FRAME`, `SPRITE_HOLD`, … |
 | `camera.js` | pan/zoom/pinch/wheel/keys, tap → tile | `Camera` |
-| `render.js` | draw: visible tiles from the sprite sheet, or cell mode zoomed out (its brighter far-view colors live at the top of render.js); animals glide; intent lines; selection | `Renderer`, `CELL_PX`, `glideProgress` |
-| `marks.js` | event marks: reads `sim.events`, rations per real second, fades | `Marks` |
+| `render.js` | draw: visible tiles from the sprite sheet, or cell mode zoomed out (its brighter far-view colors live at the top of render.js); animals glide and act out events (below); intent lines (off by default, the selected animal's always on); selection | `Renderer`, `CELL_PX`, `glideProgress` |
 | `inspect.js` | `variables.csv` → the inspector's rows for a selection | `describe`, `inspectWarnings` |
 | `graph.js` | the population graph panel (from `sim.history`) | `Graph`, `graphMath` |
 | `bench.js` | benchmark mode (grass series, animal series) | `runBench`, `benchMath` |
@@ -69,7 +68,7 @@ WOLF) is the truth about who is where. Tiles are `t = y * W.w + x`.
 
 **Who writes what.** Only `world.js`'s add/remove/move functions change `kind`, `aSlot` or
 the dense lists. Grass fields: grass.js. Corpse fields and `boostSrc`: corpse.js. Animal
-fields: animals.js, breed.js, bunny.js, wolf.js. Everything else (render, marks, inspect,
+fields: animals.js, breed.js, bunny.js, wolf.js. Everything else (render, inspect,
 graph, ui, bench) only reads.
 
 ## Time
@@ -101,9 +100,24 @@ graph, ui, bench) only reads.
   grass): both respect speed and one-thing-per-tile. Paths: `pathNext` (empty tiles only)
   and `pathNextWeighted` (cost per tile; wolves pay chew time for grass).
 - **Events:** `sim.emit(AS.EV.X, tile)` into a ring (`sim.events`): BITE, BIRTH, DEATH,
-  GRAZE (bunny grazing or wolf chewing). marks.js keeps its own cursor.
+  GRAZE (bunny grazing or wolf chewing). render.js keeps its own cursor and turns them into poses.
 - **History:** `sim.history` = `{ length, grass, bunnies, wolves }`, one sample per
   in-world hour (Uint32Arrays, doubling). The graph and the lab read it.
+
+## Sprite poses (render.js + sprites.js)
+
+The renderer reads the sim and never writes it. Each frame, `consumeEvents` reads the
+events since its cursor (a swapped-in sim or a ring overrun is handled like any reader's) and
+sets **holds**, in real ms (`performance.now()`, so a pose lasts the same at any speed):
+DEATH puts the fallen animal on that tile's corpse (`deathUntil`, per tile), BITE makes the
+bunny there flinch (runA), BIRTH hops the baby, and BITE/GRAZE mark the adjacent animal
+that targets that tile as biting or eating (ACTION). A bite is also spotted as an animal's
+`aBiteLeft` rising since the last frame it was drawn (the event route covers fast speeds
+where the timer has run down within a frame). `spritePose` picks the frame: hold, sprint run
+cycle, walk, winded/resting, pregnant, idle fidget, stand. Steps shorter than
+`SPRITE_MIN_STEP_MS` of real time (the `speed` passed to `draw`) glide in the standing pose.
+Mating animals face their partner. Grass leans in a rare gust (`grassLeans`, real seconds: a diagonal band, `GUST_EVERY` apart; sprite mode only, lean variants are extra sheet sprites). Cell mode still consumes events, so holds don't replay on
+zoom-in. Holds never flash: see DESIGN.md, Photosensitivity.
 
 ## Recipes
 
@@ -116,7 +130,7 @@ graph, ui, bench) only reads.
   grass / corpse / female) and a reader in inspect.js's `READERS`; without a reader the
   row shows "—" and a startup warning.
 - **A new animal field:** one line in `ANIMAL_FIELDS` (world.js); `addAnimal` zeroes it.
-- **A new event:** add to `AS.EV` (sim.js), emit it, give it a look in marks.js.
+- **A new event:** add to `AS.EV` (sim.js), emit it, give it a pose in render.js (`consumeEvents`) and sprites.js.
 
 ## Colors
 
