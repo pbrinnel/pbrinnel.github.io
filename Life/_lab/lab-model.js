@@ -81,7 +81,8 @@
   // kept all three species for the whole run.
   LAB.summarize = function (results) {
     const ok = results.filter(r => r && r.endReason && r.endReason !== 'error' && r.endReason !== 'canceled');
-    const count = { 'wolves extinct': 0, 'bunnies extinct': 0, 'grass extinct': 0, 'bunny boom': 0, survived: 0 };
+    const count = { 'wolves extinct': 0, 'bunnies extinct': 0, 'grass extinct': 0, 'bunny boom': 0,
+      'wolves declining': 0, 'grass collapsing': 0, survived: 0 };
     let frac = 0, days = 0;
     for (const r of ok) {
       count[r.endReason] = (count[r.endReason] || 0) + 1;
@@ -97,6 +98,8 @@
       survivalRate: n ? count.survived / n : 0,
       meanAllAliveDays: n ? days / n : 0,
       wolvesExtinct: count['wolves extinct'],
+      wolvesDeclining: count['wolves declining'],
+      grassCollapsing: count['grass collapsing'],
       bunniesExtinct: count['bunnies extinct'],
       grassExtinct: count['grass extinct'],
       booms: count['bunny boom'],

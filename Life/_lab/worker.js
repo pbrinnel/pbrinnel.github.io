@@ -2,7 +2,8 @@
 // result here is exactly what the page would do with the same tables and seed.
 //
 // In:  { type: 'init', v }                       load the sim files (?v=v)
-//      { type: 'run', id, texts, seed, days, bunnyCap, progressEvery }
+//      { type: 'run', id, texts, seed, days, bunnyCap, progressEvery, trendStops }
+//        trendStops: true ends a run as soon as its direction is clear (see TREND_*)
 //      { type: 'cancel', id }
 // Out: { type: 'ready' }
 //      { type: 'progress', id, day, grass, bunnies, wolves }   every progressEvery days
@@ -13,6 +14,15 @@ const SIM_FILES = ['tables', 'rng', 'world', 'grass', 'corpse', 'sim', 'sight', 
   'breed', 'bunny', 'wolf', 'glyphs'];
 
 let canceled = null;
+
+// Trend stops (Paul: "you can tell pretty quickly what way things are going"): after
+// TREND_SETTLE_DAYS, a run ends early when wolves have fallen below TREND_WOLF_SHARE of
+// their start and are lower than TREND_LOOKBACK_DAYS ago, or grass is below
+// TREND_GRASS_SHARE of its peak and still falling.
+const TREND_SETTLE_DAYS = 5;
+const TREND_LOOKBACK_DAYS = 3;
+const TREND_WOLF_SHARE = 0.5;
+const TREND_GRASS_SHARE = 0.1;
 
 self.onmessage = async e => {
   const m = e.data;
@@ -57,9 +67,12 @@ async function run(m) {
   };
   note(0);
 
+  const daily = { wolves: [W.wolves], grass: [W.gCount] };
   for (day = 1; day <= m.days; day++) {
     for (let i = 0; i < perDay; i++) sim.tick();
     note(day);
+    daily.wolves.push(W.wolves);
+    daily.grass.push(W.gCount);
     if (m.progressEvery && day % m.progressEvery === 0) {
       self.postMessage({ type: 'progress', id: m.id, day, grass: W.gCount, bunnies: W.bunnies, wolves: W.wolves });
     }
@@ -69,6 +82,11 @@ async function run(m) {
     if (W.bunnies === 0) { endReason = 'bunnies extinct'; break; }
     if (W.gCount === 0) { endReason = 'grass extinct'; break; }
     if (m.bunnyCap && W.bunnies > m.bunnyCap) { endReason = 'bunny boom'; break; }
+    if (m.trendStops && day >= TREND_SETTLE_DAYS && day >= TREND_LOOKBACK_DAYS) {
+      const back = day - TREND_LOOKBACK_DAYS;
+      if (W.wolves < daily.wolves[0] * TREND_WOLF_SHARE && W.wolves < daily.wolves[back]) { endReason = 'wolves declining'; break; }
+      if (W.gCount < peak.grass * TREND_GRASS_SHARE && W.gCount < daily.grass[back]) { endReason = 'grass collapsing'; break; }
+    }
     await yieldToMessages();
     if (canceled === m.id) { endReason = 'canceled'; break; }
   }

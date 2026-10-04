@@ -11,6 +11,9 @@
 //   factors: [0.25, 4]                 multiples of the current value to try
 //   base:    [{ row, col, value }]     optional, fixed for the whole screen (tables untouched)
 //   seeds:   [1, 2, 3],  days: 60,  bunnyCap: 20000
+//   rank:    "wolfGrowth"              optional: rank by wolf growth instead of all-alive days
+//   trendStops: true (default)        end a run once its direction is clear (worker.js TREND_*);
+//                                      bunnyCap defaults to 12,000
 // }
 // Clamps: a percent stays ≤ 100%; a count or range that was ≥ 1 stays ≥ 1.
 'use strict';
@@ -65,14 +68,25 @@ const PAGE = cfg => `(async () => {
   S.total = variants.length * cfg.seeds.length;
   S.phase = 'running';
   const mean = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
+  // Wolf growth, from the hourly history: wolves at the end ÷ at the start (0 if they died
+  // out), and the change over the last TREND_DAYS days (still rising = positive).
+  const TREND_DAYS = 5;
+  const growthOf = r => {
+    const w = r.history ? r.history.wolves : null;
+    if (!w || !w.length) return { growth: 0, trend: 0 };
+    const end = w[w.length - 1], back = w[Math.max(0, w.length - 1 - TREND_DAYS * 24)];
+    return { growth: w[0] ? end / w[0] : 0, trend: end - back };
+  };
   await Promise.all(variants.map(async v => {
-    const rs = await Promise.all(cfg.seeds.map(seed => pool.run({ texts: v.texts, seed, days: cfg.days, bunnyCap: cfg.bunnyCap }).then(r => { S.done++; return r; })));
+    const rs = await Promise.all(cfg.seeds.map(seed => pool.run({ texts: v.texts, seed, days: cfg.days, bunnyCap: cfg.bunnyCap || 12000, trendStops: cfg.trendStops !== false }).then(r => { S.done++; return r; })));
     const sum = LAB.summarize(rs);
     const wolfDays = rs.map(r => r.firstExtinct && r.firstExtinct.wolves != null ? r.firstExtinct.wolves : r.daysRun);
     S.rows.push({ label: v.label, row: v.row, col: v.col, factor: v.factor, from: v.from, to: v.to,
       score: sum.score, survived: sum.survived, seeds: sum.seeds, allAliveDays: sum.meanAllAliveDays,
       wolvesExtinct: sum.wolvesExtinct, bunniesExtinct: sum.bunniesExtinct, grassExtinct: sum.grassExtinct, booms: sum.booms,
+      wolfGrowth: mean(rs.map(r => growthOf(r).growth)), wolfTrend: mean(rs.map(r => growthOf(r).trend)),
       wolfDays: mean(wolfDays), bunnyPeak: mean(rs.map(r => r.peak ? r.peak.bunnies : 0)), wolfPeak: mean(rs.map(r => r.peak ? r.peak.wolves : 0)),
+      wolvesDeclining: sum.wolvesDeclining, grassCollapsing: sum.grassCollapsing,
       errors: rs.filter(r => r.endReason === 'error').map(r => r.error) });
   }));
   S.phase = 'done';
@@ -93,20 +107,31 @@ const PAGE = cfg => `(async () => {
     }
     if (s.phase === 'error') throw new Error(s.error);
     const base = s.rows.find(r => r.label === 'base');
-    // Effect = how far a variant's average all-alive days moved from the base's.
-    for (const r of s.rows) r.effect = r.allAliveDays - base.allAliveDays;
+    // Effect: with rank "wolfGrowth", how far wolf growth moved from the base's (Paul: if
+    // wolves aren't increasing it's a bad run); otherwise how far all-alive days moved.
+    const byGrowth = cfg.rank === 'wolfGrowth';
+    for (const r of s.rows) r.effect = byGrowth ? r.wolfGrowth - base.wolfGrowth : r.allAliveDays - base.allAliveDays;
     s.base = base;
     fs.writeFileSync(outFile, JSON.stringify(s, null, 1));
     // One line per number: its best and worst variant, ranked by the bigger swing.
     const byNum = new Map();
     for (const r of s.rows) if (r.label !== 'base') (byNum.get(r.label) || byNum.set(r.label, []).get(r.label)).push(r);
     const ranked = [...byNum].map(([label, rs]) => ({ label, rs, swing: Math.max(...rs.map(r => Math.abs(r.effect))) })).sort((a, b) => b.swing - a.swing);
-    const cause = r => [r.wolvesExtinct && `W†${r.wolvesExtinct}`, r.bunniesExtinct && `B†${r.bunniesExtinct}`, r.grassExtinct && `G†${r.grassExtinct}`, r.booms && `boom${r.booms}`].filter(Boolean).join(' ') || '';
-    console.log(`\nBase: all three alive ${base.allAliveDays.toFixed(0)} of ${cfg.days} days on average; survived ${base.survived}/${base.seeds}; wolves last ${base.wolfDays.toFixed(0)} days; ${cause(base)}`);
-    console.log('number'.padEnd(26) + 'value → all-alive days (Δ vs base), survived, how runs ended');
-    for (const n of ranked) {
-      console.log(n.label.padEnd(26) + n.rs.sort((a, b) => a.factor - b.factor).map(r =>
-        `${r.to.padStart(6)} → ${r.allAliveDays.toFixed(0).padStart(2)}d (${(r.effect >= 0 ? '+' : '') + r.effect.toFixed(0)}) ${r.survived}/${r.seeds} ${cause(r)}`).join('   '));
+    const cause = r => [r.wolvesExtinct && `W†${r.wolvesExtinct}`, r.wolvesDeclining && `W↓${r.wolvesDeclining}`, r.grassCollapsing && `G↓${r.grassCollapsing}`, r.bunniesExtinct && `B†${r.bunniesExtinct}`, r.grassExtinct && `G†${r.grassExtinct}`, r.booms && `boom${r.booms}`].filter(Boolean).join(' ') || '';
+    const g = r => `×${r.wolfGrowth.toFixed(2)} ${r.wolfTrend >= 0 ? '+' : ''}${r.wolfTrend.toFixed(0)}`;
+    console.log(`\nBase: wolves ${g(base)} (growth × start, change over the last days); all three alive ${base.allAliveDays.toFixed(0)} of ${cfg.days} days; ${cause(base)}`);
+    if (byGrowth) {
+      console.log('number'.padEnd(26) + 'value → wolf growth ×(end/start) and last-days change, how runs ended');
+      for (const n of ranked) {
+        console.log(n.label.padEnd(26) + n.rs.sort((a, b) => a.factor - b.factor).map(r =>
+          `${r.to.padStart(6)} → ${g(r).padEnd(10)} ${cause(r)}`).join('   '));
+      }
+    } else {
+      console.log('number'.padEnd(26) + 'value → all-alive days (Δ vs base), survived, how runs ended');
+      for (const n of ranked) {
+        console.log(n.label.padEnd(26) + n.rs.sort((a, b) => a.factor - b.factor).map(r =>
+          `${r.to.padStart(6)} → ${r.allAliveDays.toFixed(0).padStart(2)}d (${(r.effect >= 0 ? '+' : '') + r.effect.toFixed(0)}) ${r.survived}/${r.seeds} ${cause(r)}`).join('   '));
+      }
     }
     console.log(`\nsaved ${outFile} after ${((Date.now() - t0) / 60000).toFixed(1)} min`);
   } finally {

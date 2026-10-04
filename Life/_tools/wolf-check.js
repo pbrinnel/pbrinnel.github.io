@@ -86,13 +86,18 @@ const d2 = (W, a, b) => (W.tx(a) - W.tx(b)) ** 2 + (W.ty(a) - W.ty(b)) ** 2;
   ok(bunnyWindedWalk, `bunny: never sprints while winded (winded seen: ${bunnyWinded})`);
   ok(caught >= 0, `chase: the wolf catches the bunny (${(caught / AS.TICK_HZ).toFixed(1)} s)`);
   ok(sprintFar === 0, `chase: sprints only near SprintRange (${sprintFar} far ticks)`);
-  ok(biteTicks.length === 3, `bites: bunny dies on bite ${biteTicks.length} (BiteDamage ${Wf.BiteDamage}, HPMax ${B.HPMax})`);
+  // However many bites of BiteDamage it takes to empty HPMax (the tables decide; 8 vs 20
+  // is 3), allowing one more for the little healing between bites.
+  const killBites = Math.ceil(B.HPMax / Wf.BiteDamage);
+  ok(biteTicks.length === killBites || biteTicks.length === killBites + 1, `bites: bunny dies on bite ${biteTicks.length} (BiteDamage ${Wf.BiteDamage}, HPMax ${B.HPMax}, expected ${killBites})`);
   const gaps = biteTicks.slice(1).map((t, i) => t - biteTicks[i]);
   ok(gaps.every(g => g >= Wf.BiteCooldown * AS.TICK_HZ - 1), `bites: never closer than ${Wf.BiteCooldown}s (gaps ${gaps} ticks; a fleeing bunny stretches them)`);
   ok(near(hpAfterFirst, B.HPMax - Wf.BiteDamage, 0.1), `bites: first bite leaves bunny at ${hpAfterFirst.toFixed(2)} HP`);
-  ok(near(W.aFullness[w], 30 + 3 * Wf.BiteFood, 1e-3), `bites: wolf gained BiteFood per bite (${W.aFullness[w]})`);
+  // One BiteFood per bite landed, less what hunger took during the chase.
+  const fed = 30 + biteTicks.length * Wf.BiteFood, hungerSlack = Wf.HungerRate * sim.tickCount / AS.TICK_HZ + 1e-3;
+  ok(W.aFullness[w] <= Math.min(Wf.FullnessMax, fed) + 1e-3 && W.aFullness[w] >= Math.min(Wf.FullnessMax, fed) - hungerSlack, `bites: wolf gained BiteFood per bite (${W.aFullness[w].toFixed(1)}, ${biteTicks.length} bites)`);
   ok(W.aKills[w] === 1 && W.cCount === 1 && W.cSpecies[W.cList[0]] === AS.SPECIES.BUNNY, 'kill: Kills = 1, one bunny corpse');
-  ok(events.filter(e => e[0] === AS.EV.BITE).length === 3 && events.some(e => e[0] === AS.EV.DEATH), 'kill: BITE and DEATH events');
+  ok(events.filter(e => e[0] === AS.EV.BITE).length === biteTicks.length && events.some(e => e[0] === AS.EV.DEATH), 'kill: BITE and DEATH events');
 }
 {
   // wounds: survive, heal above HealAbove, no heal below it
@@ -131,7 +136,7 @@ const d2 = (W, a, b) => (W.tx(a) - W.tx(b)) ** 2 + (W.ty(a) - W.ty(b)) ** 2;
 }
 // --- give up ---
 {
-  const { AS, sim, W, Wf, events } = make(60, 4);
+  const { AS, sim, W, B, Wf, events } = make(60, 4);
   const w = wolf(AS, sim, 30, 30, { full: 20, stamina: 4 });
   const b = bun(AS, sim, 33, 30);
   let gave = false, bit = false;
@@ -143,7 +148,7 @@ const d2 = (W, a, b) => (W.tx(a) - W.tx(b)) ** 2 + (W.ty(a) - W.ty(b)) ** 2;
     if (sname(sim, w, 'wolf') !== 'GIVE_UP') { stillRest = false; break; }
   }
   ok(stillRest, `give up: it stays in GIVE_UP until Stamina reaches RestUntil (${W.aStamina[w].toFixed(1)})`);
-  ok(!events.some(e => e[0] === AS.EV.BITE) && W.aAlive[b] && W.aHP[b] === 20, 'give up: the bunny got away unbitten');
+  ok(!events.some(e => e[0] === AS.EV.BITE) && W.aAlive[b] && W.aHP[b] === B.HPMax, 'give up: the bunny got away unbitten');
   tick(sim, secs(AS, 3));
   ok(sname(sim, w, 'wolf') !== 'GIVE_UP' && !W.aWinded[w], `give up: back to normal after rest (${sname(sim, w, 'wolf')})`);
 }

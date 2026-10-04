@@ -222,9 +222,19 @@ Each one ends with something to watch. ✓ = done (3 Oct 2026).
      numbers made no difference at all (a coarse screen of 30 numbers showed it). Wolf
      `HungryAt` is now 80 and `StartWolves` 48: wolves now breed and last ~44 days instead
      of ~30 (4 seeds × 80 days). The loader now warns when `HungryAt` < `MateFullness`.
-   - The next collapse: bunnies still peak around 5,000 and eat the grass bare by about
-     day 40. More grass hides bunnies and starves wolves sooner; smaller bunny litters
-     starve them too. That balance is where tuning goes next.
+   - Then wolves starved for lack of prey early on: more bunnies at the start
+     (`StartBunnies` 450) made them grow instead of crash, and wolves that need less food
+     (`HungerRate` 0.6), breed young (`TimeToMature` 3), live long (`Lifespan` 120) and
+     see far (`VisionRange` 24) grew fast enough to matter.
+   - Then bunnies boomed past 10,000 and ate the grass bare by about day 17. Bunnies
+     living 7 days instead of 20 (litters unchanged at 2–4) slowed the boom enough:
+     6 of 6 seeds kept all three species for 90 days, and on 12 fresh seeds every one
+     passed 80 days (shortest 95, average 115; 2 went the full 150). Today's numbers before
+     these changes lost their wolves by day 11–15 on the same seeds.
+   - Past about day 100 the cycles grow until wolves over-hunt the bunnies to zero or
+     crash after them. That's where tuning goes next.
+   - Method that works (Paul): quick gross tests, judged by direction. Wolves not
+     increasing means a bad run; runs stop as soon as their direction is clear.
 9. **Release as `/life.html`.** The page already lives at the site root (unlisted, see
    "Platform and scale"); release is the point where Paul is happy with the tuning and
    pushes it.

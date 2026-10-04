@@ -6,7 +6,7 @@
 //
 // config: {
 //   variants: { "name": [{ row, col, value }], … }   "base" is added automatically (no changes)
-//   seeds: [1, 2, 3],  days: 60,  bunnyCap: 20000
+//   seeds: [1, 2, 3],  days: 60,  bunnyCap: 12000 (default),  trendStops: true (default)
 // }
 'use strict';
 const fs = require('fs');
@@ -28,10 +28,20 @@ const PAGE = cfg => `(async () => {
   const pool = LAB.Pool({ v: Date.now() });
   S.total = Object.keys(variants).length * cfg.seeds.length;
   const mean = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
+  // Wolf growth, from the hourly history: wolves at the end ÷ at the start (0 if they died
+  // out), and the change over the last TREND_DAYS days (still rising = positive).
+  const TREND_DAYS = 5;
+  const growthOf = r => {
+    const w = r.history ? r.history.wolves : null;
+    if (!w || !w.length) return { growth: 0, trend: 0 };
+    const end = w[w.length - 1], back = w[Math.max(0, w.length - 1 - TREND_DAYS * 24)];
+    return { growth: w[0] ? end / w[0] : 0, trend: end - back };
+  };
   await Promise.all(Object.entries(variants).map(async ([name, edits]) => {
     const vt = LAB.applyEdits(texts, edits.map(e => ({ file: fileOf(e.row, e.col), row: e.row, col: e.col, value: String(e.value) })));
-    const rs = await Promise.all(cfg.seeds.map(seed => pool.run({ texts: vt, seed, days: cfg.days, bunnyCap: cfg.bunnyCap }).then(r => { S.done++; return r; })));
+    const rs = await Promise.all(cfg.seeds.map(seed => pool.run({ texts: vt, seed, days: cfg.days, bunnyCap: cfg.bunnyCap || 12000, trendStops: cfg.trendStops !== false }).then(r => { S.done++; return r; })));
     S.rows.push({ name, edits, summary: LAB.summarize(rs),
+      wolfGrowth: mean(rs.map(r => growthOf(r).growth)), wolfTrend: mean(rs.map(r => growthOf(r).trend)),
       wolfDays: mean(rs.map(r => r.firstExtinct && r.firstExtinct.wolves != null ? r.firstExtinct.wolves : r.daysRun)),
       wolfPeak: mean(rs.map(r => r.peak ? r.peak.wolves : 0)), bunnyPeak: mean(rs.map(r => r.peak ? r.peak.bunnies : 0)),
       seeds: rs.map(r => ({ seed: r.seed, end: r.endReason, days: r.daysRun, final: r.final, peak: r.peak, error: r.error })) });
@@ -57,8 +67,8 @@ const PAGE = cfg => `(async () => {
     console.log(`${cfg.seeds.length} seeds × ${cfg.days} days`);
     for (const r of s.rows) {
       const m = r.summary;
-      const ends = r.seeds.map(x => x.end === 'survived' ? `ok(B${x.final.bunnies} W${x.final.wolves})` : `${x.end.replace(' extinct', '†').replace('bunny boom', 'boom')} d${x.days}`).join(', ');
-      console.log(`${r.name.padEnd(24)} score ${m.score.toFixed(2)}  survived ${m.survived}/${m.seeds}  all-alive ${m.meanAllAliveDays.toFixed(0)}d  wolves last ${r.wolfDays.toFixed(0)}d, peak ${r.wolfPeak.toFixed(0)}  bunny peak ${r.bunnyPeak.toFixed(0)}   [${ends}]`);
+      const ends = r.seeds.map(x => x.end === 'survived' ? `ok(B${x.final.bunnies} W${x.final.wolves})` : `${x.end.replace(' extinct', '†').replace(' declining', '↓').replace(' collapsing', '↓').replace('bunny boom', 'boom')} d${x.days}`).join(', ');
+      console.log(`${r.name.padEnd(28)} wolves ×${r.wolfGrowth.toFixed(2)} ${r.wolfTrend >= 0 ? '+' : ''}${r.wolfTrend.toFixed(0)}  score ${m.score.toFixed(2)}  survived ${m.survived}/${m.seeds}  all-alive ${m.meanAllAliveDays.toFixed(0)}d  wolves last ${r.wolfDays.toFixed(0)}d, peak ${r.wolfPeak.toFixed(0)}  bunny peak ${r.bunnyPeak.toFixed(0)}   [${ends}]`);
     }
   } finally {
     page.close();

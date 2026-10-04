@@ -1,7 +1,7 @@
 Setting,Value,Notes
 WorldWidth,300,Tiles
 WorldHeight,200,Tiles
-StartBunnies,150,Placed at random on empty tiles
+StartBunnies,450,Placed at random on empty tiles
 StartWolves,48,Placed at random on empty tiles
 StartGrass,15%,Share of tiles that start as a blade; scattered at random
 StartGrassAge,0,Days; every starting blade is a sprout at this Age (0 = a new sprout at SproutSize)

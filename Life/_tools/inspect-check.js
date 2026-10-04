@@ -50,14 +50,18 @@ d = A.describe(sim, sel(ce)); allValues.push(d);
 check(names(d) === 'Age,Lifestage,Dead,Position,Nutrient', 'corpse rows: ' + names(d));
 check(/^Wolf corpse #\d+$/.test(d.title), 'corpse title: ' + d.title);
 check(val(d, 'Lifestage') === '—' && val(d, 'Dead') === 'Yes' && val(d, 'Age') === '0.00', 'corpse values');
-check(val(d, 'Nutrient') === '30.0 / 30', 'nutrient ' + val(d, 'Nutrient'));
+const CN = T.wolf.CorpseNutrient, cnText = m => String(m % 1 ? m.toFixed(1) : m);
+check(val(d, 'Nutrient') === `${CN.toFixed(1)} / ${cnText(CN)}`, 'nutrient ' + val(d, 'Nutrient'));
 W.cNut[ce] = 12.34;
-check(val(A.describe(sim, sel(ce)), 'Nutrient') === '12.3 / 30', 'nutrient decimals');
+check(val(A.describe(sim, sel(ce)), 'Nutrient') === `12.3 / ${cnText(CN)}`, 'nutrient decimals');
 
 // animals
 const mk = (t, sp, sx) => {
   const s = W.addAnimal(t, sp, sx); const Tsp = T[A.SPECIES_KEY[sp]];
-  W.aFullness[s] = 62.34; W.aStamina[s] = 10; W.aHP[s] = Tsp.HPMax; W.aAge[s] = 12.345; W.aState[s] = 1;
+  // Age: the middle of adulthood for this species, from the tables, so tuning Lifespan or
+  // TimeToMature can't turn the test animal into a baby or an elder.
+  W.aFullness[s] = 62.34; W.aStamina[s] = 10; W.aHP[s] = Tsp.HPMax;
+  W.aAge[s] = (Tsp.TimeToMature + Tsp.ElderAt * Tsp.Lifespan) / 2; W.aState[s] = 1;
   return s;
 };
 const selA = s => ({ tile: W.aTile[s], serial: W.aSerial[s], slot: s });
@@ -70,8 +74,10 @@ check(names(dbf) === R + 'Pregnant,MateCooldown,Parents,Children', 'female bunny
 check(names(dwm) === R + 'Parents,Children,Kills', 'male wolf: ' + names(dwm));
 check(names(dwf) === R + 'Pregnant,MateCooldown,Parents,Children,Kills', 'female wolf: ' + names(dwf));
 check(dbf.title.startsWith('Female bunny #') && dwm.title.startsWith('Male wolf #'), 'titles ' + dbf.title + ' / ' + dwm.title);
-check(val(dbm, 'Fullness') === '62.3 / 100' && val(dbm, 'HP') === '20 / 20' || val(dbm, 'HP') === '20.0 / 20', 'fullness/hp ' + val(dbm, 'Fullness') + ' ' + val(dbm, 'HP'));
-check(val(dbm, 'Age') === '12.35' && val(dbm, 'Lifestage') === 'Adult' && val(dbm, 'Dead') === 'No', 'age/stage/dead');
+const TB = T.bunny, maxText = m => String(m % 1 ? m.toFixed(1) : m);
+check(val(dbm, 'Fullness') === `62.3 / ${maxText(TB.FullnessMax)}` && val(dbm, 'HP') === `${TB.HPMax.toFixed(1)} / ${maxText(TB.HPMax)}`,
+  'fullness/hp ' + val(dbm, 'Fullness') + ' ' + val(dbm, 'HP'));
+check(val(dbm, 'Age') === W.aAge[bm].toFixed(2) && val(dbm, 'Lifestage') === 'Adult' && val(dbm, 'Dead') === 'No', 'age/stage/dead ' + val(dbm, 'Age') + ' ' + val(dbm, 'Lifestage'));
 check(val(dbm, 'State') === T.states.bunny[1].name, 'state ' + val(dbm, 'State'));
 check(val(dbm, 'Sex') === 'Male' && val(dbf, 'Sex') === 'Female', 'sex');
 check(val(dbf, 'Pregnant') === 'No' && val(dbf, 'MateCooldown') === 'Ready', 'pregnant/cooldown none');

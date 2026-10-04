@@ -159,7 +159,11 @@ config). Local only: Jekyll never publishes `_lab/`.
 - `lab-model.js` reads cell text as numbers and writes it back in the same style
   (`10%`, `2-4`, `0.25`); lists the tunable cells; scores a set of runs (`summarize`).
 - `worker.js` runs one seed headless with the sim's own files; `lab-pool.js` runs many in
-  parallel. Runs stop early when a species dies out or bunnies pass the cap.
+  parallel. Runs stop early when a species dies out or bunnies pass the cap, and, with
+  `trendStops`, as soon as their direction is clear: wolves below half their start and
+  falling ("wolves declining"), or grass below a tenth of its peak and falling ("grass
+  collapsing"). See `TREND_*` in worker.js; lab-screen.js and lab-compare.js use them by
+  default, with a bunny cap of 12,000.
 - `lab-search.js` varies chosen cells (seeded, log-space steps) and keeps the best few.
 - `index.html`, `lab-ui.js`, `lab.css` are the page.
 - Checks: `search-check.js`, `ui-lab-check.js` (both in check-all).
