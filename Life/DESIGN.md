@@ -306,6 +306,11 @@ seeds and saves numbers back into `tables/`. What's been found, in order:
   all three species for 200 days on 11 of 12 fresh seeds (average 197 days, wolves ending
   around 100 instead of a handful), against 9 of 12. Harder bites made it worse: a bunny
   that dies in fewer bites feeds a wolf less.
+- **One-bite kills, carcass eating, the meadows start and warren holes** (4 Oct) changed
+  the balance at once. Quick tests (3 seeds × 30 days): bunnies barely dug, so warrens
+  collapsed within days; `DigChance` 50% and `CollapseDays` 10 keep about 30 holes alive
+  at day 30. With refuges, 14 starting wolves were too few (one seed in three lost them);
+  `StartWolves` 50 kept all three species on 3 of 3 seeds, wolves still rising at day 30.
 - **Wolves remembering where a bunny hid** (`TrackSeconds`) helped over 50 days (wolves
   1.35× their start instead of 1.1× at the old food, 3.7× instead of 3.2× at `BiteFood`
   20) but not over 200: with `BiteFood` 20, 15 s of memory kept 10 of 12 fresh seeds

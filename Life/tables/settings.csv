@@ -2,7 +2,7 @@ Setting,Value,Notes
 WorldWidth,300,Tiles
 WorldHeight,200,Tiles
 StartBunnies,150,Meadows: split among the colonies; Scatter: placed at random
-StartWolves,14,Meadows: split among the packs; Scatter: placed at random
+StartWolves,50,Meadows: split among the packs; Scatter: placed at random
 StartGrass,30%,Meadows: share of the world that is meadow (most of it starts as a blade); Scatter: share of tiles that start as a blade
 StartGrassAge,0,Scatter only: every starting blade is a sprout at this Age in days (0 = a new sprout at SproutSize); Meadows ages blades by how deep in the meadow they are
 StartLayout,Meadows,Meadows = meadows with open ground between, bunnies in colonies at meadow edges, wolves in packs in the open; Scatter = everything at random
@@ -11,5 +11,5 @@ BunnyColonies,6,Meadows only: how many colonies the starting bunnies live in
 WolfPacks,3,Meadows only: how many packs the starting wolves run in
 HolesPerColony,6,Meadows only: warren holes dug at each colony before its bunnies settle; Scatter has none
 WarrenRadius,4,A new hole is dug only within this many tiles of an existing hole (unless no hole is within HoleRange)
-CollapseDays,3,A hole no bunny has stood on for this long collapses into bare ground
+CollapseDays,10,A hole no bunny has stood on for this long collapses into bare ground
 Seed,,Blank = new random seed each run; the seed used is shown on screen so you can paste it here to replay that start

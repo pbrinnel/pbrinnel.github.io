@@ -207,7 +207,11 @@ function wolf(AS, sim, x, y) {
 
 // --- REST ---
 {
-  const { AS, sim, W, B } = make(60, 2, tx => { tx.species = editCSV(tx.species, 'HungerRate', 'Bunny', '0'); });
+  // DigChance 0 so a rested, fed bunny's next state is WANDER, not a dig.
+  const { AS, sim, W, B } = make(60, 2, tx => {
+    tx.species = editCSV(tx.species, 'HungerRate', 'Bunny', '0');
+    tx.species = editCSV(tx.species, 'DigChance', 'Bunny', '0%');
+  });
   const s = bunny(AS, sim, 30, 30, { stamina: B.RestBelow * B.StaminaMax - 1 });
   W.aDecideLeft[s] = 0;
   tick(sim, 3);
