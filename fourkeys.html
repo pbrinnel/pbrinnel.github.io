@@ -284,6 +284,44 @@
             color: #9a958c;
         }
 
+        /* everything past the code: laid out as if it sat in #debug itself */
+        #debug .body { display: contents; }
+        #debug .body[hidden], #debug .pin[hidden] { display: none; }
+
+        /* the code's keypad, drawn like the initials screen's */
+        #debug .pin {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 14px;
+        }
+        #debug .pin .slots { display: flex; gap: 30px; }
+        #debug .pin .slots span {
+            width: 36px;
+            text-align: center;
+            font-size: 44px;
+            color: #c9a94e;
+        }
+        #debug .pin .slots span.on { color: #f2efe9; }
+        #debug .pin .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 66px);
+            gap: 8px;
+        }
+        #debug .pin .grid button {
+            width: 66px;
+            height: 50px;
+            padding: 0;
+            border-radius: 0;
+            background: transparent;
+            color: #9a958c;
+            font-size: 18px;
+        }
+        #debug .pin .grid button.word { font-size: 13px; }
+        #debug .pin .grid button.ok { border-color: #1a1815; color: #3a352f; }
+        #debug .pin .grid button.ok.live { border-color: #c9a94e; color: #c9a94e; }
+        #debug .pin p.live { color: #c9a94e; }
+
         #debug p {
             margin-top: 6px;
             font-size: 0.72rem;
@@ -484,36 +522,36 @@ if (new URLSearchParams(location.search).has('reset')) {
     history.replaceState(null, '', location.pathname);
 }
 </script>
-<script src="js/fourkeys/runtime.js?v=128"></script>
-<script src="js/fourkeys/headless.js?v=128"></script>
-<script src="js/fourkeys/idol.js?v=128"></script>
-<script src="js/fourkeys/windmill.js?v=128"></script>
-<script src="js/fourkeys/twins.js?v=128"></script>
-<script src="js/fourkeys/gleeok.js?v=128"></script>
-<script src="js/fourkeys/agahnim.js?v=128"></script>
-<script src="js/fourkeys/lamps.js?v=128"></script>
-<script src="js/fourkeys/dark.js?v=128"></script>
-<script src="js/fourkeys/dodongo.js?v=128"></script>
-<script src="js/fourkeys/lucifer.js?v=128"></script>
-<script src="js/fourkeys/storm.js?v=128"></script>
-<script src="js/fourkeys/mole.js?v=128"></script>
-<script src="js/fourkeys/conga.js?v=128"></script>
-<script src="js/fourkeys/pong.js?v=128"></script>
-<script src="js/fourkeys/boot.js?v=128"></script>
-<script src="js/fourkeys/splitter.js?v=128"></script>
-<script src="js/fourkeys/armos.js?v=128"></script>
-<script src="js/fourkeys/guard.js?v=128"></script>
-<script src="js/fourkeys/pillars.js?v=128"></script>
-<script src="js/fourkeys/chain.js?v=128"></script>
-<script src="js/fourkeys/paddles.js?v=128"></script>
-<script src="js/fourkeys/powers.js?v=128"></script>
-<script src="js/fourkeys/levels.js?v=128"></script>
-<script src="js/fourkeys/menu.js?v=128"></script>
-<script src="js/fourkeys/debug.js?v=128"></script>
-<script src="js/fourkeys/intro.js?v=128"></script>
-<script src="js/fourkeys/memory.js?v=128"></script>
-<script src="js/fourkeys/lore.js?v=128"></script>
-<script src="js/fourkeys/engine.js?v=128"></script>
-<script src="js/fourkeys/start.js?v=128"></script>
+<script src="js/fourkeys/runtime.js?v=129"></script>
+<script src="js/fourkeys/headless.js?v=129"></script>
+<script src="js/fourkeys/idol.js?v=129"></script>
+<script src="js/fourkeys/windmill.js?v=129"></script>
+<script src="js/fourkeys/twins.js?v=129"></script>
+<script src="js/fourkeys/gleeok.js?v=129"></script>
+<script src="js/fourkeys/agahnim.js?v=129"></script>
+<script src="js/fourkeys/lamps.js?v=129"></script>
+<script src="js/fourkeys/dark.js?v=129"></script>
+<script src="js/fourkeys/dodongo.js?v=129"></script>
+<script src="js/fourkeys/lucifer.js?v=129"></script>
+<script src="js/fourkeys/storm.js?v=129"></script>
+<script src="js/fourkeys/mole.js?v=129"></script>
+<script src="js/fourkeys/conga.js?v=129"></script>
+<script src="js/fourkeys/pong.js?v=129"></script>
+<script src="js/fourkeys/boot.js?v=129"></script>
+<script src="js/fourkeys/splitter.js?v=129"></script>
+<script src="js/fourkeys/armos.js?v=129"></script>
+<script src="js/fourkeys/guard.js?v=129"></script>
+<script src="js/fourkeys/pillars.js?v=129"></script>
+<script src="js/fourkeys/chain.js?v=129"></script>
+<script src="js/fourkeys/paddles.js?v=129"></script>
+<script src="js/fourkeys/powers.js?v=129"></script>
+<script src="js/fourkeys/levels.js?v=129"></script>
+<script src="js/fourkeys/menu.js?v=129"></script>
+<script src="js/fourkeys/debug.js?v=129"></script>
+<script src="js/fourkeys/intro.js?v=129"></script>
+<script src="js/fourkeys/memory.js?v=129"></script>
+<script src="js/fourkeys/lore.js?v=129"></script>
+<script src="js/fourkeys/engine.js?v=129"></script>
+<script src="js/fourkeys/start.js?v=129"></script>
 </body>
 </html>

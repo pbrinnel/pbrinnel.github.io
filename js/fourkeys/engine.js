@@ -2349,6 +2349,7 @@
     addEventListener('keydown', e => {
         if (!debugEl.hidden) {                    // menu is open
             if (e.code === 'Escape') debugEl.hidden = true;
+            else debugKey(e);                     // the code it asks for first
             e.stopPropagation();
             return;
         }
