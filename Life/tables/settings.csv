@@ -12,6 +12,6 @@ WolfPacks,7,Meadows only: how many packs the starting wolves run in
 HolesPerColony,6,Meadows only: warren holes dug at each colony before its bunnies settle; Scatter has none
 WarrenRadius,4,A new hole is dug only within this many tiles of an existing hole (unless no hole is within HoleRange)
 CollapseDays,10,A hole no bunny has stood on for this long collapses into bare ground
-NukeRadius,100,God tab: a nuke destroys everything within this many tiles (a circle) of where it lands
+NukeRadius,75,God tab: a nuke destroys everything within this many tiles (a circle) of where it lands
 ScorchDays,8,God tab: days the ground at a nuke's center stays scorched (bare: nothing grows or is dug there); it shortens toward the rim so the crater greens from its edges
 Seed,,Blank = new random seed each run; the seed used is shown on screen so you can paste it here to replay that start
