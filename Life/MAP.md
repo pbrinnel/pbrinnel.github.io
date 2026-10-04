@@ -99,6 +99,7 @@ graph, ui, bench) only reads.
 - Movement goes only through `AS.stepTo` (empty tiles) or `AS.chewOrStep` (wolves into
   grass): both respect speed and one-thing-per-tile. Paths: `pathNext` (empty tiles only)
   and `pathNextWeighted` (cost per tile; wolves pay chew time for grass).
+- A hunting wolf remembers where it last saw its bunny: wolf.js keeps `seenTile`/`seenAt` per wolf in `mem(W)`, and while `TrackSeconds` (species.csv, 0 = off) allows it HUNT walks to that tile when the bunny is out of sight (`act` then uses `lineOfSight` instead of the bunny's true tile).
 - **Events:** `sim.emit(AS.EV.X, tile)` into a ring (`sim.events`): BITE, BIRTH, DEATH,
   GRAZE (bunny grazing or wolf chewing). render.js keeps its own cursor and turns them into poses.
 - **History:** `sim.history` = `{ length, grass, bunnies, wolves }`, one sample per

@@ -22,6 +22,8 @@
       m.preySerial = grow(m.preySerial, Uint32Array);
       m.mate = grow(m.mate, Int32Array);        // MATE's partner slot
       m.mateSerial = grow(m.mateSerial, Uint32Array);
+      m.seenTile = grow(m.seenTile, Int32Array);    // where HUNT's bunny was last in sight
+      m.seenAt = grow(m.seenAt, Float64Array);      // sim.simSeconds of that sighting
       m.cap = W.aCap;
     }
     return m;
@@ -43,6 +45,7 @@
 
   // Matchers, goals and costs are created once and read these instead of closing over a call.
   let mSim = null, mW = null, mSelf = 0, mGoal = 0, mFrom = 0, mInvSpeed = 0;
+  const isGoalTile = t => t === mGoal;
   const isBunny = t => mW.kind[t] === K.BUNNY;
   const isPartner = t => {
     if (mW.kind[t] !== K.WOLF) return false;
@@ -75,11 +78,13 @@
 
   // One step toward `goalTile` along the cheapest path, chewing where that is quicker than
   // going around. Returns false when no path exists (the caller lets the next decision choose).
-  function walkToward(sim, s, goalTile) {
+  // `exact` walks onto the tile itself instead of to a tile touching it (HUNT's search, where
+  // nothing is there to bite).
+  function walkToward(sim, s, goalTile, exact) {
     const W = sim.W;
     mSim = sim; mW = W; mSelf = s; mGoal = goalTile; mFrom = W.aTile[s];
     mInvSpeed = 1 / AS.speedOf(sim, s);
-    const next = AS.pathNextWeighted(sim, mFrom, touchesGoal, AS.speciesStats(sim, s).VisionRange, cost);
+    const next = AS.pathNextWeighted(sim, mFrom, exact ? isGoalTile : touchesGoal, AS.speciesStats(sim, s).VisionRange, cost);
     if (next < 0) return false;
     if (next !== mFrom) AS.chewOrStep(sim, s, next);
     return true;
@@ -141,11 +146,23 @@
         if (cur === GIVE_UP && W.aStamina[s] < S.RestUntil * S.StaminaMax) return false;
         mW = W;
         const t = AS.nearestVisible(sim, W.aTile[s], S.VisionRange, isBunny);
-        if (t < 0) return false;
-        const m = mem(W), p = W.aSlot[t];
-        m.prey[s] = p;
-        m.preySerial[s] = W.aSerial[p];
-        return true;
+        const m = mem(W);
+        if (t >= 0) {
+          // Any bunny in view wins, so a second one appearing mid-search takes over.
+          const p = W.aSlot[t];
+          m.prey[s] = p;
+          m.preySerial[s] = W.aSerial[p];
+          m.seenTile[s] = t;
+          m.seenAt[s] = sim.simSeconds;
+          return true;
+        }
+        // Nothing in view: a wolf already hunting keeps looking for TrackSeconds, until it
+        // reaches the spot or its bunny is gone.
+        if (cur !== HUNT || !(S.TrackSeconds > 0)) return false;
+        const p = m.prey[s];
+        if (!W.aAlive[p] || W.aSerial[p] !== m.preySerial[s]) return false;
+        if (W.aTile[s] === m.seenTile[s]) return false;
+        return sim.simSeconds - m.seenAt[s] < S.TrackSeconds;
       },
       start: calmStart,
       act(sim, s) {
@@ -157,6 +174,24 @@
           return;
         }
         const pt = W.aTile[p], t = W.aTile[s];
+        if (S.TrackSeconds > 0) {
+          // Between decisions the wolf knows only what it sees, so out of sight it heads for
+          // the last-seen tile instead of reading the bunny's real position.
+          const dx = (pt % W.w) - (t % W.w), dy = ((pt / W.w) | 0) - ((t / W.w) | 0);
+          if (dx * dx + dy * dy <= S.VisionRange * S.VisionRange && AS.lineOfSight(W, t, pt)) {
+            m.seenTile[s] = pt;
+            m.seenAt[s] = sim.simSeconds;
+          } else {
+            const goal = m.seenTile[s];
+            W.aTargetTile[s] = goal;
+            W.aTargetSlot[s] = -1;
+            AS.setSprint(sim, s, false);
+            if (W.aStepLeft[s] > 0 || t === goal) return;
+            // No way there: let the next decision give up.
+            if (!walkToward(sim, s, goal, true)) { W.aTargetTile[s] = -1; m.seenAt[s] = -Infinity; }
+            return;
+          }
+        }
         W.aTargetTile[s] = pt;
         W.aTargetSlot[s] = p;
         W.aTargetSerial[s] = W.aSerial[p];

@@ -74,7 +74,7 @@ watching the sim run. Everything else in this doc is decided.
 - Speeds: pause, 1×, 2×, 5×, 20×, and max (as fast as the machine allows).
 
 ### Agents
-**Bunny (α) and Wolf (Ω)**
+**Bunny and Wolf**
 - Sexes: male and female. Only a male–female pair can breed.
 - Life stages: Baby → Adult → Elder. Only adults breed; babies and elders move slower.
 - Pregnancy lasts `PregnancyDays`, then she gives birth on free 4-neighbor tiles. If
@@ -88,7 +88,7 @@ watching the sim run. Everything else in this doc is decided.
 - Wolves bite for `BiteDamage`. A bitten bunny can escape wounded and heal. Each bite
   feeds the wolf `BiteFood`, so wolves feed as they bite and never eat carcasses.
 - Starving: at Fullness 0 an animal loses HP each second and dies when HP reaches 0.
-- Death leaves a corpse (†) on the tile, which blocks movement like anything else.
+- Death leaves a corpse (bones) on the tile, which blocks movement like anything else.
 - No genetics yet. Every animal of a species has the same stats. Inheritance comes later.
 - **Wolves bite bunnies, and that's the only fighting.** Bunnies never fight back and
   wolves never fight each other.
@@ -96,8 +96,13 @@ watching the sim run. Everything else in this doc is decided.
 - Pregnancy doesn't slow a female down.
 - **Winded:** an animal that runs its Stamina to 0 can't sprint again until its Stamina
   is full.
+- **A hunting wolf remembers where it last saw its bunny** (Paul, 4 Oct 2026). Grass
+  blocks sight, so a bunny can duck out of view; the wolf then walks to the spot where it
+  last saw it, picks the chase back up if the bunny reappears, and gives up when it
+  reaches the spot and sees nothing or after `TrackSeconds`. Out of sight, it knows only
+  what it last saw.
 
-**Grass (░ ▒ ▓)**
+**Grass**
 - Each tile of grass is one blade. Its sprite shows its Size in thirds.
 - A blade grows from sprout to full Size, then can seed a new blade on an empty
   4-neighbor tile, and dies of old age at its `Lifespan`.
@@ -112,7 +117,7 @@ watching the sim run. Everything else in this doc is decided.
 - Bunny bites shrink a blade, and a blade bitten down to 0 dies. A bite on a blade
   smaller than `BiteSize` feeds the bunny in proportion to what it removed.
 
-**Corpses (†)**
+**Corpses**
 - Not eaten by animals; they only feed grass.
 - A corpse holds `CorpseNutrient` and decays over `CorpseDecay` days. Until it's gone, grass
   within `CorpseRadius` grows and seeds `CorpseBoost` times faster.
@@ -274,7 +279,11 @@ seeds and saves numbers back into `tables/`. What's been found, in order:
   increasing means a bad run; runs stop as soon as their direction is clear.
 - **Wolves were starving among plenty of bunnies,** not failing to catch them: from about
   day 12, 5–14 wolves starved every 3 days while bunnies tripled. Faster sprints and more
-  stamina changed almost nothing; food per bite did. Wolf `BiteFood` 20 (from 10) kept
+  stamina changed almost nothing; food per bite did. Wolf `BiteFood` 20 (from 10, now saved) kept
   all three species for 200 days on 11 of 12 fresh seeds (average 197 days, wolves ending
   around 100 instead of a handful), against 9 of 12. Harder bites made it worse: a bunny
   that dies in fewer bites feeds a wolf less.
+- **Wolves remembering where a bunny hid** (`TrackSeconds`) helped over 50 days (wolves
+  1.35× their start instead of 1.1× at the old food, 3.7× instead of 3.2× at `BiteFood`
+  20) but not over 200: with `BiteFood` 20, 15 s of memory kept 10 of 12 fresh seeds
+  alive against 11 of 12 without. It ships at 0 (off); the rule is there to turn on.

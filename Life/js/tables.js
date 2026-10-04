@@ -33,6 +33,7 @@
     ['RestBelow', 'frac', ANIMALS],
     ['RestUntil', 'frac', ANIMALS],
     ['SprintRange', 'num', ['Wolf']],
+    ['TrackSeconds', 'num', ['Wolf']],
     ['WanderRun', 'range', ANIMALS],
     ['DecidePerSec', 'pos', ANIMALS],
     ['Diet', 'text', []],

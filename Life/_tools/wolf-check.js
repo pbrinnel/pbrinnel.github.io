@@ -134,6 +134,75 @@ const d2 = (W, a, b) => (W.tx(a) - W.tx(b)) ** 2 + (W.ty(a) - W.ty(b)) ** 2;
   tick(sim, secs(AS, 2));
   ok(sname(sim, w, 'wolf') !== 'HUNT', 'a bunny behind a grass wall is unseen: no HUNT');
 }
+// --- tracking: a hunting wolf heads for where it last saw its bunny (TrackSeconds) ---
+{
+  // The bunny is in plain view, the wolf is hunting it, then grass walls go up and the
+  // bunny is set down behind the second one: out of sight, and not where it was last seen.
+  function scene(track, seed) {
+    const g = make(40, seed, false, t => { t.species = editCSV(t.species, 'TrackSeconds', 'Wolf', String(track)); });
+    const { AS, sim, W } = g;
+    const w = wolf(AS, sim, 6, 20, { full: 20 }), b = bun(AS, sim, 14, 20);
+    W.aStepLeft[b] = 1e6;
+    tick(sim, secs(AS, 0.4));
+    const hunting = sname(sim, w, 'wolf') === 'HUNT' && W.aTargetSlot[w] === b;
+    for (let y = 0; y < 40; y++) W.addGrass(at(W, 10, y), 1, 3);
+    for (let x = 0; x < 40; x++) if (x !== 10) W.addGrass(at(W, x, 24), 1, 3);
+    W.moveAnimal(b, at(W, 14, 27));
+    W.aStepLeft[b] = 1e6;
+    return { ...g, w, b, hunting, seen: at(W, 14, 20), lostAt: sim.simSeconds };
+  }
+  const track = 60;
+  {
+    const { AS, sim, W, w, b, hunting, seen, events } = scene(track, 11);
+    ok(hunting, 'track: the wolf hunts the bunny while it is in view');
+    let always = true, aimed = true, arrived = -1;
+    for (let i = 0; i < secs(AS, 40) && arrived < 0; i++) {
+      tick(sim);
+      if (W.aTile[w] === seen) { arrived = i; break; }
+      if (sname(sim, w, 'wolf') !== 'HUNT') always = false;
+      else if (W.aTargetTile[w] !== seen || W.aTargetSlot[w] !== -1) aimed = false;
+    }
+    ok(arrived >= 0, 'track: the wolf walks to the last-seen tile through the grass');
+    ok(always && aimed, 'track: it stays in HUNT, its target the last-seen tile (slot -1), all the way');
+    tick(sim, secs(AS, 1));
+    ok(sname(sim, w, 'wolf') !== 'HUNT', 'track: arriving without seeing the bunny ends the hunt');
+    ok(!events.some(e => e[0] === AS.EV.BITE), 'track: it never bites a bunny it can not see');
+  }
+  {
+    // the bunny comes back into view on the way: the chase resumes and ends in a bite
+    const { AS, sim, W, w, b, events } = scene(track, 12);
+    tick(sim, secs(AS, 1));
+    const still = sname(sim, w, 'wolf') === 'HUNT' && W.aTargetSlot[w] === -1;
+    for (let y = 0; y < 40; y++) W.removeGrass(at(W, 10, y)); // clear sight
+    for (let x = 0; x < 40; x++) if (x !== 10) W.removeGrass(at(W, x, 24));
+    tick(sim, secs(AS, 1));
+    ok(still, 'track: searching, before the bunny reappears');
+    ok(sname(sim, w, 'wolf') === 'HUNT' && W.aTargetSlot[w] === b, 'track: the bunny reappears and the chase resumes on it');
+    tick(sim, secs(AS, 10));
+    ok(events.some(e => e[0] === AS.EV.BITE), 'track: the resumed chase ends in a bite');
+  }
+  {
+    // TrackSeconds runs out before the wolf gets there
+    const T2 = 2;
+    const { AS, sim, W, w, seen, lostAt } = scene(T2, 13);
+    let early = true, late = false;
+    while (sim.simSeconds < lostAt + T2 + 0.6) {
+      tick(sim);
+      const hunt = sname(sim, w, 'wolf') === 'HUNT';
+      if (sim.simSeconds < lostAt + T2 - 0.5 && !hunt) early = false;
+      if (sim.simSeconds >= lostAt + T2 + 0.5 && !hunt) late = true;
+    }
+    ok(W.aTile[w] !== seen, 'track: (timeout case) the wolf had not reached the tile');
+    ok(early && late, `track: gives up TrackSeconds (${T2} s) after losing sight, not before`);
+  }
+  {
+    // 0 forgets at once, as before tracking existed
+    const { AS, sim, w } = scene(0, 14);
+    ok(sname(sim, w, 'wolf') === 'HUNT', 'track 0: still hunting the instant sight is lost');
+    tick(sim, secs(AS, 1));
+    ok(sname(sim, w, 'wolf') !== 'HUNT', 'track 0: drops the hunt at the next decision');
+  }
+}
 // --- give up ---
 {
   const { AS, sim, W, B, Wf, events } = make(60, 4);
@@ -183,7 +252,8 @@ const d2 = (W, a, b) => (W.tx(a) - W.tx(b)) ** 2 + (W.ty(a) - W.ty(b)) ** 2;
 }
 // --- chew toward visible prey ---
 {
-  const { AS, sim, W, events } = make(30, 7);
+  // BiteFood pinned so the wolf (starting at 20 Fullness) stays hungry for the bites counted.
+  const { AS, sim, W, events } = make(30, 7, false, tx => { tx.species = editCSV(tx.species, 'BiteFood', 'Wolf', '10'); });
   const bt = at(W, 9, 9);
   // The west blade is the cheap one; north, east and (7,9) cost a full second to chew, and
   // sight from (8,8) to the bunny stays clear.

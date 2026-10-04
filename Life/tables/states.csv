@@ -5,7 +5,7 @@ Bunny,3,SEEK_FOOD,Hungry and no blade adjacent,Walk toward the nearest visible b
 Bunny,4,MATE,Adult; Fullness ≥ MateFullness; female's cooldown 0; not pregnant,Walk to nearest eligible bunny of the other sex; adjacent → mate
 Bunny,5,REST,Stamina < RestBelow,Stand still until Stamina reaches RestUntil
 Bunny,6,WANDER,Otherwise,Walk a run of WanderRun tiles in a random direction
-Wolf,1,HUNT,Hungry (Fullness < HungryAt) and sees a bunny,Walk toward it; sprint within SprintRange; bite when adjacent
+Wolf,1,HUNT,Hungry (Fullness < HungryAt) and sees a bunny; after losing sight it keeps going to the last-seen spot until it arrives or TrackSeconds pass,Walk toward it; sprint within SprintRange; bite when adjacent
 Wolf,2,GIVE_UP,Stamina 0 mid-chase,Stop and rest until Stamina reaches RestUntil; the bunny gets away
 Wolf,3,MATE,As bunny,As bunny
 Wolf,4,REST,Stamina < RestBelow,Stand still until Stamina reaches RestUntil
