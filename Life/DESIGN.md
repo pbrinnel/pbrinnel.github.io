@@ -198,10 +198,21 @@ watching the sim run. Everything else in this doc is decided.
   is drawn, even mid-step between two tiles. A panel shows every variable from
   `variables.csv`, live, and the selection follows the agent as it moves. Clicking empty
   ground clears it. Live values only, no life history.
-- **Counts:** live totals of bunnies, wolves, blades and corpses.
-- **Population graph:** a side panel, shown and hidden from the HUD, plotting grass,
-  bunnies and wolves over the whole run on one chart with a logarithmic scale. Scroll and
-  zoom along it to see any part of the run's history; hover or tap for the exact counts.
+- **Controls in tabs** (Paul, 4 Oct 2026): the top bar always shows Pause, the speeds and
+  the day, then three tabs and Hide UI. **Info:** live counts of bunnies, wolves, blades
+  and corpses, and the Graph button. **Debug:** Lines, Benchmark, the seed. **God:** tools
+  for interfering with the sim. One tab's strip is open at a time.
+- **Hide UI** shows just the world; a small corner button (or the H key) brings it back.
+- **Population graph:** a floating window you drag by its title bar, remembered where you
+  left it, plotting grass, bunnies and wolves over the whole run on one chart with a
+  logarithmic scale. Scroll and zoom along it to see any part of the run's history; hover
+  or tap for the exact counts.
+- **NUKE MODE** (God tab; Paul's first "god" feature): while armed, a tap on the world
+  drops a nuke there. Everything within `NukeRadius` tiles is destroyed outright: animals
+  (no corpses), grass, corpses, warren holes. The ground stays scorched, with nothing
+  growing or dug, for up to `ScorchDays` at the center and less toward the rim, so the
+  crater greens from its edges. The blast shows as an expanding ring and a fading orange
+  glow within its circle, never a flash.
 
 ---
 

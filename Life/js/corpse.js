@@ -48,6 +48,9 @@
     }
   }
 
+  // Takes a corpse away outside decay (a nuke): frees its boost tiles like a rotted one.
+  AS.corpseRemove = function (sim, t) { release(sim, t); };
+
   AS.corpseTick = function (sim) {
     const { T, W } = sim;
     // Backwards: removing a corpse swaps the last one into its slot, and that one is done.

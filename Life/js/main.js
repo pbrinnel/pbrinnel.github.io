@@ -18,6 +18,8 @@
   // The inspector refreshes this often; a new selection shows at once.
   const INSPECT_EVERY_MS = 100;
   const LINES_KEY = 'life-intent-lines';
+  // The open tab ('info', 'debug', 'god', or '' for closed), remembered per browser.
+  const TAB_KEY = 'life-ui-tab';
 
   const debug = new URLSearchParams(location.search).has('debug');
   let speedIndex = START_SPEED;
@@ -33,6 +35,10 @@
   // Intent lines are the viewer's choice, kept per browser; off when storage is unavailable.
   let linesOn = false;
   try { linesOn = localStorage.getItem(LINES_KEY) === '1'; } catch (e) { /* stays off */ }
+  // The open HUD tab is also the viewer's choice. Nothing stored (or storage blocked): Info.
+  let savedTab;
+  try { const v = localStorage.getItem(TAB_KEY); if (v !== null) savedTab = v === '' ? null : v; } catch (e) { /* default */ }
+  let nukeOn = false;   // NUKE MODE: a tap on the world drops a nuke instead of selecting
   let graph = null;   // made once the tables load; the HUD button may exist before that
 
   const ui = AS.UI({
@@ -43,6 +49,9 @@
     onCloseInspector: () => { sel = null; },
     onBench: () => AS.runBench(AS.app),
     onGraph: () => { if (graph) graph.toggle(); },
+    tab: savedTab,
+    onTab: name => { try { localStorage.setItem(TAB_KEY, name || ''); } catch (e) { /* not kept */ } },
+    onNuke: on => { nukeOn = on; },
     lines: linesOn,
     onLines: on => {
       linesOn = on;
@@ -86,6 +95,7 @@
   // corpses don't move, so they're picked by tile.
   cam.attach((tx, ty, fx, fy) => {
     const W = sim.W;
+    if (nukeOn) { if (tx >= 0) app.nukeAt(tx, ty); return; }
     if (tx >= 0 && (tool === 'corpse-bunny' || tool === 'corpse-wolf')) {
       AS.debugDropCorpse(sim, W.tile(tx, ty), tool === 'corpse-bunny' ? AS.SPECIES.BUNNY : AS.SPECIES.WOLF);
       return;
@@ -191,12 +201,19 @@
   }
   // For the console, the benchmark and test harnesses.
   //   app.load(sim)     swaps in another world (the benchmark's); the camera re-centers on it
+  //   app.nukeAt(x, y)  a nuke on that tile (what a tap does in NUKE MODE)
   //   app.onFrame       null, or fn(intervalMs, tickMs, drawMs, ticks) after every frame
   const app = AS.app = {
     T, cam, renderer, sheet, ui, graph, setSpeed, onFrame: null,
     get sim() { return sim; },
     get sel() { return sel; },
     get speedIndex() { return speedIndex; },
+    // Drops a nuke on tile (tx, ty): the sim side (god.js) and the explosion drawn over it.
+    nukeAt(tx, ty) {
+      const out = AS.nuke(sim, sim.W.tile(tx, ty));
+      renderer.blast(tx, ty, sim.T.world.NukeRadius, performance.now());
+      return out;
+    },
     load(next) {
       sim = next;
       sel = null;

@@ -3,7 +3,7 @@
 const { spawn } = require('child_process'); const os = require('os'), path = require('path'), fs = require('fs');
 const PORT = 9336, CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-sim-touch-'));
-const chrome = spawn(CHROME, [`--user-data-dir=${profile}`, `--remote-debugging-port=${PORT}`, '--no-first-run', '--no-default-browser-check', '--window-size=600,900', 'about:blank'], { stdio: 'ignore' });
+const chrome = spawn(CHROME, [`--user-data-dir=${profile}`, `--remote-debugging-port=${PORT}`, '--headless=new', '--no-first-run', '--no-default-browser-check', '--window-size=600,900', 'about:blank'], { stdio: 'ignore' });
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 (async () => {
   let url; for (let i = 0; i < 50 && !url; i++) { try { url = (await (await fetch(`http://127.0.0.1:${PORT}/json`)).json()).find(t => t.type === 'page')?.webSocketDebuggerUrl; } catch (e) {} if (!url) await sleep(200); }

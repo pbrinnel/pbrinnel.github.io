@@ -79,8 +79,8 @@
   const isWolf = t => mW.kind[t] === K.WOLF;
   const isFreeHole = t => mW.hole[t] === 1 && mW.kind[t] === K.EMPTY;
   const isHoleTile = t => t === mGoalTile;
-  // Bare ground a bunny can dig: nothing on it and not already a hole.
-  const isBare = (W, t) => W.kind[t] === K.EMPTY && W.hole[t] === 0;
+  // Bare ground a bunny can dig: nothing on it, not already a hole, not scorched.
+  const isBare = (W, t) => W.kind[t] === K.EMPTY && W.hole[t] === 0 && W.scorch[t] === 0;
   const isFreshBlade = t => {
     if (mW.kind[t] !== K.GRASS) return false;
     const base = mSelf * BAD_N, now = mSim.tickCount, owner = mW.aSerial[mSelf];

@@ -25,7 +25,8 @@ function build(debug, extra = {}) {
   const ids = { hud: new El('div'), errors: new El('div'), inspector: new El('aside'), graph: new El('aside') };
   ids.graph._hidden = true;
   ids.errors._hidden = true; ids.inspector._hidden = true;
-  const doc = { createElement: t => new El(t), getElementById: i => ids[i], listeners: {},
+  const body = new El('body');
+  const doc = { createElement: t => new El(t), getElementById: i => ids[i], body, listeners: {},
     addEventListener(t, f) { (this.listeners[t] ||= []).push(f); } };
   const ctx = { document: doc, globalThis: null, AS: {} }; ctx.globalThis = ctx;
   vm.createContext(ctx);
@@ -33,9 +34,10 @@ function build(debug, extra = {}) {
   const calls = [], tools = [];
   const speeds = [0, 1, 2, 5, 20, Infinity];
   const ui = ctx.AS.UI({ debug, speeds, onSpeed: i => calls.push(i), onDebugTool: m => tools.push(m), onCloseInspector: () => calls.push('closed'), onBench: () => calls.push('bench'), onGraph: () => calls.push('graph'), ...extra });
-  return { ui, ids, doc, calls, tools };
+  return { ui, ids, doc, calls, tools, body };
 }
-const btns = (ids) => ids.hud.all(e => e.tagName === 'BUTTON' && e.className.includes('hud-btn') && !e.className.split(' ').includes('hud-tool'));
+// The speed buttons only (not the tabs, Hide UI or the debug tools).
+const btns = (ids) => ids.hud.all(e => e.className === 'hud-speeds')[0].children;
 let n = 0; const ok = m => console.log('ok', ++n, m);
 const input = { speedIndex: 1, achieved: 1, day: 3.24, seed: 1234567, counts: { bunnies: 0, wolves: 0, blades: 23999, corpses: 1234567 } };
 
@@ -121,9 +123,9 @@ const input = { speedIndex: 1, achieved: 1, day: 3.24, seed: 1234567, counts: { 
 }
 { const { ui, ids, doc, calls, tools } = build(true);
   const bench = ids.hud.all(e => e.className === 'hud-bench')[0];
-  const info = ids.hud.all(e => e.className === 'hud-info')[0];
+  const info = ids.hud.all(e => e.className === 'hud-panel hud-panel-debug')[0];
   const names = info.children.map(c => c.className);
-  assert(names.indexOf('hud-bench') === names.indexOf('hud-seed') + 1 && names.indexOf('hud-bench') < names.indexOf('hud-tools')); ok('Benchmark button sits after the seed, before the debug tools');
+  assert(names.indexOf('hud-bench') < names.indexOf('hud-seed') && names.indexOf('hud-seed') < names.indexOf('hud-tools')); ok('Debug tab: Lines/Benchmark, then the seed, then the debug tools');
   bench.fire('click'); assert.deepStrictEqual(calls, ['bench']); ok('Benchmark button calls onBench');
   calls.length = 0;
   const kd = e => doc.listeners.keydown.forEach(f => f({ ctrlKey: false, metaKey: false, altKey: false, target: {}, preventDefault() {}, ...e }));
@@ -158,5 +160,62 @@ const input = { speedIndex: 1, achieved: 1, day: 3.24, seed: 1234567, counts: { 
 { const { ids } = build(false, { onLines() {}, lines: true });
   const l = ids.hud.all(e => e.className.split(' ').includes('hud-lines'))[0];
   assert(l.classList.contains('on')); ok('Lines button starts on when the saved choice is on');
+}
+
+// ---- tabs, Hide UI, NUKE MODE ----
+const tabBtn = (ids, label) => ids.hud.all(e => e.className.split(' ').includes('hud-tab') && e.textContent === label)[0];
+const panelOf = (ids, key) => ids.hud.all(e => e.className === 'hud-panel hud-panel-' + key)[0];
+const stripOf = ids => ids.hud.all(e => e.className === 'hud-tabstrip')[0];
+{ const { ids } = build(false);
+  const bar = ids.hud.all(e => e.className === 'hud-strip')[0];
+  const barText = bar.children.map(c => c.className).join('|');
+  for (const c of ['hud-speeds', 'hud-status', 'hud-day', 'hud-tabs', 'hud-hide']) assert(barText.includes(c), c);
+  assert(!bar.all(e => e.className.includes('hud-count') || e.className.includes('hud-lines') || e.className.includes('hud-nuke')).length); ok('the bar holds speeds, day, tabs and Hide UI, none of the tab contents');
+  assert.deepStrictEqual(ids.hud.all(e => e.className.split(' ').includes('hud-tab')).map(b => b.textContent), ['Info', 'Debug', 'God']); ok('three tabs: Info, Debug, God');
+  assert.strictEqual(ids.hud.all(e => e.className.includes('hud-hide'))[0].textContent, 'Hide UI'); ok('a Hide UI button');
+}
+{ const { ui, ids } = build(false, { onLines() {} });
+  assert.strictEqual(ui.tab, 'info'); assert(!stripOf(ids).hidden && !panelOf(ids, 'info').hidden && panelOf(ids, 'debug').hidden && panelOf(ids, 'god').hidden); ok('Info is open by default');
+  assert(panelOf(ids, 'info').textContent.includes('Graph') && panelOf(ids, 'info').all(e => e.className === 'hud-glyph').length === 4); ok('Info holds the four counts and the Graph button');
+  assert(panelOf(ids, 'debug').all(e => e.className.includes('hud-lines')).length === 1 && panelOf(ids, 'debug').textContent.includes('Benchmark') && panelOf(ids, 'debug').textContent.includes('Seed')); ok('Debug holds Lines, Benchmark and the Seed');
+  assert(panelOf(ids, 'god').textContent.includes('NUKE MODE')); ok('God holds NUKE MODE');
+}
+{ const tabs = [];
+  const { ui, ids } = build(false, { tab: null, onTab: n => tabs.push(n) });
+  assert(stripOf(ids).hidden && ui.tab === null && tabs.length === 0); ok('tab: null starts closed, and the starting tab is not reported');
+  tabBtn(ids, 'Debug').fire('click');
+  assert(!stripOf(ids).hidden && !panelOf(ids, 'debug').hidden && panelOf(ids, 'info').hidden && tabBtn(ids, 'Debug').classList.contains('on')); ok('clicking a tab opens its strip');
+  tabBtn(ids, 'God').fire('click');
+  assert(panelOf(ids, 'debug').hidden && !panelOf(ids, 'god').hidden && !tabBtn(ids, 'Debug').classList.contains('on') && tabBtn(ids, 'God').classList.contains('on')); ok('only one tab is open at a time');
+  tabBtn(ids, 'God').fire('click');
+  assert(stripOf(ids).hidden && ui.tab === null && !tabBtn(ids, 'God').classList.contains('on')); ok('clicking the open tab closes the strip');
+  assert.deepStrictEqual(tabs, ['debug', 'god', null]); ok('onTab reports each change (for remembering it)');
+}
+{ const { ui, ids } = build(false, { tab: 'god' });
+  assert(ui.tab === 'god' && !panelOf(ids, 'god').hidden); ok('a remembered tab opens at load');
+  const { ui: u2 } = build(false, { tab: 'nonsense' }); assert.strictEqual(u2.tab, null); ok('an unknown remembered tab means closed');
+}
+{ const { ui, ids, doc, body } = build(false);
+  assert(!body.classList.contains('ui-off') && !ui.hidden);
+  ids.hud.all(e => e.className.includes('hud-hide'))[0].fire('click');
+  assert(ui.hidden && body.classList.contains('ui-off')); ok('Hide UI sets ui-off on the body (CSS hides bar, strip, graph and inspector)');
+  const showBtn = body.all(e => e.className === 'hud-show')[0];
+  assert(showBtn && showBtn.textContent === 'Show UI'); showBtn.fire('click');
+  assert(!ui.hidden && !body.classList.contains('ui-off')); ok('the corner button brings the UI back');
+  const kd = e => doc.listeners.keydown.forEach(f => f({ ctrlKey: false, metaKey: false, altKey: false, target: {}, preventDefault() {}, ...e }));
+  kd({ key: 'h' }); assert(ui.hidden); kd({ key: 'H' }); assert(!ui.hidden); ok('H toggles the UI');
+  kd({ key: 'h', target: { tagName: 'INPUT' } }); assert(!ui.hidden); ok('H is ignored while typing in an input');
+  kd({ key: 'h', ctrlKey: true }); assert(!ui.hidden); ok('Ctrl+H is left to the browser');
+}
+{ const calls = [];
+  const { ui, ids, body } = build(false, { onNuke: on => calls.push(on) });
+  const nuke = ids.hud.all(e => e.className.split(' ').includes('hud-nuke'))[0];
+  assert(nuke.textContent === 'NUKE MODE' && !nuke.classList.contains('on') && !ui.nuke && !body.classList.contains('nuke-armed')); ok('NUKE MODE starts off');
+  nuke.fire('click');
+  assert(ui.nuke && nuke.classList.contains('on') && body.classList.contains('nuke-armed') && calls[0] === true); ok('clicking arms it: highlighted, crosshair class, onNuke(true)');
+  ui.hud(input); assert(ui.nuke); ok('it stays armed (repeated nukes work)');
+  ui.lock(true); assert(nuke.disabled); nuke.fire('click'); assert(ui.nuke); ui.lock(false); ok('locked during the benchmark');
+  nuke.fire('click');
+  assert(!ui.nuke && !nuke.classList.contains('on') && !body.classList.contains('nuke-armed') && calls.join() === 'true,false'); ok('clicking again disarms it');
 }
 console.log('all passed');

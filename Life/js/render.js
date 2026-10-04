@@ -34,6 +34,33 @@
   const FAR_CORPSE = abgr('#6a6250'), FAR_GROUND = abgr('#121410'), FAR_HOLE = abgr('#3d2e20');
   const FAR_ANIMAL = [['#e0a868', '#f2cc96'], ['#8fb2e0', '#c0d6f2']].map(r => r.map(abgr));   // [species][sex]
 
+  // Scorched ground (a nuke's crater, W.scorch): a charcoal brown over the normal ground,
+  // fading back to nothing as the tile's timer runs out. The far view mixes the same two
+  // colors per tile; sprite mode lays translucent squares under everything else.
+  const SCORCH_GROUND = '#2e231b';
+  const FAR_SCORCH = abgr(SCORCH_GROUND);
+  function mixAbgr(a, b, f) {
+    if (f > 1) f = 1;
+    const ch = sh => Math.round(((a >>> sh) & 255) * (1 - f) + ((b >>> sh) & 255) * f);
+    return (0xff000000 | (ch(16) << 16) | (ch(8) << 8) | ch(0)) >>> 0;
+  }
+  const SCORCH_FADE_STEPS = 8;   // sprite mode quantizes the fade to this many alphas, so a big crater doesn't pay a state change per tile
+
+  // The explosion, drawn over real time so it lasts the same at any sim speed. A thin ring
+  // runs out to the blast radius while a soft orange-red glow swells and fades inside it.
+  // Photosensitivity (DESIGN.md): the glow starts and ends at zero alpha and eases through
+  // its peak, a single slow swell, never above BLAST_GLOW_PEAK, and it covers only the
+  // blast circle; no white, no flicker, nothing full-screen.
+  const BLAST_MS = 1500;
+  const BLAST_RING_CSS_PX = 2;
+  const BLAST_RING_PEAK = 0.5;
+  const BLAST_RING_COLOR = '255,150,70';
+  const BLAST_GLOW_PEAK = 0.45;
+  const BLAST_GLOW_CENTER = '224,84,31', BLAST_GLOW_EDGE = '150,30,10';
+  // The glow's alpha at 0 / 0.55 / 1 of its radius, as shares of the current peak: soft edge.
+  const BLAST_GLOW_STOPS = [1, 0.5, 0];
+  const MAX_BLASTS = 8;   // a hammered tap can't pile up work
+
   // Real time an event holds a pose, whatever the speed, so nothing flickers (DESIGN.md,
   // Photosensitivity): a meatless death's fallen sprite, a bite's flinch, a mouthful or bite, a birth's hop.
   const DEATH_HOLD_MS = 700, FLINCH_HOLD_MS = 300, ACTION_HOLD_MS = 300, BIRTH_HOLD_MS = 400;
@@ -70,6 +97,8 @@
     // When each tile's death pose ends, real ms; a corpse with no meat shows the fallen animal until then.
     let deathUntil = new Float64Array(0);
     let evSim = null, evCursor = 0;
+    const blasts = [];   // { x, y, r, t0 }: tile center, radius in tiles, real ms it began
+    const reduceMotion = !!(globalThis.matchMedia && globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches);
     // State ids by species, from states.csv names, for the poses that depend on what it is doing.
     let statesFor = null;
     const restState = [new Uint8Array(256), new Uint8Array(256)];
@@ -183,12 +212,13 @@
       }
       const px = cell.px, kind = W.kind, size = W.gSize;
       const bg = FAR_GROUND, g0 = FAR_GRASS[0], g1 = FAR_GRASS[1], g2 = FAR_GRASS[2];
-      const corpse = FAR_CORPSE, holeAt = W.hole;
+      const corpse = FAR_CORPSE, holeAt = W.hole, scorch = W.scorch, fullDays = sim.T.world.ScorchDays;
       const lo = 1 / 3, hi = 2 / 3;
       for (let t = 0, n = W.n; t < n; t++) {
         const k = kind[t];
         if (k === KIND.GRASS) { const z = size[t]; px[t] = z < lo ? g0 : z < hi ? g1 : g2; }
         else if (k === KIND.CORPSE) px[t] = corpse;
+        else if (scorch[t] > 0) px[t] = mixAbgr(bg, FAR_SCORCH, scorch[t] / fullDays);
         else px[t] = holeAt[t] ? FAR_HOLE : bg;   // empty ground (or a hole), or an animal that the loop below paints
       }
       for (let s = 0, hiSlot = W.aHigh; s < hiSlot; s++) {
@@ -236,6 +266,7 @@
           ctx.drawImage(img, sh.sx(id), sh.sy(id), px, px, dx, dy, dw, dh);
         }
       }
+      drawScorch(sim, v, s, ox, oy);
       if (intentLines) drawIntent(sim, v, s, ox, oy, dpr, -1);
       else if (sel && sel.slot >= 0 && W.aAlive[sel.slot]) drawIntent(sim, v, s, ox, oy, dpr, sel.slot);
       // Animals, over the ground. Slots are stable, so this is one pass over the used range.
@@ -280,6 +311,53 @@
           Math.round(ax * s - ox), Math.round(ay * s - oy) - Math.round((peeking ? 0 : posed[1]) * unit), px, px);
       }
       ctx.imageSmoothingEnabled = true;
+    }
+
+    // Scorched tiles under everything else. Alpha is the share of ScorchDays left, in steps.
+    function drawScorch(sim, v, s, ox, oy) {
+      const W = sim.W, scorch = W.scorch, fullDays = sim.T.world.ScorchDays;
+      let lastQ = 0;
+      for (let ty = v.y0; ty <= v.y1; ty++) {
+        const dy = Math.round(ty * s - oy), dh = Math.round((ty + 1) * s - oy) - dy;
+        const row = ty * W.w;
+        for (let tx = v.x0; tx <= v.x1; tx++) {
+          const left = scorch[row + tx];
+          if (!(left > 0)) continue;
+          const q = Math.min(SCORCH_FADE_STEPS, Math.ceil(left / fullDays * SCORCH_FADE_STEPS));
+          if (q !== lastQ) { ctx.globalAlpha = q / SCORCH_FADE_STEPS; if (!lastQ) ctx.fillStyle = SCORCH_GROUND; lastQ = q; }
+          const dx = Math.round(tx * s - ox);
+          ctx.fillRect(dx, dy, Math.round((tx + 1) * s - ox) - dx, dh);
+        }
+      }
+      if (lastQ) ctx.globalAlpha = 1;
+    }
+
+    // The blast effects, over the world. Each runs BLAST_MS of real time, then is dropped.
+    function drawBlasts(cam, dpr, nowMs) {
+      const s = cam.scale * dpr;
+      for (let i = blasts.length - 1; i >= 0; i--) {
+        const b = blasts[i], p = (nowMs - b.t0) / BLAST_MS;
+        if (p >= 1) { blasts.splice(i, 1); continue; }
+        if (p < 0) continue;
+        const cx = (b.x - cam.x) * s, cy = (b.y - cam.y) * s;
+        const grow = 1 - Math.pow(1 - p, 3);          // fast at first, settling at the edge
+        const r = b.r * s * (reduceMotion ? 1 : grow);
+        // Swells from 0 to the peak at mid-way and back to 0: sin over the half turn.
+        const glow = BLAST_GLOW_PEAK * Math.sin(Math.PI * p) * (reduceMotion ? 0.5 : 1);
+        if (glow > 0.002 && r > 0.5) {
+          const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+          g.addColorStop(0, `rgba(${BLAST_GLOW_CENTER},${glow * BLAST_GLOW_STOPS[0]})`);
+          g.addColorStop(0.55, `rgba(${BLAST_GLOW_EDGE},${glow * BLAST_GLOW_STOPS[1]})`);
+          g.addColorStop(1, `rgba(${BLAST_GLOW_EDGE},${glow * BLAST_GLOW_STOPS[2]})`);
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+        }
+        if (!reduceMotion) {
+          ctx.lineWidth = BLAST_RING_CSS_PX * dpr;
+          ctx.strokeStyle = `rgba(${BLAST_RING_COLOR},${BLAST_RING_PEAK * (1 - p)})`;
+          ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+        }
+      }
     }
 
     // One path per species-and-sex color, one stroke each: there may be thousands of lines.
@@ -360,8 +438,15 @@
           ctx.drawImage(cell.canvas, 0, 0, W.w, W.h, -cam.x * s, -cam.y * s, W.w * s, W.h * s);
           ctx.imageSmoothingEnabled = true;
         }
+        if (blasts.length) drawBlasts(cam, dpr, nowMs);
         if (sel) drawSelection(sim, cam, sel, dpr);
       },
+      // A nuke went off at tile (tx, ty), radius in tiles; the effect starts now (real time).
+      blast(tx, ty, radius, nowMs) {
+        if (blasts.length >= MAX_BLASTS) blasts.shift();
+        blasts.push({ x: tx + 0.5, y: ty + 0.5, r: radius, t0: nowMs === undefined ? performance.now() : nowMs });
+      },
+      get blasts() { return blasts.length; },
     };
   };
 })(globalThis.AS);

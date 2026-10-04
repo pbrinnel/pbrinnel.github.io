@@ -26,7 +26,7 @@ const POLL_MS = Number(process.env.POLL_MS || 30000);
 
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'life-lab-search-'));
 const chrome = spawn(CHROME, [`--user-data-dir=${profile}`, `--remote-debugging-port=${PORT}`,
-  '--no-first-run', '--no-default-browser-check', '--disable-extensions',
+  '--headless=new', '--no-first-run', '--no-default-browser-check', '--disable-extensions',
   '--disable-background-timer-throttling', '--disable-renderer-backgrounding',
   '--disable-backgrounding-occluded-windows', '--window-size=900,700', 'about:blank'], { stdio: 'ignore' });
 const sleep = ms => new Promise(r => setTimeout(r, ms));

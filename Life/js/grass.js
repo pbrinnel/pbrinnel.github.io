@@ -49,11 +49,15 @@
 
     const phase = sim.tickCount % AS.TICKS_PER_HOUR;
     const firstNew = W.nextSerial;   // blades seeded in this pass wait for the next hour
+    const scorch = W.scorch;
     for (let t = phase; t < W.n; t += AS.TICKS_PER_HOUR) {
+      // Scorched ground cools an hour at a time; nothing grows on it until it reaches 0.
+      let burnt = scorch[t];
+      if (burnt > 0) { burnt = burnt > DAYS_PER_HOUR ? burnt - DAYS_PER_HOUR : 0; scorch[t] = burnt; }
       // An empty tile can grow a blade by itself (SproutChance), so grass can come back to
       // land it has lost; a nearby corpse speeds that up like it speeds seeding.
       if (W.kind[t] === AS.KIND.EMPTY) {
-        if (sproutRate > 0 && !W.hole[t]) {
+        if (sproutRate > 0 && !W.hole[t] && burnt === 0) {
           const ps = 1 - Math.exp(-sproutRate * (boostSrc[t] >= 0 ? AS.corpseBoost(sim, t) : 1));
           if (rng.chance(ps)) W.addGrass(t, g.SproutSize, 0);
         }
@@ -73,7 +77,7 @@
       if (p < 1 && !rng.chance(p)) continue;
       const k = W.neighbors4(t, nb);
       let free = 0;
-      for (let j = 0; j < k; j++) if (W.kind[nb[j]] === AS.KIND.EMPTY && !W.hole[nb[j]]) nb[free++] = nb[j];
+      for (let j = 0; j < k; j++) if (W.kind[nb[j]] === AS.KIND.EMPTY && !W.hole[nb[j]] && scorch[nb[j]] === 0) nb[free++] = nb[j];
       if (free) W.addGrass(nb[rng.int(free)], g.SproutSize, 0);
     }
   };

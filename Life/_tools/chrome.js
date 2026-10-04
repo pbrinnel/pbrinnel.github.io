@@ -1,4 +1,5 @@
-// Opens a page in a real windowed Chrome (throwaway profile, no background throttling) and
+// Opens a page in headless Chrome (throwaway profile, no background throttling; headless so
+// it never opens a window in Paul's way) and
 // drives it over the DevTools protocol. Shared by the tools that need real timing or
 // long-running pages: the page must not be throttled the way a hidden tab is.
 //
@@ -18,7 +19,7 @@ exports.open = async function (url, opts = {}) {
   const [w, h] = opts.size || [900, 700];
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'life-chrome-'));
   const chrome = spawn(CHROME, [`--user-data-dir=${profile}`, `--remote-debugging-port=${port}`,
-    '--no-first-run', '--no-default-browser-check', '--disable-extensions',
+    '--headless=new', '--no-first-run', '--no-default-browser-check', '--disable-extensions',
     '--disable-background-timer-throttling', '--disable-renderer-backgrounding',
     '--disable-backgrounding-occluded-windows', `--window-size=${w},${h}`, 'about:blank'], { stdio: 'ignore' });
   const close = () => {

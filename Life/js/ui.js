@@ -1,8 +1,18 @@
-// The HUD strip over the map, and the page that replaces the sim when the tables are bad.
+// The HUD over the map, and the page that replaces the sim when the tables are bad.
+//
+// The bar is always visible: speed buttons, the day, three tab buttons (Info, Debug, God)
+// and Hide UI. A tab opens a strip under the bar with its controls; the open tab's button
+// closes it again, and one tab is open at a time. Hide UI hides the bar, strip, graph window
+// and inspector (CSS, `ui-off` on <body>) and leaves a faint button in the corner.
 //
 // AS.UI({ debug, speeds, onSpeed(i), onDebugTool(mode), onBench(), onGraph(),
-//         lines (initial on/off), onLines(on) }) → ui
+//         lines (initial on/off), onLines(on),
+//         tab (initial: 'info' | 'debug' | 'god' | null for closed; default 'info'), onTab(name | null),
+//         onNuke(on) }) → ui
 //   ui.hud({ speedIndex, achieved, day, seed, counts: { bunnies, wolves, blades, corpses } })
+//   ui.tab, ui.setTab(name | null)   the open tab
+//   ui.hidden, ui.setHidden(on)      Hide UI (the H key toggles it; never remembered across loads)
+//   ui.nuke, ui.setNuke(on)          NUKE MODE armed (main.js reads it through onNuke)
 //   ui.errors(errors, warnings)   the sim didn't start; show why
 //   ui.warnings(warnings)         the sim started; say quietly what the CSVs have extra
 //   ui.lock(on)                   true: speed buttons, Benchmark, Graph, debug tools and keys do nothing
@@ -27,6 +37,12 @@
     ['corpse-wolf', 'Drop Ω†', 'Click a tile to drop a wolf corpse'],
   ];
   // Counts in HUD order: glyph, key in the counts object, tooltip.
+  // The tabs, in bar order: key, label, tooltip.
+  const TABS = [
+    ['info', 'Info', 'Live counts and the population graph'],
+    ['debug', 'Debug', 'Lines, Benchmark and the seed'],
+    ['god', 'God', 'Powers over the world'],
+  ];
   const COUNTS = [
     ['α', 'bunnies', 'bunnies'],
     ['Ω', 'wolves', 'wolves'],
@@ -51,7 +67,7 @@
   }
 
   AS.UI = function (opts) {
-    const { debug, speeds, onSpeed, onDebugTool, onCloseInspector, onBench, onGraph, onLines } = opts;
+    const { debug, speeds, onSpeed, onDebugTool, onCloseInspector, onBench, onGraph, onLines, onTab, onNuke } = opts;
     const hudEl = document.getElementById('hud');
     const errorsEl = document.getElementById('errors');
     const inspEl = document.getElementById('inspector');
@@ -62,7 +78,8 @@
     let lastRunning = -1; // the last non-pause index, for Space
     let locked = false;   // the benchmark is running: nothing here changes the sim
 
-    // ---- strip ----
+    // ---- bar ----
+    const top = el('div', 'hud-top');
     const strip = el('div', 'hud-strip');
     const speedBox = el('div', 'hud-speeds');
     const buttons = speeds.map((s, i) => {
@@ -73,9 +90,38 @@
       speedBox.appendChild(b);
       return b;
     });
-    const info = el('div', 'hud-info');
     const status = el('span', 'hud-status', '');
     const dayEl = el('span', 'hud-day', '');
+    const tabBox = el('div', 'hud-tabs');
+    const tabBtns = {}, tabPanels = {};
+    const tabStrip = el('div', 'hud-tabstrip');
+    tabStrip.hidden = true;
+    for (const [key, label, tip] of TABS) {
+      const b = el('button', 'hud-btn hud-tab', label);
+      b.type = 'button';
+      b.title = tip;
+      b.addEventListener('click', () => { setTab(openTab === key ? null : key); b.blur(); });
+      tabBox.appendChild(b);
+      tabBtns[key] = b;
+      const panel = el('div', 'hud-panel hud-panel-' + key);
+      panel.hidden = true;
+      tabPanels[key] = panel;
+      tabStrip.appendChild(panel);
+    }
+    const hideBtn = el('button', 'hud-btn hud-hide', 'Hide UI');
+    hideBtn.type = 'button';
+    hideBtn.title = 'Hide everything but the world (H brings it back)';
+    hideBtn.addEventListener('click', () => { setHidden(true); hideBtn.blur(); });
+    strip.append(speedBox, status, dayEl, tabBox, hideBtn);
+
+    // The small faint button that brings the UI back; CSS shows it only while hidden.
+    const showBtn = el('button', 'hud-show', 'Show UI');
+    showBtn.type = 'button';
+    showBtn.title = 'Show the UI (H)';
+    showBtn.addEventListener('click', () => { setHidden(false); showBtn.blur(); });
+    if (document.body) document.body.appendChild(showBtn);
+
+    // ---- Info tab ----
     const countsBox = el('span', 'hud-counts');
     const countEls = {};
     for (const [glyph, key, tip] of COUNTS) {
@@ -86,31 +132,20 @@
       c.appendChild(countEls[key]);
       countsBox.appendChild(c);
     }
-    const seedBox = el('span', 'hud-seed');
-    seedBox.title = 'Paste into Seed in tables/settings.csv to replay this start';
-    const seedNum = el('span', 'hud-seednum', '');
-    seedBox.append('Seed ', seedNum);
-    info.append(status, dayEl, countsBox, seedBox);
-    let benchBtn = null;
-    if (onBench) {
-      benchBtn = el('button', 'hud-bench', 'Benchmark');
-      benchBtn.type = 'button';
-      benchBtn.title = 'Measure how large a world this device keeps smooth';
-      benchBtn.addEventListener('click', () => { if (!locked) onBench(); benchBtn.blur(); });
-      info.appendChild(benchBtn);
-    }
+    tabPanels.info.appendChild(countsBox);
 
-    // The panel closes itself too (its ×), so the button reads the panel's state in hud().
+    // The window closes itself too (its ×), so the button reads the window's state in hud().
     let graphBtn = null;
     if (onGraph) {
       graphBtn = el('button', 'hud-bench hud-graph', 'Graph');
       graphBtn.type = 'button';
       graphBtn.title = 'Population over the whole run';
       graphBtn.addEventListener('click', () => { if (!locked) onGraph(); graphBtn.blur(); });
-      info.appendChild(graphBtn);
+      tabPanels.info.appendChild(graphBtn);
     }
 
-    // Unlike Graph, the button owns its state: nothing else changes it.
+    // ---- Debug tab ----
+    // Unlike Graph, the Lines button owns its state: nothing else changes it.
     let linesBtn = null;
     if (onLines) {
       let linesOn = !!opts.lines;
@@ -122,8 +157,21 @@
         if (!locked) { linesOn = !linesOn; linesBtn.classList.toggle('on', linesOn); onLines(linesOn); }
         linesBtn.blur();
       });
-      info.appendChild(linesBtn);
+      tabPanels.debug.appendChild(linesBtn);
     }
+    let benchBtn = null;
+    if (onBench) {
+      benchBtn = el('button', 'hud-bench', 'Benchmark');
+      benchBtn.type = 'button';
+      benchBtn.title = 'Measure how large a world this device keeps smooth';
+      benchBtn.addEventListener('click', () => { if (!locked) onBench(); benchBtn.blur(); });
+      tabPanels.debug.appendChild(benchBtn);
+    }
+    const seedBox = el('span', 'hud-seed');
+    seedBox.title = 'Paste into Seed in tables/settings.csv to replay this start';
+    const seedNum = el('span', 'hud-seednum', '');
+    seedBox.append('Seed ', seedNum);
+    tabPanels.debug.appendChild(seedBox);
 
     const warnBtn = el('button', 'hud-warn', '');
     warnBtn.type = 'button';
@@ -131,7 +179,7 @@
     const warnList = el('ul', 'hud-warnlist');
     warnList.hidden = true;
     warnBtn.addEventListener('click', () => { warnList.hidden = !warnList.hidden; warnBtn.blur(); });
-    info.appendChild(warnBtn);
+    tabPanels.debug.appendChild(warnBtn);
 
     const toolButtons = [];
     if (debug) {
@@ -150,15 +198,58 @@
         toolButtons.push(b);
         return b;
       });
-      info.appendChild(tools);
+      tabPanels.debug.appendChild(tools);
     }
 
-    strip.append(speedBox, info);
-    hudEl.append(strip, warnList);
+    // ---- God tab ----
+    // Armed until toggled off, so repeated nukes work; main.js turns a tap on the world into
+    // a nuke while it is on.
+    let nukeOn = false;
+    const nukeBtn = el('button', 'hud-bench hud-nuke', 'NUKE MODE');
+    nukeBtn.type = 'button';
+    nukeBtn.title = 'While on, tapping the world drops a nuke there';
+    nukeBtn.addEventListener('click', () => { if (!locked) setNuke(!nukeOn); nukeBtn.blur(); });
+    tabPanels.god.appendChild(nukeBtn);
+    function setNuke(on) {
+      on = !!on;
+      if (on === nukeOn) return;
+      nukeOn = on;
+      nukeBtn.classList.toggle('on', on);
+      if (document.body) document.body.classList.toggle('nuke-armed', on);
+      if (onNuke) onNuke(on);
+    }
+
+    top.append(strip, tabStrip);
+    hudEl.append(top, warnList);
     // Taps on the HUD belong to the HUD, not to the map under it.
     for (const t of ['pointerdown', 'pointerup', 'wheel']) {
-      strip.addEventListener(t, e => e.stopPropagation());
+      top.addEventListener(t, e => e.stopPropagation());
       warnList.addEventListener(t, e => e.stopPropagation());
+    }
+
+    let openTab = null, quiet = false;
+    function setTab(name) {
+      if (name !== null && !tabPanels[name]) name = null;
+      if (name === openTab) return;
+      openTab = name;
+      for (const [key] of TABS) {
+        tabPanels[key].hidden = key !== name;
+        tabBtns[key].classList.toggle('on', key === name);
+      }
+      tabStrip.hidden = name === null;
+      if (onTab && !quiet) onTab(name);
+    }
+    // The first tab is set quietly: onTab is for the viewer's changes (main.js remembers them).
+    quiet = true;
+    setTab(opts.tab === undefined ? 'info' : opts.tab);
+    quiet = false;
+
+    let uiHidden = false;
+    function setHidden(on) {
+      on = !!on;
+      if (on === uiHidden) return;
+      uiHidden = on;
+      if (document.body) document.body.classList.toggle('ui-off', on);
     }
 
     function choose(i) {
@@ -176,6 +267,7 @@
     document.addEventListener('keydown', e => {
       if (typing(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
       if (locked) { if (e.key === ' ') e.preventDefault(); return; }
+      if (e.key === 'h' || e.key === 'H') { setHidden(!uiHidden); return; }
       if (e.key === ' ' || e.code === 'Space') {
         e.preventDefault();
         if (speeds[current] === 0) {
@@ -249,12 +341,12 @@
     let rowEls = [];   // { row, value, range, setValue, setRange, tip }
     let panelTop = -1;
 
-    // The panel starts under the strip, whose height changes as its contents wrap.
+    // The panel starts under the bar and tab strip, whose height changes as contents wrap.
     function placeInspector() {
-      const h = strip.offsetHeight;
+      const h = top.offsetHeight;
       if (h !== undefined && h !== panelTop) { panelTop = h; inspEl.style.setProperty('--hud-bottom', h + 'px'); }
     }
-    if (typeof ResizeObserver === 'function') new ResizeObserver(placeInspector).observe(strip);
+    if (typeof ResizeObserver === 'function') new ResizeObserver(placeInspector).observe(top);
 
     function inspector(desc) {
       if (!desc) { if (!inspEl.hidden) inspEl.hidden = true; return; }
@@ -311,11 +403,16 @@
     // Disabling the buttons also dims them; the handlers check `locked` as well.
     function lock(on) {
       locked = !!on;
-      for (const b of [...buttons, benchBtn, graphBtn, linesBtn, ...toolButtons]) {
+      for (const b of [...buttons, benchBtn, graphBtn, linesBtn, nukeBtn, ...toolButtons]) {
         if (b) b.disabled = locked;
       }
     }
 
-    return { hud, errors, warnings, inspector, lock };
+    return {
+      hud, errors, warnings, inspector, lock, setTab, setHidden, setNuke,
+      get tab() { return openTab; },
+      get hidden() { return uiHidden; },
+      get nuke() { return nukeOn; },
+    };
   };
 })(globalThis.AS);

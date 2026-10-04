@@ -49,8 +49,10 @@ The goal is a self-sustaining ecosystem (DESIGN.md, top).
   `http://localhost:8914/life.html`; set `LIFE_URL` to point them elsewhere.
 - **The browser pane throttles when hidden.** If the Claude app's browser pane isn't on
   screen, the page sees itself as a background tab and animation frames nearly stop. For
-  anything timed (speed, benchmarks, screenshots of motion) use `_tools/shoot.js` or
-  `_tools/run-bench.js`, which drive a real windowed Chrome.
+  anything timed (screenshots of motion, lab runs) use `_tools/shoot.js` and
+  `_tools/chrome.js`, which drive headless Chrome. **Never open a visible browser window**
+  (Paul, 4 Oct 2026: they get in his way). `_tools/run-bench.js` is the exception: it needs
+  a real window for honest frame timing, so run it only when Paul asks for a benchmark.
 - Verify on a phone-sized viewport as well as desktop; phone is a target. Paul's phone is an
   iPhone; Safari is the browser to judge it by (Firefox on iOS caps pages at 30 fps).
 - Never strobe or flash. Event poses (a bite, a mouthful, a death) hold for a minimum of

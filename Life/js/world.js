@@ -91,6 +91,11 @@
       hSlot: new Int32Array(n).fill(-1),
       hCount: 0,
 
+      // Scorched ground, by tile: days left. A nuke sets it (god.js), the hourly grass pass counts
+      // it down (grass.js). While it is above 0 no blade may stand, seed or sprout there and no
+      // hole may be dug; animals walk over it. Only a ground property, so `kind` is untouched.
+      scorch: new Float32Array(n),
+
       // The corpse tile that boosts each tile's grass, or -1. Written only by corpse.js.
       boostSrc: new Int32Array(n).fill(-1),
 
@@ -138,6 +143,7 @@
 
     W.addGrass = function (t, size, age) {
       if (W.hole[t]) throw new Error(`tile ${t} is a warren hole; no grass grows there`);
+      if (W.scorch[t] > 0) throw new Error(`tile ${t} is scorched; no grass grows there`);
       claim(t, KIND.GRASS);
       W.serial[t] = W.nextSerial++;
       W.gSize[t] = size;
@@ -158,10 +164,11 @@
       W.gAge[t] = 0;
     };
 
-    // Digs a hole on tile t. Bare ground only: no blade on it, and no wolf standing there.
+    // Digs a hole on tile t. Bare ground only: no blade on it, no wolf standing there, not scorched.
     W.addHole = function (t, usedAt) {
       if (W.hole[t]) throw new Error(`tile ${t} is already a hole`);
       if (W.kind[t] === KIND.GRASS || W.kind[t] === KIND.WOLF) throw new Error(`tile ${t} can't be dug (kind ${W.kind[t]})`);
+      if (W.scorch[t] > 0) throw new Error(`tile ${t} is scorched; it can't be dug`);
       W.hole[t] = 1;
       W.holeUsedAt[t] = usedAt || 0;
       W.hSlot[t] = W.hCount;

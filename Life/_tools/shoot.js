@@ -1,5 +1,5 @@
-// Screenshots the live sim in a real windowed Chrome (throwaway profile, no background
-// throttling), after running a setup script in the page.
+// Screenshots the live sim in headless Chrome (throwaway profile, no background
+// throttling, no window in Paul's way), after running a setup script in the page.
 //
 //   node Life/_tools/shoot.js <desktop|phone> <out.png> [setup-file.js] [query]
 //
@@ -17,7 +17,7 @@ const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-sim-shot-'));
 const chrome = spawn(CHROME, [
   `--user-data-dir=${profile}`, `--remote-debugging-port=${DEBUG_PORT}`,
-  '--no-first-run', '--no-default-browser-check', '--disable-extensions',
+  '--headless=new', '--no-first-run', '--no-default-browser-check', '--disable-extensions',
   '--disable-background-timer-throttling', '--disable-renderer-backgrounding',
   '--disable-backgrounding-occluded-windows', '--window-size=1440,900', 'about:blank',
 ], { stdio: 'ignore' });

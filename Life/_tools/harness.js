@@ -11,7 +11,7 @@ const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..');
 // glyphs.js is DOM-free until a sheet is built, and holds the life-stage helper animals use.
-const SIM_FILES = ['tables', 'rng', 'world', 'grass', 'corpse', 'warren', 'sim', 'start', 'sight', 'animals', 'breed', 'bunny', 'wolf', 'glyphs'];
+const SIM_FILES = ['tables', 'rng', 'world', 'grass', 'corpse', 'warren', 'sim', 'god', 'start', 'sight', 'animals', 'breed', 'bunny', 'wolf', 'glyphs'];
 
 function load(overrides = {}) {
   const ctx = vm.createContext({ console, crypto: globalThis.crypto });
@@ -77,6 +77,11 @@ function audit(AS, sim, label) {
       check(k !== K.WOLF, `${label}: a wolf stands on hole ${t}`);
     } else {
       check(W.hSlot[t] === -1, `${label}: tile ${t} has hSlot but no hole`);
+    }
+    check(W.scorch[t] >= 0 && !Number.isNaN(W.scorch[t]), `${label}: tile ${t} scorch ${W.scorch[t]}`);
+    if (W.scorch[t] > 0) {
+      check(k !== K.GRASS, `${label}: grass on scorched tile ${t}`);
+      check(!W.hole[t], `${label}: hole on scorched tile ${t}`);
     }
     const src = W.boostSrc[t];
     if (src >= 0) {

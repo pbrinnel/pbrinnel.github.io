@@ -1,9 +1,10 @@
 // The population graph: grass, bunnies and wolves over the whole run on one logarithmic
-// chart, in a side panel the HUD's Graph button shows and hides.
+// chart, in a floating window the Info tab's Graph button shows and hides. Drag it by its
+// title bar (mouse or touch); it stays inside the viewport and its place is remembered.
 //
 // AS.Graph(T) → { open, toggle(), draw(sim, nowMs) }
-//   open    whether the panel is showing
-//   toggle  shows or hides the panel (the HUD's Graph button calls it through main.js)
+//   open    whether the window is showing
+//   toggle  shows or hides the window (the Graph button calls it through main.js)
 //   draw    called every frame by main.js; redraws only while open, throttled unless the user
 //           is interacting, from sim.history (see sim.js)
 //
@@ -25,6 +26,7 @@
   const LINE_W = 2;
   const FONT_PX = 11;
   const MARGIN = { left: 40, right: 58, top: 40, bottom: 22 };  // top holds legend and readout
+  const POS_KEY = 'life-graph-pos';   // the window's remembered { x, y }, CSS px from the viewport's top-left
   const LABEL_GAP = 12;           // direct labels are kept at least this far apart, in px
   const SERIES = [
     { key: 'grass', glyph: '░', name: 'grass' },
@@ -109,7 +111,13 @@
   }
   const panBy = (v, n, dh) => settle({ h0: v.h0 + dh, h1: v.h1 + dh }, n);
 
-  AS.graphMath = { yOf, topDecade, yTicks, fmtCount, niceStep, dayTicks, envelope, fitView, clampView, settle, advance, zoomAt, panBy, liveEnd, MIN_SPAN_H };
+  // Keeps a window of w × h inside a viewport of vw × vh; one wider or taller than the
+  // viewport sits at 0 so its title bar is still reachable.
+  function clampWindow(x, y, w, h, vw, vh) {
+    return { x: clamp(x, 0, Math.max(0, vw - w)), y: clamp(y, 0, Math.max(0, vh - h)) };
+  }
+
+  AS.graphMath = { clampWindow, yOf, topDecade, yTicks, fmtCount, niceStep, dayTicks, envelope, fitView, clampView, settle, advance, zoomAt, panBy, liveEnd, MIN_SPAN_H };
 
   // ---- the panel ----
   const fmtInt = n => Math.round(n).toLocaleString('en-US');
@@ -122,7 +130,7 @@
 
   AS.Graph = function (T) {
     const panel = document.getElementById('graph');
-    const strip = document.querySelector('#hud .hud-strip');
+    const strip = document.querySelector('#hud .hud-top');
     const g = { open: false, toggle, draw };
 
     const head = el('div', 'graph-head');
@@ -134,6 +142,7 @@
     closeBtn.type = 'button';
     closeBtn.title = 'Close';
     head.append(title, wholeBtn, closeBtn);
+    head.title = 'Drag to move';
     const canvas = el('canvas', 'graph-canvas');
     panel.append(head, canvas);
     const ctx = canvas.getContext('2d');
@@ -154,10 +163,59 @@
     }
     if (strip && typeof ResizeObserver === 'function') new ResizeObserver(placeUnderStrip).observe(strip);
 
+    // ---- the window's place ----
+    // Until it has been dragged (or one was remembered) the window sits under the bar, which
+    // CSS does from --hud-bottom; after that it is placed by left/top and clamped.
+    let pos = null;
+    try {
+      const saved = JSON.parse(localStorage.getItem(POS_KEY));
+      if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) pos = { x: saved.x, y: saved.y };
+    } catch (e) { /* nothing remembered */ }
+    const viewW = () => globalThis.innerWidth || 0, viewH = () => globalThis.innerHeight || 0;
+    function applyPos() {
+      if (!pos) { panel.style.left = ''; panel.style.top = ''; return; }
+      const w = panel.offsetWidth, h = panel.offsetHeight;
+      // Not measurable yet (hidden, or no layout): leave it as set rather than guess.
+      if (w > 0 && viewW() > 0) pos = clampWindow(pos.x, pos.y, w, h, viewW(), viewH());
+      panel.style.left = pos.x + 'px';
+      panel.style.top = pos.y + 'px';
+    }
+    function savePos() { try { localStorage.setItem(POS_KEY, JSON.stringify(pos)); } catch (e) { /* not kept */ } }
+    g.position = () => (pos ? { x: pos.x, y: pos.y } : null);
+    globalThis.addEventListener && globalThis.addEventListener('resize', () => { if (g.open) applyPos(); });
+    globalThis.addEventListener && globalThis.addEventListener('orientationchange', () => { if (g.open) applyPos(); });
+
+    // Showing the window again after Hide UI (display none → shown) changes its box: re-clamp
+    // there, in case the viewport changed while it was away.
+    if (typeof ResizeObserver === 'function') new ResizeObserver(() => { if (g.open) applyPos(); }).observe(panel);
+
+    // Mouse or touch on the title bar (not its buttons) drags the window.
+    let drag = null;   // { id, dx, dy }: pointer id and its offset inside the window
+    head.addEventListener('pointerdown', e => {
+      if (e.target !== head && e.target !== title) return;
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      const r = panel.getBoundingClientRect();
+      drag = { id: e.pointerId, dx: e.clientX - r.left, dy: e.clientY - r.top };
+      if (head.setPointerCapture) { try { head.setPointerCapture(e.pointerId); } catch (err) { /* not capturable */ } }
+      e.preventDefault();
+    });
+    head.addEventListener('pointermove', e => {
+      if (!drag || drag.id !== e.pointerId) return;
+      pos = { x: e.clientX - drag.dx, y: e.clientY - drag.dy };
+      applyPos();
+    });
+    const endDrag = e => {
+      if (!drag || drag.id !== e.pointerId) return;
+      drag = null;
+      if (pos) savePos();
+    };
+    head.addEventListener('pointerup', endDrag);
+    head.addEventListener('pointercancel', endDrag);
+
     function toggle() {
       g.open = !g.open;
       panel.hidden = !g.open;
-      if (g.open) { placeUnderStrip(); dirty = true; }
+      if (g.open) { placeUnderStrip(); applyPos(); dirty = true; }
     }
     closeBtn.addEventListener('click', toggle);
     wholeBtn.addEventListener('click', () => {

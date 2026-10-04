@@ -53,4 +53,15 @@ assert.strictEqual(M.niceStep(60), 10); assert.strictEqual(M.niceStep(12), 2); o
   near(z.h0, 150); near(z.h1, 250); ok('zoom keeps the point under the pointer fixed');
   const tiny = M.fitView(0); assert(tiny.h1 > tiny.h0); const t5 = M.zoomAt(M.fitView(5), 5, 2, 0.01); assert(t5.h0 >= 0 && t5.h1 <= 4); ok('tiny runs stay inside the data');
 }
+
+// The floating window stays inside the viewport.
+{
+  const c = M.clampWindow;
+  assert.deepStrictEqual({ ...c(100, 50, 420, 320, 1440, 900) }, { x: 100, y: 50 });
+  assert.deepStrictEqual({ ...c(-30, -5, 420, 320, 1440, 900) }, { x: 0, y: 0 });
+  assert.deepStrictEqual({ ...c(1300, 800, 420, 320, 1440, 900) }, { x: 1020, y: 580 });
+  assert.deepStrictEqual({ ...c(40, 40, 374, 300, 390, 250) }, { x: 16, y: 0 });   // taller than the viewport: pinned to the top
+  assert.deepStrictEqual({ ...c(40, 40, 500, 100, 390, 844) }, { x: 0, y: 40 });   // wider than the viewport: pinned to the left
+  ok('clampWindow keeps the window inside the viewport (and reachable when it is bigger)');
+}
 console.log('all passed');

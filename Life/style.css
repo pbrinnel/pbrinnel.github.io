@@ -40,7 +40,7 @@ html, body {
   --insp-bg: rgba(10, 12, 10, 0.95);
 }
 
-/* The wrapper lets gestures through to the map; only the strip and the warning list catch them. */
+/* The wrapper lets gestures through to the map; only the bar, the tab strip and the warning list catch them. */
 #hud {
   position: fixed;
   top: 0; left: 0; right: 0;
@@ -49,28 +49,64 @@ html, body {
   font-size: 13px;
   line-height: 1.2;
 }
-.hud-strip, .hud-warnlist {
+.hud-top, .hud-warnlist {
   pointer-events: auto;
   box-sizing: border-box;
   background: var(--hud-bg);
   border-bottom: 1px solid var(--hud-line);
 }
+.hud-top { box-sizing: border-box; background: var(--hud-bg); border-bottom: 1px solid var(--hud-line); }
+/* The bar: always visible. Speeds, status and day on the left, tabs and Hide UI after. */
 .hud-strip {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 16px;
+  gap: 4px 12px;
   padding: calc(env(safe-area-inset-top) + 4px) calc(env(safe-area-inset-right) + 8px) 4px calc(env(safe-area-inset-left) + 8px);
+  color: var(--hud-dim);
 }
-.hud-speeds { display: flex; gap: 4px; }
-.hud-info { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; min-height: var(--hud-h); color: var(--hud-dim); }
-.hud-counts { display: inline-flex; gap: 12px; color: var(--fg); }
+.hud-speeds, .hud-tabs { display: flex; gap: 4px; }
+.hud-hide { margin-left: auto; }
+/* The strip under the bar holds the open tab's controls; it scrolls inside itself, never the page. */
+.hud-tabstrip {
+  border-top: 1px solid var(--hud-line);
+  padding: 4px calc(env(safe-area-inset-right) + 8px) 4px calc(env(safe-area-inset-left) + 8px);
+  max-height: 40vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  color: var(--hud-dim);
+}
+.hud-tabstrip[hidden], .hud-panel[hidden] { display: none; }
+.hud-panel { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-height: var(--hud-h); }
+.hud-counts { display: inline-flex; flex-wrap: wrap; gap: 4px 12px; color: var(--fg); }
+/* The corner button that brings the UI back: small and faint, only while it is hidden. */
+.hud-show {
+  display: none;
+  position: fixed;
+  z-index: 10;
+  top: calc(env(safe-area-inset-top) + 6px);
+  right: calc(env(safe-area-inset-right) + 6px);
+  font: inherit;
+  font-size: 11px;
+  color: var(--fg);
+  background: transparent;
+  border: 1px solid var(--hud-line);
+  border-radius: 3px;
+  padding: 2px 6px;
+  opacity: 0.3;
+  cursor: pointer;
+}
+.hud-show:hover, .hud-show:focus-visible { opacity: 0.9; }
+body.ui-off .hud-show { display: block; }
+body.ui-off #hud, body.ui-off #inspector, body.ui-off #graph { display: none; }
+body.nuke-armed #map { cursor: crosshair; }
 .hud-glyph { color: var(--hud-dim); margin-right: 5px; }
 .hud-day { color: var(--fg); }
 .hud-status { color: var(--hud-on); }
 .hud-status:empty { display: none; }
 .hud-seednum { user-select: all; -webkit-user-select: all; color: var(--fg); cursor: text; }
 .hud-tools { display: inline-flex; gap: 4px; }
+.hud-tab { min-width: 0; }
 
 .hud-btn, .hud-warn {
   font: inherit;
@@ -97,14 +133,15 @@ html, body {
 }
 .hud-warnlist li { margin: 3px 0; }
 
-/* Phone: speeds share the first row evenly, everything else wraps under them. */
+/* Phone: speeds share the first row evenly; the day, tabs and Hide UI wrap under them. */
 @media (max-width: 600px) {
   #hud { font-size: 12px; }
-  .hud-strip { gap: 2px 0; }
+  .hud-strip { gap: 2px 8px; }
   .hud-speeds { width: 100%; }
   .hud-speeds .hud-btn { flex: 1; min-width: 0; padding: 0 2px; }
-  .hud-info { width: 100%; gap: 2px 10px; min-height: 0; }
-  .hud-counts { gap: 8px; }
+  .hud-tab, .hud-hide { padding: 0 8px; }
+  .hud-panel { gap: 2px 10px; }
+  .hud-counts { gap: 4px 8px; }
   .hud-tools .hud-btn { min-width: 0; padding: 0 6px; }
 }
 
@@ -237,7 +274,13 @@ html, body {
 
 /* ---- Population graph ---- */
 .hud-graph.on, .hud-lines.on { color: var(--bg); background: var(--hud-on); border-color: var(--hud-on); }
-/* JS sets --hud-bottom to the strip's current height, as for the inspector. */
+/* NUKE MODE armed: a steady orange-red fill, unmistakable and never animated. */
+.hud-nuke.on, .hud-nuke.on:hover { color: #fff3e8; background: #b8431a; border-color: #e0662f; }
+
+/* ---- Population graph: a floating window ---- */
+/* Until it is dragged (or a place is remembered) it sits under the bar: JS sets --hud-bottom to
+   the bar's current height, as for the inspector. A dragged window gets left/top inline, and
+   JS keeps it inside the viewport. */
 #graph {
   position: fixed;
   z-index: 9;
@@ -250,24 +293,20 @@ html, body {
   font-size: 13px;
   left: calc(env(safe-area-inset-left) + 8px);
   top: calc(var(--hud-bottom, 40px) + 8px);
-  bottom: 8px;
-  width: 420px;
+  width: min(420px, calc(100vw - 16px));
+  height: min(320px, calc(100vh - 16px));
   padding: 4px 8px 8px;
 }
 #graph[hidden] { display: none; }
-.graph-head { display: flex; align-items: center; gap: 8px; }
+.graph-head { display: flex; align-items: center; gap: 8px; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+.graph-head:active { cursor: grabbing; }
 .graph-title { color: var(--hud-on); flex: 1; }
 .graph-close { min-width: var(--hud-h); padding: 0; font-size: 18px; }
 .graph-whole { font-size: 12px; }
 .graph-canvas { flex: 1; min-height: 0; width: 100%; display: block; touch-action: none; }
 
-/* Phone: full width from under the strip to about half the screen, above the inspector's sheet. */
+/* Phone: the window spans the width, and a bit under half the height. */
 @media (max-width: 600px) {
-  #graph {
-    left: 0; right: 0; width: auto;
-    top: var(--hud-bottom, 80px);
-    bottom: 50%;
-    border-width: 0 0 1px;
-  }
+  #graph { width: calc(100vw - 16px); height: min(300px, 45vh); }
   .graph-whole { padding: 0 6px; }
 }
