@@ -310,3 +310,15 @@ body.nuke-armed #map { cursor: crosshair; }
   #graph { width: calc(100vw - 16px); height: min(300px, 45vh); }
   .graph-whole { padding: 0 6px; }
 }
+
+/* ---- End of a run ---- */
+.end-card {
+  position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%);
+  max-width: calc(100vw - 32px); box-sizing: border-box;
+  padding: 20px 28px; text-align: center;
+  background: var(--insp-bg, rgba(10, 12, 10, 0.95)); border: 1px solid #2a2f28; border-radius: 8px;
+  color: var(--fg); z-index: 50;
+}
+.end-title { font-size: 28px; letter-spacing: 0.08em; color: #e6d9a8; margin-bottom: 4px; }
+.end-day { color: #8a8d80; margin: 6px 0 14px; }
+.end-buttons { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }

@@ -169,6 +169,7 @@
     }
 
     const tickMs = performance.now() - t0;
+    checkEnded();
 
     if (now - window0 >= ACHIEVED_WINDOW_S * 1000) {
       achieved = (sim.simSeconds - simAtWindow0) / ((now - window0) / 1000);
@@ -203,6 +204,32 @@
   //   app.load(sim)     swaps in another world (the benchmark's); the camera re-centers on it
   //   app.nukeAt(x, y)  a nuke on that tile (what a tap does in NUKE MODE)
   //   app.onFrame       null, or fn(intervalMs, tickMs, drawMs, ticks) after every frame
+  // A run ends the moment a species dies out (Paul): the sim pauses and says which. Keep
+  // watching resumes without asking again about the species already gone. A species a
+  // world starts without (the benchmark's grass-only worlds) never counts as dying out.
+  const EXTINCT = [['wolves', 'WOLVES EXTINCT'], ['bunnies', 'BUNNIES EXTINCT'], ['grass', 'GRASS EXTINCT']];
+  const counts = W => ({ wolves: W.wolves, bunnies: W.bunnies, grass: W.gCount });
+  let gone = new Set(), absent = new Set(), runSpeed = speedIndex;
+  function resetEnded() {
+    const n = counts(sim.W);
+    gone = new Set();
+    absent = new Set(EXTINCT.filter(([k]) => n[k] === 0).map(([k]) => k));
+  }
+  function checkEnded() {
+    const n = counts(sim.W);
+    const fresh = EXTINCT.filter(([k]) => n[k] === 0 && !gone.has(k) && !absent.has(k));
+    if (!fresh.length) return;
+    fresh.forEach(([k]) => gone.add(k));
+    if (speedIndex !== 0) runSpeed = speedIndex;
+    setSpeed(0);
+    ui.ended({
+      titles: EXTINCT.filter(([k]) => gone.has(k)).map(([, t]) => t),
+      day: sim.day,
+      onNew() { ui.ended(null); app.load(AS.Sim(T, T.world.Seed ?? AS.newSeed())); setSpeed(runSpeed); },
+      onContinue() { ui.ended(null); setSpeed(runSpeed); },
+    });
+  }
+
   const app = AS.app = {
     T, cam, renderer, sheet, ui, graph, setSpeed, onFrame: null,
     get sim() { return sim; },
@@ -217,6 +244,8 @@
     load(next) {
       sim = next;
       sel = null;
+      resetEnded();
+      ui.ended(null);
       acc = 0;
       cam.setWorld(next.W);
       window0 = performance.now();
@@ -224,6 +253,7 @@
     },
   };
 
+  resetEnded();
   // Loading took real time the sim didn't run; start the clocks from here.
   last = window0 = performance.now();
   requestAnimationFrame(frame);

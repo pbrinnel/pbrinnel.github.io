@@ -16,6 +16,8 @@
 //   ui.errors(errors, warnings)   the sim didn't start; show why
 //   ui.warnings(warnings)         the sim started; say quietly what the CSVs have extra
 //   ui.lock(on)                   true: speed buttons, Benchmark, Graph, debug tools and keys do nothing
+//   ui.ended(info)                the run is over: info = { titles: ['WOLVES EXTINCT', …], day,
+//                                 onNew(), onContinue() }; null hides it
 //   ui.inspector(desc)            null hides the panel; else { title, rows: [{ name, value, range, tip }] }
 //                                 (opts.onCloseInspector() runs when the × is pressed)
 //
@@ -408,8 +410,31 @@
       }
     }
 
+    // End of a run: a card over the world naming what died out, with a way to start a new
+    // world or keep watching what's left.
+    let endEl = null;
+    function ended(info) {
+      if (endEl) { endEl.remove(); endEl = null; }
+      if (!info) return;
+      endEl = el('div', 'end-card');
+      endEl.setAttribute('role', 'dialog');
+      for (const t of info.titles) endEl.appendChild(el('div', 'end-title', t));
+      endEl.appendChild(el('div', 'end-day', `Day ${info.day.toFixed(1)}`));
+      const row = el('div', 'end-buttons');
+      const again = el('button', 'hud-bench', 'New world');
+      again.type = 'button';
+      again.addEventListener('click', () => info.onNew());
+      const watch = el('button', 'hud-bench', 'Keep watching');
+      watch.type = 'button';
+      watch.addEventListener('click', () => info.onContinue());
+      row.appendChild(again);
+      row.appendChild(watch);
+      endEl.appendChild(row);
+      document.body.appendChild(endEl);
+    }
+
     return {
-      hud, errors, warnings, inspector, lock, setTab, setHidden, setNuke,
+      hud, errors, warnings, inspector, lock, setTab, setHidden, setNuke, ended,
       get tab() { return openTab; },
       get hidden() { return uiHidden; },
       get nuke() { return nukeOn; },

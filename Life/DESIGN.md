@@ -202,6 +202,10 @@ watching the sim run. Everything else in this doc is decided.
   the day, then three tabs and Hide UI. **Info:** live counts of bunnies, wolves, blades
   and corpses, and the Graph button. **Debug:** Lines, Benchmark, the seed. **God:** tools
   for interfering with the sim. One tab's strip is open at a time.
+- **A run ends when a species dies out** (Paul, 4 Oct 2026): the sim pauses and a card
+  says which (WOLVES EXTINCT, BUNNIES EXTINCT, GRASS EXTINCT) and on what day, with **New
+  world** and **Keep watching** (which resumes and won't ask again about a species already
+  gone). A species a world starts without doesn't count.
 - **Hide UI** shows just the world; a small corner button (or the H key) brings it back.
 - **Population graph:** a floating window you drag by its title bar, remembered where you
   left it, plotting grass, bunnies and wolves over the whole run on one chart with a
