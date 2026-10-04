@@ -101,6 +101,7 @@ body.ui-off .hud-show { display: block; }
 body.ui-off #hud, body.ui-off #inspector, body.ui-off #graph { display: none; }
 body.nuke-armed #map { cursor: crosshair; }
 .hud-glyph { color: var(--hud-dim); margin-right: 5px; }
+.hud-icon { width: 16px; height: 16px; margin-right: 5px; vertical-align: -3px; image-rendering: pixelated; }
 .hud-day { color: var(--fg); }
 .hud-status { color: var(--hud-on); }
 .hud-status:empty { display: none; }

@@ -16,6 +16,8 @@
 //   ui.errors(errors, warnings)   the sim didn't start; show why
 //   ui.warnings(warnings)         the sim started; say quietly what the CSVs have extra
 //   ui.lock(on)                   true: speed buttons, Benchmark, Graph, debug tools and keys do nothing
+//   ui.setIcons(draw)             swaps the count letters for sprite icons: draw(key, canvas)
+//                                 paints the icon for 'bunnies', 'wolves', 'blades' or 'corpses'
 //   ui.ended(info)                the run is over: info = { titles: ['WOLVES EXTINCT', …], day,
 //                                 onNew(), onContinue() }; null hides it
 //   ui.inspector(desc)            null hides the panel; else { title, rows: [{ name, value, range, tip }] }
@@ -125,11 +127,11 @@
 
     // ---- Info tab ----
     const countsBox = el('span', 'hud-counts');
-    const countEls = {};
+    const countEls = {}, glyphEls = {};
     for (const [glyph, key, tip] of COUNTS) {
       const c = el('span', 'hud-count');
       c.title = tip;
-      c.appendChild(el('span', 'hud-glyph', glyph));
+      glyphEls[key] = c.appendChild(el('span', 'hud-glyph', glyph));
       countEls[key] = el('span', 'hud-num', '');
       c.appendChild(countEls[key]);
       countsBox.appendChild(c);
@@ -410,6 +412,19 @@
       }
     }
 
+    // The letters stand in until the sprite sheet exists (it needs the tables); then each
+    // becomes a small canvas with the same sprite the world draws.
+    function setIcons(draw) {
+      for (const [, key] of COUNTS) {
+        const cv = document.createElement('canvas');
+        cv.className = 'hud-icon';
+        cv.setAttribute('aria-hidden', 'true');
+        draw(key, cv);
+        glyphEls[key].replaceWith(cv);
+        glyphEls[key] = cv;
+      }
+    }
+
     // End of a run: a card over the world naming what died out, with a way to start a new
     // world or keep watching what's left.
     let endEl = null;
@@ -434,7 +449,7 @@
     }
 
     return {
-      hud, errors, warnings, inspector, lock, setTab, setHidden, setNuke, ended,
+      hud, errors, warnings, inspector, lock, setTab, setHidden, setNuke, ended, setIcons,
       get tab() { return openTab; },
       get hidden() { return uiHidden; },
       get nuke() { return nukeOn; },

@@ -87,6 +87,23 @@
   const canvas = document.getElementById('map');
   const cam = AS.Camera(canvas, sim.W);
   const sheet = AS.SpriteSheet(T);
+  // The Info tab's counts show the world's own sprites: a bunny, a wolf, a full tuft, a skull.
+  const ICON_CSS_PX = 16;
+  const ICON_SPRITE = {
+    bunnies: AS.spriteIndex(AS.SPECIES.BUNNY, AS.SEX.MALE, AS.STAGE.ADULT, 0, AS.SPRITE_FRAME.STAND),
+    wolves: AS.spriteIndex(AS.SPECIES.WOLF, AS.SEX.MALE, AS.STAGE.ADULT, 0, AS.SPRITE_FRAME.STAND),
+    blades: AS.spriteGrass(2),
+    corpses: AS.spriteSkull(AS.SPECIES.BUNNY),
+  };
+  ui.setIcons((key, cv) => {
+    // A whole number of device pixels per sprite pixel keeps the pixel art crisp.
+    const px = AS.SPRITE_SIZE * Math.max(1, Math.ceil(ICON_CSS_PX * (window.devicePixelRatio || 1) / AS.SPRITE_SIZE));
+    const sh = sheet.get(px), i = ICON_SPRITE[key];
+    cv.width = cv.height = px;
+    const g = cv.getContext('2d');
+    g.imageSmoothingEnabled = false;
+    g.drawImage(sh.canvas, sh.sx(i), sh.sy(i), px, px, 0, 0, px, px);
+  });
   const renderer = AS.Renderer(canvas);
   graph = AS.Graph(T);
 
