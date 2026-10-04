@@ -10,7 +10,7 @@
 //      { type: 'done', id, result }                            see finish() below
 'use strict';
 
-const SIM_FILES = ['tables', 'rng', 'world', 'grass', 'corpse', 'sim', 'sight', 'animals',
+const SIM_FILES = ['tables', 'rng', 'world', 'grass', 'corpse', 'sim', 'start', 'sight', 'animals',
   'breed', 'bunny', 'wolf', 'glyphs'];
 
 let canceled = null;

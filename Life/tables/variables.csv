@@ -1,5 +1,5 @@
 Variable,Kind,Applies to,Range,Goes up when,Goes down when,At the limit
-Fullness,Dynamic,Bunny Wolf,0 – FullnessMax,Eats (BiteFood),Every tick (HungerRate); mating (MateCost),0 → loses StarveDamage HP per s
+Fullness,Dynamic,Bunny Wolf,0 – FullnessMax,Eats (BiteFood; a wolf from a carcass),Every tick (HungerRate); mating (MateCost),0 → loses StarveDamage HP per s
 Stamina,Dynamic,Bunny Wolf,0 – StaminaMax,Not sprinting (StaminaRefill),Sprinting (SprintCost),0 → walk only until Stamina is full again
 HP,Dynamic,Bunny Wolf,0 – HPMax,HealRate while Fullness > HealAbove,Bitten; starving,0 → dies
 Age,Dynamic,All,0 – Lifespan (days),Every tick,—,Lifespan → dies of old age
@@ -16,3 +16,4 @@ Parents,Static,Bunny Wolf,two ids,—,—,For the inspector; none for the first 
 Children,Dynamic,Bunny Wolf,count,Each birth,—,
 Kills,Dynamic,Wolf,count,Each kill,—,
 Nutrient,Dynamic,Corpse,0 – CorpseNutrient,—,Drunk by boosted grass (one per unit of extra growth),0 or CorpseDecay days → corpse gone
+Meat,Dynamic,Corpse,0 – MeatOnBody,—,Eaten by a wolf (BiteFood per mouthful),0 or CorpseDecay days → nothing left to eat; the corpse is bones

@@ -109,15 +109,14 @@
     return false;
   };
 
-  // One bite of an adjacent animal (DESIGN.md: wolves bite for BiteDamage and feed BiteFood
-  // per bite, never eating carcasses). Returns whether a bite landed; a killing bite
-  // leaves a corpse and counts as a kill.
+  // One bite of an adjacent animal: BiteDamage, and no food. A wolf eats the carcass its
+  // kill leaves behind (wolf.js, FEED), not the live animal. Returns whether a bite landed;
+  // a killing bite leaves a corpse and counts as a kill.
   AS.biteAnimal = function (sim, s, prey) {
     const W = sim.W;
     if (W.aBiteLeft[s] > 0 || !W.aAlive[prey]) return false;
     const S = AS.speciesStats(sim, s);
     W.aBiteLeft[s] = S.BiteCooldown;
-    W.aFullness[s] = Math.min(S.FullnessMax, W.aFullness[s] + S.BiteFood);
     const t = W.aTile[prey];
     sim.emit(EV.BITE, t);
     W.aHP[prey] -= S.BiteDamage;

@@ -58,6 +58,7 @@
     ['SeedChance', 'frac', ['Grass']],
     ['CorpseNutrient', 'num', ANIMALS],
     ['CorpseDecay', 'pos', ANIMALS],
+    ['MeatOnBody', 'num', ANIMALS],
     ['CorpseRadius', 'num', ANIMALS],
     ['CorpseBoost', 'num', ANIMALS],
   ];
@@ -74,8 +75,14 @@
     ['StartWolves', 'count'],
     ['StartGrass', 'frac'],
     ['StartGrassAge', 'num'],
+    ['StartLayout', 'layout'],
+    ['MeadowSize', 'pos'],
+    ['BunnyColonies', 'count'],
+    ['WolfPacks', 'count'],
     ['Seed', 'seed'],
   ];
+  // How the world is laid out on day 0 (sim.js populate, start.js).
+  const LAYOUTS = ['Meadows', 'Scatter'];
 
   // RFC 4180-style: quoted fields, doubled quotes, CRLF, and the BOM a spreadsheet may add.
   function parseCSV(text) {
@@ -259,6 +266,12 @@
         if (!Number.isInteger(n) || n < 0 || n > MAX_SEED) {
           errors.push(`${where}: "${raw}" should be blank or a whole number from 0 to ${MAX_SEED}.`);
         } else out[name] = n;
+        continue;
+      }
+      if (type === 'layout') {
+        const hit = LAYOUTS.find(l => l.toLowerCase() === raw.toLowerCase());
+        if (!hit) errors.push(`${where}: "${raw}" should be one of ${LAYOUTS.join(', ')}.`);
+        else out[name] = hit;
         continue;
       }
       if (raw === '') { errors.push(`${where}: needs a value.`); continue; }

@@ -112,7 +112,8 @@
     return Object.freeze({
       ...T,
       world: Object.freeze({
-        ...T.world, WorldWidth: w, WorldHeight: h,
+        // Scatter: a benchmark needs its load spread evenly, not in meadows and colonies.
+        ...T.world, WorldWidth: w, WorldHeight: h, StartLayout: 'Scatter',
         StartGrass: share === undefined ? T.world.StartGrass : share,
         StartBunnies: animals.bunnies, StartWolves: animals.wolves,
       }),

@@ -34,8 +34,11 @@ for (const blades of M.BLADE_STEPS) {
   console.log(`   ${String(blades).padStart(7)} -> ${w}x${h} @ ${(share * 100).toFixed(1)}%  (${got} blades)`);
 }
 ok('worldFor: aspect, sides <= 2000, blades within 1% for every step');
-{ const a = M.worldFor(T, 384000), b = M.worldFor(T, 768000);
-  assert.strictEqual(a.share, T.world.StartGrass); assert(b.share > T.world.StartGrass && b.w === 2000);
+{ // From the tables: a blade count that fits at StartGrass, and one past what the side cap holds.
+  const aspect = T.world.WorldWidth / T.world.WorldHeight;
+  const capTiles = aspect >= 1 ? 2000 * Math.round(2000 / aspect) : Math.round(2000 * aspect) * 2000;
+  const a = M.worldFor(T, Math.floor(capTiles * T.world.StartGrass / 4)), b = M.worldFor(T, Math.ceil(capTiles * T.world.StartGrass * 1.2));
+  assert.strictEqual(a.share, T.world.StartGrass); assert(b.share > T.world.StartGrass && Math.max(b.w, b.h) === 2000);
   ok('share stays Paul\'s while the world fits, rises when the side cap bites'); }
 { const r = M.worldFor(T, 5e6); assert(!r.fits && r.w <= 2000 && r.h <= 2000); ok('a step that cannot fit is flagged'); }
 { const r = M.worldFor(T, 768000, 2000, 1000); assert(r.fits); const r2 = M.worldFor(T, 2660000, 2000, 100000); assert(!r2.fits); ok('animals are kept room for'); }

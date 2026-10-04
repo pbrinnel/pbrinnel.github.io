@@ -19,7 +19,8 @@
   // opts.grassAges 'mixed' starts each blade at a random age (and the Size that age grows
   // to) instead of StartGrassAge, and opts.bodies 'mixed' starts each animal at a random
   // Fullness, so some are hungry and hunting or seeking food from the first second. Both
-  // make a benchmark world cost what a world mid-run does.
+  // make a benchmark world cost what a world mid-run does. opts.layout overrides
+  // settings.csv's StartLayout.
   // Population history, one sample per in-world hour (counts at the start of that hour),
   // for the graph. It grows by doubling, so a long run costs a few bytes per hour.
   const HISTORY_START = 24 * 64;
@@ -82,6 +83,10 @@
   // One shuffle of all tiles feeds both, so nothing lands on a taken tile.
   function populate(sim, opts) {
     const { T, W, rng } = sim;
+    // Meadows (start.js) lays out a lived-in world; Scatter, or opts.layout 'scatter' (the
+    // benchmark, which needs evenly spread load), scatters everything evenly at random.
+    const layout = opts.layout || T.world.StartLayout;
+    if (layout === 'Meadows' || layout === 'meadows') { AS.startMeadows(sim, opts); return; }
     const order = new Int32Array(W.n);
     for (let i = 0; i < W.n; i++) order[i] = i;
     let k = 0;

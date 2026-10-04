@@ -18,7 +18,8 @@ const maps = [];
 const B = AS.SPRITE_BITMAPS;
 B.bunny.forEach((m, i) => maps.push([`bunny ${i}`, m]));
 B.wolf.forEach((m, i) => maps.push([`wolf ${i}`, m]));
-maps.push(['corpse', B.corpse]);
+B.carcass.forEach((m, i) => maps.push([`carcass ${i}`, m]));
+B.skull.forEach((m, i) => maps.push([`skull ${i}`, m]));
 B.grassLean.forEach((m, i) => maps.push([`grass lean ${i}`, m]));
 B.grass.forEach((m, i) => maps.push([`grass ${i}`, m]));
 check(B.bunny.length === AS.SPRITE_FRAMES && B.wolf.length === AS.SPRITE_FRAMES, 'every species has SPRITE_FRAMES frames');
@@ -42,7 +43,8 @@ const add = (i, what) => {
 for (let sp = 0; sp < 2; sp++) for (let sx = 0; sx < 2; sx++) for (let st = 0; st < 3; st++)
   for (let fl = 0; fl < 2; fl++) for (let fr = 0; fr < AS.SPRITE_FRAMES; fr++)
     add(AS.spriteIndex(sp, sx, st, fl, fr), `sp${sp} sex${sx} stage${st} left${fl} frame${fr}`);
-add(AS.SPRITE_CORPSE, 'corpse');
+for (let sp = 0; sp < 2; sp++) add(AS.spriteSkull(sp), `skull ${sp}`);
+for (let sp = 0; sp < 2; sp++) add(AS.spriteCarcass(sp), `carcass ${sp}`);
 for (let t = 0; t < 3; t++) add(AS.spriteGrassLean(t), `grass lean ${t}`);
 for (let t = 0; t < 3; t++) add(AS.spriteGrass(t), `grass ${t}`);
 check(seen.size === AS.SPRITE_COUNT, `every index used once (${seen.size} of ${AS.SPRITE_COUNT})`);

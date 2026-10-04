@@ -45,8 +45,17 @@
     ['........', '........', '..d.d.d.', '.xxxxxx.', 'dxxxxxxx', '.xwwxxxx', '.....xdx', '.....x.x'],
     ['.....x.x', '.....xxx', 'd...xxyx', '.dxxxxxn', '.xxxxxx.', '.xwwwwx.', '..d.d.d.', '..d.d.d.'],
   ];
-  const CORPSE_BITMAP =
-    ['........', '........', '.x....x.', 'xx....xx', '.xxxxxx.', 'xx....xx', '.x....x.', '........'];
+  // A body with meat still on it lies flat with its eye shut (Paul's pick: it reads as
+  // dead at full zoom, where X eyes or legs-up read as a blob); once the meat is gone,
+  // a skull is left until the corpse rots away. By species.
+  const CARCASS_BITMAPS = [
+    ['........', '........', '........', '......x.', '.....xx.', '..xxxxxx', 'wxxxxxdx', '.xxxxxxx'],
+    ['........', '........', '........', '.....x.x', '.....xxx', 'd...xxdx', 'dxxxxxxn', '.xxxxxdd'],
+  ];
+  const SKULL_BITMAPS = [
+    ['........', '........', '........', '..xxxx..', '.xxxxxxx', '.xdxxxxx', '..xxx.x.', '...x.x..'],
+    ['........', '........', '..x..x..', '.xxxx...', 'xxxxxxxx', 'xdxxxxxx', '.xxx.x.x', '........'],
+  ];
   // Sprout, middle, full: the three thirds of a blade's size.
   const GRASS_BITMAPS = [
     ['........', '........', '........', '........', '...x....', '....x...', '..x.x...', '...dd...'],
@@ -56,7 +65,7 @@
   // A gust leans a tuft: its top LEAN_ROWS rows shift one pixel right, the roots stay put.
   const LEAN_ROWS = 4;
   const GRASS_LEAN = GRASS_BITMAPS.map(m => m.map((row, j) => (j < LEAN_ROWS ? '.' + row.slice(0, SIZE - 1) : row)));
-  const BITMAPS = { bunny: BUNNY, wolf: WOLF, corpse: CORPSE_BITMAP, grass: GRASS_BITMAPS, grassLean: GRASS_LEAN };
+  const BITMAPS = { bunny: BUNNY, wolf: WOLF, carcass: CARCASS_BITMAPS, skull: SKULL_BITMAPS, grass: GRASS_BITMAPS, grassLean: GRASS_LEAN };
   AS.SPRITE_BITMAPS = BITMAPS;
   AS.SPRITE_CODES = 'xdweynfp';
   AS.SPRITE_SIZE = SIZE;
@@ -64,6 +73,8 @@
   // ---- palette ----------------------------------------------------------------------
   const GRASS_COLORS = ['#4f7a3c', '#5e9a46', '#7fc06a'];
   const SHADE_DARK = 0.6, SHADE_LIGHT = 1.35;
+  // A carcass is its species' color at this brightness, so it never reads as a live animal.
+  const CARCASS_BRIGHTNESS = 0.65;
   const ELDER_BRIGHTNESS = 0.72;
   const EYE = '#141210', AMBER = '#e8b84a', NOSE = '#1a1a1e', FANG = '#f2ece0', TONGUE = '#d99a9a';
   // Babies and corpses are drawn smaller than a tile, bottom-centered.
@@ -130,16 +141,17 @@
   };
 
   // ---- sheet layout -----------------------------------------------------------------
-  // Animals: ((((species*2+sex)*3+stage)*2+faceLeft)*FRAMES+frame), then the corpse, then
-  // the three grass thirds.
+  // Animals: ((((species*2+sex)*3+stage)*2+faceLeft)*FRAMES+frame), then each species'
+  // skull, the three grass thirds, the three leaning ones, and each species' carcass.
   const ANIMAL_SPRITES = 2 * 2 * 3 * 2 * FRAMES;
-  const CORPSE = ANIMAL_SPRITES, GRASS0 = CORPSE + 1, LEAN0 = GRASS0 + 3, COUNT = LEAN0 + 3;
+  const SKULL0 = ANIMAL_SPRITES, GRASS0 = SKULL0 + 2, LEAN0 = GRASS0 + 3, CARCASS0 = LEAN0 + 3, COUNT = CARCASS0 + 2;
   const SHEET_COLS = 19;
   AS.SPRITE_COUNT = COUNT;
   AS.SPRITE_FRAMES = FRAMES;
-  AS.SPRITE_CORPSE = CORPSE;
+  AS.spriteSkull = species => SKULL0 + species;
   AS.spriteGrass = third => GRASS0 + third;
   AS.spriteGrassLean = third => LEAN0 + third;
+  AS.spriteCarcass = species => CARCASS0 + species;
 
   // Wind: now and then a band sweeps diagonally across the meadow and tufts in it lean.
   // `clock` is real seconds, so a gust looks the same at any sim speed. Grass otherwise
@@ -180,13 +192,14 @@
 
   // Paints one bitmap into the px x px cell at (ox, oy) of g. A scaled sprite is bottom-
   // centered in its cell; its pixels land on whole device pixels.
-  function paint(g, ox, oy, px, map, base, flip, scale) {
+  function paint(g, ox, oy, px, map, base, flip, scale, dim) {
     const b = Math.max(MIN_SCALED_PX, Math.round(px * scale));
     const off = ox + Math.floor((px - b) / 2), top = oy + px - b;
     const col = {
       x: base, d: shade(base, SHADE_DARK), w: shade(base, SHADE_LIGHT),
       e: EYE, y: AMBER, n: NOSE, f: FANG, p: TONGUE,
     };
+    if (dim) for (const k of Object.keys(col)) col[k] = shade(col[k], dim);
     for (let j = 0; j < SIZE; j++) for (let i = 0; i < SIZE; i++) {
       const c = map[j][i];
       if (c === '.') continue;
@@ -221,7 +234,11 @@
             paint(g, x, y, px, frames[fr], base, fl === 1, st === AS.STAGE.BABY ? BABY_SCALE : 1));
         }
       }
-      at(CORPSE, (x, y) => paint(g, x, y, px, CORPSE_BITMAP, AS.COLORS[AS.GLYPH.CORPSE], false, CORPSE_SCALE));
+      for (let sp = 0; sp < 2; sp++) {
+        const base = AS.COLORS[AS.animalGlyph(sp, 0, AS.STAGE.ADULT)];
+        at(CARCASS0 + sp, (x, y) => paint(g, x, y, px, CARCASS_BITMAPS[sp], base, false, 1, CARCASS_BRIGHTNESS));
+        at(SKULL0 + sp, (x, y) => paint(g, x, y, px, SKULL_BITMAPS[sp], AS.COLORS[AS.GLYPH.CORPSE], false, CORPSE_SCALE));
+      }
       for (let i = 0; i < 3; i++) {
         at(GRASS0 + i, (x, y) => paint(g, x, y, px, GRASS_BITMAPS[i], GRASS_COLORS[i], false, 1));
         at(LEAN0 + i, (x, y) => paint(g, x, y, px, GRASS_LEAN[i], GRASS_COLORS[i], false, 1));

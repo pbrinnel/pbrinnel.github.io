@@ -47,13 +47,22 @@ check(d.rows[3].tip === '', 'Position tip empty: "' + d.rows[3].tip + '"');
 const ce = empties[1];
 W.addCorpse(ce, A.SPECIES.WOLF); A.corpseAdded(sim, ce);
 d = A.describe(sim, sel(ce)); allValues.push(d);
-check(names(d) === 'Age,Lifestage,Dead,Position,Nutrient', 'corpse rows: ' + names(d));
+check(names(d) === 'Age,Lifestage,Dead,Position,Nutrient,Meat', 'corpse rows: ' + names(d));
 check(/^Wolf corpse #\d+$/.test(d.title), 'corpse title: ' + d.title);
 check(val(d, 'Lifestage') === '—' && val(d, 'Dead') === 'Yes' && val(d, 'Age') === '0.00', 'corpse values');
 const CN = T.wolf.CorpseNutrient, cnText = m => String(m % 1 ? m.toFixed(1) : m);
 check(val(d, 'Nutrient') === `${CN.toFixed(1)} / ${cnText(CN)}`, 'nutrient ' + val(d, 'Nutrient'));
 W.cNut[ce] = 12.34;
 check(val(A.describe(sim, sel(ce)), 'Nutrient') === `12.3 / ${cnText(CN)}`, 'nutrient decimals');
+
+// meat: a bunny's carcass shows what is left of MeatOnBody; a wolf's has none to begin with
+const MW = T.wolf.MeatOnBody, MB = T.bunny.MeatOnBody, mtext = m => String(m % 1 ? m.toFixed(1) : m);
+check(val(d, 'Meat') === `${MW.toFixed(1)} / ${mtext(MW)}`, 'wolf corpse meat ' + val(d, 'Meat'));
+const cb = empties[19];
+W.addCorpse(cb, A.SPECIES.BUNNY); A.corpseAdded(sim, cb);
+check(val(A.describe(sim, sel(cb)), 'Meat') === `${MB.toFixed(1)} / ${mtext(MB)}`, 'bunny corpse meat starts at MeatOnBody');
+W.cMeat[cb] = 12.34;
+check(val(A.describe(sim, sel(cb)), 'Meat') === `12.3 / ${mtext(MB)}`, 'meat decimals');
 
 // animals
 const mk = (t, sp, sx) => {

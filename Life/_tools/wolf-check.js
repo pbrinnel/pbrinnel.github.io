@@ -61,8 +61,10 @@ const bun = (AS, sim, x, y, o = {}) => animal(AS, sim, AS.SPECIES.BUNNY, x, y, o
 const d2 = (W, a, b) => (W.tx(a) - W.tx(b)) ** 2 + (W.ty(a) - W.ty(b)) ** 2;
 
 // --- the chase, the bites, the kill; bunny side: flee, winded walk, wounds ---
+// BiteDamage is pinned below a bunny's HPMax here so the multi-bite path (a wound, the
+// healing, several bites to a kill) stays covered; the shipped one-bite kill is tested after.
 {
-  const { AS, sim, W, B, Wf, events } = make(60, 1);
+  const { AS, sim, W, B, Wf, events } = make(60, 1, false, tx => { tx.species = editCSV(tx.species, 'BiteDamage', 'Wolf', '8'); });
   const w = wolf(AS, sim, 30, 30, { full: 30 });
   const b = bun(AS, sim, 32, 30);
   const bSer = W.aSerial[b];
@@ -93,15 +95,14 @@ const d2 = (W, a, b) => (W.tx(a) - W.tx(b)) ** 2 + (W.ty(a) - W.ty(b)) ** 2;
   const gaps = biteTicks.slice(1).map((t, i) => t - biteTicks[i]);
   ok(gaps.every(g => g >= Wf.BiteCooldown * AS.TICK_HZ - 1), `bites: never closer than ${Wf.BiteCooldown}s (gaps ${gaps} ticks; a fleeing bunny stretches them)`);
   ok(near(hpAfterFirst, B.HPMax - Wf.BiteDamage, 0.1), `bites: first bite leaves bunny at ${hpAfterFirst.toFixed(2)} HP`);
-  // One BiteFood per bite landed, less what hunger took during the chase.
-  const fed = 30 + biteTicks.length * Wf.BiteFood, hungerSlack = Wf.HungerRate * sim.tickCount / AS.TICK_HZ + 1e-3;
-  ok(W.aFullness[w] <= Math.min(Wf.FullnessMax, fed) + 1e-3 && W.aFullness[w] >= Math.min(Wf.FullnessMax, fed) - hungerSlack, `bites: wolf gained BiteFood per bite (${W.aFullness[w].toFixed(1)}, ${biteTicks.length} bites)`);
+  // A bite feeds nothing: the wolf eats the carcass afterward (HungerRate is 0 here).
+  ok(fullAtBite.every(f => f === 30) && W.aFullness[w] === 30, `bites: no food from a live bunny (Fullness ${W.aFullness[w]} after ${biteTicks.length} bites)`);
   ok(W.aKills[w] === 1 && W.cCount === 1 && W.cSpecies[W.cList[0]] === AS.SPECIES.BUNNY, 'kill: Kills = 1, one bunny corpse');
   ok(events.filter(e => e[0] === AS.EV.BITE).length === biteTicks.length && events.some(e => e[0] === AS.EV.DEATH), 'kill: BITE and DEATH events');
 }
 {
   // wounds: survive, heal above HealAbove, no heal below it
-  const { AS, sim, W, B, Wf } = make(20, 2);
+  const { AS, sim, W, B, Wf } = make(20, 2, false, tx => { tx.species = editCSV(tx.species, 'BiteDamage', 'Wolf', '8'); });
   const w = wolf(AS, sim, 5, 5), b = bun(AS, sim, 6, 5);
   W.aBiteLeft[w] = 0;
   AS.biteAnimal(sim, w, b);
@@ -252,8 +253,7 @@ const d2 = (W, a, b) => (W.tx(a) - W.tx(b)) ** 2 + (W.ty(a) - W.ty(b)) ** 2;
 }
 // --- chew toward visible prey ---
 {
-  // BiteFood pinned so the wolf (starting at 20 Fullness) stays hungry for the bites counted.
-  const { AS, sim, W, events } = make(30, 7, false, tx => { tx.species = editCSV(tx.species, 'BiteFood', 'Wolf', '10'); });
+  const { AS, sim, W, events } = make(30, 7);
   const bt = at(W, 9, 9);
   // The west blade is the cheap one; north, east and (7,9) cost a full second to chew, and
   // sight from (8,8) to the bunny stays clear.
@@ -279,6 +279,116 @@ const d2 = (W, a, b) => (W.tx(a) - W.tx(b)) ** 2 + (W.ty(a) - W.ty(b)) ** 2;
   W.aStepLeft[b] = 1e6; W.aHP[b] = 1000;
   for (let i = 0; i < secs(AS, 8); i++) { tick(sim); W.aStepLeft[b] = 1e6; }
   ok(events.some(e => e[0] === AS.EV.GRAZE) && events.some(e => e[0] === AS.EV.BITE), 'chew-through: wolf boxed in a corner by grass chews out and bites visible prey');
+}
+// --- one bite kills; bodies hold meat; FEED ---
+{
+  // The shipped tables: a single bite kills, and the wolf gains nothing from it.
+  const { AS, sim, W, B, Wf, events } = make(20, 21);
+  ok(Wf.BiteDamage >= B.HPMax, `one-bite: BiteDamage ${Wf.BiteDamage} reaches a bunny's HPMax ${B.HPMax}`);
+  const w = wolf(AS, sim, 5, 5, { full: 30 }), b = bun(AS, sim, 6, 5);
+  W.aBiteLeft[w] = 0;
+  AS.biteAnimal(sim, w, b);
+  const ct = at(W, 6, 5);
+  ok(!W.aAlive[b] && W.aKills[w] === 1 && W.kind[ct] === AS.KIND.CORPSE, 'one-bite: the first bite kills and leaves a corpse');
+  ok(W.aFullness[w] === 30, 'one-bite: the killing bite feeds nothing');
+  ok(W.cMeat[ct] === B.MeatOnBody, `meat: the corpse holds the bunny's MeatOnBody (${W.cMeat[ct]})`);
+}
+{
+  // A starved bunny's body has meat too, and a rotting corpse takes its meat with it.
+  const { AS, sim, W, B } = make(20, 22, true);
+  const b = bun(AS, sim, 4, 4, { full: 0 });
+  W.aHP[b] = 0.01;
+  tick(sim, secs(AS, 1));
+  ok(!W.aAlive[b] && W.cMeat[at(W, 4, 4)] === B.MeatOnBody, 'meat: a starved bunny leaves a carcass with meat');
+  tick(sim, days(AS, B.CorpseDecay) + 5);
+  ok(W.kind[at(W, 4, 4)] === AS.KIND.EMPTY && W.cMeat[at(W, 4, 4)] === 0, 'meat: a corpse that rots takes its meat');
+}
+{
+  // Hungry wolf, carcass in sight: walks to it and eats BiteFood per BiteCooldown, past HungryAt.
+  const { AS, sim, W, B, Wf, events } = make(40, 23, false, tx => { tx.species = editCSV(tx.species, 'MeatOnBody', 'Bunny', '1000'); });
+  const ct = at(W, 20, 20);
+  W.addCorpse(ct, AS.SPECIES.BUNNY); AS.corpseAdded(sim, ct);
+  const w = wolf(AS, sim, 26, 20, { full: 10 });
+  const meat0 = W.cMeat[ct];
+  let fedAt = [], prev = W.aFullness[w], inFeed = true, bad = false, maxF = 0, pastHungry = false;
+  for (let i = 0; i < secs(AS, 30); i++) {
+    tick(sim);
+    const f = W.aFullness[w];
+    if (f > prev + 1e-6) fedAt.push([i, f - prev]);
+    prev = f;
+    if (f > Wf.FullnessMax + 1e-6 || W.cMeat[ct] < 0) bad = true;
+    if (f > Wf.HungryAt * Wf.FullnessMax + 1 && sname(sim, w, 'wolf') === 'FEED') pastHungry = true;
+    maxF = Math.max(maxF, f);
+  }
+  ok(fedAt.length >= 3 && fedAt.every(([, d]) => near(d, Wf.BiteFood, 1e-3) || W.aFullness[w] >= Wf.FullnessMax - 1e-3), `feed: each mouthful is BiteFood (${fedAt.length} mouthfuls)`);
+  const gaps = fedAt.slice(1).map(([t], i) => t - fedAt[i][0]);
+  ok(gaps.every(g => near(g, Wf.BiteCooldown * AS.TICK_HZ, 1)), `feed: a mouthful every BiteCooldown (gaps ${gaps.slice(0, 8)} ticks)`);
+  ok(pastHungry, 'feed: keeps eating past HungryAt');
+  // HungerRate is 0 here, so every point of Fullness gained is a point of meat lost.
+  ok(!bad && near(meat0 - W.cMeat[ct], W.aFullness[w] - 10, 1e-2), 'feed: meat never negative, Fullness never past FullnessMax, meat lost = Fullness gained');
+  ok(near(W.aFullness[w], Wf.FullnessMax, 1e-3) && W.cMeat[ct] > 0, `feed: eats until full (${W.aFullness[w].toFixed(1)}), leaving ${W.cMeat[ct].toFixed(0)} meat`);
+  ok(sname(sim, w, 'wolf') !== 'FEED', 'feed: a full wolf stops');
+  ok(!events.some(e => e[0] === AS.EV.BITE), 'feed: eating a carcass is not a bite on anyone');
+}
+{
+  // Intent line points at the carcass; the bite timer rises per mouthful (what the renderer reads).
+  const { AS, sim, W, Wf } = make(40, 24);
+  const ct = at(W, 20, 20);
+  W.addCorpse(ct, AS.SPECIES.BUNNY); AS.corpseAdded(sim, ct);
+  const w = wolf(AS, sim, 23, 20, { full: 10 });
+  let rises = 0, prev = 0, aimed = true;
+  for (let i = 0; i < secs(AS, 6); i++) {
+    tick(sim);
+    if (W.aBiteLeft[w] > prev + 1e-6) rises++;
+    prev = W.aBiteLeft[w];
+    if (sname(sim, w, 'wolf') === 'FEED' && W.aTargetTile[w] !== ct && W.aTargetTile[w] !== -1) aimed = false;
+  }
+  ok(rises >= 3 && aimed, `feed: target is the carcass tile, bite timer rises per mouthful (${rises})`);
+}
+{
+  // Meat runs out: the wolf takes what is there, never more; a second wolf eats the leftovers.
+  const { AS, sim, W, Wf } = make(40, 25);
+  const ct = at(W, 20, 20);
+  W.addCorpse(ct, AS.SPECIES.BUNNY); AS.corpseAdded(sim, ct);
+  W.cMeat[ct] = Wf.BiteFood * 1.5;
+  const a = wolf(AS, sim, 22, 20, { full: 10 });
+  tick(sim, secs(AS, 8));
+  ok(near(W.aFullness[a], 10 + Wf.BiteFood * 1.5, 1e-3) && W.cMeat[ct] === 0, `feed: a wolf eats the meat down to 0, no more (${W.aFullness[a].toFixed(1)}, meat ${W.cMeat[ct]})`);
+  ok(sname(sim, a, 'wolf') !== 'FEED' && W.kind[ct] === AS.KIND.CORPSE, 'feed: with the meat gone it leaves the bones');
+  // second wolf: half-eaten carcass
+  const b = wolf(AS, sim, 18, 20, { full: 10 });
+  const ct2 = at(W, 20, 30);
+  W.addCorpse(ct2, AS.SPECIES.BUNNY); AS.corpseAdded(sim, ct2);
+  W.cMeat[ct2] = 25;
+  const c = wolf(AS, sim, 17, 30, { full: 10 });
+  tick(sim, secs(AS, 10));
+  ok(near(W.aFullness[c], 35, 1e-3) && W.cMeat[ct2] === 0, `feed: leftovers go to the next wolf (${W.aFullness[c].toFixed(1)})`);
+}
+{
+  // Two wolves from different sides of one carcass.
+  const { AS, sim, W, Wf } = make(40, 26);
+  const ct = at(W, 20, 20);
+  W.addCorpse(ct, AS.SPECIES.BUNNY); AS.corpseAdded(sim, ct);
+  W.cMeat[ct] = 1000;
+  const a = wolf(AS, sim, 15, 20, { full: 10 }), b = wolf(AS, sim, 25, 20, { full: 10 });
+  tick(sim, secs(AS, 25));
+  ok(W.aFullness[a] > 50 && W.aFullness[b] > 50, `feed: two wolves feed on one carcass (${W.aFullness[a].toFixed(0)}, ${W.aFullness[b].toFixed(0)})`);
+}
+{
+  // A wolf that is not hungry ignores a carcass; a hungry wolf with no carcass in sight does not feed.
+  const { AS, sim, W } = make(40, 27);
+  const ct = at(W, 20, 20);
+  W.addCorpse(ct, AS.SPECIES.BUNNY); AS.corpseAdded(sim, ct);
+  const w = wolf(AS, sim, 24, 20, { full: 100 });
+  const meat0 = W.cMeat[ct];
+  tick(sim, secs(AS, 6));
+  ok(sname(sim, w, 'wolf') !== 'FEED' && W.cMeat[ct] === meat0, 'feed: a wolf that is not hungry ignores a carcass');
+  const { AS: A2, sim: s2, W: W2 } = make(40, 28);
+  const c2 = at(W2, 5, 5);
+  W2.addCorpse(c2, A2.SPECIES.BUNNY); A2.corpseAdded(s2, c2);
+  const h = wolf(A2, s2, 30, 30, { full: 10 });
+  tick(s2, secs(A2, 2));
+  ok(sname(s2, h, 'wolf') !== 'FEED', 'feed: a carcass out of sight does not draw a wolf');
 }
 // --- mating and births ---
 {

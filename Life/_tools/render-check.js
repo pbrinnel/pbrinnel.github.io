@@ -99,17 +99,28 @@ function rig(sim) {
   check(rec.lines >= 1 && r.intentLines === true, 'lines on: everyone\'s lines');
   r.setIntentLines(false);
 
-  // A death shows the fallen animal on the corpse's tile for a while, then the bones.
+  // A wolf's death (no meat) shows its body lying on the corpse's tile for a while, then its skull.
   let victim = -1;
   for (let s = 0; s < W2.aHigh; s++) if (W2.aAlive[s] && W2.aSpecies[s] === AS.SPECIES.WOLF) { victim = s; break; }
-  const vt = W2.aTile[victim], dead = AS.spriteIndex(AS.SPECIES.WOLF, 0, AS.STAGE.ADULT, 0, AS.SPRITE_FRAME.DEAD);
+  const vt = W2.aTile[victim], dead = AS.spriteCarcass(AS.SPECIES.WOLF), skull = AS.spriteSkull(AS.SPECIES.WOLF);
   AS.killAnimal(sim2, victim);
   rec.ids.length = 0; r.draw(sim2, cam, sheet, null, 0, 100, 1);
-  check(rec.ids.includes(dead), 'death: the dead pose is drawn');
-  check(!rec.ids.includes(AS.SPRITE_CORPSE) || W2.cCount > 1, 'death: in place of the bones');
+  check(rec.ids.includes(dead), 'death: the body is drawn');
+  check(!rec.ids.includes(skull) || W2.cCount > 1, 'death: in place of the skull');
   rec.ids.length = 0; r.draw(sim2, cam, sheet, null, 0, 100 + 5000, 1);
-  check(!rec.ids.includes(dead) && rec.ids.includes(AS.SPRITE_CORPSE), 'death: bones once the hold ends');
+  check(!rec.ids.includes(dead) && rec.ids.includes(skull), 'death: skull once the hold ends');
   void vt;
+
+  // A bunny's body, with meat: lying flat, however long ago it died; a skull once eaten.
+  let bun = -1;
+  for (let s = 0; s < W2.aHigh; s++) if (W2.aAlive[s] && W2.aSpecies[s] === AS.SPECIES.BUNNY) { bun = s; break; }
+  const bt = W2.aTile[bun];
+  AS.killAnimal(sim2, bun);
+  rec.ids.length = 0; r.draw(sim2, cam, sheet, null, 0, 20000, 1);
+  check(rec.ids.includes(AS.spriteCarcass(AS.SPECIES.BUNNY)), 'carcass: a body with meat draws lying flat');
+  W2.cMeat[bt] = 0;
+  rec.ids.length = 0; r.draw(sim2, cam, sheet, null, 0, 40000, 1);
+  check(!rec.ids.includes(AS.spriteCarcass(AS.SPECIES.BUNNY)) && rec.ids.includes(AS.spriteSkull(AS.SPECIES.BUNNY)), 'carcass: a skull once the meat is gone');
 }
 console.log(bad ? `FAIL (${bad})` : `PASS (${ids.length} glyphs, 12 animal combos, ${cases.length} grass cases)`);
 process.exit(bad ? 1 : 0);

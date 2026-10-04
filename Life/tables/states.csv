@@ -5,10 +5,11 @@ Bunny,3,SEEK_FOOD,Hungry and no blade adjacent,Walk toward the nearest visible b
 Bunny,4,MATE,Adult; Fullness ≥ MateFullness; female's cooldown 0; not pregnant,Walk to nearest eligible bunny of the other sex; adjacent → mate
 Bunny,5,REST,Stamina < RestBelow,Stand still until Stamina reaches RestUntil
 Bunny,6,WANDER,Otherwise,Walk a run of WanderRun tiles in a random direction
-Wolf,1,HUNT,Hungry (Fullness < HungryAt) and sees a bunny; after losing sight it keeps going to the last-seen spot until it arrives or TrackSeconds pass,Walk toward it; sprint within SprintRange; bite when adjacent
-Wolf,2,GIVE_UP,Stamina 0 mid-chase,Stop and rest until Stamina reaches RestUntil; the bunny gets away
-Wolf,3,MATE,As bunny,As bunny
-Wolf,4,REST,Stamina < RestBelow,Stand still until Stamina reaches RestUntil
-Wolf,5,PROWL,Otherwise,Wander in runs of WanderRun tiles (longer than bunnies)
+Wolf,1,FEED,Hungry (Fullness < HungryAt) and a carcass with meat is in sight; or already feeding and not yet full (Fullness < FullnessMax),Walk to the carcass; eat BiteFood from it every BiteCooldown until full or the meat is gone
+Wolf,2,HUNT,Hungry (Fullness < HungryAt) and sees a bunny; after losing sight it keeps going to the last-seen spot until it arrives or TrackSeconds pass,Walk toward it; sprint within SprintRange; bite when adjacent
+Wolf,3,GIVE_UP,Stamina 0 mid-chase,Stop and rest until Stamina reaches RestUntil; the bunny gets away
+Wolf,4,MATE,As bunny,As bunny
+Wolf,5,REST,Stamina < RestBelow,Stand still until Stamina reaches RestUntil
+Wolf,6,PROWL,Otherwise,Wander in runs of WanderRun tiles (longer than bunnies)
 Grass,—,GROW,Always,Size rises by GrowthRate
 Grass,—,SEED,At full Size; roll SeedChance,New sprout on a random empty 4-neighbor tile

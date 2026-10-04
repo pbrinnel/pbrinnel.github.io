@@ -5,7 +5,8 @@
 //   node Life/_tools/lab-compare.js config.json [out.json]
 //
 // config: {
-//   variants: { "name": [{ row, col, value }], … }   "base" is added automatically (no changes)
+//   variants: { "name": [{ row, col, value, file? }], … }   "base" is added automatically (no changes);
+//             file (species/settings/…) is needed only for a cell that isn't a numeric tunable, e.g. StartLayout
 //   seeds: [1, 2, 3],  days: 60,  bunnyCap: 12000 (default),  trendStops: true (default)
 // }
 'use strict';
@@ -38,7 +39,7 @@ const PAGE = cfg => `(async () => {
     return { growth: w[0] ? end / w[0] : 0, trend: end - back };
   };
   await Promise.all(Object.entries(variants).map(async ([name, edits]) => {
-    const vt = LAB.applyEdits(texts, edits.map(e => ({ file: fileOf(e.row, e.col), row: e.row, col: e.col, value: String(e.value) })));
+    const vt = LAB.applyEdits(texts, edits.map(e => ({ file: e.file || fileOf(e.row, e.col), row: e.row, col: e.col, value: String(e.value) })));
     const rs = await Promise.all(cfg.seeds.map(seed => pool.run({ texts: vt, seed, days: cfg.days, bunnyCap: cfg.bunnyCap || 12000, trendStops: cfg.trendStops !== false }).then(r => { S.done++; return r; })));
     S.rows.push({ name, edits, summary: LAB.summarize(rs),
       wolfGrowth: mean(rs.map(r => growthOf(r).growth)), wolfTrend: mean(rs.map(r => growthOf(r).trend)),

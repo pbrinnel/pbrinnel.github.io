@@ -73,6 +73,7 @@
 
       // Corpses, by tile, same pattern.
       cNut: new Float32Array(n),
+      cMeat: new Float32Array(n),   // Fullness left on the body for wolves; written by addCorpse, wolf.js (eating)
       cAge: new Float32Array(n),    // days
       cSpecies: new Uint8Array(n),
       cList: new Int32Array(n),
@@ -151,6 +152,7 @@
       W.serial[t] = W.nextSerial++;
       W.cSpecies[t] = species;
       W.cNut[t] = T[AS.SPECIES_KEY[species]].CorpseNutrient;
+      W.cMeat[t] = T[AS.SPECIES_KEY[species]].MeatOnBody;
       W.cAge[t] = 0;
       W.cSlot[t] = W.cCount;
       W.cList[W.cCount++] = t;
@@ -165,6 +167,7 @@
       W.kind[t] = KIND.EMPTY;
       W.serial[t] = 0;
       W.cNut[t] = 0;
+      W.cMeat[t] = 0;
       W.cAge[t] = 0;
     };
 

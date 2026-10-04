@@ -11,7 +11,7 @@ const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..');
 // glyphs.js is DOM-free until a sheet is built, and holds the life-stage helper animals use.
-const SIM_FILES = ['tables', 'rng', 'world', 'grass', 'corpse', 'sim', 'sight', 'animals', 'breed', 'bunny', 'wolf', 'glyphs'];
+const SIM_FILES = ['tables', 'rng', 'world', 'grass', 'corpse', 'sim', 'start', 'sight', 'animals', 'breed', 'bunny', 'wolf', 'glyphs'];
 
 function load(overrides = {}) {
   const ctx = vm.createContext({ console, crypto: globalThis.crypto });

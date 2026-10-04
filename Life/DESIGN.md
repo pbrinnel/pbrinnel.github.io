@@ -57,13 +57,19 @@ watching the sim run. Everything else in this doc is decided.
 ### Setup
 - World size, starting counts and the seed come from `settings.csv` only. Change them
   there and reload; there's no settings panel in the sim.
-- **Everything starts at random:** grass scattered evenly, animals placed on random empty
-  tiles.
+- **A lived-in world** (Paul, 4 Oct 2026; `StartLayout` Meadows): grass in meadows of
+  every size with open ground between, the way temperate grassland looks from the air
+  (`StartGrass` is the meadow share, `MeadowSize` the size of the largest). Blades are old
+  in the middle of a meadow and younger toward its edge, with a few lone seedlings in the
+  open. Bunnies live in `BunnyColonies` colonies just outside meadow edges; wolves run in
+  `WolfPacks` packs out in the open, away from the colonies. Populations start smaller and
+  concentrated so animals still meet. `StartLayout` Scatter keeps the old even scatter
+  (the benchmark uses it).
 - **Starting animals** are 50/50 male and female, at random ages within adulthood, with
   full Fullness, HP and Stamina.
-- **Every blade starts as a sprout** at Age 0 and Size `SproutSize`, a little above 0, so
-  even a sprout feeds a bunny a little. The starting blades grow up and die of old
-  age together; the first generation dying off as one wave is expected.
+- **Scatter only:** every blade starts as a sprout at `StartGrassAge` and Size
+  `SproutSize`, a little above 0, so even a sprout feeds a bunny a little. The starting
+  blades grow up and die of old age together, as one wave.
 - **Seeded:** the same seed gives the same start. Leave `Seed` blank for a new random start
   each run. The seed in use is shown on screen; paste it into `settings.csv` to replay.
 
@@ -85,10 +91,17 @@ watching the sim run. Everything else in this doc is decided.
   partner only has to meet the MATE conditions, whatever it's doing.
 - Newborns start with full Fullness, HP and Stamina, and the litter's two parents as
   Parents.
-- Wolves bite for `BiteDamage`. A bitten bunny can escape wounded and heal. Each bite
-  feeds the wolf `BiteFood`, so wolves feed as they bite and never eat carcasses.
+- **A wolf's bite kills** (Paul, 4 Oct 2026: a wolf doesn't take a nibble and let the
+  rabbit go). `BiteDamage` still decides it, and is set to a bunny's full HP. The bite
+  itself feeds nothing.
+- **Wolves eat the carcass.** A bunny's body holds `MeatOnBody`, whatever killed it. A
+  hungry wolf that sees a carcass with meat walks to it and eats `BiteFood` every
+  `BiteCooldown`, and keeps eating until it's full or the meat is gone. What's left stays
+  for it or another wolf until the corpse rots. (One-bite kills that fed the wolf on the
+  spot failed: a wolf's stomach holds 100 and it hunts below 80, so most of a big meal was
+  wasted.)
 - Starving: at Fullness 0 an animal loses HP each second and dies when HP reaches 0.
-- Death leaves a corpse (bones) on the tile, which blocks movement like anything else.
+- Death leaves a corpse on the tile, which blocks movement like anything else.
 - No genetics yet. Every animal of a species has the same stats. Inheritance comes later.
 - **Wolves bite bunnies, and that's the only fighting.** Bunnies never fight back and
   wolves never fight each other.
@@ -118,7 +131,7 @@ watching the sim run. Everything else in this doc is decided.
   smaller than `BiteSize` feeds the bunny in proportion to what it removed.
 
 **Corpses**
-- Not eaten by animals; they only feed grass.
+- Wolves eat a bunny's carcass while it has meat (above); a corpse also feeds grass.
 - A corpse holds `CorpseNutrient` and decays over `CorpseDecay` days. Until it's gone, grass
   within `CorpseRadius` grows and seeds `CorpseBoost` times faster.
 - **Grass drinks the Nutrient.** Each unit of extra growth the boost gives a blade costs
@@ -128,16 +141,17 @@ watching the sim run. Everything else in this doc is decided.
 
 ### What the screen shows
 - **Sprites:** 8×8 pixel art drawn in code, no image files: a bunny, a wolf (pointed
-  ears, long snout, amber eye), grass as tufts in three heights by Size, bones for a
-  corpse. Animals face the way they last stepped sideways.
+  ears, long snout, amber eye), grass as tufts in three heights by Size. A
+  body with meat on it lies flat with its eye shut; once eaten, a skull is left until it
+  rots (Paul picked these over bones, X eyes and a legs-up pose). Animals face the way they last stepped sideways.
 - **Animals move like animals.** Bunnies stretch and hop a pixel mid-step; wolves stride
   and bob a pixel. Standing animals now and then flick an ear or wag the tail, each on
   its own timer so they never move in unison. Frames change with movement, at walking
   pace, so nothing blinks.
 - **Animals act out what they do:** a wolf lunges with its jaw open when it bites and the
   bunny flinches; a bunny puts its head down for each mouthful; sprinters gallop with
-  ears back; resting animals lie down, and a winded wolf pants; a dying animal falls on
-  its side for a moment before it turns to bones; a pregnant female has a rounder belly;
+  ears back; resting animals lie down, and a winded wolf pants; a wolf's body lies there for a
+  moment before it becomes a skull; a pregnant female has a rounder belly;
   a newborn hops; a mating pair turns to face each other.
 - **Wind** (Paul, 3 Oct 2026): every 25 seconds of real time a gust a few tiles wide rolls
   diagonally across the meadow and the tufts it passes lean a pixel; the rest of the time

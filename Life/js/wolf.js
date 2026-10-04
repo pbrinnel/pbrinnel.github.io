@@ -24,22 +24,27 @@
       m.mateSerial = grow(m.mateSerial, Uint32Array);
       m.seenTile = grow(m.seenTile, Int32Array);    // where HUNT's bunny was last in sight
       m.seenAt = grow(m.seenAt, Float64Array);      // sim.simSeconds of that sighting
+      m.feedTile = grow(m.feedTile, Int32Array);    // FEED's carcass tile
+      m.feedSerial = grow(m.feedSerial, Uint32Array); // that corpse's serial, since a tile is reused
       m.cap = W.aCap;
     }
     return m;
   }
 
   // State indices come from the CSV order, so find them by name once per table set.
-  let idxT = null, HUNT = -1, GIVE_UP = -1, REST = -1;
+  let idxT = null, HUNT = -1, GIVE_UP = -1, REST = -1, FEED = -1;
   function indices(T) {
     if (idxT !== T) {
       idxT = T;
       const find = n => T.states.wolf.findIndex(st => st.name === n);
-      HUNT = find('HUNT'); GIVE_UP = find('GIVE_UP'); REST = find('REST');
+      HUNT = find('HUNT'); FEED = find('FEED'); GIVE_UP = find('GIVE_UP'); REST = find('REST');
     }
   }
 
   // ---- shared pieces ----------------------------------------------------------------------
+
+  // Float32 meat after subtractions can leave dust; below this it counts as eaten.
+  const MEAT_EPS = 1e-4;
 
   const nb = new Int32Array(4), open = new Int32Array(4), grassDirs = new Int32Array(4);
 
@@ -47,6 +52,7 @@
   let mSim = null, mW = null, mSelf = 0, mGoal = 0, mFrom = 0, mInvSpeed = 0;
   const isGoalTile = t => t === mGoal;
   const isBunny = t => mW.kind[t] === K.BUNNY;
+  const hasMeat = t => mW.kind[t] === K.CORPSE && mW.cMeat[t] > 0;
   const isPartner = t => {
     if (mW.kind[t] !== K.WOLF) return false;
     const p = mW.aSlot[t];
@@ -133,6 +139,55 @@
   // ---- the states --------------------------------------------------------------------------
 
   AS.registerStates('wolf', {
+    // "Walk to the carcass; eat BiteFood from it every BiteCooldown until full or the meat is
+    // gone." A feeding wolf gorges past HungryAt: stopping there would leave the rest of a
+    // body to rot while the wolf walked off to hunt, and Fullness would sit wasted at the cap.
+    FEED: {
+      enter(sim, s) {
+        const W = sim.W, S = AS.speciesStats(sim, s);
+        indices(sim.T);
+        const feeding = W.aState[s] === FEED;
+        if (feeding ? !(W.aFullness[s] < S.FullnessMax) : !AS.isHungry(sim, s)) return false;
+        const m = mem(W);
+        // Keep the carcass it was at while there is meat on it (it may be right under the
+        // wolf's nose and out of line of sight behind grass the wolf chewed to get there).
+        const ft = m.feedTile[s];
+        if (feeding && ft >= 0 && W.kind[ft] === K.CORPSE && W.serial[ft] === m.feedSerial[s] && W.cMeat[ft] > 0) return true;
+        mW = W;
+        const t = AS.nearestVisible(sim, W.aTile[s], S.VisionRange, hasMeat);
+        if (t < 0) return false;
+        m.feedTile[s] = t;
+        m.feedSerial[s] = W.serial[t];
+        return true;
+      },
+      start: calmStart,
+      act(sim, s) {
+        const W = sim.W, m = mem(W), S = AS.speciesStats(sim, s), ft = m.feedTile[s];
+        AS.setSprint(sim, s, false);
+        if (!(W.kind[ft] === K.CORPSE && W.serial[ft] === m.feedSerial[s] && W.cMeat[ft] > 0)) {
+          // Eaten up or rotted away: wait for the next decision.
+          W.aTargetTile[s] = -1;
+          m.feedTile[s] = -1;
+          return;
+        }
+        W.aTargetTile[s] = ft;
+        W.aTargetSlot[s] = -1;
+        if (adjacent(W, W.aTile[s], ft)) {
+          if (W.aBiteLeft[s] > 0) return;
+          const bite = Math.min(S.BiteFood, W.cMeat[ft], S.FullnessMax - W.aFullness[s]);
+          if (!(bite > 0)) return;
+          W.cMeat[ft] -= bite;
+          if (W.cMeat[ft] < MEAT_EPS) W.cMeat[ft] = 0;
+          W.aFullness[s] += bite;
+          // Raising the bite timer is what the renderer reads as a mouthful (render.js).
+          W.aBiteLeft[s] = S.BiteCooldown;
+          return;
+        }
+        if (W.aStepLeft[s] > 0) return;
+        if (!walkToward(sim, s, ft)) { W.aTargetTile[s] = -1; m.feedTile[s] = -1; }
+      },
+    },
+
     // "Walk toward it; sprint within SprintRange; bite when adjacent."
     HUNT: {
       enter(sim, s) {

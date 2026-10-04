@@ -35,7 +35,7 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
     ['wolf.HungryAt 60 → 0.6', T.wolf.HungryAt === 0.6, T.wolf.HungryAt],
     ['bunny.SprintRange blank → null', T.bunny.SprintRange === null, T.bunny.SprintRange],
     ['bunny states priority order', eq(T.states.bunny.map(s => s.name), ['FLEE', 'EAT', 'SEEK_FOOD', 'MATE', 'REST', 'WANDER']), T.states.bunny.map(s => s.name)],
-    ['wolf states order', eq(T.states.wolf.map(s => s.name), ['HUNT', 'GIVE_UP', 'MATE', 'REST', 'PROWL']), T.states.wolf.map(s => s.name)],
+    ['wolf states order', eq(T.states.wolf.map(s => s.name), ['FEED', 'HUNT', 'GIVE_UP', 'MATE', 'REST', 'PROWL']), T.states.wolf.map(s => s.name)],
     ['variables has every row', T.variables.length === base.variables.trim().split(/\r?\n/).length - 1, T.variables.length],
     ['wolf.WanderRun 4-10 → {4,10}', eq(T.wolf.WanderRun, { min: 4, max: 10 }), T.wolf.WanderRun],
     ['bunny.HealAbove 50 → 0.5', T.bunny.HealAbove === 0.5, T.bunny.HealAbove],

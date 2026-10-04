@@ -114,6 +114,7 @@
     },
     Children: (sim, c) => count(sim.W.aChildren[c.s]),
     Kills: (sim, c) => count(sim.W.aKills[c.s]),
+    Meat: (sim, c) => outOf(sim.W.cMeat[c.t], sim.T[AS.SPECIES_KEY[sim.W.cSpecies[c.t]]].MeatOnBody),
     Nutrient: (sim, c) => outOf(sim.W.cNut[c.t], sim.T[AS.SPECIES_KEY[sim.W.cSpecies[c.t]]].CorpseNutrient),
   };
 

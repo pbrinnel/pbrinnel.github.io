@@ -33,12 +33,13 @@ load time: every file reads other files' `AS.*` inside functions, at call time.
 | `grass.js` | growth every tick; age, seeding, sprouting on empty tiles, old age in hourly slices; bites | `grassTick`, `grassBite`, `grassStage` |
 | `corpse.js` | decay, and the boost field grass drinks from | `corpseTick`, `corpseAdded`, `corpseBoost` |
 | `sim.js` | the fixed tick, populate, events ring, population history | `Sim`, `TICK_HZ`, `DT`, `DAY_SECONDS`, `TICKS_PER_HOUR`, `EV`, `debugDropCorpse` |
+| `start.js` | the Meadows day-0 layout (`StartLayout`): meadow grass aged by depth, bunny colonies at meadow edges, wolf packs in the open; uses only `sim.rng` | `startMeadows` |
 | `sight.js` | line of sight through grass, nearest visible thing, local paths (plain and weighted for chewing) | `lineOfSight`, `nearestVisible`, `pathNext`, `pathNextWeighted` |
 | `animals.js` | every animal's body, steps, the decide loop, bites, death, spawning | `animalsTick`, `registerStates`, `checkStates`, `stepTo`, `chewOrStep`, `biteAnimal`, `killAnimal`, `spawnStarting`, … |
 | `breed.js` | mating and births, shared by both species | `canMate`, `mate`, `tryBirth` |
 | `bunny.js`, `wolf.js` | each species' states, by the names in `states.csv` | (register via `AS.registerStates`) |
 | `glyphs.js` | glyph ids, palette, life stage, the pre-rendered glyph sheet | `GLYPH`, `COLORS`, `CELL_COLOR`, `GlyphSheet`, `stageOf`, … |
-| `sprites.js` | the 8×8 pixel-art sprites (bunny, wolf, corpse, grass) as bitmaps (ten frames per animal: stand, walk, idle, eat/bite, runA, runB, rest, winded, dead, pregnant), the pose-priority rule (`spritePose`, pure), per-slot facing, and the pre-rendered sprite sheet | `SpriteSheet`, `spritePose`, `spriteIndex`, `SpriteFacing`, `SPRITE_FRAME`, `SPRITE_HOLD`, … |
+| `sprites.js` | the 8×8 pixel-art sprites (bunny, wolf, corpse, grass) as bitmaps (ten frames per animal: stand, walk, idle, eat/bite, runA, runB, rest, winded, dead, pregnant; plus a dimmed dead-pose carcass per species, `spriteCarcass`), the pose-priority rule (`spritePose`, pure), per-slot facing, and the pre-rendered sprite sheet | `SpriteSheet`, `spritePose`, `spriteIndex`, `SpriteFacing`, `SPRITE_FRAME`, `SPRITE_HOLD`, … |
 | `camera.js` | pan/zoom/pinch/wheel/keys, tap → tile | `Camera` |
 | `render.js` | draw: visible tiles from the sprite sheet, or cell mode zoomed out (its brighter far-view colors live at the top of render.js); animals glide and act out events (below); intent lines (off by default, the selected animal's always on); selection | `Renderer`, `CELL_PX`, `glideProgress` |
 | `inspect.js` | `variables.csv` → the inspector's rows for a selection | `describe`, `inspectWarnings` |
@@ -57,7 +58,7 @@ WOLF) is the truth about who is where. Tiles are `t = y * W.w + x`.
 
 - **Blades** are indexed by tile (they never move): `gSize`, `gAge` (days), plus a dense
   list `gList[0..gCount)` with `gSlot[t]` for O(1) removal.
-- **Corpses**, by tile: `cNut`, `cAge`, `cSpecies`, dense `cList`/`cSlot`/`cCount`;
+- **Corpses**, by tile: `cNut`, `cMeat` (Fullness left on the body, set from `MeatOnBody` by `addCorpse`, eaten down by wolf.js's FEED, zeroed with the corpse), `cAge`, `cSpecies`, dense `cList`/`cSlot`/`cCount`;
   `boostSrc[t]` = the corpse tile boosting tile t, or −1.
 - **Animals** live in stable slots (`0..aHigh`, free list `aFree`, never compacted), so a
   slot index is valid for a whole life; `aSerial[s]` tells a reused slot from its old
@@ -67,7 +68,7 @@ WOLF) is the truth about who is where. Tiles are `t = y * W.w + x`.
   and checks the serial before trusting it (selection, targets, fathers).
 
 **Who writes what.** Only `world.js`'s add/remove/move functions change `kind`, `aSlot` or
-the dense lists. Grass fields: grass.js. Corpse fields and `boostSrc`: corpse.js. Animal
+the dense lists. Grass fields: grass.js. Corpse fields and `boostSrc`: corpse.js (`cMeat` also wolf.js, FEED). Animal
 fields: animals.js, breed.js, bunny.js, wolf.js. Everything else (render, inspect,
 graph, ui, bench) only reads.
 
@@ -99,6 +100,7 @@ graph, ui, bench) only reads.
 - Movement goes only through `AS.stepTo` (empty tiles) or `AS.chewOrStep` (wolves into
   grass): both respect speed and one-thing-per-tile. Paths: `pathNext` (empty tiles only)
   and `pathNextWeighted` (cost per tile; wolves pay chew time for grass).
+- A wolf's bite kills a bunny and feeds nothing (`biteAnimal`); the body holds `MeatOnBody`. **FEED** (wolf.js, above HUNT): a hungry wolf that sees a carcass with `cMeat > 0` walks to a tile touching it and eats `min(BiteFood, cMeat, room)` every `BiteCooldown`, raising `aBiteLeft` (the renderer reads that as a mouthful); once feeding it stays until Fullness is `FullnessMax` or the meat is gone, past `HungryAt`. Its carcass is kept per wolf in `mem(W)` (`feedTile`/`feedSerial`).
 - A hunting wolf remembers where it last saw its bunny: wolf.js keeps `seenTile`/`seenAt` per wolf in `mem(W)`, and while `TrackSeconds` (species.csv, 0 = off) allows it HUNT walks to that tile when the bunny is out of sight (`act` then uses `lineOfSight` instead of the bunny's true tile).
 - **Events:** `sim.emit(AS.EV.X, tile)` into a ring (`sim.events`): BITE, BIRTH, DEATH,
   GRAZE (bunny grazing or wolf chewing). render.js keeps its own cursor and turns them into poses.
@@ -110,7 +112,7 @@ graph, ui, bench) only reads.
 The renderer reads the sim and never writes it. Each frame, `consumeEvents` reads the
 events since its cursor (a swapped-in sim or a ring overrun is handled like any reader's) and
 sets **holds**, in real ms (`performance.now()`, so a pose lasts the same at any speed):
-DEATH puts the fallen animal on that tile's corpse (`deathUntil`, per tile), BITE makes the
+DEATH shows the body on that tile's corpse for a moment (`deathUntil`, per tile; only matters for a corpse with no meat, since one with `cMeat > 0` always draws as its carcass, lying flat with its eye shut, and as its species' skull once eaten), BITE makes the
 bunny there flinch (runA), BIRTH hops the baby, and BITE/GRAZE mark the adjacent animal
 that targets that tile as biting or eating (ACTION). A bite is also spotted as an animal's
 `aBiteLeft` rising since the last frame it was drawn (the event route covers fast speeds

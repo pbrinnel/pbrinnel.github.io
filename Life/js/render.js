@@ -35,7 +35,7 @@
   const FAR_ANIMAL = [['#e0a868', '#f2cc96'], ['#8fb2e0', '#c0d6f2']].map(r => r.map(abgr));   // [species][sex]
 
   // Real time an event holds a pose, whatever the speed, so nothing flickers (DESIGN.md,
-  // Photosensitivity): a death's fallen sprite, a bite's flinch, a mouthful or bite, a birth's hop.
+  // Photosensitivity): a meatless death's fallen sprite, a bite's flinch, a mouthful or bite, a birth's hop.
   const DEATH_HOLD_MS = 700, FLINCH_HOLD_MS = 300, ACTION_HOLD_MS = 300, BIRTH_HOLD_MS = 400;
   // Events this many tiles outside the view are skipped: nobody sees them.
   const EVENT_MARGIN = 2;
@@ -67,7 +67,7 @@
     // animal was drawn (a gap means the timer is stale, so it can't count as a bite).
     let prevBite = new Float64Array(0), seenFrame = new Int32Array(0), seenSerial = new Uint32Array(0);
     let frameNo = 0;
-    // When each tile's death pose ends, real ms; the corpse there shows the fallen animal until then.
+    // When each tile's death pose ends, real ms; a corpse with no meat shows the fallen animal until then.
     let deathUntil = new Float64Array(0);
     let evSim = null, evCursor = 0;
     // State ids by species, from states.csv names, for the poses that depend on what it is doing.
@@ -219,9 +219,12 @@
             id = AS.grassLeans(tx, ty, nowMs / 1000) ? AS.spriteGrassLean(third) : AS.spriteGrass(third);
           }
           else if (k === KIND.CORPSE) {
-            // A fresh death shows the animal fallen, in place of the bones.
-            id = nowMs < deathUntil[row + tx]
-              ? AS.spriteIndex(W.cSpecies[row + tx], 0, AS.STAGE.ADULT, 0, FRAME.DEAD) : AS.SPRITE_CORPSE;
+            // A body with meat on it lies flat, eye shut; once the meat is gone, a skull. A
+            // body with none to begin with (a wolf's) lies there for a moment after the death,
+            // so it doesn't snap straight to a skull.
+            if (W.cMeat[row + tx] > 0) id = AS.spriteCarcass(W.cSpecies[row + tx]);
+            else if (nowMs < deathUntil[row + tx]) id = AS.spriteCarcass(W.cSpecies[row + tx]);
+            else id = AS.spriteSkull(W.cSpecies[row + tx]);
           } else continue;   // empty, or an animal (own pass)
           const dx = Math.round(tx * s - ox), dw = Math.round((tx + 1) * s - ox) - dx;
           ctx.drawImage(img, sh.sx(id), sh.sy(id), px, px, dx, dy, dw, dh);
