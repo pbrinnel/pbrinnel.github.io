@@ -100,6 +100,10 @@ watching the sim run. Everything else in this doc is decided.
 - Each tile of grass is one blade. The glyph shows its Size in thirds.
 - A blade grows from sprout to full Size, then can seed a new blade on an empty
   4-neighbor tile, and dies of old age at its `Lifespan`.
+- **Grass can sprout by itself** (Paul): each empty tile has a small `SproutChance` per day
+  of growing a new blade, so grass can return to land it has lost and can never go extinct
+  for good. A nearby corpse speeds that up by `CorpseBoost`, like seeding. Seeding from
+  neighbors works as before.
 - **A blade seeds only while it's at full Size.** A bitten blade regrows at `GrowthRate`
   and seeds again once it's full, so grazing slows a meadow's spread. Grass
   `TimeToMature` only sets the Lifestage label.
@@ -236,10 +240,15 @@ Each one ends with something to watch. ✓ = done (3 Oct 2026).
      16 (from 0.6 and 24) kept all three species 162 of 200 days on average on 12 fresh
      seeds (3 reached 200), against 137 days (2 reached 200) before. Bunny and grass
      numbers have become touchy: halving or doubling any of them breaks the balance.
-   - The remaining failures are mostly wolves eating the last bunnies, and survivors often
-     end with only a handful of wolves. Numbers alone are near their limit; something
-     that protects scarce bunnies (a refuge) or limits wolves when prey is scarce is the
-     likely next step, and is Paul's call.
+   - The real trap was grass: once bunnies stripped it, it could only come back from the
+     blades left, so bunnies starved and wolves followed. Letting empty tiles sprout on
+     their own (`SproutChance`) fixed most of that, but only when it's rare: on 12 fresh
+     seeds 9 of 12 kept all three species for 200 days (average 190 days), against 3 of
+     12 (162 days) without it. 0.05% and 0.2% did nearly as well (6 and 9 of 12). From
+     0.5% up, grass refills the open ground faster than bunnies can clear it, walls the
+     wolves off from their prey, and wolves die out (by day 20 at 2%).
+   - The remaining failures are bunnies eaten to zero or wolves dying out late (days
+     145–180), and some survivors end with only a handful of wolves.
    - Method that works (Paul): quick gross tests, judged by direction. Wolves not
      increasing means a bad run; runs stop as soon as their direction is clear.
 9. **Release as `/life.html`.** The page already lives at the site root (unlisted, see

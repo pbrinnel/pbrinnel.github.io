@@ -30,7 +30,7 @@ load time: every file reads other files' `AS.*` inside functions, at call time.
 | `tables.js` | fetch + parse + validate the CSVs into frozen `T` | `loadTables`, `parseTables` |
 | `rng.js` | seeded randomness (mulberry32); the only source the sim may use | `makeRng`, `newSeed` |
 | `world.js` | the grid and every store (typed arrays) + the only code that changes occupancy | `World`, `KIND`, `SPECIES`, `SPECIES_KEY`, `SEX` |
-| `grass.js` | growth every tick; age, seeding, old age in hourly slices; bites | `grassTick`, `grassBite`, `grassStage` |
+| `grass.js` | growth every tick; age, seeding, sprouting on empty tiles, old age in hourly slices; bites | `grassTick`, `grassBite`, `grassStage` |
 | `corpse.js` | decay, and the boost field grass drinks from | `corpseTick`, `corpseAdded`, `corpseBoost` |
 | `sim.js` | the fixed tick, populate, events ring, population history | `Sim`, `TICK_HZ`, `DT`, `DAY_SECONDS`, `TICKS_PER_HOUR`, `EV`, `debugDropCorpse` |
 | `sight.js` | line of sight through grass, nearest visible thing, local paths (plain and weighted for chewing) | `lineOfSight`, `nearestVisible`, `pathNext`, `pathNextWeighted` |
@@ -76,7 +76,7 @@ graph, ui, bench) only reads.
 - **Tick:** fixed `AS.DT` = 1/30 s of sim time (`TICK_HZ`); a day is `DAY_SECONDS` = 20 s.
   `sim.tick()` does, in order: record history at the start of each in-world hour →
   `corpseTick` → `grassTick` → `animalsTick`.
-- **Grass:** growth every tick; age/seed/old-age once per in-world hour, spread over
+- **Grass:** growth every tick; age/seed/sprout/old-age once per in-world hour, spread over
   `TICKS_PER_HOUR` ticks by tile (`t % TICKS_PER_HOUR`).
 - **Animals:** body every tick (age, hunger, starve/heal, stamina + winded, timers), decide
   every 1/`DecidePerSec` s (random phase per animal), then the current state's `act` every

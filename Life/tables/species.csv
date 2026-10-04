@@ -36,6 +36,7 @@ ElderSpeed,% of adult,75,75,,
 GrowthRate,Size per day,,,1,Grass Size runs 0 to 1
 SproutSize,Size,,,0.1,Size a new blade starts at; above 0 so even a sprout feeds a little
 SeedChance,per day,,,10%,Mature blade seeds one empty 4-neighbor tile
+SproutChance,per day,,,0.1%,Chance an empty tile grows a blade by itself (grass can return to bare land); 0% = off
 CorpseNutrient,per body,10,30,,How long and how hard a corpse feeds grass
 CorpseDecay,days,3,5,,Corpse disappears after this
 CorpseRadius,tiles,3,3,,Grass inside grows and seeds faster

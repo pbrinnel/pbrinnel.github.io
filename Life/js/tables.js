@@ -53,6 +53,7 @@
     ['ElderSpeed', 'ratio', ANIMALS],
     ['GrowthRate', 'num', ['Grass']],
     ['SproutSize', 'frac', ['Grass']],
+    ['SproutChance', 'frac', ['Grass']],
     ['SeedChance', 'frac', ['Grass']],
     ['CorpseNutrient', 'num', ANIMALS],
     ['CorpseDecay', 'pos', ANIMALS],

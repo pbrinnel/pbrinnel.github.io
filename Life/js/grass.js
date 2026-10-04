@@ -12,12 +12,15 @@
   // SeedChance is "seeds at least once per day", so it becomes a per-day hazard rate and the
   // hourly chance follows from it. Boost multiplies the rate, not the chance, so it can never
   // push the chance past 1. Rebuilt when the tables change (one per sim in practice).
-  let cachedT = null, hourlyRate = 0, seedsAlways = false;
+  let cachedT = null, hourlyRate = 0, seedsAlways = false, sproutRate = 0;
+  // Per-day chance → per-hour hazard rate, so a boost multiplies the rate, not the chance.
+  const hourlyHazard = c => (c > 0 && c < 1 ? -Math.log(1 - c) / HOURS_PER_DAY : 0);
   function prepare(T) {
     cachedT = T;
     const c = T.grass.SeedChance;
     seedsAlways = c >= 1;
-    hourlyRate = c > 0 && c < 1 ? -Math.log(1 - c) / HOURS_PER_DAY : 0;
+    hourlyRate = hourlyHazard(c);
+    sproutRate = T.grass.SproutChance >= 1 ? Infinity : hourlyHazard(T.grass.SproutChance);
   }
 
   const nb = new Int32Array(4);
@@ -47,6 +50,15 @@
     const phase = sim.tickCount % AS.TICKS_PER_HOUR;
     const firstNew = W.nextSerial;   // blades seeded in this pass wait for the next hour
     for (let t = phase; t < W.n; t += AS.TICKS_PER_HOUR) {
+      // An empty tile can grow a blade by itself (SproutChance), so grass can come back to
+      // land it has lost; a nearby corpse speeds that up like it speeds seeding.
+      if (W.kind[t] === AS.KIND.EMPTY) {
+        if (sproutRate > 0) {
+          const ps = 1 - Math.exp(-sproutRate * (boostSrc[t] >= 0 ? AS.corpseBoost(sim, t) : 1));
+          if (rng.chance(ps)) W.addGrass(t, g.SproutSize, 0);
+        }
+        continue;
+      }
       if (W.kind[t] !== AS.KIND.GRASS || W.serial[t] >= firstNew) continue;
       const age = W.gAge[t] += DAYS_PER_HOUR;
       if (age >= g.Lifespan) { W.removeGrass(t); continue; }

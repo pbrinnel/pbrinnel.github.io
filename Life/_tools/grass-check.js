@@ -11,6 +11,8 @@ function make(size, seed = 1, edit) {
   s = editCSV(s, 'StartBunnies', 'Value', '0');
   s = editCSV(s, 'StartWolves', 'Value', '0');
   texts.settings = s;
+  // Sprouting off unless a test turns it on, so seeding counts only seeding.
+  texts.species = editCSV(texts.species, 'SproutChance', 'Grass', '0%');
   if (edit) edit(texts);
   const { T, errors } = AS.parseTables(texts);
   if (errors.length) throw new Error(errors.join('\n'));
@@ -142,6 +144,15 @@ const day = AS => AS.TICK_HZ * AS.DAY_SECONDS;
   const r3 = AS.grassBite(sim, t, 0.5);
   ok(r3 === 0.5 && W.kind[t] === AS.KIND.EMPTY, 'f: bite to exactly 0 kills');
   ok(AS.grassBite(sim, t, 1) === 0, 'f: bite on empty tile returns 0');
+}
+
+// sprouting: empty tiles with no grass nearby grow blades at SPROUT_TEST per day
+{
+  const SPROUT_TEST = 0.1, size = 100;
+  const { AS, T, sim } = make(size, 7, tx => { tx.species = editCSV(tx.species, 'SproutChance', 'Grass', SPROUT_TEST * 100 + '%'); });
+  for (let i = 0; i < day(AS); i++) sim.tick();
+  const want = size * size * SPROUT_TEST, got = sim.W.gCount;
+  ok(Math.abs(got - want) <= want * 0.1, `sprout: ${got} blades on ${size * size} empty tiles in a day, expected ~${want} (SproutChance ${T.grass.SproutChance * 100}%)`);
 }
 
 // stage label
