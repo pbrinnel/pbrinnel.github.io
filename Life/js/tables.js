@@ -53,6 +53,8 @@
     ['MateCooldown', 'num', ANIMALS],
     ['MateFullness', 'frac', ANIMALS],
     ['MateCost', 'frac', ANIMALS],
+    ['PackLimit', 'num', []],        // blank = no territory rule
+    ['TerritoryRange', 'num', []],
     ['BabySpeed', 'ratio', ANIMALS],
     ['ElderSpeed', 'ratio', ANIMALS],
     ['GrowthRate', 'num', ['Grass']],

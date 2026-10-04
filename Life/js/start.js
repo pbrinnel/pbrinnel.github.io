@@ -1,6 +1,6 @@
 // How the world looks on day 0 when settings.csv's StartLayout is Meadows: grass in
 // meadows of every size with open ground between (the look of temperate grassland from the
-// air), old in the middle of a meadow and younger toward its edge; bunnies in a few colonies
+// air), partly filled and of every age, as a settled meadow is; bunnies in a few colonies
 // just outside meadow edges, each colony with a few warren holes dug around it before its
 // bunnies settle; wolves in small packs out in the open, away from the colonies.
 // Paul chose this over scattering everything evenly, which reads as a random, empty world.
@@ -14,10 +14,8 @@
 
   // ---- shape of the layout (not tuning numbers: these only make the start look natural) ----
   const OCTAVES = 4;            // meadow edges: big shapes with smaller wiggles on them
-  const EDGE_DEPTH = 0.12;      // how far into a meadow (in field units) blades reach full age
-  const MEADOW_FILL = 0.9;      // share of meadow tiles that start with a blade
+  const MEADOW_FILL = 0.55;     // share of meadow tiles that start with a blade: a settled meadow has gaps, which it needs to reseed
   const STRAY_BLADES = 0.004;   // lone seedlings out in the open, per open tile
-  const AGE_MIN = 0.15, AGE_SPAN = 0.8, AGE_JITTER = 0.4;   // blade age as shares of Lifespan
   const COLONY_SPREAD = 3.5;    // tiles: how far a colony's bunnies scatter from its center
   const PACK_SPREAD = 1.6;      // tiles: a pack starts close together
   const COLONY_GAP = 28;        // tiles between colony centers, at least
@@ -69,10 +67,9 @@
       const d = (vals[t] - th) / range;
       let age = -1;
       if (d >= 0) {
-        if (rng.next() < MEADOW_FILL) {
-          const depth = Math.min(1, d / EDGE_DEPTH);
-          age = g.Lifespan * (AGE_MIN + AGE_SPAN * depth) * (1 - AGE_JITTER + AGE_JITTER * rng.next());
-        }
+        // Ages spread evenly over the Lifespan, as in a meadow that has been growing a
+        // while, so blades die a few at a time instead of all at once.
+        if (rng.next() < MEADOW_FILL) age = rng.next() * g.Lifespan;
       } else if (rng.next() < STRAY_BLADES) {
         age = rng.next() * g.TimeToMature;
       }

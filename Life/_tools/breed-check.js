@@ -77,6 +77,35 @@ const M = 0, F = 1;
   ok(!AS.mate(sim, adultM, adultM), 'mate: refuses itself');
 }
 
+// --- wolf territory: a crowded female wolf doesn't breed ---
+{
+  const { AS, sim, W, T } = make(60, 5);
+  const wolf = (x, y, sex, o = {}) => {
+    const s = AS.spawnStarting(sim, AS.SPECIES.WOLF, at(W, x, y));
+    W.aSex[s] = sex; W.aAge[s] = o.age ?? 20; W.aFullness[s] = 100; W.aDecideLeft[s] = 0;
+    return s;
+  };
+  const L = T.wolf.PackLimit, R = T.wolf.TerritoryRange;
+  ok(L != null && R != null && T.bunny.PackLimit == null, 'territory: wolves have the rule, bunnies are blank');
+  const f = wolf(30, 30, F);
+  const row = (n, dx, dy, o) => { for (let i = 0; i < n; i++) wolf(30 + dx + (i % 7) * 2, 30 + dy + ((i / 7) | 0) * 2, i % 2 ? F : M, o); };
+  row(L, -R, -R);   // exactly PackLimit others, on the range's far corner
+  ok(AS.canMate(sim, f), 'territory: PackLimit others in range, she can mate');
+  wolf(30 + R, 30 + R, M);
+  ok(!AS.canMate(sim, f), 'territory: one more than PackLimit, she cannot');
+  const m = wolf(31, 30, M);
+  ok(AS.canMate(sim, m), 'territory: a male is never gated');
+  const g = wolf(10, 50, F);
+  for (let i = 0; i < L + 1; i++) wolf(10 + R + 1, 50 - R + i, M);
+  ok(AS.canMate(sim, g), 'territory: wolves just outside TerritoryRange do not count');
+  const h = wolf(50, 8, F);
+  for (let i = 0; i < L + 1; i++) wolf(50 - (i % 7) * 2, 8 + 2 * ((i / 7) | 0) + 2, M, { age: 0.1 });
+  ok(AS.canMate(sim, h), 'territory: babies do not count');
+  const b = bunny(AS, sim, 5, 5, F);
+  for (let i = 0; i < L + 3; i++) bunny(AS, sim, 6 + i, 5, M);
+  ok(AS.canMate(sim, b), 'territory: a crowd of bunnies is not gated');
+}
+
 // --- a male next to each ineligible female never mates ---
 {
   const { AS, sim, W, B } = make(30, 2);

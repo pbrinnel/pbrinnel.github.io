@@ -37,7 +37,7 @@ load time: every file reads other files' `AS.*` inside functions, at call time.
 | `start.js` | the Meadows day-0 layout (`StartLayout`): meadow grass aged by depth, bunny colonies at meadow edges, wolf packs in the open; uses only `sim.rng` | `startMeadows` |
 | `sight.js` | line of sight through grass, nearest visible thing, local paths (plain and weighted for chewing) | `lineOfSight`, `nearestVisible`, `pathNext`, `pathNextWeighted` |
 | `animals.js` | every animal's body, steps, the decide loop, bites, death, spawning | `animalsTick`, `registerStates`, `checkStates`, `stepTo`, `chewOrStep`, `biteAnimal`, `killAnimal`, `spawnStarting`, … |
-| `breed.js` | mating and births, shared by both species | `canMate`, `mate`, `tryBirth` |
+| `breed.js` | mating and births, shared by both species (a female's `PackLimit`/`TerritoryRange` territory rule is in `canMate`; blank for bunnies = off) | `canMate`, `mate`, `tryBirth` |
 | `bunny.js`, `wolf.js` | each species' states, by the names in `states.csv` | (register via `AS.registerStates`) |
 | `glyphs.js` | glyph ids, palette, life stage, the pre-rendered glyph sheet | `GLYPH`, `COLORS`, `CELL_COLOR`, `GlyphSheet`, `stageOf`, … |
 | `sprites.js` | the 8×8 pixel-art sprites (bunny, wolf, corpse, grass) as bitmaps (ten frames per animal: stand, walk, idle, eat/bite, runA, runB, rest, winded, dead, pregnant; plus a dimmed dead-pose carcass per species, `spriteCarcass`), the pose-priority rule (`spritePose`, pure), per-slot facing, and the pre-rendered sprite sheet | `SpriteSheet`, `spritePose`, `spriteIndex`, `SpriteFacing`, `SPRITE_FRAME`, `SPRITE_HOLD`, … |

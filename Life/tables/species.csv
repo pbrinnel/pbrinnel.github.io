@@ -35,6 +35,8 @@ LitterSize,count,2-4,1-2,,
 MateCooldown,days,2,10,,Female only; starts after birth
 MateFullness,% of FullnessMax,60,70,,Both parents must be at least this full
 MateCost,% of FullnessMax,30,30,,Fullness each parent loses at mating
+PackLimit,count,,8,,A female wolf breeds only if no more than this many other adult wolves are within TerritoryRange; blank = no limit
+TerritoryRange,tiles,,15,,Square (Chebyshev) distance for PackLimit
 BabySpeed,% of adult,50,50,,
 ElderSpeed,% of adult,75,75,,
 GrowthRate,Size per day,,,1,Grass Size runs 0 to 1

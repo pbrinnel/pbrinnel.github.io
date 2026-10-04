@@ -59,9 +59,10 @@ watching the sim run. Everything else in this doc is decided.
   there and reload; there's no settings panel in the sim.
 - **A lived-in world** (Paul, 4 Oct 2026; `StartLayout` Meadows): grass in meadows of
   every size with open ground between, the way temperate grassland looks from the air
-  (`StartGrass` is the meadow share, `MeadowSize` the size of the largest). Blades are old
-  in the middle of a meadow and younger toward its edge, with a few lone seedlings in the
-  open. Bunnies live in `BunnyColonies` colonies just outside meadow edges; wolves run in
+  (`StartGrass` is the meadow share, `MeadowSize` the size of the largest). Meadows start
+  partly filled with blades of every age, as a meadow that has been growing a while is,
+  with a few lone seedlings in the open, so the start doesn't die back as one wave.
+  Bunnies live in `BunnyColonies` colonies just outside meadow edges; wolves run in
   `WolfPacks` packs out in the open, away from the colonies. Populations start smaller and
   concentrated so animals still meet. `StartLayout` Scatter keeps the old even scatter
   (the benchmark uses it).
@@ -118,6 +119,11 @@ watching the sim run. Everything else in this doc is decided.
   sometimes digs a new one (`DigChance` per day, `DigSeconds` to dig) within
   `WarrenRadius` of its warren, or founds a new warren where no hole is near. A hole no
   bunny has used for `CollapseDays` falls in, so warrens grow and die with their colony.
+- **Wolf territories** (Paul, 4 Oct 2026): crowded wolves don't breed. A female wolf
+  mates only if no more than `PackLimit` other adult wolves are within `TerritoryRange`
+  tiles of her (a square). Nothing else about territories exists: wolves still go
+  anywhere and never fight. Real packs hold territories and few pairs breed, which keeps
+  wolf numbers at what the land can feed instead of overshooting.
 - **A hunting wolf remembers where it last saw its bunny** (Paul, 4 Oct 2026). Grass
   blocks sight, so a bunny can duck out of view; the wolf then walks to the spot where it
   last saw it, picks the chase back up if the bunny reappears, and gives up when it
@@ -311,6 +317,14 @@ seeds and saves numbers back into `tables/`. What's been found, in order:
   collapsed within days; `DigChance` 50% and `CollapseDays` 10 keep about 30 holes alive
   at day 30. With refuges, 14 starting wolves were too few (one seed in three lost them);
   `StartWolves` 50 kept all three species on 3 of 3 seeds, wolves still rising at day 30.
+- Starting grass used to die back to the meadows' outlines (old blades in the middles all
+  died together); evenly spread ages and meadows 55% filled start near where grass
+  settles (about 10,000 easing to 7,500 blades over 20 days, against 16,400 crashing to
+  6,000).
+- **Space and wolf territories:** a 450×300 world at the same density (340 bunnies in 13
+  colonies, 112 wolves in 7 packs) kept all three species on 3 of 3 seeds for 30 days,
+  against 1 of 3 in the 300×200 world; territories on top kept more bunnies and lost no
+  seeds (2 of 3 without). Wolves still drift down from their large start (to 65–104).
 - **Wolves remembering where a bunny hid** (`TrackSeconds`) helped over 50 days (wolves
   1.35× their start instead of 1.1× at the old food, 3.7× instead of 3.2× at `BiteFood`
   20) but not over 200: with `BiteFood` 20, 15 s of memory kept 10 of 12 fresh seeds

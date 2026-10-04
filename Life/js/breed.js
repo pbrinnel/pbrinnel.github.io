@@ -22,8 +22,30 @@
     return f;
   }
 
+  // Territory: a female breeds only while no more than PackLimit other adults of her species
+  // stand within TerritoryRange tiles (Chebyshev, so a square scan of aSlot, stopping as soon as
+  // she is over the limit). Keeps a thriving pack from outgrowing its range. Blank PackLimit
+  // (bunnies) turns the rule off.
+  function crowded(sim, s, S) {
+    const W = sim.W, t = W.aTile[s], sp = W.aSpecies[s], r = Math.floor(S.TerritoryRange);
+    const cx = W.tx(t), cy = W.ty(t);
+    const x0 = Math.max(0, cx - r), x1 = Math.min(W.w - 1, cx + r);
+    const y0 = Math.max(0, cy - r), y1 = Math.min(W.h - 1, cy + r);
+    let n = 0;
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        const o = W.aSlot[y * W.w + x];
+        if (o < 0 || o === s || W.aSpecies[o] !== sp || !W.aAlive[o]) continue;
+        if (AS.stageOfSlot(sim, o) !== AS.STAGE.ADULT) continue;
+        if (++n > S.PackLimit) return true;
+      }
+    }
+    return false;
+  }
+
   // The conditions in states.csv's MATE row. Only adults breed; a female also needs her
-  // cooldown over and no pregnancy running or waiting to be born. Males have no cooldown.
+  // cooldown over, no pregnancy running or waiting to be born, and room in her territory.
+  // Males have no cooldown and no territory.
   AS.canMate = function (sim, s) {
     const W = sim.W;
     if (!W.aAlive[s]) return false;
@@ -31,6 +53,7 @@
     if (AS.stageOfSlot(sim, s) !== AS.STAGE.ADULT) return false;
     if (W.aFullness[s] < S.MateFullness * S.FullnessMax) return false;
     if (W.aSex[s] === AS.SEX.FEMALE && (W.aMateCd[s] > 0 || W.aPregnant[s] > 0 || W.aLitter[s] > 0)) return false;
+    if (S.PackLimit != null && W.aSex[s] === AS.SEX.FEMALE && crowded(sim, s, S)) return false;
     return true;
   };
 
