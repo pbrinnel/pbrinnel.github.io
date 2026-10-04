@@ -153,6 +153,12 @@
         pin.appendChild(grid);
         const hint = document.createElement('p');
         pin.appendChild(hint);
+        // a phone has no esc key, so the way back out is a button
+        const close = document.createElement('button');
+        close.className = 'close';
+        close.textContent = 'close';
+        close.addEventListener('click', () => { debugEl.hidden = true; });
+        pin.appendChild(close);
 
         const look = () => {
             pin.hidden = dbgOpen;
