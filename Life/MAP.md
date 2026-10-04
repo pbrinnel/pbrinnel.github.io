@@ -162,7 +162,8 @@ config). Local only: Jekyll never publishes `_lab/`.
   parallel. Runs stop early when a species dies out or bunnies pass the cap, and, with
   `trendStops`, as soon as their direction is clear: wolves below half their start and
   falling ("wolves declining"), or grass below a tenth of its peak and falling ("grass
-  collapsing"). See `TREND_*` in worker.js; lab-screen.js and lab-compare.js use them by
+  collapsing"), in the first `TREND_UNTIL_DAYS` (30) days only: later, wolves dip at the
+  bottom of every predator-prey cycle and recover. See `TREND_*` in worker.js; lab-screen.js and lab-compare.js use them by
   default, with a bunny cap of 12,000.
 - `lab-search.js` varies chosen cells (seeded, log-space steps) and keeps the best few.
 - `index.html`, `lab-ui.js`, `lab.css` are the page.

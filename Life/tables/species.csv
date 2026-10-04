@@ -6,7 +6,7 @@ StaminaMax,points,100,100,,
 StaminaRefill,per s,8,4,,While not sprinting
 SprintCost,per s,25,20,,
 FullnessMax,points,100,100,,
-HungerRate,per s,2,0.6,,Bunny empty in ~2.5 days; wolf in ~4
+HungerRate,per s,2,0.9,,Bunny empty in ~2.5 days; wolf in ~5.6
 StarveDamage,HP per s,1,1,,HP lost while Fullness = 0
 HPMax,points,20,60,,
 HealRate,HP per s,0.5,0.5,,Only while Fullness > HealAbove
@@ -25,7 +25,7 @@ BiteSize,Size per bite,0.25,0.5,,How much of a blade one bite removes; a wolf ch
 TimeToMature,days,3,3,1,Grass: days to reach full Size and start seeding
 Lifespan,days,7,120,10,
 ElderAt,% of Lifespan,80,80,,
-VisionRange,tiles,8,24,,
+VisionRange,tiles,8,16,,
 PregnancyDays,days,1,3,,
 LitterSize,count,2-4,1-2,,
 MateCooldown,days,2,10,,Female only; starts after birth

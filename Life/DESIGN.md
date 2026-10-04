@@ -232,7 +232,14 @@ Each one ends with something to watch. ✓ = done (3 Oct 2026).
      passed 80 days (shortest 95, average 115; 2 went the full 150). Today's numbers before
      these changes lost their wolves by day 11–15 on the same seeds.
    - Past about day 100 the cycles grow until wolves over-hunt the bunnies to zero or
-     crash after them. That's where tuning goes next.
+     crash after them. Damping the wolves helped most: `HungerRate` 0.9 and `VisionRange`
+     16 (from 0.6 and 24) kept all three species 162 of 200 days on average on 12 fresh
+     seeds (3 reached 200), against 137 days (2 reached 200) before. Bunny and grass
+     numbers have become touchy: halving or doubling any of them breaks the balance.
+   - The remaining failures are mostly wolves eating the last bunnies, and survivors often
+     end with only a handful of wolves. Numbers alone are near their limit; something
+     that protects scarce bunnies (a refuge) or limits wolves when prey is scarce is the
+     likely next step, and is Paul's call.
    - Method that works (Paul): quick gross tests, judged by direction. Wolves not
      increasing means a bad run; runs stop as soon as their direction is clear.
 9. **Release as `/life.html`.** The page already lives at the site root (unlisted, see

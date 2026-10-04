@@ -23,6 +23,9 @@ const TREND_SETTLE_DAYS = 5;
 const TREND_LOOKBACK_DAYS = 3;
 const TREND_WOLF_SHARE = 0.5;
 const TREND_GRASS_SHARE = 0.1;
+// Only early on: later, wolves dip low at the bottom of every predator-prey cycle and
+// recover, so a dip isn't a verdict. After this many days only extinctions end a run.
+const TREND_UNTIL_DAYS = 30;
 
 self.onmessage = async e => {
   const m = e.data;
@@ -82,7 +85,7 @@ async function run(m) {
     if (W.bunnies === 0) { endReason = 'bunnies extinct'; break; }
     if (W.gCount === 0) { endReason = 'grass extinct'; break; }
     if (m.bunnyCap && W.bunnies > m.bunnyCap) { endReason = 'bunny boom'; break; }
-    if (m.trendStops && day >= TREND_SETTLE_DAYS && day >= TREND_LOOKBACK_DAYS) {
+    if (m.trendStops && day >= TREND_SETTLE_DAYS && day >= TREND_LOOKBACK_DAYS && day <= TREND_UNTIL_DAYS) {
       const back = day - TREND_LOOKBACK_DAYS;
       if (W.wolves < daily.wolves[0] * TREND_WOLF_SHARE && W.wolves < daily.wolves[back]) { endReason = 'wolves declining'; break; }
       if (W.gCount < peak.grass * TREND_GRASS_SHARE && W.gCount < daily.grass[back]) { endReason = 'grass collapsing'; break; }
