@@ -26,6 +26,8 @@
       m.seenAt = grow(m.seenAt, Float64Array);      // sim.simSeconds of that sighting
       m.feedTile = grow(m.feedTile, Int32Array);    // FEED's carcass tile
       m.feedSerial = grow(m.feedSerial, Uint32Array); // that corpse's serial, since a tile is reused
+      m.bunnyAt = grow(m.bunnyAt, Float64Array);    // sim.simSeconds this wolf last saw any bunny
+      m.bunnyFor = grow(m.bunnyFor, Uint32Array);   // the serial bunnyAt belongs to (slots are reused)
       m.cap = W.aCap;
     }
     return m;
@@ -191,12 +193,21 @@
       }
       W.aRunLeft[s] = 0;
     }
+    // A wolf that hasn't seen a bunny for RoamAfter days roams (Paul): it keeps going the
+    // way it was heading, in runs of RoamRun tiles, until it finds prey or meets a wall,
+    // instead of circling the land it has hunted out.
+    const S = AS.speciesStats(sim, s), m = mem(W), now = sim.simSeconds;
+    if (m.bunnyFor[s] !== W.aSerial[s]) { m.bunnyFor[s] = W.aSerial[s]; m.bunnyAt[s] = now; }
+    mW = W;
+    if (AS.nearestVisible(sim, t, S.VisionRange, isBunny) >= 0) m.bunnyAt[s] = now;
+    const roaming = S.RoamAfter > 0 && now - m.bunnyAt[s] > S.RoamAfter * AS.DAY_SECONDS;
     let d;
-    if (nOpen > 0) d = pickRoomDir(sim, s, K.WOLF, open, nOpen);
+    if (roaming && nOpen > 0 && open.subarray(0, nOpen).includes(W.aRunDir[s])) d = W.aRunDir[s];
+    else if (nOpen > 0) d = pickRoomDir(sim, s, K.WOLF, open, nOpen);
     else if (nGrass > 0) d = grassDirs[sim.rng.int(nGrass)];
     else return;
     W.aRunDir[s] = d;
-    W.aRunLeft[s] = sim.rng.inRange(AS.speciesStats(sim, s).WanderRun);
+    W.aRunLeft[s] = sim.rng.inRange(roaming ? S.RoamRun : S.WanderRun);
     if (AS.chewOrStep(sim, s, dirTile(W, t, d))) W.aRunLeft[s]--;
   }
 
@@ -278,6 +289,7 @@
           m.preySerial[s] = W.aSerial[p];
           m.seenTile[s] = t;
           m.seenAt[s] = sim.simSeconds;
+          m.bunnyAt[s] = sim.simSeconds; m.bunnyFor[s] = W.aSerial[s];
           return true;
         }
         // Nothing in view: a wolf already hunting keeps looking for TrackSeconds, until it

@@ -55,6 +55,8 @@
     ['MateCooldown', 'num', ANIMALS],
     ['MateFullness', 'frac', ANIMALS],
     ['MateCost', 'frac', ANIMALS],
+    ['RoamAfter', 'num', []],        // blank = never roams
+    ['RoamRun', 'range', []],
     ['MateRange', 'num', []],        // blank = a mate must be in sight
     ['PackLimit', 'num', []],        // blank = no territory rule
     ['TerritoryRange', 'num', []],

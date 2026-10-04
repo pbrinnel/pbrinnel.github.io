@@ -129,6 +129,9 @@ watching the sim run. Everything else in this doc is decided.
   wandering), so crowded colonies and packs leak into empty land. A fleeing bunny with no
   hole in reach picks the escape direction that gains distance without running into a
   wall or corner.
+- **Wolves roam when they find nothing** (Paul, 4 Oct 2026: they circled hunted-out land
+  until they died). A wolf that hasn't seen a bunny for `RoamAfter` days keeps going the
+  way it was heading, in runs of `RoamRun` tiles, until it finds prey or meets a wall.
 - **Wolves find mates far beyond sight** (Paul, 4 Oct 2026): a ready wolf senses a ready
   mate within `MateRange` (howling and scent) and travels straight toward it, so wolves
   thinned to a scattered few can still pair up. Wolf litters are 3–5, nearer real wolves'
@@ -372,6 +375,9 @@ seeds and saves numbers back into `tables/`. What's been found, in order:
   3 of 3 either way; litters alone gave the most wolves (1.17× their start), both together
   boomed higher (peak 208) and were falling by day 30 (0.90×). Committed together for
   Paul's long runs; mate range is for scattered survivors, which 30 days can't show.
+- Roaming after `RoamAfter` 1 day without seeing a bunny: wolves 1.26× their start at day
+  30 (3 of 3 seeds), against 0.90× without roaming and 1.05× roaming after half a day;
+  bunnies end a little lower (642–923).
 - **Wolves remembering where a bunny hid** (`TrackSeconds`) helped over 50 days (wolves
   1.35× their start instead of 1.1× at the old food, 3.7× instead of 3.2× at `BiteFood`
   20) but not over 200: with `BiteFood` 20, 15 s of memory kept 10 of 12 fresh seeds

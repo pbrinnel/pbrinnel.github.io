@@ -12,6 +12,6 @@ Wolf,2,HUNT,Hungry (Fullness < HungryAt) and sees a bunny; after losing sight it
 Wolf,3,GIVE_UP,Stamina 0 mid-chase,Stop and rest until Stamina reaches RestUntil; the bunny gets away
 Wolf,4,MATE,As bunny (a partner in sight or within MateRange); and the female has no more than PackLimit other adult wolves within TerritoryRange (territory),Travel to the partner (beyond sight: straight toward it); adjacent → mate
 Wolf,5,REST,Stamina < RestBelow,Stand still until Stamina reaches RestUntil
-Wolf,6,PROWL,Otherwise,Wander in runs of WanderRun tiles (longer than bunnies)
+Wolf,6,PROWL,Otherwise,Wander in runs of WanderRun tiles (longer than bunnies); after RoamAfter days without seeing a bunny, keep heading the same way in runs of RoamRun
 Grass,—,GROW,Always,Size rises by GrowthRate
 Grass,—,SEED,At full Size; roll SeedChance,New sprout on a random empty 4-neighbor tile

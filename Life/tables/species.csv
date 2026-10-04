@@ -37,6 +37,8 @@ LitterSize,count,2-4,3-5,,
 MateCooldown,days,2,10,,Female only; starts after birth
 MateFullness,% of FullnessMax,60,70,,Both parents must be at least this full
 MateCost,% of FullnessMax,30,30,,Fullness each parent loses at mating
+RoamAfter,days,,1,,A wolf that hasn't seen a bunny this long roams: it keeps its heading in long runs until it finds prey or a wall; blank = never
+RoamRun,tiles,,40-80,,Length of a roaming wolf's runs (WanderRun otherwise)
 MateRange,tiles,,80,,A ready wolf hears and scents a ready mate this far away (howling, scent) and travels to it; blank = only mates in sight
 PackLimit,count,,8,,A female wolf breeds only if no more than this many other adult wolves are within TerritoryRange; blank = no limit
 TerritoryRange,tiles,,15,,Square (Chebyshev) distance for PackLimit
