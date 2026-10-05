@@ -47,6 +47,14 @@
     ['TrackSeconds', 'num', ['Wolf', 'Human']],
     ['HoleRange', 'num', ['Bunny']],
     ['DigChance', 'frac', ['Bunny']],
+    ['LeaveCrowd', 'num', []],       // blank = never emigrates
+    ['LeaveChance', 'frac', []],
+    ['SettleCrowd', 'num', []],
+    ['SettleRange', 'num', []],
+    ['LeaveStress', 'num', []],      // blank = stress never sets one emigrating
+    ['ScareStress', 'num', []],
+    ['HungerStress', 'num', []],
+    ['StressHalfLife', 'pos', []],
     ['DigSeconds', 'num', ['Bunny']],
     ['WanderRun', 'range', ANIMALS],
     ['RoomPreference', 'num', ANIMALS],

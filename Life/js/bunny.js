@@ -21,6 +21,16 @@
   // decision. BAD_N such blades are remembered per bunny.
   const BAD_SECONDS = 10;
   const BAD_N = 4;
+  // A companion stops and waits within this many tiles of the bunny it is emigrating with.
+  const FOLLOW_NEAR = 2;
+  // An emigrant's destination: tries for one near water, and how near is near (walking tiles).
+  const GOAL_TRIES = 12, GOAL_WATER = 12;
+  // Scares closer together than this (sim seconds) are one chase, and count once.
+  const SCARE_GAP = 3;
+  // How often, in sim seconds, an emigrant looks around to see whether to settle.
+  const SETTLE_EVERY = 1;
+  // An emigrant paths, within sight, to a tile this many tiles nearer its destination.
+  const AWAY_GAIN = 4;
   // A dig timer within this of 0 is done (1/30 s has no exact binary value).
   const DIG_EPS = 1e-9;
 
@@ -50,6 +60,16 @@
       m.badUntil = grow(m.badUntil, Int32Array, BAD_N);   // sim tick the entry expires at
       m.badOwner = grow(m.badOwner, Uint32Array, BAD_N);  // serial, so a reused slot starts clean
       m.badNext = grow(m.badNext, Uint8Array, 1);
+      m.awayTo = grow(m.awayTo, Int32Array, 1);    // an emigrant's destination tile
+      m.awayFor = grow(m.awayFor, Uint32Array, 1); // the serial awayTo belongs to; another = not emigrating
+      m.checkAt = grow(m.checkAt, Float64Array, 1); // sim.simSeconds of the last crowd check
+      m.checkFor = grow(m.checkFor, Uint32Array, 1); // the serial checkAt belongs to
+      m.stress = grow(m.stress, Float64Array, 1);  // stress as of stressAt (it fades by StressHalfLife)
+      m.stressAt = grow(m.stressAt, Float64Array, 1);
+      m.scareAt = grow(m.scareAt, Float64Array, 1); // sim.simSeconds of the last scare counted
+      m.stressFor = grow(m.stressFor, Uint32Array, 1); // the serial these three belong to
+      m.lead = grow(m.lead, Int32Array, 1);        // a companion's leader slot; -1 = it leads itself
+      m.leadSerial = grow(m.leadSerial, Uint32Array, 1);
       m.cap = W.aCap;
     }
     return m;
@@ -91,6 +111,18 @@
       if (mMem.badTile[base + i] === t && mMem.badOwner[base + i] === owner && mMem.badUntil[base + i] > now) return false;
     }
     return true;
+  };
+  // A tile at least AWAY_GAIN nearer the emigrant's destination (mGoalTile) than it is now.
+  let mAwayNeed = 0;
+  const isNearerAway = t => {
+    const w = mW.w, dx = (t % w) - (mGoalTile % w), dy = ((t / w) | 0) - ((mGoalTile / w) | 0);
+    return dx * dx + dy * dy <= mAwayNeed;
+  };
+  // A bunny of the other sex not already emigrating: who a leaving bunny takes along.
+  const isCompanion = t => {
+    if (mW.kind[t] !== K.BUNNY) return false;
+    const p = mW.aSlot[t];
+    return mW.aSex[p] !== mW.aSex[mSelf] && mMem.awayFor[p] !== mW.aSerial[p];
   };
   // A bunny of the other sex that meets the MATE conditions.
   const isPartner = t => {
@@ -145,13 +177,186 @@
 
   const bestAdjacentBlade = (W, t) => AS.bestAdjacentBlade(W, t);
 
+  // ---- emigrating ----------------------------------------------------------------------------
+
+  // Bunnies in the square r tiles around t, not counting the one on t.
+  function crowdAt(W, t, r) {
+    const w = W.w, tx = t % w, ty = (t / w) | 0;
+    const x0 = Math.max(0, tx - r), x1 = Math.min(w - 1, tx + r), y0 = Math.max(0, ty - r), y1 = Math.min(W.h - 1, ty + r);
+    let c = 0;
+    for (let y = y0; y <= y1; y++) {
+      const row = y * w;
+      for (let x = x0; x <= x1; x++) if (W.kind[row + x] === K.BUNNY) c++;
+    }
+    return c - 1;
+  }
+
+  // Within GOAL_WATER walking tiles of a shore, or anywhere in a world with no water.
+  function nearWater(W, t) {
+    if (W.waterCount === 0) return true;
+    if (W.waterStale || !W.wDist) W.buildWaterField();
+    return W.wDist[t] <= GOAL_WATER;
+  }
+
+  // A tile a random RoamRun away from t at a random angle, clamped to the world. In a world
+  // with water it is one of up to GOAL_TRIES such tiles within GOAL_WATER walking tiles of a
+  // shore if any is: a bunny can't live out of reach of water, and one sent into dry land
+  // turned back to its home lake to drink every time it got thirsty.
+  function farGoal(sim, t, run) {
+    const W = sim.W;
+    let g = -1;
+    for (let i = 0; i < GOAL_TRIES; i++) {
+      const a = sim.rng.next() * 2 * Math.PI, r = sim.rng.inRange(run);
+      const x = Math.min(W.w - 1, Math.max(0, Math.round(t % W.w + r * Math.cos(a))));
+      const y = Math.min(W.h - 1, Math.max(0, Math.round(((t / W.w) | 0) + r * Math.sin(a))));
+      g = y * W.w + x;
+      if (nearWater(W, g)) break;
+    }
+    return g;
+  }
+
+  // Stress (Paul): scares and hunger with nothing to eat add to it, and it halves every
+  // StressHalfLife days, so scares that come faster than they fade build up (repeated
+  // harassment, not one bad chase) and LeaveStress sets a bunny emigrating. Stored as a value
+  // and the time of it, and faded only when read or added to, so it costs nothing per tick.
+  function stressNow(sim, s, m) {
+    const W = sim.W, now = sim.simSeconds, S = AS.speciesStats(sim, s);
+    if (m.stressFor[s] !== W.aSerial[s]) { m.stressFor[s] = W.aSerial[s]; m.stress[s] = 0; m.scareAt[s] = -Infinity; m.stressAt[s] = now; }
+    if (now > m.stressAt[s]) {
+      m.stress[s] *= Math.pow(0.5, (now - m.stressAt[s]) / (S.StressHalfLife * AS.DAY_SECONDS));
+      m.stressAt[s] = now;
+    }
+    return m.stress[s];
+  }
+  function addStress(sim, s, amount) {
+    if (!(amount > 0) || !(AS.speciesStats(sim, s).LeaveStress > 0)) return;
+    const m = mem(sim.W);
+    m.stress[s] = stressNow(sim, s, m) + amount;
+  }
+  // The inspector's view: stress now (faded to this moment) and whether it is emigrating.
+  AS.bunnyStress = function (sim, s) {
+    const m = mem(sim.W);
+    return { stress: stressNow(sim, s, m), away: m.awayFor[s] === sim.W.aSerial[s] };
+  };
+  // A scare: one per chase. Fleeing, hiding and fleeing again from the same wolf within
+  // SCARE_GAP seconds is still the one chase.
+  function scared(sim, s) {
+    const S = AS.speciesStats(sim, s);
+    if (!(S.LeaveStress > 0)) return;
+    const m = mem(sim.W), now = sim.simSeconds;
+    stressNow(sim, s, m);
+    if (now - m.scareAt[s] < SCARE_GAP) return;
+    m.scareAt[s] = now;
+    m.stress[s] += S.ScareStress;
+  }
+
+  // Leaving a crowd, with hysteresis (Paul): a wandering bunny, not yet elderly, with
+  // LeaveCrowd or more bunnies around it sets off, with LeaveChance a day, for a destination
+  // RoamRun tiles away in any direction, and keeps choosing new ones until it stands
+  // somewhere near water with no more than SettleCrowd within SettleRange. Then it settles and is content with a
+  // crowd again. Leaving thins the crowd, so most of a colony stays. It takes the nearest
+  // bunny of the other sex not already leaving along, which follows it and settles when it
+  // does: a lone settler never finds a mate, and a pair can found a colony. Takes this step
+  // and returns true while emigrating; false lets a plain run go on (also how an emigrant
+  // gets around a lake or a meadow its straight line runs into).
+  function emigrateStep(sim, s, S, t) {
+    const W = sim.W, m = mem(W), serial = W.aSerial[s], r = Math.round(S.VisionRange);
+    if (m.awayFor[s] !== serial) {
+      if (W.aRunLeft[s] > 0) return false;
+      const now = sim.simSeconds, since = m.checkFor[s] === serial ? now - m.checkAt[s] : 0;
+      m.checkFor[s] = serial; m.checkAt[s] = now;
+      if (!(since > 0) || W.aAge[s] >= S.ElderAt * S.Lifespan) return false;
+      // Stressed past LeaveStress it goes; crowded, it goes with LeaveChance a day.
+      const stressed = S.LeaveStress > 0 && stressNow(sim, s, m) >= S.LeaveStress;
+      if (!stressed) {
+        if (!(S.LeaveCrowd > 0 && S.LeaveChance > 0) || crowdAt(W, t, r) < S.LeaveCrowd) return false;
+        if (sim.rng.next() >= 1 - Math.pow(1 - Math.min(S.LeaveChance, 1 - 1e-9), since / AS.DAY_SECONDS)) return false;
+      }
+      m.stress[s] = 0;   // a fresh start where it settles
+      m.awayFor[s] = serial;
+      m.lead[s] = -1;
+      m.checkAt[s] = now;
+      m.awayTo[s] = farGoal(sim, t, S.RoamRun);
+      mW = W; mSelf = s; mMem = m;
+      const ct = AS.nearestVisible(sim, t, S.VisionRange, isCompanion);
+      if (ct >= 0) {
+        const c = W.aSlot[ct];
+        m.awayFor[c] = W.aSerial[c]; m.lead[c] = s; m.leadSerial[c] = serial;
+        W.aRunLeft[c] = 0;
+      }
+    } else if (m.lead[s] >= 0) {
+      return followStep(sim, s, m, t);
+    } else if (sim.simSeconds - m.checkAt[s] >= SETTLE_EVERY) {
+      // Settling looks SettleRange around, much wider than sight, so a pair doesn't stop
+      // just past its colony's edge and merge back in; and only near water, where it can live.
+      m.checkAt[s] = sim.simSeconds;
+      if (crowdAt(W, t, Math.round(S.SettleRange)) <= S.SettleCrowd && nearWater(W, t)) {
+        m.awayFor[s] = 0;
+        W.aTargetTile[s] = -1;
+        return false;
+      }
+    }
+    if (W.aRunLeft[s] > 0) return false;
+    const g = m.awayTo[s];
+    W.aTargetTile[s] = g;
+    // There: a new destination, and a plain run before heading for it.
+    const gx = g % W.w, gy = (g / W.w) | 0, tx = t % W.w, ty = (t / W.w) | 0;
+    const left = Math.hypot(tx - gx, ty - gy);
+    if (left <= AWAY_GAIN) { m.awayTo[s] = farGoal(sim, t, S.RoamRun); return false; }
+    // Path, within sight, to a tile AWAY_GAIN nearer the destination: bunnies can't cross
+    // grass, and a straight-line step stalls at every meadow. None within sight (walled in
+    // by water or grass that way): try another destination after a plain run.
+    mW = W; mGoalTile = g; mAwayNeed = (left - AWAY_GAIN) * (left - AWAY_GAIN);
+    const best = AS.pathNext(sim, t, isNearerAway, S.VisionRange);
+    if (best < 0 || best === t) { m.awayTo[s] = farGoal(sim, t, S.RoamRun); return false; }
+    AS.stepTo(sim, s, best);
+    return true;
+  }
+
+  // The open neighbor of t that most shortens the straight line to g, or -1 if none does.
+  function closerStep(W, t, g) {
+    const gx = g % W.w, gy = (g / W.w) | 0;
+    const d2 = u => (u % W.w - gx) ** 2 + (((u / W.w) | 0) - gy) ** 2;
+    let best = -1, bestD = d2(t);
+    for (let i = 0, k = W.neighbors4(t, nb); i < k; i++) {
+      const u = nb[i];
+      if (W.kind[u] !== K.EMPTY) continue;
+      const d = d2(u);
+      if (d < bestD) { best = u; bestD = d; }
+    }
+    return best;
+  }
+
+  // A companion keeps near its leader, and settles when the leader settles or dies.
+  function followStep(sim, s, m, t) {
+    const W = sim.W, L = m.lead[s];
+    if (!W.aAlive[L] || W.aSerial[L] !== m.leadSerial[s] || m.awayFor[L] !== m.leadSerial[s]) {
+      m.awayFor[s] = 0;
+      W.aTargetTile[s] = -1;
+      return false;
+    }
+    if (W.aRunLeft[s] > 0) return false;
+    const lt = W.aTile[L];
+    W.aTargetTile[s] = lt;
+    const dx = (t % W.w) - (lt % W.w), dy = ((t / W.w) | 0) - ((lt / W.w) | 0);
+    if (dx * dx + dy * dy <= FOLLOW_NEAR * FOLLOW_NEAR) return true;
+    mW = W; mGoalTile = lt;
+    let next = AS.pathNext(sim, t, touchesGoal, AS.speciesStats(sim, s).VisionRange);
+    if (next < 0 || next === t) next = closerStep(W, t, lt);
+    if (next < 0) return false;
+    AS.stepTo(sim, s, next);
+    return true;
+  }
+
   // One step of a wander run: keep going while the way ahead is open, otherwise pick a new
   // open direction and run length right away. Shared by WANDER and by SEEK_FOOD when it has
-  // no usable target, so a bunny never stands where it could be walking.
+  // no usable target, so a bunny never stands where it could be walking. An emigrating bunny
+  // heads for its destination instead.
   function wanderStep(sim, s) {
     const W = sim.W;
     if (W.aStepLeft[s] > 0) return;
-    const t = W.aTile[s];
+    const t = W.aTile[s], S = AS.speciesStats(sim, s);
+    if ((S.LeaveCrowd > 0 && S.LeaveChance > 0 || S.LeaveStress > 0) && emigrateStep(sim, s, S, t)) return;
     if (W.aRunLeft[s] > 0) {
       const ahead = dirTile(W, t, W.aRunDir[s]);
       if (ahead >= 0 && W.kind[ahead] === K.EMPTY) {
@@ -168,7 +373,7 @@
     if (n === 0) return;
     const d = pickRoomDir(sim, s, K.BUNNY, open, n);
     W.aRunDir[s] = d;
-    W.aRunLeft[s] = sim.rng.inRange(AS.speciesStats(sim, s).WanderRun);
+    W.aRunLeft[s] = sim.rng.inRange(S.WanderRun);
     if (AS.stepTo(sim, s, dirTile(W, t, d))) W.aRunLeft[s]--;
   }
 
@@ -212,7 +417,7 @@
         m.hole[s] = S.HoleRange > 0 && W.hCount > 0 ? AS.nearestVisible(sim, W.aTile[s], S.HoleRange, isFreeHole) : -1;
         return true;
       },
-      start(sim, s) { sim.W.aRunLeft[s] = 0; },
+      start(sim, s) { sim.W.aRunLeft[s] = 0; scared(sim, s); },
       act(sim, s) {
         const W = sim.W, w = W.w, t = W.aTile[s], wolf = mem(W).wolf[s];
         const tx = t % w, ty = (t / w) | 0, wx = wolf % w, wy = (wolf / w) | 0;
@@ -458,7 +663,11 @@
     // "Walk a run of WanderRun tiles in a random direction." Always enters.
     WANDER: {
       enter() { return true; },
-      start: calmStart,
+      // Wandering hungry means SEEK_FOOD found no blade in sight: this land isn't feeding it.
+      start(sim, s) {
+        calmStart(sim, s);
+        if (AS.isHungry(sim, s)) addStress(sim, s, AS.speciesStats(sim, s).HungerStress);
+      },
       act: wanderStep,
     },
   });

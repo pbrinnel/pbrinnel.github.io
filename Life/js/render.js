@@ -64,6 +64,21 @@
   const BLAST_GLOW_STOPS = [1, 0.5, 0];
   const MAX_BLASTS = 8;   // a hammered tap can't pile up work
 
+  // A count in the Info tab, tapped, toggles rings around every one of that kind on the map,
+  // steady (no pulsing: DESIGN.md Photosensitivity), drawn every frame so they follow the
+  // animals and show paused. A ring is at least LOCATE_MIN_CSS_PX across, so it shows zoomed
+  // far out where a tile is a dot. An animal off the screen gets a pip on the map's edge in
+  // its direction, when there are no more than LOCATE_PIPS_MAX of that kind off it (pips for
+  // thousands would only line the edges).
+  const LOCATE_ALPHA = 0.9;
+  const LOCATE_CSS_PX = 2;
+  const LOCATE_MIN_CSS_PX = 14;
+  const LOCATE_PIP_CSS_PX = 5;
+  const LOCATE_PIPS_MAX = 200;
+  // The graph's colors (graph.js), so a ring matches the kind's line; ui.js marks a toggled
+  // count with the same color.
+  const LOCATE_COLORS = AS.LOCATE_COLORS = Object.freeze({ blades: '25,158,112', bunnies: '217,89,38', wolves: '57,135,229', humans: '199,99,179', corpses: '200,200,190' });
+
   // Real time an event holds a pose, whatever the speed, so nothing flickers (DESIGN.md,
   // Photosensitivity): a meatless death's fallen sprite, a bite's flinch, a mouthful or bite, a birth's hop.
   const DEATH_HOLD_MS = 700, FLINCH_HOLD_MS = 300, ACTION_HOLD_MS = 300, BIRTH_HOLD_MS = 400;
@@ -368,6 +383,69 @@
       }
     }
 
+    // The rings (see LOCATE_ALPHA), one kind at a time: one path each, as there may be
+    // thousands of blades.
+    let located = null, locTop = 0;   // a Set of kinds, and the CSS px the HUD covers at the top
+    function drawLocate(sim, cam, dpr, key) {
+      const W = sim.W, s = cam.scale * dpr;
+      const r = Math.max(LOCATE_MIN_CSS_PX * dpr, s * 1.6) / 2;
+      const cw = canvas.width, ch = canvas.height;
+      const x0 = Math.max(0, Math.floor(cam.x - 1)), y0 = Math.max(0, Math.floor(cam.y - 1));
+      const x1 = Math.min(W.w - 1, Math.ceil(cam.x + cw / s + 1)), y1 = Math.min(W.h - 1, Math.ceil(cam.y + ch / s + 1));
+      const ring = (tx, ty) => {
+        const cx = (tx + 0.5 - cam.x) * s, cy = (ty + 0.5 - cam.y) * s;
+        ctx.moveTo(cx + r, cy);
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      };
+      ctx.beginPath();
+      let pips = 0;
+      const species = { bunnies: AS.SPECIES.BUNNY, wolves: AS.SPECIES.WOLF, humans: AS.SPECIES.HUMAN }[key];
+      if (species !== undefined) {
+        for (let a = 0, hi = W.aHigh; a < hi; a++) {
+          if (!W.aAlive[a] || W.aSpecies[a] !== species) continue;
+          animalPos(W, a, curAlpha, pos);
+          if (pos[0] < x0 || pos[0] > x1 || pos[1] < y0 || pos[1] > y1) {
+            if (pips < LOCATE_PIPS_MAX) { offPip[pips * 2] = pos[0]; offPip[pips * 2 + 1] = pos[1]; }
+            pips++;
+            continue;
+          }
+          ring(pos[0], pos[1]);
+        }
+      } else {
+        const kind = key === 'blades' ? KIND.GRASS : KIND.CORPSE;
+        for (let ty = y0; ty <= y1; ty++) {
+          const row = ty * W.w;
+          for (let tx = x0; tx <= x1; tx++) if (W.kind[row + tx] === kind) ring(tx, ty);
+        }
+      }
+      const a = LOCATE_ALPHA, color = LOCATE_COLORS[key];
+      ctx.lineWidth = (LOCATE_CSS_PX + 2) * dpr;
+      ctx.strokeStyle = `rgba(0,0,0,${a * 0.6})`;
+      ctx.stroke();
+      ctx.lineWidth = LOCATE_CSS_PX * dpr;
+      ctx.strokeStyle = `rgba(${color},${a})`;
+      ctx.stroke();
+      if (pips > 0 && pips <= LOCATE_PIPS_MAX) {
+        // Each pip sits where the line from the screen's middle toward the animal leaves the screen.
+        // The edges are the visible map's: below the HUD bar (locTop, CSS px) as well.
+        const top = locTop * dpr, mx = cw / 2, my = (ch + top) / 2, inset = LOCATE_PIP_CSS_PX * dpr * 1.5;
+        ctx.beginPath();
+        for (let i = 0; i < pips; i++) {
+          const dx = (offPip[i * 2] + 0.5 - cam.x) * s - mx, dy = (offPip[i * 2 + 1] + 0.5 - cam.y) * s - my;
+          const k = Math.min((mx - inset) / Math.max(Math.abs(dx), 1e-9), (my - top - inset) / Math.max(Math.abs(dy), 1e-9));
+          const px = mx + dx * k, py = my + dy * k, pr = LOCATE_PIP_CSS_PX * dpr;
+          ctx.moveTo(px + pr, py);
+          ctx.arc(px, py, pr, 0, Math.PI * 2);
+        }
+        ctx.fillStyle = `rgba(${color},${a})`;
+        ctx.fill();
+        ctx.lineWidth = dpr;
+        ctx.strokeStyle = `rgba(0,0,0,${a * 0.6})`;
+        ctx.stroke();
+      }
+    }
+    const offPip = new Float64Array(LOCATE_PIPS_MAX * 2);
+
     // One path per species-and-sex color, one stroke each: there may be thousands of lines.
     // only >= 0 draws just that slot's line.
     function drawIntent(sim, v, s, ox, oy, dpr, only) {
@@ -447,8 +525,13 @@
           ctx.imageSmoothingEnabled = true;
         }
         if (blasts.length) drawBlasts(cam, dpr, nowMs);
+        if (located) for (const key of located) if (LOCATE_COLORS[key]) drawLocate(sim, cam, dpr, key);
         if (sel) drawSelection(sim, cam, sel, dpr);
       },
+      // The kinds to ring ('bunnies', 'wolves', 'humans', 'blades', 'corpses'): a Set, read
+      // every frame; top is how many CSS px of the canvas's top the HUD covers, so pips stay below it.
+      locate(kinds, top) { located = kinds && kinds.size ? kinds : null; locTop = top || 0; },
+      get located() { return located ? [...located] : []; },
       // A nuke went off at tile (tx, ty), radius in tiles; the effect starts now (real time).
       blast(tx, ty, radius, nowMs) {
         if (blasts.length >= MAX_BLASTS) blasts.shift();

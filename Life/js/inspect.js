@@ -91,6 +91,11 @@
     Fullness: (sim, c) => outOf(sim.W.aFullness[c.s], c.Tsp.FullnessMax),
     Water: (sim, c) => outOf(sim.W.aWater[c.s], c.Tsp.WaterMax),
     Stamina: (sim, c) => outOf(sim.W.aStamina[c.s], c.Tsp.StaminaMax),
+    // Bunnies only (variables.csv); the number it leaves at is LeaveStress.
+    Stress: (sim, c) => {
+      const b = AS.bunnyStress(sim, c.s);
+      return (c.Tsp.LeaveStress > 0 ? outOf(b.stress, c.Tsp.LeaveStress) : b.stress.toFixed(1)) + (b.away ? ', emigrating' : '');
+    },
     HP: (sim, c) => outOf(sim.W.aHP[c.s], c.Tsp.HPMax),
     // A corpse's age is the time since it died, which is its own clock (cAge).
     Age: (sim, c) => {

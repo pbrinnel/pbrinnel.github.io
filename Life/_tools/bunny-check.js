@@ -195,6 +195,7 @@ function wolf(AS, sim, x, y) {
     const { AS, sim, W } = make(60, 11, tx => {
       tx.species = editCSV(editCSV(tx.species, 'HungerRate', 'Bunny', '0'), 'RoomPreference', 'Bunny', String(pref));
       tx.species = editCSV(tx.species, 'StaminaRefill', 'Bunny', '0');
+      tx.species = editCSV(tx.species, 'LeaveChance', 'Bunny', '0%');   // the crowd here would set them emigrating
     });
     // The crowd is out of Stamina and never refills, so it rests where it is.
     for (let y = 20; y < 40; y++) for (let x = 33; x < 38; x++) bunny(AS, sim, x, y, { stamina: 0 });
@@ -363,6 +364,63 @@ function wolf(AS, sim, x, y) {
   const before = bad; audit(AS, sim, 'bunny-check');
   const h = require('./harness.js');
   ok(h.failures.length === 0, 'real: grid/store audit clean ' + h.failures.slice(0, 3).join('; '));
+}
+
+// --- Leaving a crowd: a bunny beside a big crowd strikes out for open land and settles there ---
+{
+  const { AS, sim, W, B } = make(100, 3, tx => {
+    tx.species = editCSV(tx.species, 'HungerRate', 'Bunny', '0');
+    tx.species = editCSV(tx.species, 'StaminaRefill', 'Bunny', '0');
+    tx.species = editCSV(tx.species, 'DigChance', 'Bunny', '0%');
+    tx.species = editCSV(tx.species, 'LeaveChance', 'Bunny', '100%');
+  });
+  // Young (no mating), and the crowd is out of Stamina, so it rests where it is.
+  for (let y = 40; y < 60; y++) for (let x = 5; x < 13; x++) bunny(AS, sim, x, y, { stamina: 0, age: 1 });
+  const s = bunny(AS, sim, 14, 50, { age: 1 });
+  const R = Math.round(B.VisionRange);
+  const crowdAt = t => { let c = 0; const tx = t % W.w, ty = (t / W.w) | 0;
+    for (let y = Math.max(0, ty - R); y <= Math.min(W.h - 1, ty + R); y++) for (let x = Math.max(0, tx - R); x <= Math.min(W.w - 1, tx + R); x++) if (W.kind[y * W.w + x] === AS.KIND.BUNNY) c++;
+    return c - 1; };
+  ok(crowdAt(W.aTile[s]) >= B.LeaveCrowd, `leave: the bunny starts in a crowd (${crowdAt(W.aTile[s])} >= LeaveCrowd ${B.LeaveCrowd})`);
+  let headed = false, settledAt = -1;
+  for (let i = 0; i < secs(AS, 60) && settledAt < 0; i++) {
+    tick(sim);
+    if (W.aTargetTile[s] >= 0) headed = true;
+    if (headed && W.aTargetTile[s] < 0) settledAt = W.aTile[s];
+  }
+  ok(headed, 'leave: it sets off for a destination');
+  ok(settledAt >= 0 && crowdAt(settledAt) <= B.SettleCrowd, `leave: it settles where no more than SettleCrowd ${B.SettleCrowd} are around (${settledAt >= 0 ? crowdAt(settledAt) : 'never settled'})`);
+}
+
+// --- Stress: repeated scares set a bunny emigrating; one scare doesn't ---
+{
+  function scaredRun(scares) {
+    const { AS, sim, W, B } = make(100, 4, tx => {
+      tx.species = editCSV(tx.species, 'HungerRate', 'Bunny', '0');
+      tx.species = editCSV(tx.species, 'DigChance', 'Bunny', '0%');
+      tx.species = editCSV(tx.species, 'LeaveChance', 'Bunny', '0%');   // no crowd reason to leave
+    });
+    const s = bunny(AS, sim, 50, 50, { age: 1 });
+    const w = wolf(AS, sim, 95, 95);
+    let fled = 0, left = false;
+    for (let k = 0; k < scares; k++) {
+      // The wolf shows up beside the bunny, then is gone for longer than SCARE_GAP, so each is a new chase.
+      const t = W.aTile[s], near = [t + 3, t - 3, t + 3 * W.w, t - 3 * W.w].find(u => W.kind[u] === AS.KIND.EMPTY);
+      W.moveAnimal(w, near);
+      W.aDecideLeft[s] = 0;
+      let saw = false;
+      for (let i = 0; i < secs(AS, 2); i++) { tick(sim); if (stateName(sim, s) === 'FLEE') saw = true; }
+      if (saw) fled++;
+      const far = W.tile(W.aTile[s] % W.w < 50 ? 95 : 2, (W.aTile[s] / W.w | 0) < 50 ? 95 : 2);
+      W.moveAnimal(w, far);
+      for (let i = 0; i < secs(AS, 4); i++) { tick(sim); if (W.aTargetTile[s] >= 0 && stateName(sim, s) === 'WANDER') left = true; }
+    }
+    for (let i = 0; i < secs(AS, 10); i++) { tick(sim); if (W.aTargetTile[s] >= 0 && stateName(sim, s) === 'WANDER') left = true; }
+    return { fled, left, B };
+  }
+  const many = scaredRun(8), one = scaredRun(1);
+  ok(many.fled === 8 && many.left, `stress: ${many.fled} scares (left ${many.left}) in about two days (LeaveStress ${many.B.LeaveStress}) set it off for new land`);
+  ok(one.fled === 1 && !one.left, 'stress: a single scare does not');
 }
 
 console.log(bad ? `\nFAIL (${bad})` : '\nALL PASS');

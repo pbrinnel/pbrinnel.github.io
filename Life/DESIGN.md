@@ -146,6 +146,31 @@ watching the sim run. Everything else in this doc is decided.
   wandering), so crowded colonies and packs leak into empty land. A fleeing bunny with no
   hole in reach picks the escape direction that gains distance without running into a
   wall or corner.
+- **Bunnies leave big crowds** (Paul, 5 Oct 2026: they only grew existing colonies, never
+  founded remote ones). A wandering bunny, not yet elderly, with `LeaveCrowd` or more
+  bunnies within `VisionRange` sets off (`LeaveChance` a day) for destinations `RoamRun`
+  tiles away near water, taking the nearest bunny of the other sex along, and the pair keeps
+  going until it is near water with no more than `SettleCrowd` bunnies within
+  `SettleRange`; then both settle and are content with a crowd again. The gap between the
+  two thresholds is the point: they don't stop at the colony's edge, they go until they find
+  land nobody uses. What it took, each found by measuring emigrants in a 30-day run: alone,
+  a settler never found a mate; settling by `VisionRange` stopped pairs just past their
+  colony's edge, to merge back in; destinations in dry land sent them home to drink; and
+  bunnies can't cross grass, so they path within sight toward a tile a few nearer the
+  destination rather than step in a straight line. Seed 1, day 30: bunnies in 37 of 150
+  30-tile cells (22 without emigration), and 289 litters born with 5 or fewer other bunnies
+  near (199). Seeds 2 and 3 were crowded less, so fewer left, and spread about the same as
+  without. Gross test, 3 seeds x 60 days: every species alive, bunnies 318-1,548.
+- **Harassed or hungry bunnies leave too** (Paul, 5 Oct 2026). Each bunny carries a
+  stress level: a scare (starting to flee a hunter, once per chase) adds `ScareStress`, and
+  wandering hungry with no grass in sight adds `HungerStress`. It halves every
+  `StressHalfLife` days, so one bad chase fades and scares coming faster than that build up.
+  At `LeaveStress` the bunny emigrates exactly as a crowded one does, and starts fresh where
+  it settles. It is a value and a timestamp, faded only when read or added to, so it costs
+  nothing per tick. Thirst adds none: water doesn't move, so leaving can't fix it. Two
+  30-day runs: 128 and 303 stress departures, peak stress about 9. Gross test, 3 seeds x 60
+  days: every species alive; bunnies 134-924 at day 60 against 318-1,548 without it, and
+  wolves 57-80 against 74-91.
 - **Wolves roam when they find nothing** (Paul, 4 Oct 2026: they circled hunted-out land
   until they died). A wolf that hasn't seen a bunny for `RoamAfter` days heads for a
   random destination `RoamRun` tiles away in any direction, diagonals included, then
@@ -335,6 +360,13 @@ only with what an animal is doing (a step, a bite). A pose for an event (a bite,
 mouthful, a flinch, a death) holds for at least a quarter of a second of real time,
 whatever the speed, and when the sim runs so fast that steps would flicker, animals
 glide in their standing pose instead of cycling their legs.
+
+**Finding things** (Paul, 5 Oct 2026). Each count in the Info tab (bunnies, wolves,
+humans, grass, corpses) is a toggle: on, every one of that kind on the map is ringed in its
+graph color, and the count wears a border of that color. Rings are steady (a first try was a
+one-off fade, which Paul swapped for a toggle) and follow the animals, paused or running. They
+have a minimum size on screen, so they show zoomed far out, and animals off the screen get a
+pip on the edge of the map in their direction (up to 200 per kind).
 
 ---
 

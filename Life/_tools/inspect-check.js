@@ -84,10 +84,11 @@ const mk = (t, sp, sx) => {
 const selA = s => ({ tile: W.aTile[s], serial: W.aSerial[s], slot: s });
 const bm = mk(empties[2], 0, 0), bf = mk(empties[3], 0, 1), wm = mk(empties[4], 1, 0), wf = mk(empties[5], 1, 1);
 const R = 'Fullness,Water,Stamina,HP,Age,Lifestage,Dead,State,Target,Position,Sex,';
+const RB = 'Fullness,Water,Stress,Stamina,HP,Age,Lifestage,Dead,State,Target,Position,Sex,';   // bunnies also have Stress
 const dbm = A.describe(sim, selA(bm)), dbf = A.describe(sim, selA(bf)), dwm = A.describe(sim, selA(wm)), dwf = A.describe(sim, selA(wf));
 allValues.push(dbm, dbf, dwm, dwf);
-check(names(dbm) === R + 'Parents,Children,InHole', 'male bunny: ' + names(dbm));
-check(names(dbf) === R + 'Pregnant,MateCooldown,Parents,Children,InHole', 'female bunny: ' + names(dbf));
+check(names(dbm) === RB + 'Parents,Children,InHole', 'male bunny: ' + names(dbm));
+check(names(dbf) === RB + 'Pregnant,MateCooldown,Parents,Children,InHole', 'female bunny: ' + names(dbf));
 check(names(dwm) === R + 'Parents,Children,Kills', 'male wolf: ' + names(dwm));
 check(names(dwf) === R + 'Pregnant,MateCooldown,Parents,Children,Kills', 'female wolf: ' + names(dwf));
 check(dbf.title.startsWith('Female bunny #') && dwm.title.startsWith('Male wolf #'), 'titles ' + dbf.title + ' / ' + dwm.title);

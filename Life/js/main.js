@@ -40,6 +40,7 @@
   // Intent lines are the viewer's choice, kept per browser; off when storage is unavailable.
   // Water (lakes, rivers, thirst) is the viewer's choice too: on unless they turned it off.
   // The HUD is built before the tables load, so this default can't read settings.csv's Water.
+  const located = new Set();   // kinds whose rings are on (ui onLocate)
   let waterOn = true;
   try { waterOn = localStorage.getItem(WATER_KEY) !== '0'; } catch (e) { /* stays on */ }
   let linesOn = false;
@@ -63,6 +64,8 @@
     tab: savedTab,
     onTab: name => { try { localStorage.setItem(TAB_KEY, name || ''); } catch (e) { /* not kept */ } },
     onNuke: on => { nukeOn = on; },
+    // A count's toggle: the kinds to ring on the map, handed to the renderer every frame.
+    onLocate: (key, on) => { if (on) located.add(key); else located.delete(key); },
     onMode: m => { brush = m === 'grass' || AS.SPECIES_KEY.includes(m) ? m : ''; },
     water: waterOn,
     onWater: on => {
@@ -229,6 +232,10 @@
     const t1 = performance.now();
     const live = liveSelection();
     renderer.setIntentLines(linesOn);
+    // Pips stay below the HUD bar, which covers the canvas's top.
+    let top = 0;
+    if (located.size && !document.body.classList.contains('ui-off')) { const hud = document.getElementById('hud'); if (hud) top = hud.getBoundingClientRect().bottom; }
+    renderer.locate(located, top);
     renderer.draw(sim, cam, sheet, live, alpha, now, speed);
     const shown = live ? live.serial : 0;
     if (shown !== inspected || now - inspectedAt >= INSPECT_EVERY_MS) {

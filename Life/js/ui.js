@@ -8,7 +8,7 @@
 // AS.UI({ debug, speeds, onSpeed(i), onDebugTool(mode), onBench(), onGraph(),
 //         lines (initial on/off), onLines(on), water (initial on/off), onWater(on),
 //         tab (initial: 'info' | 'debug' | 'god' | null for closed; default 'info'), onTab(name | null),
-//         onNuke(on) }) → ui
+//         onNuke(on), onLocate(key, on): a count's ring toggle ('bunnies', 'wolves', 'humans', 'blades', 'corpses') }) → ui
 //   ui.hud({ speedIndex, achieved, day, seed, humansSeen, counts: { bunnies, wolves, humans, total, blades, corpses } })
 //                                 (humansSeen: this world has had a human, so their count shows)
 //   ui.tab, ui.setTab(name | null)   the open tab
@@ -81,7 +81,7 @@
   }
 
   AS.UI = function (opts) {
-    const { debug, speeds, onSpeed, onDebugTool, onCloseInspector, onBench, onGraph, onLines, onWater, onTab, onNuke, onMode } = opts;
+    const { debug, speeds, onSpeed, onDebugTool, onCloseInspector, onBench, onGraph, onLines, onWater, onTab, onNuke, onMode, onLocate } = opts;
     const hudEl = document.getElementById('hud');
     const errorsEl = document.getElementById('errors');
     const inspEl = document.getElementById('inspector');
@@ -142,6 +142,25 @@
     for (const [glyph, key, tip] of COUNTS) {
       const c = countBoxes[key] = el('span', 'hud-count');
       c.title = tip;
+      // A species or thing's count is also a toggle: on, every one of that kind is ringed on
+      // the map, and the count wears the same ring color (AS.LOCATE_COLORS) to say so.
+      if (key !== 'total' && onLocate) {
+        c.classList.add('hud-locate');
+        c.title = 'Ring the ' + tip + ' on the map';
+        c.setAttribute('role', 'button');
+        c.setAttribute('aria-pressed', 'false');
+        c.tabIndex = 0;
+        if (AS.LOCATE_COLORS && AS.LOCATE_COLORS[key]) c.style.setProperty('--loc', `rgb(${AS.LOCATE_COLORS[key]})`);
+        const toggleLocate = () => {
+          if (locked) return;
+          const on = !c.classList.contains('on');
+          c.classList.toggle('on', on);
+          c.setAttribute('aria-pressed', String(on));
+          onLocate(key, on);
+        };
+        c.addEventListener('click', toggleLocate);
+        c.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleLocate(); } });
+      }
       glyphEls[key] = c.appendChild(el('span', 'hud-glyph', glyph));
       countEls[key] = el('span', `hud-num hud-num-${key}`, '');
       c.appendChild(countEls[key]);
