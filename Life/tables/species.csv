@@ -14,7 +14,7 @@ ThirstRate,per s,1.1,0.567,0.833,,Water lost per second walking; bunny empty in 
 ThirstyAt,% of WaterMax,50,50,50,,Below this an animal looks for water, but only if it knows where some is (WaterSense)
 DrinkRate,per s,25,25,25,,Water gained per second while drinking at the shore; it drinks until the meter is full
 ThirstDamage,HP per s,1,0.4,0.4,,HP lost while Water = 0 (on top of any starving)
-WaterSense,tiles,40,80,80,,How far, walking, an animal knows its way to water without seeing it: its knowledge of its land
+WaterSense,tiles,200,200,200,,How far, walking, an animal knows its way to water without seeing it: its knowledge of its land (big enough to always know the nearest)
 HPMax,points,20,60,80,,
 HealRate,HP per s,0.5,0.5,0.5,,Only while Fullness > HealAbove
 HealAbove,% of FullnessMax,50,50,50,,Healing needs at least this much Fullness
@@ -26,7 +26,7 @@ TrackSeconds,s,,0,15,,How long a hunting wolf or human keeps heading for where i
 HoleRange,tiles,8,,,,A bunny that sees a wolf runs for a free warren hole this close; also how far from any hole it must be to found a new warren
 DigChance,per day,50%,,,,Chance per day that a fed adult with no wolf in sight digs a warren hole; 0% = never
 DigSeconds,s,8,,,,How long a digging bunny stands still before the hole opens
-WanderRun,tiles,1-3,4-10,4-10,,Steps taken in one direction before turning while wandering or prowling
+WanderRun,tiles,3-8,4-10,4-10,,Steps taken in one direction before turning while wandering or prowling
 RoomPreference,×,1,1,1,,How strongly a wandering animal heads away from crowds of its own kind; 0 = random wandering
 DecidePerSec,per s,4,4,4,,How often an animal re-picks its state; it moves every tick
 Diet,,Grass,Bunny or Human (killed; eats the carcass),Bunny or Wolf (killed; eats the carcass); grass when no meat is in sight,Corpses (nearby),A wolf or human kills and then eats the carcass; bunnies only graze
@@ -46,8 +46,8 @@ LitterSize,count,2-4,3-5,,,
 MateCooldown,days,2,10,,,Female only; starts after birth
 MateFullness,% of FullnessMax,60,70,,,Both parents must be at least this full
 MateCost,% of FullnessMax,30,30,,,Fullness each parent loses at mating
-RoamAfter,days,,1,1,,A wolf or human that hasn't seen prey this long roams: it keeps its heading in long runs until it finds prey or a wall; blank = never
-RoamRun,tiles,,40-80,40-80,,Length of a roaming animal's runs (WanderRun otherwise)
+RoamAfter,days,,1,1,,A wolf or human that hasn't seen prey this long roams: it heads for far destinations in any direction until it finds prey; blank = never
+RoamRun,tiles,,40-120,40-120,,How far away a roaming animal's destinations are, straight-line
 MateRange,tiles,,80,,,A ready wolf hears and scents a ready mate this far away (howling, scent) and travels to it; blank = only mates in sight
 PackLimit,count,,8,,,A female wolf breeds only if no more than this many other adult wolves are within TerritoryRange; blank = no limit
 TerritoryRange,tiles,,15,,,Square (Chebyshev) distance for PackLimit

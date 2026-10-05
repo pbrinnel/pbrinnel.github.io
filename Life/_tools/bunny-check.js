@@ -141,7 +141,8 @@ function wolf(AS, sim, x, y) {
 
 // --- WANDER ---
 {
-  const { AS, sim, W, B } = make(60, 5, tx => { tx.species = editCSV(tx.species, 'HungerRate', 'Bunny', '0'); });
+  // WanderRun pinned short, so a run never reaches the edge of this small world and turns early.
+  const { AS, sim, W, B } = make(60, 5, tx => { tx.species = editCSV(editCSV(tx.species, 'HungerRate', 'Bunny', '0'), 'WanderRun', 'Bunny', '1-3'); });
   const s = bunny(AS, sim, 30, 30);
   let steps = 0, last = W.aTile[s], lastDir = -1, lastLeft = 0, maxRun = 0, run = 0, badTurn = 0, tooLong = 0, targets = 0;
   for (let i = 0; i < secs(AS, 10); i++) {

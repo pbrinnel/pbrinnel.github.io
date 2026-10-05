@@ -147,8 +147,10 @@ watching the sim run. Everything else in this doc is decided.
   hole in reach picks the escape direction that gains distance without running into a
   wall or corner.
 - **Wolves roam when they find nothing** (Paul, 4 Oct 2026: they circled hunted-out land
-  until they died). A wolf that hasn't seen a bunny for `RoamAfter` days keeps going the
-  way it was heading, in runs of `RoamRun` tiles, until it finds prey or meets a wall.
+  until they died). A wolf that hasn't seen a bunny for `RoamAfter` days heads for a
+  random destination `RoamRun` tiles away in any direction, diagonals included, then
+  another, until it finds prey (Paul, 5 Oct 2026: keeping a grid heading made big packs
+  sweep the map in parallel lines).
 - **Wolves find mates far beyond sight** (Paul, 4 Oct 2026): a ready wolf senses a ready
   mate within `MateRange` (howling and scent) and travels straight toward it, so wolves
   thinned to a scattered few can still pair up. Wolf litters are 3–5, nearer real wolves'

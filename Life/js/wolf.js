@@ -31,6 +31,8 @@
       m.feedSerial = grow(m.feedSerial, Uint32Array); // that corpse's serial, since a tile is reused
       m.preyAt = grow(m.preyAt, Float64Array);      // sim.simSeconds this hunter last saw any prey
       m.preyFor = grow(m.preyFor, Uint32Array);     // the serial preyAt belongs to (slots are reused)
+      m.roamTo = grow(m.roamTo, Int32Array);        // a roaming hunter's far destination tile
+      m.roamFor = grow(m.roamFor, Uint32Array);     // the serial roamTo belongs to; another serial = none
       m.cap = W.aCap;
     }
     return m;
@@ -206,23 +208,38 @@
       }
       W.aRunLeft[s] = 0;
     }
-    // A hunter that hasn't seen prey for RoamAfter days roams (Paul): it keeps going the
-    // way it was heading, in runs of RoamRun tiles, until it finds prey or meets a wall,
-    // instead of circling the land it has hunted out.
+    // A hunter that hasn't seen prey for RoamAfter days roams (Paul): it heads for a far
+    // destination, RoamRun tiles away in any direction (diagonals included), instead of
+    // circling the land it has hunted out. Random destinations rather than a kept heading,
+    // since many wolves holding the four grid headings swept the map in parallel lines. A
+    // destination it reaches or can't get closer to (a shore, a crowd) is dropped, and a
+    // plain run follows, which also walks it out of a dead end before the next one.
     const S = AS.speciesStats(sim, s), m = mem(W), now = sim.simSeconds;
     if (m.preyFor[s] !== W.aSerial[s]) { m.preyFor[s] = W.aSerial[s]; m.preyAt[s] = now; }
     mW = W;
     mPrey = AS.relations(sim.T).prey[W.aSpecies[s]];
     if (AS.nearestVisible(sim, t, S.VisionRange, isPrey) >= 0) m.preyAt[s] = now;
     const roaming = S.RoamAfter > 0 && now - m.preyAt[s] > S.RoamAfter * AS.DAY_SECONDS;
+    if (roaming) {
+      if (m.roamFor[s] !== W.aSerial[s]) { m.roamFor[s] = W.aSerial[s]; m.roamTo[s] = roamGoal(sim, t, S.RoamRun); }
+      if (headToward(sim, s, m.roamTo[s])) return;
+    }
+    m.roamFor[s] = 0;
     let d;
-    if (roaming && nOpen > 0 && open.subarray(0, nOpen).includes(W.aRunDir[s])) d = W.aRunDir[s];
-    else if (nOpen > 0) d = pickRoomDir(sim, s, AS.kindOf(W.aSpecies[s]), open, nOpen);
+    if (nOpen > 0) d = pickRoomDir(sim, s, AS.kindOf(W.aSpecies[s]), open, nOpen);
     else if (nGrass > 0) d = grassDirs[sim.rng.int(nGrass)];
     else return;
     W.aRunDir[s] = d;
-    W.aRunLeft[s] = sim.rng.inRange(roaming ? S.RoamRun : S.WanderRun);
+    W.aRunLeft[s] = sim.rng.inRange(S.WanderRun);
     if (AS.chewOrStep(sim, s, dirTile(W, t, d))) W.aRunLeft[s]--;
+  }
+
+  // A tile a random distance from `run` away from t at a random angle, clamped to the world.
+  function roamGoal(sim, t, run) {
+    const W = sim.W, a = sim.rng.next() * 2 * Math.PI, r = sim.rng.inRange(run);
+    const x = Math.min(W.w - 1, Math.max(0, Math.round(t % W.w + r * Math.cos(a))));
+    const y = Math.min(W.h - 1, Math.max(0, Math.round((t / W.w | 0) + r * Math.sin(a))));
+    return y * W.w + x;
   }
 
   function calmStart(sim, s) {

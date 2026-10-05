@@ -107,7 +107,7 @@ for (const [sp, name] of [[0, 'bunny'], [1, 'wolf'], [2, 'human']]) {
 
 // ---- beyond WaterSense it doesn't go; it enters only when the water is known ----
 {
-  const { AS, T, sim, W } = make(220, 30, { edit: t => { t.species = editCSV(t.species, 'ThirstRate', 'Bunny', '0.3'); } });
+  const { AS, T, sim, W } = make(220, 30, { edit: t => { t.species = editCSV(editCSV(t.species, 'ThirstRate', 'Bunny', '0.3'), 'WaterSense', 'Bunny', '40'); } });
   lake(W, 212, 5, 217, 25);
   const B = T.bunny;
   const far = put(AS, sim, AS.SPECIES.BUNNY, 10, 15, { water: 10 }), close = put(AS, sim, AS.SPECIES.BUNNY, 212 - B.WaterSense + 6, 15, { water: 10 });
