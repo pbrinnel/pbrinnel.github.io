@@ -91,7 +91,7 @@
   if (allWarnings.length) ui.warnings(allWarnings);
 
   const seed = T.world.Seed ?? AS.newSeed();
-  ui.setRadiusDefaults(T.world.NukeRadius, T.world.BrushRadius);
+  ui.setRadiusDefaults(T.world.NukeRadius, T.world.BrushRadius, T.world.AnimalWarnAt);
   sim = AS.Sim(T, seed);
   const canvas = document.getElementById('map');
   const cam = AS.Camera(canvas, sim.W);

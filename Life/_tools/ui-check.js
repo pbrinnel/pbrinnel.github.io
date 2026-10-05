@@ -260,7 +260,8 @@ const stripOf = ids => ids.hud.all(e => e.className === 'hud-tabstrip')[0];
   const slider = ids.hud.all(e => e.className === 'hud-radius-input')[0], label = ids.hud.all(e => e.className === 'hud-radius-label')[0];
   const by = l => ids.hud.all(e => e.textContent === l && e.className.includes('hud-bench'))[0];
   assert(slider && slider.disabled && label.textContent === 'Radius –'); ok('the Radius slider is off until a mode is armed');
-  ui.setRadiusDefaults(75, 0);
+  const CROWD = 20000, MAXR = Math.floor(Math.sqrt(CROWD / Math.PI));   // the slider's top follows the crowd limit
+  ui.setRadiusDefaults(75, 0, CROWD);
   assert.strictEqual(ui.radiusOf('nuke'), 75); assert.strictEqual(ui.radiusOf('grass'), 0); ok('defaults: NukeRadius for the nuke, BrushRadius (0) for the brushes');
   by('NUKE MODE').fire('click');
   assert(!slider.disabled && slider.value === '75' && label.textContent === 'Radius 75'); ok('NUKE MODE shows Radius 75');
@@ -274,8 +275,8 @@ const stripOf = ids => ids.hud.all(e => e.className === 'hud-tabstrip')[0];
   by('GRASS MODE').fire('click');
   assert(slider.value === '9'); ok('coming back to a mode restores its radius');
   slider.value = '250'; slider.listeners.input.forEach(f => f());
-  assert(ui.radiusOf('grass') === 100); ok('the radius tops out at 100');
-  ui.lock(true); assert(slider.disabled); slider.value = '5'; slider.listeners.input.forEach(f => f()); assert(ui.radiusOf('grass') === 100); ui.lock(false); assert(!slider.disabled); ok('disabled (and ignored) during the benchmark');
+  assert(ui.radiusOf('grass') === MAXR && slider.max === String(MAXR)); ok(`the radius tops out at ${MAXR}, whose circle holds no more than the crowd limit`);
+  ui.lock(true); assert(slider.disabled); slider.value = '5'; slider.listeners.input.forEach(f => f()); assert(ui.radiusOf('grass') === MAXR); ui.lock(false); assert(!slider.disabled); ok('disabled (and ignored) during the benchmark');
 }
 { // Remembered per mode in localStorage, and a stored value beats the default.
   const mem = { 'life-radius-nuke': '12', 'life-radius-wolf': '3' };
