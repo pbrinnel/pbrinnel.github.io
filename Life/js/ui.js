@@ -15,8 +15,7 @@
 //   ui.nuke, ui.setNuke(on)          NUKE MODE armed (main.js reads it through onNuke)
 //   ui.mode, ui.setMode(name)        the God tab's one armed mode: 'nuke', 'grass', 'bunny', 'wolf', 'human' or ''
 //                                    (onMode(name) on every change; onNuke(on) when nuke flips)
-//   ui.setRadiusDefaults(nuke, brush, crowdLimit)  the Radius slider's starting values and, from
-//                                 the crowd limit, its maximum (settings.csv); a radius the
+//   ui.setRadiusDefaults(nuke, brush)  the Radius slider's starting values (settings.csv); a radius the
 //                                    viewer chose earlier (kept per mode in localStorage) wins. Called once the tables load.
 //   ui.radiusOf(mode)                the radius in tiles that mode will use now (the slider's value for the armed mode)
 //   ui.setRadius(mode, r)            sets and keeps a mode's radius, as the slider does
@@ -242,10 +241,8 @@
     // The Radius slider sets the size of whichever mode is on (0 = one tile). Each mode keeps
     // its own value, remembered in localStorage; the defaults come from settings.csv once the
     // tables load (setRadiusDefaults), so until then a mode reads 0.
-    // The largest radius whose full circle still holds no more tiles than the crowd limit
-    // (AnimalWarnAt), so one tap never paints past it: about sqrt(limit / pi). Until the
-    // tables load, a placeholder.
-    let RADIUS_MAX = 75;
+    // Paul's cap: a round 75, whose circle (~17,700 tiles) stays under the crowd limit.
+    const RADIUS_MAX = 75;
     const RADIUS_KEY = 'life-radius-';
     const radii = {}, radiusDefaults = {};
     const radiusBox = el('span', 'hud-radius');
@@ -277,9 +274,7 @@
       if (name === mode) showRadius();
     }
     radiusInput.addEventListener('input', () => { if (!locked && mode !== '') setRadius(mode, radiusInput.value); });
-    function setRadiusDefaults(nuke, brush, crowdLimit) {
-      if (crowdLimit > 0) RADIUS_MAX = Math.max(1, Math.floor(Math.sqrt(crowdLimit / Math.PI)));
-      radiusInput.max = String(RADIUS_MAX);
+    function setRadiusDefaults(nuke, brush) {
       for (const [name] of MODES) radiusDefaults[name] = name === 'nuke' ? nuke : brush;
       for (const [name] of MODES) {
         delete radii[name];

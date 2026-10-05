@@ -240,8 +240,7 @@ watching the sim run. Everything else in this doc is decided.
   scorch; wolves skip holes. One God mode is on at a time; while a paint mode is on,
   dragging paints instead of panning (pan with the keys).
 - **Radius slider** (God tab): sets the size for whichever mode is on, 0 (a single tile,
-  one agent per tap) up to the largest radius whose circle holds no more tiles than the
-  crowd limit (`AnimalWarnAt`; 79 at 20,000), so one tap never paints past it; each mode remembers its own (paint modes start at
+  one agent per tap) to 75 tiles (Paul), a circle smaller than the crowd limit; each mode remembers its own (paint modes start at
   `BrushRadius`, the nuke at `NukeRadius`).
 - **Too many animals, asked first** (Paul): the Info tab shows the total of all animals.
   Painting past `AnimalWarnAt` animals stops at the limit and asks, in plain words, whether
