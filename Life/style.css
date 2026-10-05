@@ -106,7 +106,7 @@ body.nuke-armed #map, body.paint-armed #map { cursor: crosshair; }
 /* Numbers hold a fixed width (room for the largest count each can reach) so a new digit
    never shifts the controls after them. */
 .hud-num { display: inline-block; font-variant-numeric: tabular-nums; min-width: 6ch; }
-.hud-num-blades { min-width: 7ch; }
+.hud-num-blades, .hud-num-total { min-width: 7ch; }
 .hud-status { color: var(--hud-on); }
 .hud-status:empty { display: none; }
 .hud-seednum { user-select: all; -webkit-user-select: all; color: var(--fg); cursor: text; }
@@ -317,6 +317,19 @@ body.nuke-armed #map, body.paint-armed #map { cursor: crosshair; }
   #graph { width: calc(100vw - 16px); height: min(300px, 45vh); }
   .graph-whole { padding: 0 6px; }
 }
+
+/* The Radius slider in the God tab: a native range input, so touch works as it does anywhere;
+   the thumb is tall enough to grab with a finger. */
+.hud-radius { display: inline-flex; align-items: center; gap: 8px; }
+.hud-radius-label { color: var(--fg); display: inline-block; min-width: 10ch; font-variant-numeric: tabular-nums; }
+.hud-radius-input { width: 140px; height: var(--hud-h); margin: 0; accent-color: var(--hud-on); background: transparent; touch-action: none; }
+.hud-radius-input:disabled { opacity: 0.4; }
+@media (max-width: 600px) { .hud-radius-input { width: 110px; } }
+
+/* ---- The painting limit's card: an end-card, so only its text needs room ---- */
+.crowd-card { width: min(340px, calc(100vw - 32px)); }
+.crowd-card .end-title { font-size: 22px; }
+.crowd-text { max-width: 34ch; margin: 8px auto 16px; color: #c9c5b8; line-height: 1.4; }
 
 /* ---- End of a run ---- */
 .end-card {

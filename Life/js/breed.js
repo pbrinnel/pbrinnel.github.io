@@ -1,4 +1,4 @@
-// Mating and birth, for any species (wolves reuse this): who may mate, what mating does,
+// Mating and birth, for any species that breeds (wolves reuse this; humans never do): who may mate, what mating does,
 // and a due mother's birth. The MATE state that walks bunnies together is in bunny.js; the
 // call to tryBirth is in animals.js's tick.
 (function (AS) {
@@ -50,6 +50,7 @@
     const W = sim.W;
     if (!W.aAlive[s]) return false;
     const S = AS.speciesStats(sim, s);
+    if (S.LitterSize == null) return false;   // a species with no mating stats never breeds (humans)
     if (AS.stageOfSlot(sim, s) !== AS.STAGE.ADULT) return false;
     if (W.aFullness[s] < S.MateFullness * S.FullnessMax) return false;
     if (W.aSex[s] === AS.SEX.FEMALE && (W.aMateCd[s] > 0 || W.aPregnant[s] > 0 || W.aLitter[s] > 0)) return false;
@@ -90,9 +91,9 @@
     const W = sim.W, rng = sim.rng, n = W.aLitter[s];
     const k = W.neighbors4(W.aTile[s], nb);
     let room = 0;
-    // A hole is a wall to wolves, so a wolf's litter is never born onto one.
-    const wolf = W.aSpecies[s] === AS.SPECIES.WOLF;
-    for (let i = 0; i < k; i++) if (W.kind[nb[i]] === K.EMPTY && !(wolf && W.hole[nb[i]])) free[room++] = nb[i];
+    // A hole is a wall to all but bunnies, so their litters are never born onto one.
+    const holes = AS.canEnterHole(W.aSpecies[s]);
+    for (let i = 0; i < k; i++) if (W.kind[nb[i]] === K.EMPTY && (holes || !W.hole[nb[i]])) free[room++] = nb[i];
     if (room < n) return;
 
     const species = W.aSpecies[s], S = AS.speciesStats(sim, s);

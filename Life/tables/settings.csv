@@ -12,7 +12,8 @@ WolfPacks,7,Meadows only: how many packs the starting wolves run in
 HolesPerColony,6,Meadows only: warren holes dug at each colony before its bunnies settle; Scatter has none
 WarrenRadius,4,A new hole is dug only within this many tiles of an existing hole (unless no hole is within HoleRange)
 CollapseDays,10,A hole no bunny has stood on for this long collapses into bare ground
-NukeRadius,75,God tab: a nuke destroys everything within this many tiles (a circle) of where it lands
+NukeRadius,75,God tab: the default radius of the nuke (the Radius slider overrides it; 0-100); a nuke destroys everything within this many tiles (a circle) of where it lands
 ScorchDays,8,God tab: days the ground at a nuke's center stays scorched (bare: nothing grows or is dug there); it shortens toward the rim so the crater greens from its edges
-BrushRadius,2,God tab: radius in tiles of the grass/rabbit/wolf brush
+BrushRadius,0,God tab: the default radius in tiles of the grass/rabbit/wolf/human brush (0 = one tile; the Radius slider overrides it per mode)
 Seed,,Blank = new random seed each run; the seed used is shown on screen so you can paste it here to replay that start
+AnimalWarnAt,20000,God tab: painting past this many animals in total asks first since big crowds slow the sim down on many devices (the benchmark shows smooth to about 32000 animals on a Mac; phones vary)

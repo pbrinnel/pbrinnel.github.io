@@ -100,7 +100,7 @@
       if (!W.inside(x, y)) continue;
       const t = W.tile(x, y);
       if (W.kind[t] !== K.EMPTY) continue;
-      if (species === AS.SPECIES.WOLF && W.hole[t]) continue;   // a hole is a wall to wolves
+      if (W.hole[t] && !AS.canEnterHole(species)) continue;   // a hole is a wall to all but bunnies
       AS.spawnStarting(sim, species, t, bodies);
       placed++;
     }

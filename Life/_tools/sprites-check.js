@@ -18,13 +18,17 @@ const maps = [];
 const B = AS.SPRITE_BITMAPS;
 B.bunny.forEach((m, i) => maps.push([`bunny ${i}`, m]));
 B.wolf.forEach((m, i) => maps.push([`wolf ${i}`, m]));
+B.human.forEach((m, i) => maps.push([`human ${i}`, m]));
 B.carcass.forEach((m, i) => maps.push([`carcass ${i}`, m]));
 B.skull.forEach((m, i) => maps.push([`skull ${i}`, m]));
 B.hole.forEach((m, i) => maps.push([`hole ${i}`, m]));
 B.peek.forEach((m, i) => maps.push([`peek ${i}`, m]));
 B.grassLean.forEach((m, i) => maps.push([`grass lean ${i}`, m]));
 B.grass.forEach((m, i) => maps.push([`grass ${i}`, m]));
-check(B.bunny.length === AS.SPRITE_FRAMES && B.wolf.length === AS.SPRITE_FRAMES, 'every species has SPRITE_FRAMES frames');
+check(B.bunny.length === AS.SPRITE_FRAMES && B.wolf.length === AS.SPRITE_FRAMES && B.human.length === AS.SPRITE_FRAMES, 'every species has SPRITE_FRAMES frames');
+check(B.carcass.length === AS.SPECIES_COUNT && B.skull.length === AS.SPECIES_COUNT, 'a carcass and a skull per species');
+// The human carries a spear in every pose but the fallen one: spearhead (m) or shaft (q) shows.
+B.human.forEach((m, i) => { if (i !== AS.SPRITE_FRAME.DEAD) check(m.some(r => /[qm]/.test(r)), `human frame ${i} shows its spear`); });
 check(B.grass.length === 3, 'three grass bitmaps');
 for (const [name, m] of maps) {
   check(m.length === SIZE, `${name}: ${SIZE} rows, got ${m.length}`);
@@ -42,11 +46,11 @@ const add = (i, what) => {
   check(!seen.has(i), `${what} index ${i} distinct`);
   seen.add(i);
 };
-for (let sp = 0; sp < 2; sp++) for (let sx = 0; sx < 2; sx++) for (let st = 0; st < 3; st++)
+for (let sp = 0; sp < AS.SPECIES_COUNT; sp++) for (let sx = 0; sx < 2; sx++) for (let st = 0; st < 3; st++)
   for (let fl = 0; fl < 2; fl++) for (let fr = 0; fr < AS.SPRITE_FRAMES; fr++)
     add(AS.spriteIndex(sp, sx, st, fl, fr), `sp${sp} sex${sx} stage${st} left${fl} frame${fr}`);
-for (let sp = 0; sp < 2; sp++) add(AS.spriteSkull(sp), `skull ${sp}`);
-for (let sp = 0; sp < 2; sp++) add(AS.spriteCarcass(sp), `carcass ${sp}`);
+for (let sp = 0; sp < AS.SPECIES_COUNT; sp++) add(AS.spriteSkull(sp), `skull ${sp}`);
+for (let sp = 0; sp < AS.SPECIES_COUNT; sp++) add(AS.spriteCarcass(sp), `carcass ${sp}`);
 add(AS.spriteHole(), 'hole');
 for (let sx = 0; sx < 2; sx++) add(AS.spritePeek(sx), `peek sex${sx}`);
 for (let t = 0; t < 3; t++) add(AS.spriteGrassLean(t), `grass lean ${t}`);
@@ -63,8 +67,8 @@ const eq = (got, f, l, m) => check(got[0] === f && got[1] === l, `${m}: got fram
 check(F.STAND === 0 && Object.values(F).length === AS.SPRITE_FRAMES, 'every frame has a named slot');
 // Standing: the idle window is found by scanning the clock, not by assuming its numbers.
 const out = new Float64Array(2);
-for (const sp of [0, 1]) {
-  const name = sp ? 'wolf' : 'bunny';
+for (const sp of [0, 1, 2]) {
+  const name = ['bunny', 'wolf', 'human'][sp];
   let idleAt = -1, standAt = -1;
   for (let c = 0; c < 20; c += 0.01) {
     const [f, l] = pose(sp, false, false, false, false, false, H.NONE, SLOW, 0, c);
@@ -106,7 +110,8 @@ for (const sp of [0, 1]) {
   eq(pose(sp, true, false, false, false, true, H.NONE, FAST, 0.5, 0), F.PREGNANT, 0, `${name} fast pregnant glides in pregnant pose`);
   check(pose(sp, true, false, false, false, false, H.NONE, Infinity, 0.5, 0).length === 2, 'paused (infinite step) still poses');
 }
-// Winded is the wolf's only.
+// Winded is the wolf's and the human's; a bunny rests instead.
+eq(pose(2, false, false, false, true, false, H.NONE, SLOW, 0, 0), F.WINDED, 0, 'winded human standing');
 eq(pose(1, false, false, true, true, false, H.NONE, SLOW, 0, 0), F.WINDED, 0, 'winded wolf resting');
 eq(pose(1, false, false, false, true, false, H.NONE, SLOW, 0, 0), F.WINDED, 0, 'winded wolf standing');
 eq(pose(0, false, false, true, true, false, H.NONE, SLOW, 0, 0), F.REST, 0, 'bunny never shows winded');

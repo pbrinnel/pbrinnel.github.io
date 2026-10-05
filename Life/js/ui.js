@@ -9,17 +9,22 @@
 //         lines (initial on/off), onLines(on),
 //         tab (initial: 'info' | 'debug' | 'god' | null for closed; default 'info'), onTab(name | null),
 //         onNuke(on) }) → ui
-//   ui.hud({ speedIndex, achieved, day, seed, counts: { bunnies, wolves, blades, corpses } })
+//   ui.hud({ speedIndex, achieved, day, seed, counts: { bunnies, wolves, humans, total, blades, corpses } })
 //   ui.tab, ui.setTab(name | null)   the open tab
 //   ui.hidden, ui.setHidden(on)      Hide UI (the H key toggles it; never remembered across loads)
 //   ui.nuke, ui.setNuke(on)          NUKE MODE armed (main.js reads it through onNuke)
-//   ui.mode, ui.setMode(name)        the God tab's one armed mode: 'nuke', 'grass', 'bunny', 'wolf' or ''
+//   ui.mode, ui.setMode(name)        the God tab's one armed mode: 'nuke', 'grass', 'bunny', 'wolf', 'human' or ''
 //                                    (onMode(name) on every change; onNuke(on) when nuke flips)
+//   ui.setRadiusDefaults(nuke, brush)  the Radius slider's starting values (settings.csv); a radius the
+//                                    viewer chose earlier (kept per mode in localStorage) wins. Called once the tables load.
+//   ui.radiusOf(mode)                the radius in tiles that mode will use now (the slider's value for the armed mode)
+//   ui.setRadius(mode, r)            sets and keeps a mode's radius, as the slider does
+//   ui.crowd(info)                   the "That's a crowd" card: info = { limit, onKeep(), onStop() }; null hides it
 //   ui.errors(errors, warnings)   the sim didn't start; show why
 //   ui.warnings(warnings)         the sim started; say quietly what the CSVs have extra
 //   ui.lock(on)                   true: speed buttons, Benchmark, Graph, debug tools and keys do nothing
 //   ui.setIcons(draw)             swaps the count letters for sprite icons: draw(key, canvas)
-//                                 paints the icon for 'bunnies', 'wolves', 'blades' or 'corpses'
+//                                 paints the icon for 'bunnies', 'wolves', 'humans', 'blades' or 'corpses'
 //   ui.ended(info)                the run is over: info = { titles: ['WOLVES EXTINCT', …], day,
 //                                 onNew(), onContinue() }; null hides it
 //   ui.inspector(desc)            null hides the panel; else { title, rows: [{ name, value, range, tip }] }
@@ -39,11 +44,10 @@
   const FALLBACK_RUN_INDEX = 1;
   const DEBUG_TOOLS = [
     ['select', 'Select', 'Click to inspect'],
-    ['corpse-bunny', 'Drop bunny body', 'Click a tile to drop a bunny corpse'],
-    ['corpse-wolf', 'Drop wolf body', 'Click a tile to drop a wolf corpse'],
+    ...AS.SPECIES_KEY.map(k => ['corpse-' + k, `Drop ${k} body`, `Click a tile to drop a ${k} corpse`]),
   ];
-  // Counts in HUD order: a stand-in label (empty: the sprite icon replaces it once the sheet
-  // exists, see setIcons), key in the counts object, tooltip.
+  // Counts in HUD order: a label (empty: the sprite icon replaces it once the sheet exists, see
+  // setIcons; the total keeps its word), key in the counts object, tooltip.
   // The tabs, in bar order: key, label, tooltip.
   const TABS = [
     ['info', 'Info', 'Live counts and the population graph'],
@@ -53,6 +57,8 @@
   const COUNTS = [
     ['', 'bunnies', 'bunnies'],
     ['', 'wolves', 'wolves'],
+    ['', 'humans', 'humans'],
+    ['Total', 'total', 'all animals together (bunnies, wolves and humans)'],
     ['', 'blades', 'blades of grass'],
     ['', 'corpses', 'corpses'],
   ];
@@ -210,7 +216,7 @@
     }
 
     // ---- God tab ----
-    // One mode at a time: 'nuke', or a brush ('grass', 'bunny', 'wolf'), or '' for none.
+    // One mode at a time: 'nuke', or a brush ('grass', 'bunny', 'wolf', 'human'), or '' for none.
     // Armed until toggled off, so repeated nukes and strokes work; main.js turns a tap (or a
     // drag, for a brush) on the world into that mode's action while it is on.
     let mode = '';
@@ -219,6 +225,7 @@
       ['grass', 'GRASS MODE', 'hud-brush', 'While on, tap or drag to plant grass of random ages on empty ground'],
       ['bunny', 'RABBIT MODE', 'hud-brush', 'While on, tap or drag to add rabbits of random ages on empty ground'],
       ['wolf', 'WOLF MODE', 'hud-brush', 'While on, tap or drag to add wolves of random ages on empty ground'],
+      ['human', 'HUMAN MODE', 'hud-brush', 'While on, tap or drag to add adult humans on empty ground'],
     ];
     const modeBtns = {};
     for (const [name, label, cls, tip] of MODES) {
@@ -230,6 +237,54 @@
       modeBtns[name] = b;
     }
     const nukeBtn = modeBtns.nuke;
+
+    // The Radius slider sets the size of whichever mode is on (0 = one tile). Each mode keeps
+    // its own value, remembered in localStorage; the defaults come from settings.csv once the
+    // tables load (setRadiusDefaults), so until then a mode reads 0.
+    const RADIUS_MAX = 100;
+    const RADIUS_KEY = 'life-radius-';
+    const radii = {}, radiusDefaults = {};
+    const radiusBox = el('span', 'hud-radius');
+    radiusBox.title = 'Size of the armed mode, in tiles (0 = one tile)';
+    const radiusLabel = el('span', 'hud-radius-label', 'Radius –');
+    const radiusInput = el('input', 'hud-radius-input');
+    radiusInput.type = 'range';
+    radiusInput.min = '0';
+    radiusInput.max = String(RADIUS_MAX);
+    radiusInput.step = '1';
+    radiusInput.value = '0';
+    radiusInput.disabled = true;
+    radiusInput.setAttribute('aria-label', 'Radius in tiles');
+    radiusBox.append(radiusLabel, radiusInput);
+    tabPanels.god.appendChild(radiusBox);
+    const clampRadius = v => Math.max(0, Math.min(RADIUS_MAX, Math.round(Number(v) || 0)));
+    const radiusOf = name => name in radii ? radii[name] : clampRadius(radiusDefaults[name]);
+    function showRadius() {
+      radiusInput.disabled = locked || mode === '';
+      if (mode === '') { radiusLabel.textContent = 'Radius –'; return; }
+      const r = radiusOf(mode);
+      radiusLabel.textContent = 'Radius ' + r;
+      if (radiusInput.value !== String(r)) radiusInput.value = String(r);
+    }
+    function setRadius(name, r) {
+      r = clampRadius(r);
+      radii[name] = r;
+      try { localStorage.setItem(RADIUS_KEY + name, String(r)); } catch (e) { /* the choice just isn't kept */ }
+      if (name === mode) showRadius();
+    }
+    radiusInput.addEventListener('input', () => { if (!locked && mode !== '') setRadius(mode, radiusInput.value); });
+    function setRadiusDefaults(nuke, brush) {
+      for (const [name] of MODES) radiusDefaults[name] = name === 'nuke' ? nuke : brush;
+      for (const [name] of MODES) {
+        delete radii[name];
+        try {
+          const v = localStorage.getItem(RADIUS_KEY + name);
+          if (v !== null && v !== '' && Number.isFinite(Number(v))) radii[name] = clampRadius(v);
+        } catch (e) { /* default */ }
+      }
+      showRadius();
+    }
+
     function setMode(next) {
       next = modeBtns[next] ? next : '';
       if (next === mode) return;
@@ -240,6 +295,7 @@
         document.body.classList.toggle('nuke-armed', mode === 'nuke');
         document.body.classList.toggle('paint-armed', mode !== '' && mode !== 'nuke');
       }
+      showRadius();
       if (onNuke && (prev === 'nuke' || mode === 'nuke')) onNuke(mode === 'nuke');
       if (onMode) onMode(mode);
     }
@@ -432,12 +488,14 @@
       for (const b of [...buttons, benchBtn, graphBtn, linesBtn, ...Object.values(modeBtns), ...toolButtons]) {
         if (b) b.disabled = locked;
       }
+      showRadius();
     }
 
     // The letters stand in until the sprite sheet exists (it needs the tables); then each
     // becomes a small canvas with the same sprite the world draws.
     function setIcons(draw) {
-      for (const [, key] of COUNTS) {
+      for (const [label, key] of COUNTS) {
+        if (label) continue;   // the total is a word, not a sprite
         const cv = document.createElement('canvas');
         cv.className = 'hud-icon';
         cv.setAttribute('aria-hidden', 'true');
@@ -470,8 +528,32 @@
       document.body.appendChild(endEl);
     }
 
+    // The painting limit's card (an end-card, since the same kind of question): the sim keeps
+    // running behind it. Keep adding and Stop here both close it; main.js decides what they mean.
+    let crowdEl = null;
+    function crowd(info) {
+      if (crowdEl) { crowdEl.remove(); crowdEl = null; }
+      if (!info) return;
+      crowdEl = el('div', 'end-card crowd-card');
+      crowdEl.setAttribute('role', 'dialog');
+      crowdEl.appendChild(el('div', 'end-title', 'That\'s a crowd'));
+      crowdEl.appendChild(el('div', 'crowd-text',
+        `Over ${fmtInt(info.limit)} animals can make the sim slow down or stutter, especially on phones. Add more anyway?`));
+      const row = el('div', 'end-buttons');
+      const keep = el('button', 'hud-bench crowd-keep', 'Keep adding');
+      keep.type = 'button';
+      keep.addEventListener('click', () => info.onKeep());
+      const stop = el('button', 'hud-bench crowd-stop', 'Stop here');
+      stop.type = 'button';
+      stop.addEventListener('click', () => info.onStop());
+      row.append(keep, stop);
+      crowdEl.appendChild(row);
+      document.body.appendChild(crowdEl);
+    }
+
     return {
       hud, errors, warnings, inspector, lock, setTab, setHidden, setNuke, setMode, ended, setIcons,
+      setRadiusDefaults, setRadius, radiusOf, crowd,
       get tab() { return openTab; },
       get hidden() { return uiHidden; },
       get nuke() { return mode === 'nuke'; },

@@ -392,7 +392,7 @@
     {
       key: 'animals', name: 'animals', unit: 'animals', steps: ANIMAL_STEPS, measureS: MEASURE_S_ANIMALS,
       build: (T, n) => ({ ...animalWorldFor(T, n), opts: { grassAges: 'mixed', bodies: 'mixed' } }),
-      count: W => W.bunnies + W.wolves,
+      count: W => W.bunnies + W.wolves + W.humans,
     },
   ];
 

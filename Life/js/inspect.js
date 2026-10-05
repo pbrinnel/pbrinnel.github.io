@@ -9,7 +9,7 @@
 (function (AS) {
   'use strict';
 
-  const KIND = AS.KIND, SP = AS.SPECIES, SEX = AS.SEX;
+  const KIND = AS.KIND, SEX = AS.SEX;
 
   const NONE = '—';
   const DAYS_DECIMALS = 2;
@@ -17,7 +17,7 @@
   const POINT_DECIMALS = 1;   // Fullness, Stamina, HP, Nutrient
 
   // What "Applies to" may say. Anything else is a typo and matches nothing.
-  const TOKENS = ['all', 'bunny', 'wolf', 'grass', 'corpse', 'female', 'hole'];
+  const TOKENS = ['all', ...AS.SPECIES_KEY, 'grass', 'corpse', 'female', 'hole'];
 
   // The kinds of selectable thing. 'bunnyF' is a female bunny, and so on, so the "female"
   // token can be decided once per kind instead of once per row.
@@ -25,11 +25,14 @@
     grass: ['all', 'grass'],
     corpse: ['all', 'corpse'],
     hole: ['hole'],   // a hole has no age, stage or life to show
-    bunny: ['all', 'bunny'],
-    wolf: ['all', 'wolf'],
-    bunnyF: ['all', 'bunny', 'female'],
-    wolfF: ['all', 'wolf', 'female'],
   };
+  // Each species is a thing of its own; one that breeds has a female variant ('wolfF') that
+  // also takes the "female" token. A species that never breeds (humans) has none, so a female
+  // human never shows Pregnant or MateCooldown.
+  for (const key of AS.SPECIES_KEY) {
+    THING_TOKENS[key] = ['all', key];
+    THING_TOKENS[key + 'F'] = ['all', key, 'female'];
+  }
 
   // ---- formatting ------------------------------------------------------------------
 
@@ -50,7 +53,7 @@
     ? num(v, POINT_DECIMALS) + ' / ' + num(max, max % 1 ? POINT_DECIMALS : 0) : NONE;
 
   const position = (W, t) => W.tx(t) + ', ' + W.ty(t);
-  const speciesName = sp => sp === SP.BUNNY ? 'Bunny' : 'Wolf';
+  const speciesName = sp => AS.SPECIES_KEY[sp][0].toUpperCase() + AS.SPECIES_KEY[sp].slice(1);
   const stageName = stage => ['Baby', 'Adult', 'Elder'][stage] || NONE;
 
   // ---- readers: (sim, ctx) → string -------------------------------------------------
@@ -168,7 +171,7 @@
     if (sel.slot >= 0) {
       const s = sel.slot, sp = W.aSpecies[s], female = W.aSex[s] === SEX.FEMALE;
       const key = AS.SPECIES_KEY[sp];
-      thing = key + (female ? 'F' : '');
+      thing = key + (female && T[key].LitterSize != null ? 'F' : '');
       title = (female ? 'Female ' : 'Male ') + key + ' #' + serial(W.aSerial[s]);
       ctx = { t: W.aTile[s], s, Tsp: T[key] };
     } else {

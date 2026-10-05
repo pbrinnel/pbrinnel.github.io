@@ -15,8 +15,9 @@
   const ACHIEVED_WINDOW_S = 1;
   // A tap within this many tiles of an animal's drawn center picks it.
   const PICK_RADIUS = 0.75;
-  // Dabs along a brush stroke are at most this far apart (tiles): under a brush's own width,
-  // so the stroke is solid, and each dab costs only its still-empty tiles.
+  // Dabs along a brush stroke are at most this far apart (tiles), and at most half the brush's
+  // radius when that is larger: a dab is a whole circle, so a big brush needs few of them, and
+  // each dab costs only its still-empty tiles.
   const BRUSH_STEP = 1;
   // The inspector refreshes this often; a new selection shows at once.
   const INSPECT_EVERY_MS = 100;
@@ -42,7 +43,8 @@
   let savedTab;
   try { const v = localStorage.getItem(TAB_KEY); if (v !== null) savedTab = v === '' ? null : v; } catch (e) { /* default */ }
   let nukeOn = false;   // NUKE MODE: a tap on the world drops a nuke instead of selecting
-  let brush = '';   // GRASS / RABBIT / WOLF MODE: the kind a tap or drag paints, or ''
+  let brush = '';   // GRASS / RABBIT / WOLF / HUMAN MODE: the kind a tap or drag paints, or ''
+  let radiusOf = () => 0;   // the Radius slider's value for a mode; the real one exists once the UI does
   let graph = null;   // made once the tables load; the HUD button may exist before that
 
   const ui = AS.UI({
@@ -56,7 +58,7 @@
     tab: savedTab,
     onTab: name => { try { localStorage.setItem(TAB_KEY, name || ''); } catch (e) { /* not kept */ } },
     onNuke: on => { nukeOn = on; },
-    onMode: m => { brush = m === 'grass' || m === 'bunny' || m === 'wolf' ? m : ''; },
+    onMode: m => { brush = m === 'grass' || AS.SPECIES_KEY.includes(m) ? m : ''; },
     lines: linesOn,
     onLines: on => {
       linesOn = on;
@@ -64,6 +66,7 @@
     },
   });
 
+  radiusOf = m => ui.radiusOf(m);
   try { await document.fonts.load(`32px ${AS.FONT}`); } catch (e) { /* draws with a fallback */ }
 
   // Opened from disk, a browser refuses to fetch the CSVs; say how to serve it instead of
@@ -88,15 +91,17 @@
   if (allWarnings.length) ui.warnings(allWarnings);
 
   const seed = T.world.Seed ?? AS.newSeed();
+  ui.setRadiusDefaults(T.world.NukeRadius, T.world.BrushRadius);
   sim = AS.Sim(T, seed);
   const canvas = document.getElementById('map');
   const cam = AS.Camera(canvas, sim.W);
   const sheet = AS.SpriteSheet(T);
-  // The Info tab's counts show the world's own sprites: a bunny, a wolf, a full tuft, a skull.
+  // The Info tab's counts show the world's own sprites: a bunny, a wolf, a human, a full tuft, a skull.
   const ICON_CSS_PX = 16;
   const ICON_SPRITE = {
     bunnies: AS.spriteIndex(AS.SPECIES.BUNNY, AS.SEX.MALE, AS.STAGE.ADULT, 0, AS.SPRITE_FRAME.STAND),
     wolves: AS.spriteIndex(AS.SPECIES.WOLF, AS.SEX.MALE, AS.STAGE.ADULT, 0, AS.SPRITE_FRAME.STAND),
+    humans: AS.spriteIndex(AS.SPECIES.HUMAN, AS.SEX.MALE, AS.STAGE.ADULT, 0, AS.SPRITE_FRAME.STAND),
     blades: AS.spriteGrass(2),
     corpses: AS.spriteSkull(AS.SPECIES.BUNNY),
   };
@@ -115,7 +120,8 @@
   graph = AS.Graph(T);
   graph.setIcons({ grass: drawIcon('blades', document.createElement('canvas')),
     bunnies: drawIcon('bunnies', document.createElement('canvas')),
-    wolves: drawIcon('wolves', document.createElement('canvas')) });
+    wolves: drawIcon('wolves', document.createElement('canvas')),
+    humans: drawIcon('humans', document.createElement('canvas')) });
 
   // A tap picks an animal by where its sprite is drawn: mid-step it's between the tile it
   // left and the one it already occupies, and people tap what they see. Blades and
@@ -124,8 +130,8 @@
     const W = sim.W;
     if (nukeOn) { if (tx >= 0) app.nukeAt(tx, ty); return; }
     if (brush) { if (tx >= 0) app.paintAt(tx, ty); return; }
-    if (tx >= 0 && (tool === 'corpse-bunny' || tool === 'corpse-wolf')) {
-      AS.debugDropCorpse(sim, W.tile(tx, ty), tool === 'corpse-bunny' ? AS.SPECIES.BUNNY : AS.SPECIES.WOLF);
+    if (tx >= 0 && tool.startsWith('corpse-')) {
+      AS.debugDropCorpse(sim, W.tile(tx, ty), AS.SPECIES_KEY.indexOf(tool.slice('corpse-'.length)));
       return;
     }
     const s = animalDrawnNear(W, fx, fy);
@@ -221,7 +227,7 @@
     const W = sim.W;
     ui.hud({
       speedIndex, achieved, day: sim.day, seed: sim.seed,
-      counts: { bunnies: W.bunnies, wolves: W.wolves, blades: W.gCount, corpses: W.cCount },
+      counts: { bunnies: W.bunnies, wolves: W.wolves, humans: W.humans, total: W.bunnies + W.wolves + W.humans, blades: W.gCount, corpses: W.cCount },
     });
     // CPU time only: the browser's own compositing shows up in `interval`, not here.
     if (app.onFrame) {
@@ -232,11 +238,13 @@
   // For the console, the benchmark and test harnesses.
   //   app.load(sim)     swaps in another world (the benchmark's); the camera re-centers on it
   //   app.nukeAt(x, y)  a nuke on that tile (what a tap does in NUKE MODE)
-  //   app.paintAt(x, y), app.paintLine(x0, y0, x1, y1)   the brush of GRASS/RABBIT/WOLF MODE
+  //   app.paintAt(x, y), app.paintLine(x0, y0, x1, y1)   the brush of GRASS/RABBIT/WOLF/HUMAN MODE
+  //   app.animalLimit   the animal total painting may reach before it asks (AnimalWarnAt, doubled by each Keep adding)
   //   app.onFrame       null, or fn(intervalMs, tickMs, drawMs, ticks) after every frame
   // A run ends the moment a species dies out (Paul): the sim pauses and says which. Keep
   // watching resumes without asking again about the species already gone. A species a
   // world starts without (the benchmark's grass-only worlds) never counts as dying out.
+  // Humans are optional (only painted in), so their dying out never ends a run: not listed.
   const EXTINCT = [['wolves', 'WOLVES EXTINCT'], ['bunnies', 'BUNNIES EXTINCT'], ['grass', 'GRASS EXTINCT']];
   const counts = W => ({ wolves: W.wolves, bunnies: W.bunnies, grass: W.gCount });
   let gone = new Set(), absent = new Set(), runSpeed = speedIndex;
@@ -260,6 +268,19 @@
     });
   }
 
+  // The soft limit on painting animals (AnimalWarnAt): painting that would pass it places what
+  // fits, stops, and asks. Keep adding doubles the limit; Stop here leaves it, so the next
+  // paint asks again. The sim runs on behind the card. Births never ask, only painting.
+  let crowdOpen = false;
+  function askCrowd() {
+    crowdOpen = true;
+    ui.crowd({
+      limit: app.animalLimit,
+      onKeep() { app.animalLimit *= 2; crowdOpen = false; ui.crowd(null); },
+      onStop() { crowdOpen = false; ui.crowd(null); },
+    });
+  }
+
   const app = AS.app = {
     T, cam, renderer, sheet, ui, graph, setSpeed, onFrame: null,
     get sim() { return sim; },
@@ -267,28 +288,41 @@
     get speedIndex() { return speedIndex; },
     // Drops a nuke on tile (tx, ty): the sim side (god.js) and the explosion drawn over it.
     nukeAt(tx, ty) {
-      const out = AS.nuke(sim, sim.W.tile(tx, ty));
-      renderer.blast(tx, ty, sim.T.world.NukeRadius, performance.now());
+      const r = radiusOf('nuke');
+      const out = AS.nuke(sim, sim.W.tile(tx, ty), r);
+      renderer.blast(tx, ty, Math.max(r, 0.5), performance.now());   // a 0 radius still shows a tile-sized ring
       return out;
     },
-    // A brush dab: the armed kind on every eligible tile within BrushRadius of tile (tx, ty).
+    // A brush dab: the armed kind on every eligible tile within that mode's Radius of tile
+    // (tx, ty). Animals stop at the soft limit (animalLimit): the dab places what fits and asks.
     paintAt(tx, ty) {
-      return brush && tx >= 0 && ty >= 0 && tx < sim.W.w && ty < sim.W.h
-        ? AS.paintCircle(sim, brush, tx, ty, sim.T.world.BrushRadius) : 0;
+      if (!brush || tx < 0 || ty < 0 || tx >= sim.W.w || ty >= sim.W.h) return 0;
+      const r = radiusOf(brush);
+      if (brush === 'grass') return AS.paintCircle(sim, brush, tx, ty, r);
+      if (crowdOpen) return 0;   // the card is up: the stroke stays stopped until it is answered
+      const W = sim.W, cap = { room: app.animalLimit - (W.bunnies + W.wolves + W.humans), hit: false };
+      const placed = AS.paintCircle(sim, brush, tx, ty, r, cap);
+      if (cap.hit) askCrowd();
+      return placed;
     },
     // A brush stroke between two pointer samples (world tiles, fractions kept): a dab every
     // BRUSH_STEP tiles along the segment, so a fast drag leaves no gaps.
     paintLine(x0, y0, x1, y1) {
-      const n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / BRUSH_STEP));
+      const step = brush ? Math.max(BRUSH_STEP, radiusOf(brush) / 2) : BRUSH_STEP;
+      const n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / step));
       let placed = 0;
       for (let i = 0; i <= n; i++) {
         const f = i / n;
         placed += app.paintAt(Math.floor(x0 + (x1 - x0) * f), Math.floor(y0 + (y1 - y0) * f));
+        if (crowdOpen) break;   // the limit stopped the stroke
       }
       return placed;
     },
+    animalLimit: T.world.AnimalWarnAt,
     load(next) {
       sim = next;
+      app.animalLimit = T.world.AnimalWarnAt;   // a new world starts with the first limit again
+      ui.crowd(null); crowdOpen = false;
       sel = null;
       resetEnded();
       ui.ended(null);

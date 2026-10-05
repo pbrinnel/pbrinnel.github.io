@@ -136,6 +136,15 @@ watching the sim run. Everything else in this doc is decided.
   mate within `MateRange` (howling and scent) and travels straight toward it, so wolves
   thinned to a scattered few can still pair up. Wolf litters are 3–5, nearer real wolves'
   4–6 pups.
+- **Humans** (Paul, 4 Oct 2026): hunters placed only with HUMAN MODE, as adults; they
+  never breed, so they last only as long as their lives. Marathon runners, not sprinters:
+  a low top speed but stamina that lasts, so they wear prey down (persistence hunting).
+  One spear strike kills a bunny or a wolf; then they eat the carcass like wolves, and
+  with no meat in sight they forage grass for a little food (`GrassFood`). Wolves hunt
+  humans too (several bites kill one). Who hunts and eats whom is data (`Prey`,
+  `EatsCarcass`): wolves hunt bunnies and humans, humans hunt bunnies and wolves; no
+  species eats its own kind. Like wolves, humans can't enter warren holes and trample
+  through grass. Drawn as a little hunter with a spear. Humans dying out never ends a run.
 - **Wolf territories** (Paul, 4 Oct 2026): crowded wolves don't breed. A female wolf
   mates only if no more than `PackLimit` other adult wolves are within `TerritoryRange`
   tiles of her (a square). Nothing else about territories exists: wolves still go
@@ -206,8 +215,8 @@ watching the sim run. Everything else in this doc is decided.
   `variables.csv`, live, and the selection follows the agent as it moves. Clicking empty
   ground clears it. Live values only, no life history.
 - **Controls in tabs** (Paul, 4 Oct 2026): the top bar always shows Pause, the speeds and
-  the day, then three tabs and Hide UI. **Info:** live counts of bunnies, wolves, blades
-  and corpses, and the Graph button. **Debug:** Lines, Benchmark, the seed. **God:** tools
+  the day, then three tabs and Hide UI. **Info:** live counts of bunnies, wolves, humans, the
+  total, blades and corpses, and the Graph button. **Debug:** Lines, Benchmark, the seed. **God:** tools
   for interfering with the sim. One tab's strip is open at a time.
 - **A run ends when a species dies out** (Paul, 4 Oct 2026): the sim pauses and a card
   says which (WOLVES EXTINCT, BUNNIES EXTINCT, GRASS EXTINCT) and on what day, with **New
@@ -230,6 +239,14 @@ watching the sim run. Everything else in this doc is decided.
   random sex, from newborn to elder, full and rested). Grass skips warren holes and
   scorch; wolves skip holes. One God mode is on at a time; while a paint mode is on,
   dragging paints instead of panning (pan with the keys).
+- **Radius slider** (God tab): sets the size for whichever mode is on, 0 (a single tile,
+  one agent per tap) to 100 tiles; each mode remembers its own (paint modes start at
+  `BrushRadius`, the nuke at `NukeRadius`).
+- **Too many animals, asked first** (Paul): the Info tab shows the total of all animals.
+  Painting past `AnimalWarnAt` animals stops at the limit and asks, in plain words, whether
+  to keep adding, since big crowds slow the sim down on many devices; Keep adding doubles
+  the limit for that world. Births never ask.
+- **HUMAN MODE** paints humans (below).
 
 ---
 

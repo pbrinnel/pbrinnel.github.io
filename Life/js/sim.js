@@ -21,7 +21,7 @@
   // Fullness, so some are hungry and hunting or seeking food from the first second. Both
   // make a benchmark world cost what a world mid-run does. opts.layout overrides
   // settings.csv's StartLayout.
-  // Population history, one sample per in-world hour (counts at the start of that hour),
+  // Population history, one sample per in-world hour (counts at the start of that hour; humans are never placed at the start, so their series starts at 0),
   // for the graph. It grows by doubling, so a long run costs a few bytes per hour.
   const HISTORY_START = 24 * 64;
 
@@ -30,12 +30,13 @@
     h.grass = new Uint32Array(h.cap);
     h.bunnies = new Uint32Array(h.cap);
     h.wolves = new Uint32Array(h.cap);
-    h.push = function (g, b, w) {
+    h.humans = new Uint32Array(h.cap);
+    h.push = function (g, b, w, hu) {
       if (h.length === h.cap) {
         h.cap *= 2;
-        for (const k of ['grass', 'bunnies', 'wolves']) { const a = new Uint32Array(h.cap); a.set(h[k]); h[k] = a; }
+        for (const k of ['grass', 'bunnies', 'wolves', 'humans']) { const a = new Uint32Array(h.cap); a.set(h[k]); h[k] = a; }
       }
-      h.grass[h.length] = g; h.bunnies[h.length] = b; h.wolves[h.length] = w;
+      h.grass[h.length] = g; h.bunnies[h.length] = b; h.wolves[h.length] = w; h.humans[h.length] = hu;
       h.length++;
     };
     return h;
@@ -69,7 +70,7 @@
     populate(sim, opts || {});
 
     sim.tick = function () {
-      if (sim.tickCount % AS.TICKS_PER_HOUR === 0) history.push(W.gCount, W.bunnies, W.wolves);
+      if (sim.tickCount % AS.TICKS_PER_HOUR === 0) history.push(W.gCount, W.bunnies, W.wolves, W.humans);
       AS.corpseTick(sim);
       AS.grassTick(sim);
       AS.warrenTick(sim);

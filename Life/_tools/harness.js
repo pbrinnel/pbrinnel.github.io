@@ -11,7 +11,7 @@ const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..');
 // glyphs.js is DOM-free until a sheet is built, and holds the life-stage helper animals use.
-const SIM_FILES = ['tables', 'rng', 'world', 'grass', 'corpse', 'warren', 'sim', 'god', 'start', 'sight', 'animals', 'breed', 'bunny', 'wolf', 'glyphs'];
+const SIM_FILES = ['tables', 'rng', 'world', 'grass', 'corpse', 'warren', 'sim', 'god', 'start', 'sight', 'animals', 'breed', 'bunny', 'wolf', 'human', 'glyphs'];
 
 function load(overrides = {}) {
   const ctx = vm.createContext({ console, crypto: globalThis.crypto });
@@ -65,16 +65,17 @@ function audit(AS, sim, label) {
       check(W.cList[W.cSlot[t]] === t, `${label}: corpse ${t} missing from cList`);
       check(W.cNut[t] >= -1e-6 && !Number.isNaN(W.cNut[t]), `${label}: corpse ${t} nutrient ${W.cNut[t]}`);
     }
-    if (k === K.BUNNY || k === K.WOLF) {
+    if (k >= K.BUNNY) {
       animals++;
       const s = W.aSlot[t];
       check(s >= 0 && W.aAlive[s] && W.aTile[s] === t, `${label}: animal grid/slot mismatch at ${t}`);
+      check(s >= 0 && AS.kindOf(W.aSpecies[s]) === k, `${label}: animal kind/species mismatch at ${t}`);
     }
     if (W.hole[t]) {
       holes++;
       check(W.hList[W.hSlot[t]] === t, `${label}: hole ${t} missing from hList`);
       check(k !== K.GRASS, `${label}: grass on hole ${t}`);
-      check(k !== K.WOLF, `${label}: a wolf stands on hole ${t}`);
+      check(k === K.EMPTY || k === K.BUNNY || k === K.CORPSE, `${label}: a non-bunny animal stands on hole ${t}`);
     } else {
       check(W.hSlot[t] === -1, `${label}: tile ${t} has hSlot but no hole`);
     }
@@ -94,7 +95,7 @@ function audit(AS, sim, label) {
   check(grass === W.gCount, `${label}: ${grass} blades on grid, gCount ${W.gCount}`);
   check(holes === W.hCount, `${label}: ${holes} holes on grid, hCount ${W.hCount}`);
   check(corpses === W.cCount, `${label}: ${corpses} corpses on grid, cCount ${W.cCount}`);
-  check(animals === W.bunnies + W.wolves, `${label}: animal counts`);
+  check(animals === W.bunnies + W.wolves + W.humans, `${label}: animal counts`);
   let h = 2166136261;
   for (let t = 0; t < W.n; t++) {
     h = Math.imul(h ^ W.kind[t], 16777619);

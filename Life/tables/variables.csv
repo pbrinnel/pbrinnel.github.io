@@ -1,21 +1,21 @@
 Variable,Kind,Applies to,Range,Goes up when,Goes down when,At the limit
-Fullness,Dynamic,Bunny Wolf,0 – FullnessMax,Eats (BiteFood; a wolf from a carcass),Every tick (HungerRate); mating (MateCost),0 → loses StarveDamage HP per s
-Stamina,Dynamic,Bunny Wolf,0 – StaminaMax,Not sprinting (StaminaRefill),Sprinting (SprintCost),0 → walk only until Stamina is full again
-HP,Dynamic,Bunny Wolf,0 – HPMax,HealRate while Fullness > HealAbove,Bitten; starving,0 → dies
+Fullness,Dynamic,Bunny Wolf Human,0 – FullnessMax,Eats (BiteFood; a wolf or human from a carcass; GrassFood per bite of grass for a human),Every tick (HungerRate); mating (MateCost),0 → loses StarveDamage HP per s
+Stamina,Dynamic,Bunny Wolf Human,0 – StaminaMax,Not sprinting (StaminaRefill),Sprinting (SprintCost),0 → walk only until Stamina is full again
+HP,Dynamic,Bunny Wolf Human,0 – HPMax,HealRate while Fullness > HealAbove,Bitten; starving,0 → dies
 Age,Dynamic,All,0 – Lifespan (days),Every tick,—,Lifespan → dies of old age
 Lifestage,Dynamic,All,Baby / Adult / Elder,Age ≥ TimeToMature → Adult; Age ≥ ElderAt → Elder,—,Grass: Sprout / Mature / Elder
 Dead,Dynamic,All,true / false,HP 0; Age ≥ Lifespan; blade Size 0,—,Animal → corpse; blade → empty tile
-State,Dynamic,Bunny Wolf,see states.csv,—,—,What it is doing now
-Target,Dynamic,Bunny Wolf,an agent or tile,—,—,Drawn as the intent line
+State,Dynamic,Bunny Wolf Human,see states.csv,—,—,What it is doing now
+Target,Dynamic,Bunny Wolf Human,an agent or tile,—,—,Drawn as the intent line
 Position,Dynamic,All Hole,tile x y,—,—,
-Sex,Static,Bunny Wolf,Male / Female,—,—,50/50 at birth
+Sex,Static,Bunny Wolf Human,Male / Female,—,—,50/50 at birth
 Pregnant,Dynamic,Female,days left,Mating,Every tick,0 → gives birth if there's room; waits if not
 MateCooldown,Dynamic,Female,days left,Giving birth,Every tick,0 → can mate
 Size,Dynamic,Grass,0 – 1,GrowthRate (× CorpseBoost near a corpse),Bitten (BiteSize),0 → blade dies
 Parents,Static,Bunny Wolf,two ids,—,—,For the inspector; none for the first generation
 Children,Dynamic,Bunny Wolf,count,Each birth,—,
-Kills,Dynamic,Wolf,count,Each kill,—,
+Kills,Dynamic,Wolf Human,count,Each kill,—,
 Nutrient,Dynamic,Corpse,0 – CorpseNutrient,—,Drunk by boosted grass (one per unit of extra growth),0 or CorpseDecay days → corpse gone
-Meat,Dynamic,Corpse,0 – MeatOnBody,—,Eaten by a wolf (BiteFood per mouthful),0 or CorpseDecay days → nothing left to eat; the corpse is bones
+Meat,Dynamic,Corpse,0 – MeatOnBody,—,Eaten by a wolf or human (BiteFood per mouthful),0 or CorpseDecay days → nothing left to eat; the corpse is bones
 InHole,Dynamic,Bunny,yes / no,Walks onto a warren hole,Walks off it,A bunny in a hole can't be bitten or hunted
 LastUsed,Dynamic,Hole,0 – CollapseDays (days),Every tick no bunny stands on it,A bunny stands on it,CollapseDays → the hole collapses into bare ground

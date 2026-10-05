@@ -32,7 +32,8 @@
   }
   const FAR_GRASS = ['#2c4a2c', '#3f7040', '#62a457'].map(abgr);
   const FAR_CORPSE = abgr('#6a6250'), FAR_GROUND = abgr('#121410'), FAR_HOLE = abgr('#3d2e20');
-  const FAR_ANIMAL = [['#e0a868', '#f2cc96'], ['#8fb2e0', '#c0d6f2']].map(r => r.map(abgr));   // [species][sex]
+  // Humans are a bright pink-violet no other species or ground uses, so a hunter stands out from far away.
+  const FAR_ANIMAL = [['#e0a868', '#f2cc96'], ['#8fb2e0', '#c0d6f2'], ['#e08fd8', '#f0b8ea']].map(r => r.map(abgr));   // [species][sex]
 
   // Scorched ground (a nuke's crater, W.scorch): a charcoal brown over the normal ground,
   // fading back to nothing as the tile's timer runs out. The far view mixes the same two
@@ -101,8 +102,8 @@
     const reduceMotion = !!(globalThis.matchMedia && globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches);
     // State ids by species, from states.csv names, for the poses that depend on what it is doing.
     let statesFor = null;
-    const restState = [new Uint8Array(256), new Uint8Array(256)];
-    const mateState = [new Uint8Array(256), new Uint8Array(256)];
+    const restState = AS.SPECIES_KEY.map(() => new Uint8Array(256));
+    const mateState = AS.SPECIES_KEY.map(() => new Uint8Array(256));
 
     function growSlots(W) {
       if (holdKind.length >= W.aCap) return;
@@ -119,7 +120,7 @@
 
     function buildStates(T) {
       statesFor = T;
-      for (let sp = 0; sp < 2; sp++) {
+      for (let sp = 0; sp < restState.length; sp++) {
         restState[sp].fill(0); mateState[sp].fill(0);
         const list = T.states[AS.SPECIES_KEY[sp]];
         for (let i = 0; i < list.length; i++) {
@@ -129,14 +130,17 @@
       }
     }
 
-    // The animal on tile `t` next to `tile` whose bite timer is running and whose target is
-    // `tile`: who just bit or grazed there. Catches bites that a fast frame's timer misses.
+    // Which species a BITE event and a GRAZE event come from: hunters bite animals, bunnies and
+    // humans eat blades (a hunter chewing through grass makes the same GRAZE but isn't marked).
+    const BITES = [0, 1, 1], GRAZES = [1, 0, 1];
+    // The animal next to `tile` of a species in `who` whose bite timer is running and whose
+    // target is `tile`: who just bit or grazed there. Catches bites that a fast frame's timer misses.
     const nbAt = new Int32Array(4);
-    function markBiter(W, tile, species, nowMs) {
+    function markBiter(W, tile, who, nowMs) {
       const k = W.neighbors4(tile, nbAt);
       for (let i = 0; i < k; i++) {
         const n = nbAt[i];
-        if (W.kind[n] !== (species ? KIND.WOLF : KIND.BUNNY)) continue;
+        if (W.kind[n] < KIND.BUNNY || !who[W.kind[n] - KIND.BUNNY]) continue;
         const a = W.aSlot[n];
         if (W.aTargetTile[a] === tile && W.aBiteLeft[a] > 0) startHold(W, a, HOLD.ACTION, nowMs, ACTION_HOLD_MS);
       }
@@ -164,12 +168,12 @@
         switch (ev.type[i]) {
           case EV.DEATH: deathUntil[tile] = nowMs + DEATH_HOLD_MS; break;
           case EV.BITE:
-            if (W.kind[tile] === KIND.BUNNY) startHold(W, W.aSlot[tile], HOLD.FLINCH, nowMs, FLINCH_HOLD_MS);
-            markBiter(W, tile, 1, nowMs);
+            if (W.kind[tile] >= KIND.BUNNY) startHold(W, W.aSlot[tile], HOLD.FLINCH, nowMs, FLINCH_HOLD_MS);
+            markBiter(W, tile, BITES, nowMs);
             break;
-          case EV.GRAZE: markBiter(W, tile, 0, nowMs); break;
+          case EV.GRAZE: markBiter(W, tile, GRAZES, nowMs); break;
           case EV.BIRTH:
-            if (W.kind[tile] === KIND.BUNNY || W.kind[tile] === KIND.WOLF) {
+            if (W.kind[tile] >= KIND.BUNNY) {
               startHold(W, W.aSlot[tile], HOLD.BIRTH, nowMs, BIRTH_HOLD_MS);
             }
             break;
@@ -256,7 +260,7 @@
           }
           else if (k === KIND.CORPSE) {
             // A body with meat on it lies flat, eye shut; once the meat is gone, a skull. A
-            // body with none to begin with (a wolf's) lies there for a moment after the death,
+            // body with none to begin with (a species with no MeatOnBody) lies there for a moment after the death,
             // so it doesn't snap straight to a skull.
             if (W.cMeat[row + tx] > 0) id = AS.spriteCarcass(W.cSpecies[row + tx]);
             else if (nowMs < deathUntil[row + tx]) id = AS.spriteCarcass(W.cSpecies[row + tx]);
@@ -366,7 +370,7 @@
       const W = sim.W, alpha = curAlpha, half = s / 2;
       const line = INTENT_CSS_PX * dpr, halo = INTENT_HALO_CSS_PX * dpr;
       ctx.globalAlpha = INTENT_ALPHA;
-      for (let grp = 0; grp < 4; grp++) {
+      for (let grp = 0; grp < AS.SPECIES_COUNT * 2; grp++) {
         ctx.beginPath();
         let any = false;
         for (let a = only >= 0 ? only : 0, hiSlot = only >= 0 ? only + 1 : W.aHigh; a < hiSlot; a++) {

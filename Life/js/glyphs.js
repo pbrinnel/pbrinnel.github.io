@@ -2,7 +2,7 @@
 // that holds every glyph pre-rendered at one tile size so the renderer can copy from it.
 //
 // Palette: black ground, a few calm muted hues. Grass is the three greens (a sprout is the
-// darkest so a young meadow recedes), bunnies a warm tan, wolves a gray-blue, a corpse
+// darkest so a young meadow recedes), bunnies a warm tan, wolves a gray-blue, humans a tunic brown (male) or green (female), a corpse
 // bone. Sex is two shades of the species color; elders are the same hue dimmed. No pure
 // saturated primaries.
 (function (AS) {
@@ -12,6 +12,8 @@
   const GRASS_COLORS = ['#2f5a33', '#4a8a4a', '#7fc06a'];   // sprout, middle, full
   const BUNNY_MALE = '#b98f58', BUNNY_FEMALE = '#dcb888';
   const WOLF_MALE = '#6f86a3', WOLF_FEMALE = '#98adc8';
+  // Hunters: skin and tunic in one color a tile can carry, a warm ochre-brown (the sprite adds its own skin).
+  const HUMAN_MALE = '#8c6a40', HUMAN_FEMALE = '#6f8f56';
   const CORPSE_COLOR = '#cfc6ac';
   // How much of the way an elder's color is pulled toward the background.
   const ELDER_DIM = 0.4;
@@ -19,7 +21,7 @@
   // The original font glyphs. The page draws sprites now (sprites.js); these remain for
   // GlyphSheet and the ids and colors other files still share.
   const GRASS_CHARS = ['░', '▒', '▓'];
-  const BUNNY_CHAR = 'α', WOLF_CHAR = 'Ω', CORPSE_CHAR = '†';
+  const BUNNY_CHAR = 'α', WOLF_CHAR = 'Ω', HUMAN_CHAR = 'Ψ', CORPSE_CHAR = '†';
 
   // Letters' ink fits a square this share of the tile, so neighbors keep a gap between
   // them; a baby's square is BABY_SCALE of that.
@@ -36,21 +38,22 @@
   const STAGE = AS.STAGE = Object.freeze({ BABY: 0, ADULT: 1, ELDER: 2 });
   const SP = AS.SPECIES, SEX = AS.SEX, KIND = AS.KIND;
 
-  // Ids: grass thirds, corpse, then species × sex × stage in a fixed block of twelve.
+  const N_SPECIES = AS.SPECIES_COUNT;
+  // Ids: grass thirds, corpse, then species × sex × stage in a fixed block of six per species.
   const G = AS.GLYPH = {};
   G.GRASS_0 = 0; G.GRASS_1 = 1; G.GRASS_2 = 2; G.CORPSE = 3;
   const ANIMAL_BASE = 4;
   const names = [];
   names[G.GRASS_0] = 'GRASS_0'; names[G.GRASS_1] = 'GRASS_1'; names[G.GRASS_2] = 'GRASS_2';
   names[G.CORPSE] = 'CORPSE';
-  const SPECIES_NAMES = ['BUNNY', 'WOLF'], SEX_NAMES = ['MALE', 'FEMALE'];
+  const SPECIES_NAMES = ['BUNNY', 'WOLF', 'HUMAN'], SEX_NAMES = ['MALE', 'FEMALE'];
   const STAGE_NAMES = ['BABY', 'ADULT', 'ELDER'];
-  for (let sp = 0; sp < 2; sp++) for (let sx = 0; sx < 2; sx++) for (let st = 0; st < 3; st++) {
+  for (let sp = 0; sp < N_SPECIES; sp++) for (let sx = 0; sx < 2; sx++) for (let st = 0; st < 3; st++) {
     const id = ANIMAL_BASE + (sp * 2 + sx) * 3 + st;
     G[`${SPECIES_NAMES[sp]}_${SEX_NAMES[sx]}_${STAGE_NAMES[st]}`] = id;
     names[id] = `${SPECIES_NAMES[sp]}_${SEX_NAMES[sx]}_${STAGE_NAMES[st]}`;
   }
-  const COUNT = AS.GLYPH_COUNT = ANIMAL_BASE + 12;
+  const COUNT = AS.GLYPH_COUNT = ANIMAL_BASE + N_SPECIES * 6;
   AS.GLYPH_NAMES = Object.freeze(names);
 
   AS.animalGlyph = (species, sex, stage) => ANIMAL_BASE + (species * 2 + sex) * 3 + stage;
@@ -70,8 +73,8 @@
   const colors = AS.COLORS = { background: BACKGROUND };
   GRASS_COLORS.forEach((c, i) => { colors[i] = c; });
   colors[G.CORPSE] = CORPSE_COLOR;
-  const speciesColor = [[BUNNY_MALE, BUNNY_FEMALE], [WOLF_MALE, WOLF_FEMALE]];
-  for (let sp = 0; sp < 2; sp++) for (let sx = 0; sx < 2; sx++) {
+  const speciesColor = [[BUNNY_MALE, BUNNY_FEMALE], [WOLF_MALE, WOLF_FEMALE], [HUMAN_MALE, HUMAN_FEMALE]];
+  for (let sp = 0; sp < N_SPECIES; sp++) for (let sx = 0; sx < 2; sx++) {
     const base = speciesColor[sp][sx];
     colors[AS.animalGlyph(sp, sx, STAGE.BABY)] = base;
     colors[AS.animalGlyph(sp, sx, STAGE.ADULT)] = base;
@@ -126,7 +129,7 @@
     if (id === G.CORPSE) return CORPSE_CHAR;
     const sp = ((id - ANIMAL_BASE) / 6) | 0;
     const own = T && T[AS.SPECIES_KEY[sp]] && T[AS.SPECIES_KEY[sp]].Glyph;
-    return own || (sp === SP.BUNNY ? BUNNY_CHAR : WOLF_CHAR);
+    return own || [BUNNY_CHAR, WOLF_CHAR, HUMAN_CHAR][sp];
   }
 
   // One sheet per integer device-pixel tile size, each glyph centered in a px × px cell on a

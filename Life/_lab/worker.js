@@ -11,7 +11,7 @@
 'use strict';
 
 const SIM_FILES = ['tables', 'rng', 'world', 'grass', 'corpse', 'warren', 'sim', 'god', 'start', 'sight', 'animals',
-  'breed', 'bunny', 'wolf', 'glyphs'];
+  'breed', 'bunny', 'wolf', 'human', 'glyphs'];
 
 let canceled = null;
 

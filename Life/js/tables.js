@@ -5,8 +5,11 @@
   'use strict';
 
   const FILES = ['species', 'variables', 'states', 'settings'];
-  const ANIMALS = ['Bunny', 'Wolf'];
-  const ALL = ['Bunny', 'Wolf', 'Grass'];
+  // In AS.SPECIES order: a species' code is its index here.
+  const ANIMALS = ['Bunny', 'Wolf', 'Human'];
+  const ALL = [...ANIMALS, 'Grass'];
+  // The animals that breed; a species with none of the mating stats never mates (humans).
+  const BREEDERS = ['Bunny', 'Wolf'];
 
   // Each stat the code reads: its type, and which species must fill it in. A cell left
   // blank for any other species reads as null.
@@ -15,6 +18,7 @@
   //   frac  percent, 0–100 → 0–1 (a "%" on the value or a "% of …" unit)
   //   ratio percent with no upper bound (speeds as a share of the adult's)
   //   range "a-b" or a single whole number → {min, max}
+  //   species space-separated animal species names → frozen array of species codes (AS.SPECIES)
   //   text  kept as written
   const SPECIES_SCHEMA = [
     ['WalkSpeed', 'num', ANIMALS],
@@ -33,8 +37,8 @@
     ['HungryAt', 'frac', ANIMALS],
     ['RestBelow', 'frac', ANIMALS],
     ['RestUntil', 'frac', ANIMALS],
-    ['SprintRange', 'num', ['Wolf']],
-    ['TrackSeconds', 'num', ['Wolf']],
+    ['SprintRange', 'num', ['Wolf', 'Human']],
+    ['TrackSeconds', 'num', ['Wolf', 'Human']],
     ['HoleRange', 'num', ['Bunny']],
     ['DigChance', 'frac', ['Bunny']],
     ['DigSeconds', 'num', ['Bunny']],
@@ -42,19 +46,22 @@
     ['RoomPreference', 'num', ANIMALS],
     ['DecidePerSec', 'pos', ANIMALS],
     ['Diet', 'text', []],
-    ['BiteDamage', 'num', ['Wolf']],
+    ['Prey', 'species', []],         // blank = hunts nothing
+    ['EatsCarcass', 'species', []],  // blank = eats no carcasses
+    ['BiteDamage', 'num', ['Wolf', 'Human']],
     ['BiteCooldown', 'pos', ANIMALS],
     ['BiteFood', 'num', ANIMALS],
+    ['GrassFood', 'num', []],        // blank = a grazer's BiteFood
     ['BiteSize', 'num', ANIMALS],
     ['TimeToMature', 'num', ALL],
     ['Lifespan', 'pos', ALL],
     ['ElderAt', 'frac', ANIMALS],
     ['VisionRange', 'num', ANIMALS],
-    ['PregnancyDays', 'num', ANIMALS],
-    ['LitterSize', 'range', ANIMALS],
-    ['MateCooldown', 'num', ANIMALS],
-    ['MateFullness', 'frac', ANIMALS],
-    ['MateCost', 'frac', ANIMALS],
+    ['PregnancyDays', 'num', BREEDERS],
+    ['LitterSize', 'range', BREEDERS],
+    ['MateCooldown', 'num', BREEDERS],
+    ['MateFullness', 'frac', BREEDERS],
+    ['MateCost', 'frac', BREEDERS],
     ['RoamAfter', 'num', []],        // blank = never roams
     ['RoamRun', 'range', []],
     ['MateRange', 'num', []],        // blank = a mate must be in sight
@@ -94,7 +101,8 @@
     ['CollapseDays', 'num'],
     ['NukeRadius', 'pos'],
     ['ScorchDays', 'pos'],
-    ['BrushRadius', 'pos'],
+    ['BrushRadius', 'num'],
+    ['AnimalWarnAt', 'pos'],
     ['Seed', 'seed'],
   ];
   // How the world is laid out on day 0 (sim.js populate, start.js).
@@ -167,6 +175,15 @@
   function convert(raw, type, unit) {
     const s = raw.replace(DASHES, '-').trim();
     if (type === 'text') return { value: raw.trim() };
+    if (type === 'species') {
+      const codes = [];
+      for (const name of s.split(/\s+/).filter(Boolean)) {
+        const i = ANIMALS.findIndex(a => a.toLowerCase() === name.toLowerCase());
+        if (i < 0) return { error: `"${name}" isn't an animal species. Use ${ANIMALS.join(', ')}` };
+        codes.push(i);
+      }
+      return { value: Object.freeze(codes) };
+    }
     if (type === 'range') {
       const m = s.match(/^(\d+)\s*(?:-\s*(\d+))?$/);
       if (!m) return { error: `"${raw}" should be a whole number or a range like 2-4` };
@@ -198,7 +215,8 @@
   }
 
   function parseSpecies(rows, errors, warnings) {
-    const out = { bunny: {}, wolf: {}, grass: {} };
+    const out = {};
+    for (const Sp of ALL) out[Sp.toLowerCase()] = {};
     const byStat = new Map();
     for (const r of rows) {
       if (!r.Stat) continue;
@@ -369,6 +387,7 @@
     const T = Object.freeze({
       bunny: species.bunny,
       wolf: species.wolf,
+      human: species.human,
       grass: species.grass,
       world: parseSettings(se, errors, warnings),
       states: parseStates(st, errors),

@@ -14,13 +14,17 @@ class El {
   get className() { return this._cls; }
   set hidden(v) { writes++; this._hidden = !!v; } get hidden() { return this._hidden; }
   set title(v) { writes++; this._title = v; }
-  appendChild(c) { writes++; this.children.push(c); return c; }
-  append(...cs) { for (const c of cs) { writes++; this.children.push(typeof c === 'string' ? Object.assign(new El('#text'), { _text: c }) : c); } }
+  appendChild(c) { writes++; this.children.push(c); c.parent = this; return c; }
+  setAttribute() {}
+  replaceWith(n) { if (this.parent) this.parent.children = this.parent.children.map(c => c === this ? n : c); n.parent = this.parent; }
+  remove() { if (this.parent) this.parent.children = this.parent.children.filter(c => c !== this); this.parent = null; }
+  append(...cs) { for (const c of cs) { writes++; const k = typeof c === 'string' ? Object.assign(new El('#text'), { _text: c }) : c; k.parent = this; this.children.push(k); } }
   addEventListener(t, f) { (this.listeners[t] ||= []).push(f); }
   blur() {}
   fire(t, e = {}) { (this.listeners[t] || []).forEach(f => f(e)); }
   all(p, out = []) { if (p(this)) out.push(this); this.children.forEach(c => c.all(p, out)); return out; }
 }
+let LS;   // what the page sees as localStorage (undefined: none, which the page copes with)
 function build(debug, extra = {}) {
   const ids = { hud: new El('div'), errors: new El('div'), inspector: new El('aside'), graph: new El('aside') };
   ids.graph._hidden = true;
@@ -28,8 +32,10 @@ function build(debug, extra = {}) {
   const body = new El('body');
   const doc = { createElement: t => new El(t), getElementById: i => ids[i], body, listeners: {},
     addEventListener(t, f) { (this.listeners[t] ||= []).push(f); } };
-  const ctx = { document: doc, globalThis: null, AS: {} }; ctx.globalThis = ctx;
+  const ctx = { document: doc, globalThis: null, AS: {}, localStorage: LS }; ctx.globalThis = ctx;
   vm.createContext(ctx);
+  // ui.js builds its debug tools from the species list, which world.js owns.
+  vm.runInContext(fs.readFileSync(require('path').join(__dirname, '../js/world.js'), 'utf8'), ctx);
   vm.runInContext(fs.readFileSync(require('path').join(__dirname, '../js/ui.js'), 'utf8'), ctx);
   const calls = [], tools = [];
   const speeds = [0, 1, 2, 5, 20, Infinity];
@@ -39,7 +45,7 @@ function build(debug, extra = {}) {
 // The speed buttons only (not the tabs, Hide UI or the debug tools).
 const btns = (ids) => ids.hud.all(e => e.className === 'hud-speeds')[0].children;
 let n = 0; const ok = m => console.log('ok', ++n, m);
-const input = { speedIndex: 1, achieved: 1, day: 3.24, seed: 1234567, counts: { bunnies: 0, wolves: 0, blades: 23999, corpses: 1234567 } };
+const input = { speedIndex: 1, achieved: 1, day: 3.24, seed: 1234567, counts: { bunnies: 0, wolves: 0, humans: 0, total: 0, blades: 23999, corpses: 1234567 } };
 
 { const { ui, ids } = build(false);
   ui.hud(input); const w = writes; ui.hud(input);
@@ -70,11 +76,11 @@ const input = { speedIndex: 1, achieved: 1, day: 3.24, seed: 1234567, counts: { 
 }
 { const { ui, ids } = build(true);
   const tools = ids.hud.all(e => e.className.split(' ').includes('hud-tool'));
-  assert.deepStrictEqual(tools.map(t => t.textContent), ['Select', 'Drop bunny body', 'Drop wolf body']); ok('debug tools exist');
+  assert.deepStrictEqual(tools.map(t => t.textContent), ['Select', 'Drop bunny body', 'Drop wolf body', 'Drop human body']); ok('debug tools exist');
 }
 { const { tools, ids } = (() => { const r = build(true); return { tools: r.tools, ids: r.ids }; })();
-  const t = ids.hud.all(e => e.className.split(' ').includes('hud-tool')); t[1].fire('click'); t[2].fire('click');
-  assert.deepStrictEqual(tools, ['corpse-bunny', 'corpse-wolf']); ok('debug tools call onDebugTool');
+  const t = ids.hud.all(e => e.className.split(' ').includes('hud-tool')); t[1].fire('click'); t[2].fire('click'); t[3].fire('click');
+  assert.deepStrictEqual(tools, ['corpse-bunny', 'corpse-wolf', 'corpse-human']); ok('debug tools call onDebugTool');
 }
 { const { ui, ids } = build(false);
   const errs = ['settings.csv row 3, column Seed: not a number <b>x</b>', 'species.csv row 2: bad'];
@@ -176,7 +182,7 @@ const stripOf = ids => ids.hud.all(e => e.className === 'hud-tabstrip')[0];
 }
 { const { ui, ids } = build(false, { onLines() {} });
   assert.strictEqual(ui.tab, 'info'); assert(!stripOf(ids).hidden && !panelOf(ids, 'info').hidden && panelOf(ids, 'debug').hidden && panelOf(ids, 'god').hidden); ok('Info is open by default');
-  assert(panelOf(ids, 'info').textContent.includes('Graph') && panelOf(ids, 'info').all(e => e.className === 'hud-glyph').length === 4); ok('Info holds the four counts and the Graph button');
+  assert(panelOf(ids, 'info').textContent.includes('Graph') && panelOf(ids, 'info').all(e => e.className === "hud-glyph").length === 6); ok('Info holds the six counts (humans and the Total included) and the Graph button');
   assert(panelOf(ids, 'debug').all(e => e.className.includes('hud-lines')).length === 1 && panelOf(ids, 'debug').textContent.includes('Benchmark') && panelOf(ids, 'debug').textContent.includes('Seed')); ok('Debug holds Lines, Benchmark and the Seed');
   assert(panelOf(ids, 'god').textContent.includes('NUKE MODE')); ok('God holds NUKE MODE');
 }
@@ -221,8 +227,8 @@ const stripOf = ids => ids.hud.all(e => e.className === 'hud-tabstrip')[0];
 { const modes = [], nukes = [];
   const { ui, ids, body } = build(false, { onMode: m => modes.push(m), onNuke: on => nukes.push(on) });
   const by = label => ids.hud.all(e => e.textContent === label && e.tagName === 'button' || e.textContent === label && e.className.includes('hud-bench'))[0];
-  const names = ['NUKE MODE', 'GRASS MODE', 'RABBIT MODE', 'WOLF MODE'], b = names.map(by);
-  assert(b.every(Boolean)); ok('the four God modes exist as buttons');
+  const names = ['NUKE MODE', 'GRASS MODE', 'RABBIT MODE', 'WOLF MODE', 'HUMAN MODE'], b = names.map(by);
+  assert(b.every(Boolean)); ok('the five God modes exist as buttons');
   assert(ids.hud.all(e => e.textContent === 'WOLF MODE').length >= 1 && panelOf(ids, 'god').textContent.includes('RABBIT MODE')); ok('they sit in the God tab');
   b[1].fire('click');
   assert(ui.mode === 'grass' && b[1].classList.contains('on') && body.classList.contains('paint-armed') && !body.classList.contains('nuke-armed')); ok('GRASS MODE arms: highlighted, crosshair class');
@@ -232,8 +238,69 @@ const stripOf = ids => ids.hud.all(e => e.className === 'hud-tabstrip')[0];
   assert(ui.mode === 'bunny' && !ui.nuke && nukes.join() === 'true,false' && !b[0].classList.contains('on')); ok('RABBIT MODE turns nuke off (onNuke(false))');
   b[3].fire('click');
   assert(ui.mode === 'wolf' && !b[2].classList.contains('on') && b[3].classList.contains('on')); ok('WOLF MODE turns RABBIT MODE off');
-  ui.lock(true); b[1].fire('click'); assert(ui.mode === 'wolf' && b.every(x => x.disabled)); ui.lock(false); ok('locked during the benchmark');
-  b[3].fire('click');
-  assert(ui.mode === '' && !b.some(x => x.classList.contains('on')) && !body.classList.contains('paint-armed') && modes.join() === 'grass,nuke,bunny,wolf,'); ok('clicking the active mode turns it off');
+  b[4].fire('click');
+  assert(ui.mode === 'human' && !b[3].classList.contains('on') && b[4].classList.contains('on') && body.classList.contains('paint-armed')); ok('HUMAN MODE turns WOLF MODE off');
+  ui.lock(true); b[1].fire('click'); assert(ui.mode === 'human' && b.every(x => x.disabled)); ui.lock(false); ok('locked during the benchmark');
+  b[4].fire('click');
+  assert(ui.mode === '' && !b.some(x => x.classList.contains('on')) && !body.classList.contains('paint-armed') && modes.join() === 'grass,nuke,bunny,wolf,human,'); ok('clicking the active mode turns it off');
+}
+
+// ---- counts: a Total beside the species, humans with their own count ----
+{ const { ui, ids } = build(false);
+  ui.hud({ ...input, counts: { bunnies: 12000, wolves: 300, humans: 40, total: 12340, blades: 5, corpses: 6 } });
+  const txt = ids.hud.textContent;
+  assert(txt.includes('Total') && txt.includes('12,340') && txt.includes('12,000') && txt.includes('300') && txt.includes('40')); ok('Info shows a Total (12,340) and a human count');
+  assert(ids.hud.all(e => e.className === 'hud-num hud-num-total').length === 1 && ids.hud.all(e => e.className === 'hud-num hud-num-humans').length === 1); ok('Total and humans are counts like the others (fixed width in CSS)');
+  const icons = [];
+  ui.setIcons((key, cv) => { icons.push(key); });
+  assert.deepStrictEqual(icons, ['bunnies', 'wolves', 'humans', 'blades', 'corpses']); ok('icons for every count but the Total, which keeps its word');
+}
+// ---- the Radius slider: per-mode memory, defaults, keeping, the benchmark lock ----
+{ const { ui, ids } = build(false);
+  const slider = ids.hud.all(e => e.className === 'hud-radius-input')[0], label = ids.hud.all(e => e.className === 'hud-radius-label')[0];
+  const by = l => ids.hud.all(e => e.textContent === l && e.className.includes('hud-bench'))[0];
+  assert(slider && slider.disabled && label.textContent === 'Radius –'); ok('the Radius slider is off until a mode is armed');
+  ui.setRadiusDefaults(75, 0);
+  assert.strictEqual(ui.radiusOf('nuke'), 75); assert.strictEqual(ui.radiusOf('grass'), 0); ok('defaults: NukeRadius for the nuke, BrushRadius (0) for the brushes');
+  by('NUKE MODE').fire('click');
+  assert(!slider.disabled && slider.value === '75' && label.textContent === 'Radius 75'); ok('NUKE MODE shows Radius 75');
+  slider.value = '40'; slider.listeners.input.forEach(f => f());
+  assert(ui.radiusOf('nuke') === 40 && label.textContent === 'Radius 40'); ok('moving the slider sets that mode\'s radius and the label');
+  by('GRASS MODE').fire('click');
+  assert(slider.value === '0' && label.textContent === 'Radius 0' && ui.radiusOf('nuke') === 40); ok('switching modes switches the slider; the nuke keeps 40');
+  slider.value = '9'; slider.listeners.input.forEach(f => f());
+  by('HUMAN MODE').fire('click');
+  assert(label.textContent === 'Radius 0' && ui.radiusOf('grass') === 9); ok('each brush mode has its own radius');
+  by('GRASS MODE').fire('click');
+  assert(slider.value === '9'); ok('coming back to a mode restores its radius');
+  slider.value = '250'; slider.listeners.input.forEach(f => f());
+  assert(ui.radiusOf('grass') === 100); ok('the radius tops out at 100');
+  ui.lock(true); assert(slider.disabled); slider.value = '5'; slider.listeners.input.forEach(f => f()); assert(ui.radiusOf('grass') === 100); ui.lock(false); assert(!slider.disabled); ok('disabled (and ignored) during the benchmark');
+}
+{ // Remembered per mode in localStorage, and a stored value beats the default.
+  const mem = { 'life-radius-nuke': '12', 'life-radius-wolf': '3' };
+  LS = { getItem: k => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = v; } };
+  const { ui } = build(false);
+  ui.setRadiusDefaults(75, 0);
+  assert(ui.radiusOf('nuke') === 12 && ui.radiusOf('wolf') === 3 && ui.radiusOf('bunny') === 0); ok('a radius chosen earlier is remembered per mode; the rest start at their defaults');
+  ui.setRadius('bunny', 7);
+  assert(mem['life-radius-bunny'] === '7'); ok('a change is written to localStorage');
+  LS = { getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); } };
+  const u2 = build(false).ui; u2.setRadiusDefaults(75, 0); u2.setRadius('wolf', 4);
+  assert(u2.radiusOf('wolf') === 4 && u2.radiusOf('nuke') === 75); ok('blocked storage just means no memory');
+  LS = undefined;
+}
+// ---- the "That's a crowd" card ----
+{ const { ui, body } = build(false);
+  const cards = () => body.all(e => e.className.includes('crowd-card'));
+  let keep = 0, stop = 0;
+  ui.crowd({ limit: 20000, onKeep: () => keep++, onStop: () => stop++ });
+  assert(cards().length === 1 && /That's a crowd/.test(cards()[0].textContent) && /Over 20,000 animals/.test(cards()[0].textContent)); ok('the card names the limit, formatted');
+  const keepBtn = body.all(e => e.textContent === 'Keep adding')[0], stopBtn = body.all(e => e.textContent === 'Stop here')[0];
+  assert(keepBtn && stopBtn); keepBtn.fire('click'); stopBtn.fire('click');
+  assert(keep === 1 && stop === 1); ok('Keep adding and Stop here call back');
+  ui.crowd({ limit: 40000, onKeep() {}, onStop() {} });
+  assert(cards().length === 1 && /40,000/.test(cards()[0].textContent)); ok('showing it again replaces the old card');
+  ui.crowd(null); assert(cards().length === 0); ok('null hides it');
 }
 console.log('all passed');

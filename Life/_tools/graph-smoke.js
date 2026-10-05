@@ -8,8 +8,8 @@ const panel = mk();
 const ctx = { AS: { FONT: 'x' }, document: { getElementById: () => panel, createElement: () => mk(), querySelector: () => null }, devicePixelRatio: 2, innerWidth: 1000, innerHeight: 700,
   localStorage: { m: {}, getItem(k) { return k in this.m ? this.m[k] : null; }, setItem(k, v) { this.m[k] = String(v); } } }; ctx.globalThis = ctx;
 vm.createContext(ctx); vm.runInContext(fs.readFileSync(require('path').join(__dirname, '../js/graph.js'), 'utf8'), ctx);
-const N = 24000, h = { length: N, grass: new Uint32Array(N), bunnies: new Uint32Array(N), wolves: new Uint32Array(N) };
-for (let i = 0; i < N; i++) { h.grass[i] = 20000 + (i % 977); h.bunnies[i] = i % 300; h.wolves[i] = i < 12000 ? i % 20 : 0; }
+const N = 24000, h = { length: N, grass: new Uint32Array(N), bunnies: new Uint32Array(N), wolves: new Uint32Array(N), humans: new Uint32Array(N) };
+for (let i = 0; i < N; i++) { h.grass[i] = 20000 + (i % 977); h.bunnies[i] = i % 300; h.wolves[i] = i < 12000 ? i % 20 : 0; h.humans[i] = i < 6000 ? 0 : i % 7; }
 const g = ctx.AS.Graph({}); const sim = { history: h };
 g.draw(sim, 0); if (calls.stroke) throw new Error('drew while closed');
 g.toggle(); g.draw(sim, 0); const full = calls.stroke;

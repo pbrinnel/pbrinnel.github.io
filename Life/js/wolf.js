@@ -1,7 +1,10 @@
-// The wolf's states (states.csv, Species = Wolf). Same contract as bunny.js: enter() in
-// Priority order a few times a second, act() every tick, movement only through animals.js's
-// helpers. A wolf may walk through grass by chewing it (DESIGN.md "World"), so it moves with
-// AS.chewOrStep and plans with AS.pathNextWeighted, which counts the bites against detours.
+// The wolf's states (states.csv, Species = Wolf), which are also the states humans hunt and
+// rest with (human.js adds FORAGE and registers the rest under 'human'). Same contract as
+// bunny.js: enter() in Priority order a few times a second, act() every tick, movement only
+// through animals.js's helpers. A hunter may walk through grass by chewing it (DESIGN.md
+// "World"), so it moves with AS.chewOrStep and plans with AS.pathNextWeighted, which counts
+// the bites against detours. Who a hunter hunts and eats is species.csv's Prey and
+// EatsCarcass rows (AS.relations), not anything named here.
 (function (AS) {
   'use strict';
 
@@ -18,29 +21,34 @@
     if (!m) { m = { cap: 0 }; memOf.set(W, m); }
     if (m.cap < W.aCap) {
       const grow = (old, Ctor) => { const a = new Ctor(W.aCap); if (old) a.set(old); return a; };
-      m.prey = grow(m.prey, Int32Array);        // HUNT's bunny slot
+      m.prey = grow(m.prey, Int32Array);        // HUNT's prey slot
       m.preySerial = grow(m.preySerial, Uint32Array);
       m.mate = grow(m.mate, Int32Array);        // MATE's partner slot
       m.mateSerial = grow(m.mateSerial, Uint32Array);
-      m.seenTile = grow(m.seenTile, Int32Array);    // where HUNT's bunny was last in sight
+      m.seenTile = grow(m.seenTile, Int32Array);    // where HUNT's prey was last in sight
       m.seenAt = grow(m.seenAt, Float64Array);      // sim.simSeconds of that sighting
       m.feedTile = grow(m.feedTile, Int32Array);    // FEED's carcass tile
       m.feedSerial = grow(m.feedSerial, Uint32Array); // that corpse's serial, since a tile is reused
-      m.bunnyAt = grow(m.bunnyAt, Float64Array);    // sim.simSeconds this wolf last saw any bunny
-      m.bunnyFor = grow(m.bunnyFor, Uint32Array);   // the serial bunnyAt belongs to (slots are reused)
+      m.preyAt = grow(m.preyAt, Float64Array);      // sim.simSeconds this hunter last saw any prey
+      m.preyFor = grow(m.preyFor, Uint32Array);     // the serial preyAt belongs to (slots are reused)
       m.cap = W.aCap;
     }
     return m;
   }
 
-  // State indices come from the CSV order, so find them by name once per table set.
-  let idxT = null, HUNT = -1, GIVE_UP = -1, REST = -1, FEED = -1;
-  function indices(T) {
-    if (idxT !== T) {
-      idxT = T;
-      const find = n => T.states.wolf.findIndex(st => st.name === n);
-      HUNT = find('HUNT'); FEED = find('FEED'); GIVE_UP = find('GIVE_UP'); REST = find('REST');
+  // State indices come from the CSV order, so find them by name once per table set and
+  // species (wolves and humans share these states but list them at their own priorities).
+  const idxOf = new WeakMap();
+  function idx(sim, s) {
+    let byKey = idxOf.get(sim.T);
+    if (!byKey) { byKey = {}; idxOf.set(sim.T, byKey); }
+    const key = AS.SPECIES_KEY[sim.W.aSpecies[s]];
+    let r = byKey[key];
+    if (!r) {
+      const find = n => sim.T.states[key].findIndex(st => st.name === n);
+      r = byKey[key] = { HUNT: find('HUNT'), FEED: find('FEED'), GIVE_UP: find('GIVE_UP'), REST: find('REST') };
     }
+    return r;
   }
 
   // ---- shared pieces ----------------------------------------------------------------------
@@ -52,12 +60,17 @@
 
   // Matchers, goals and costs are created once and read these instead of closing over a call.
   let mSim = null, mW = null, mSelf = 0, mGoal = 0, mFrom = 0, mInvSpeed = 0;
+  // The species this animal hunts and the carcasses it eats, as AS.relations bitmasks.
+  let mPrey = 0, mEats = 0;
   const isGoalTile = t => t === mGoal;
   // A bunny on a warren hole is safe, so it isn't prey.
-  const isBunny = t => mW.kind[t] === K.BUNNY && !mW.hole[t];
-  const hasMeat = t => mW.kind[t] === K.CORPSE && mW.cMeat[t] > 0;
+  const isPrey = t => {
+    const k = mW.kind[t];
+    return k >= K.BUNNY && ((mPrey >> (k - K.BUNNY)) & 1) === 1 && !mW.hole[t];
+  };
+  const hasMeat = t => mW.kind[t] === K.CORPSE && mW.cMeat[t] > 0 && ((mEats >> mW.cSpecies[t]) & 1) === 1;
   const isPartner = t => {
-    if (mW.kind[t] !== K.WOLF) return false;
+    if (mW.kind[t] !== AS.kindOf(mW.aSpecies[mSelf])) return false;
     const p = mW.aSlot[t];
     return mW.aSex[p] !== mW.aSex[mSelf] && AS.canMate(mSim, p);
   };
@@ -193,17 +206,18 @@
       }
       W.aRunLeft[s] = 0;
     }
-    // A wolf that hasn't seen a bunny for RoamAfter days roams (Paul): it keeps going the
+    // A hunter that hasn't seen prey for RoamAfter days roams (Paul): it keeps going the
     // way it was heading, in runs of RoamRun tiles, until it finds prey or meets a wall,
     // instead of circling the land it has hunted out.
     const S = AS.speciesStats(sim, s), m = mem(W), now = sim.simSeconds;
-    if (m.bunnyFor[s] !== W.aSerial[s]) { m.bunnyFor[s] = W.aSerial[s]; m.bunnyAt[s] = now; }
+    if (m.preyFor[s] !== W.aSerial[s]) { m.preyFor[s] = W.aSerial[s]; m.preyAt[s] = now; }
     mW = W;
-    if (AS.nearestVisible(sim, t, S.VisionRange, isBunny) >= 0) m.bunnyAt[s] = now;
-    const roaming = S.RoamAfter > 0 && now - m.bunnyAt[s] > S.RoamAfter * AS.DAY_SECONDS;
+    mPrey = AS.relations(sim.T).prey[W.aSpecies[s]];
+    if (AS.nearestVisible(sim, t, S.VisionRange, isPrey) >= 0) m.preyAt[s] = now;
+    const roaming = S.RoamAfter > 0 && now - m.preyAt[s] > S.RoamAfter * AS.DAY_SECONDS;
     let d;
     if (roaming && nOpen > 0 && open.subarray(0, nOpen).includes(W.aRunDir[s])) d = W.aRunDir[s];
-    else if (nOpen > 0) d = pickRoomDir(sim, s, K.WOLF, open, nOpen);
+    else if (nOpen > 0) d = pickRoomDir(sim, s, AS.kindOf(W.aSpecies[s]), open, nOpen);
     else if (nGrass > 0) d = grassDirs[sim.rng.int(nGrass)];
     else return;
     W.aRunDir[s] = d;
@@ -218,15 +232,14 @@
 
   // ---- the states --------------------------------------------------------------------------
 
-  AS.registerStates('wolf', {
+  const STATES = {
     // "Walk to the carcass; eat BiteFood from it every BiteCooldown until full or the meat is
     // gone." A feeding wolf gorges past HungryAt: stopping there would leave the rest of a
     // body to rot while the wolf walked off to hunt, and Fullness would sit wasted at the cap.
     FEED: {
       enter(sim, s) {
         const W = sim.W, S = AS.speciesStats(sim, s);
-        indices(sim.T);
-        const feeding = W.aState[s] === FEED;
+        const feeding = W.aState[s] === idx(sim, s).FEED;
         if (feeding ? !(W.aFullness[s] < S.FullnessMax) : !AS.isHungry(sim, s)) return false;
         const m = mem(W);
         // Keep the carcass it was at while there is meat on it (it may be right under the
@@ -234,6 +247,7 @@
         const ft = m.feedTile[s];
         if (feeding && ft >= 0 && W.kind[ft] === K.CORPSE && W.serial[ft] === m.feedSerial[s] && W.cMeat[ft] > 0) return true;
         mW = W;
+        mEats = AS.relations(sim.T).eats[W.aSpecies[s]];
         const t = AS.nearestVisible(sim, W.aTile[s], S.VisionRange, hasMeat);
         if (t < 0) return false;
         m.feedTile[s] = t;
@@ -272,29 +286,29 @@
     HUNT: {
       enter(sim, s) {
         const W = sim.W;
-        indices(sim.T);
         if (!AS.isHungry(sim, s)) return false;
-        const S = AS.speciesStats(sim, s), cur = W.aState[s];
+        const S = AS.speciesStats(sim, s), cur = W.aState[s], I = idx(sim, s);
         // Out of breath mid-chase hands over to GIVE_UP; and once it has given up, the bunny
         // stays safe until the wolf has rested.
-        if (cur === HUNT && W.aWinded[s]) return false;
-        if (cur === GIVE_UP && W.aStamina[s] < S.RestUntil * S.StaminaMax) return false;
+        if (cur === I.HUNT && W.aWinded[s]) return false;
+        if (cur === I.GIVE_UP && W.aStamina[s] < S.RestUntil * S.StaminaMax) return false;
         mW = W;
-        const t = AS.nearestVisible(sim, W.aTile[s], S.VisionRange, isBunny);
+        mPrey = AS.relations(sim.T).prey[W.aSpecies[s]];
+        const t = AS.nearestVisible(sim, W.aTile[s], S.VisionRange, isPrey);
         const m = mem(W);
         if (t >= 0) {
-          // Any bunny in view wins, so a second one appearing mid-search takes over.
+          // Any prey in view wins, so a second one appearing mid-search takes over.
           const p = W.aSlot[t];
           m.prey[s] = p;
           m.preySerial[s] = W.aSerial[p];
           m.seenTile[s] = t;
           m.seenAt[s] = sim.simSeconds;
-          m.bunnyAt[s] = sim.simSeconds; m.bunnyFor[s] = W.aSerial[s];
+          m.preyAt[s] = sim.simSeconds; m.preyFor[s] = W.aSerial[s];
           return true;
         }
         // Nothing in view: a wolf already hunting keeps looking for TrackSeconds, until it
         // reaches the spot or its bunny is gone.
-        if (cur !== HUNT || !(S.TrackSeconds > 0)) return false;
+        if (cur !== I.HUNT || !(S.TrackSeconds > 0)) return false;
         const p = m.prey[s];
         if (!W.aAlive[p] || W.aSerial[p] !== m.preySerial[s]) return false;
         if (W.hole[W.aTile[p]]) return false;   // it ducked into a hole: the hunt is over
@@ -354,9 +368,8 @@
     GIVE_UP: {
       enter(sim, s) {
         const W = sim.W, S = AS.speciesStats(sim, s);
-        indices(sim.T);
-        const cur = W.aState[s];
-        return (cur === HUNT && W.aWinded[s] === 1) || (cur === GIVE_UP && W.aStamina[s] < S.RestUntil * S.StaminaMax);
+        const cur = W.aState[s], I = idx(sim, s);
+        return (cur === I.HUNT && W.aWinded[s] === 1) || (cur === I.GIVE_UP && W.aStamina[s] < S.RestUntil * S.StaminaMax);
       },
       start: calmStart,
       act(sim, s) { AS.setSprint(sim, s, false); },
@@ -403,8 +416,7 @@
     REST: {
       enter(sim, s) {
         const W = sim.W, S = AS.speciesStats(sim, s);
-        indices(sim.T);
-        const limit = (W.aState[s] === REST ? S.RestUntil : S.RestBelow) * S.StaminaMax;
+        const limit = (W.aState[s] === idx(sim, s).REST ? S.RestUntil : S.RestBelow) * S.StaminaMax;
         return W.aStamina[s] < limit;
       },
       start: calmStart,
@@ -416,5 +428,12 @@
       start: calmStart,
       act: prowlStep,
     },
-  });
+  };
+  AS.registerStates('wolf', STATES);
+
+  // What human.js builds on: the states every hunter shares (everything but MATE, which is
+  // for breeders) and the helpers FORAGE moves with.
+  const { MATE, ...SHARED } = STATES;
+  AS.hunterStates = Object.freeze(SHARED);
+  AS.hunterKit = Object.freeze({ walkToward, prowlStep, calmStart });
 })(globalThis.AS);

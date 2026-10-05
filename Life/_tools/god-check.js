@@ -37,7 +37,7 @@ const tally = () => {
   const c = { in: { animals: 0, blades: 0, corpses: 0, holes: 0 }, out: { animals: 0, blades: 0, corpses: 0, holes: 0 } };
   for (let t = 0; t < W.n; t++) {
     const o = inside(t) ? c.in : c.out, k = W.kind[t];
-    if (k === K.BUNNY || k === K.WOLF) o.animals++; else if (k === K.GRASS) o.blades++; else if (k === K.CORPSE) o.corpses++;
+    if (k >= K.BUNNY) o.animals++; else if (k === K.GRASS) o.blades++; else if (k === K.CORPSE) o.corpses++;
     if (W.hole[t]) o.holes++;
   }
   return c;
@@ -95,7 +95,7 @@ W.scorch[t0] = 0;
   const sim2 = AS.Sim(T, 11), W2 = sim2.W, P = AS.SPECIES;
   const cx = 60, cy = 40, R = 9;
   const inCircle = (t, r = R) => (W2.tx(t) - cx) ** 2 + (W2.ty(t) - cy) ** 2 <= r * r;
-  for (const kind of ['grass', 'bunny', 'wolf']) {
+  for (const kind of ['grass', 'bunny', 'wolf', 'human']) {
     // Scatter obstacles: a scorched strip, a few holes, and whatever already stands there.
     for (let x = cx - 3; x <= cx + 3; x++) { const t = W2.tile(x, cy + 2); if (W2.kind[t] === K.EMPTY && !W2.hole[t]) W2.scorch[t] = 5; }
     for (const [x, y] of [[cx, cy], [cx + 1, cy + 5], [cx - 4, cy - 3]]) { const t = W2.tile(x, y); if (W2.kind[t] === K.EMPTY && !(W2.scorch[t] > 0) && !W2.hole[t]) W2.addHole(t, 0); }
@@ -103,11 +103,11 @@ W.scorch[t0] = 0;
     for (let t = 0; t < W2.n; t++) {
       snap.set(t, W2.kind[t]);
       if (!inCircle(t) || W2.kind[t] !== K.EMPTY) continue;
-      if (kind === 'grass' ? (W2.hole[t] || W2.scorch[t] > 0) : kind === 'wolf' && W2.hole[t]) continue;
+      if (kind === 'grass' ? (W2.hole[t] || W2.scorch[t] > 0) : kind !== 'bunny' && W2.hole[t]) continue;
       eligible.push(t);
     }
     const placed = AS.paintCircle(sim2, kind, cx, cy, R);
-    const want = kind === 'grass' ? K.GRASS : kind === 'bunny' ? K.BUNNY : K.WOLF;
+    const want = kind === 'grass' ? K.GRASS : AS.kindOf(AS.SPECIES_KEY.indexOf(kind));
     let filled = 0, changedOutside = 0, bad2 = 0;
     for (let t = 0; t < W2.n; t++) {
       if (W2.kind[t] !== snap.get(t)) { if (inCircle(t) && eligible.includes(t) && W2.kind[t] === want) filled++; else changedOutside++; }
@@ -124,8 +124,10 @@ W.scorch[t0] = 0;
       } else {
         const s2 = W2.aSlot[t], a = W2.aAge[s2];
         sexes.add(W2.aSex[s2]); minAge = Math.min(minAge, a); maxAge = Math.max(maxAge, a);
-        if (a < 0 || a >= S.Lifespan * 0.95 || W2.aFullness[s2] !== S.FullnessMax || W2.aHP[s2] !== S.HPMax || W2.aStamina[s2] !== S.StaminaMax) bad2++;
-        if (kind === 'wolf' && W2.hole[t]) bad2++;
+        // Breeders span baby to elder; humans never breed, so they are painted within adulthood.
+        const ageOk = S.LitterSize != null ? a >= 0 && a < S.Lifespan * 0.95 : a >= S.TimeToMature && a < S.ElderAt * S.Lifespan;
+        if (!ageOk || W2.aFullness[s2] !== S.FullnessMax || W2.aHP[s2] !== S.HPMax || W2.aStamina[s2] !== S.StaminaMax) bad2++;
+        if (kind !== 'bunny' && W2.hole[t]) bad2++;
       }
     }
     ok(bad2 === 0, `${kind}: ages in range, full body, none on forbidden ground`);
@@ -136,7 +138,7 @@ W.scorch[t0] = 0;
     ok(failures.length === fz, `${kind}: the grid and stores audit after painting`);
     // Clear it for the next kind.
     for (const t of eligible) {
-      if (W2.kind[t] === K.GRASS) W2.removeGrass(t); else if (W2.kind[t] === K.BUNNY || W2.kind[t] === K.WOLF) W2.removeAnimal(W2.aSlot[t]);
+      if (W2.kind[t] === K.GRASS) W2.removeGrass(t); else if (W2.kind[t] >= K.BUNNY) W2.removeAnimal(W2.aSlot[t]);
     }
   }
   // Bunnies may stand on holes; scorch and edges don't stop them; the world edge clips.
@@ -151,6 +153,46 @@ W.scorch[t0] = 0;
   const f2 = failures.length;
   for (let d = 1; d <= 4; d++) { for (let i = 0; i < DAY; i++) sim2.tick(); audit(AS, sim2, 'painted, day ' + d); }
   ok(failures.length === f2, 'the sim runs and audits for 4 days after painting animals');
+}
+
+// ---- The Radius slider's values reach the sim: nuke(sim, tile, radius), paintCircle's r = 0, the animal cap ----
+{
+  const sim3 = AS.Sim(T, 13), W3 = sim3.W, P = AS.SPECIES;
+  // A nuke of radius 0 is the one tile, and still scorches it; radius 6 takes a disc of that size, not NukeRadius.
+  const t0 = W3.tile(40, 40);
+  if (W3.kind[t0] === K.GRASS) W3.removeGrass(t0);
+  if (W3.kind[t0] === K.CORPSE) AS.corpseRemove(sim3, t0);
+  if (W3.kind[t0] >= K.BUNNY) W3.removeAnimal(W3.aSlot[t0]);
+  AS.debugDropCorpse(sim3, t0, P.BUNNY);
+  const out0 = AS.nuke(sim3, t0, 0);
+  ok(out0.tiles === 1 && out0.corpses === 1 && W3.scorch[t0] > 0 && W3.kind[t0] === K.EMPTY, `nuke radius 0 is one tile (${out0.tiles}), its corpse gone and the ground scorched (${W3.scorch[t0]} days)`);
+  const out6 = AS.nuke(sim3, W3.tile(100, 60), 6);
+  let discIn = 0; for (let y = 54; y <= 66; y++) for (let x = 94; x <= 106; x++) if ((x - 100) ** 2 + (y - 60) ** 2 <= 36) discIn++;
+  ok(out6.tiles === discIn && discIn < 200, `nuke radius 6 takes the ${discIn}-tile disc, not NukeRadius's`);
+  ok(AS.nuke(sim3, W3.tile(20, 20)).tiles > 1000, 'with no radius given the nuke uses NukeRadius');
+  // Brush at radius 0 is exactly one tile (an animal, or a blade).
+  const sim4 = AS.Sim(T, 14), W4 = sim4.W;
+  for (const kind of ['grass', 'bunny', 'wolf', 'human']) {
+    let x = 5; const row = 3; while (W4.kind[W4.tile(x, row)] !== K.EMPTY) x++;
+    ok(AS.paintCircle(sim4, kind, x, row, 0) === 1, `${kind} at radius 0: exactly one placed`);
+  }
+  // The animal cap: a brush stops at `room`, says it was cut short, and grass ignores the cap.
+  const sim5 = AS.Sim(T, 15), W5 = sim5.W;
+  const before = W5.bunnies + W5.wolves + W5.humans;
+  const cap = { room: 10, hit: false };
+  const placed = AS.paintCircle(sim5, 'human', 75, 50, 8, cap);
+  ok(placed === 10 && cap.room === 0 && cap.hit && W5.bunnies + W5.wolves + W5.humans === before + 10, `paint stops at the limit (placed ${placed} of room 10, hit ${cap.hit})`);
+  const capB = { room: 1000, hit: false };
+  const n = AS.paintCircle(sim5, 'bunny', 75, 50, 3, capB);
+  ok(!capB.hit && capB.room === 1000 - n, 'room to spare: no hit, room counts down');
+  const capZ = { room: 0, hit: false };
+  ok(AS.paintCircle(sim5, 'wolf', 30, 20, 3, capZ) === 0 && capZ.hit, 'no room at all: nothing placed, hit');
+  const capG = { room: 0, hit: false };
+  ok(AS.paintCircle(sim5, 'grass', 120, 80, 3, capG) > 0 && !capG.hit, 'grass never counts against the animal limit');
+  // Births never touch the cap (it exists only inside paintCircle): a world of fertile pairs grows past any room.
+  const live = W5.bunnies + W5.wolves + W5.humans;
+  for (let i = 0; i < 4 * DAY; i++) sim5.tick();
+  ok(W5.bunnies + W5.wolves + W5.humans !== live, 'a running world changes its animal count freely (births and deaths do not consult the limit)');
 }
 console.log(bad ? `${bad} FAILED` : 'all passed');
 process.exit(bad ? 1 : 0);

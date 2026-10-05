@@ -5,7 +5,8 @@
 //
 // Bitmaps face right; a left-facing sprite is painted mirrored into its own sheet slot, so
 // the renderer never flips at draw time. Codes: x base color, d darker (shade), w lighter
-// (highlight), e eye, y amber eye, n nose, f fang, p pink (tongue). Colors come from AS.COLORS (glyphs.js),
+// (highlight), e eye, y amber eye, n nose, f fang, p pink (tongue), s skin, q spear
+// shaft, m spearhead. Colors come from AS.COLORS (glyphs.js),
 // so the species and sexes still read the same as the HUD.
 //
 // The sheet is DOM-free until a canvas is asked for, so Node checks can load this file for
@@ -19,7 +20,8 @@
   // Frames, in the order every species lists them (FRAME below names the slots): stand,
   // walk, idle fidget, act (bunny eats, wolf bites), runA, runB, rest, winded, dead,
   // pregnant. A bunny never shows winded, so its slot repeats rest and the sheet keeps one
-  // shape for both species.
+  // shape for every species. A human never shows pregnant either (it never breeds), so that
+  // slot repeats stand.
   const BUNNY_REST = ['........', '........', '........', '....xxx.', '.xxxxxxx', 'wxxxxxex', 'xxxxxxxx', '.d....d.'];
   const BUNNY = [
     ['.....x..', '.....xx.', '.....xx.', '..xxxxxx', '.xxxxxex', 'wxxxxxx.', '.xxxxxx.', '..d..dd.'],
@@ -45,16 +47,33 @@
     ['........', '........', '..d.d.d.', '.xxxxxx.', 'dxxxxxxx', '.xwwxxxx', '.....xdx', '.....x.x'],
     ['.....x.x', '.....xxx', 'd...xxyx', '.dxxxxxn', '.xxxxxx.', '.xwwwwx.', '..d.d.d.', '..d.d.d.'],
   ];
+  // A hunter with a spear, upright and facing right: head (s skin, e eye), tunic (x), spear
+  // (q shaft, m head) held upright at the right edge so it reads as a spear, not a stick.
+  const HUMAN_STAND = ['......m.', '...ss.q.', '...se.q.', '..xxxxq.', '..xxxsq.', '..xxx.q.', '..s.s.q.', '..d.d.q.'];
+  const HUMAN = [
+    HUMAN_STAND,
+    ['......m.', '...ss.q.', '...se.q.', '..xxxxq.', '..xxxsq.', '..xxx.q.', '.s...sq.', '.d...dq.'],
+    ['........', '...ss.m.', '...se.q.', '..xxxxq.', '..xxxsq.', '..xxx.q.', '..s.s.q.', '..d.d.q.'],
+    ['........', '...ss...', '...se...', '..xxxs..', '..xxsqqm', '..xx.s..', '.s...s..', '.d...d..'],
+    ['........', '....ss..', '....se..', '..xxxx..', '.xxxxsqm', '..xxx...', '.s...s..', 's.....d.'],
+    ['........', '....ss..', '....se..', '..xxxx..', '.xxxxsqm', '..xxx...', '..s.s...', '...dd...'],
+    ['........', '......m.', '......q.', '...ss.q.', '...se.q.', '..xxxsq.', '..xxxxq.', '..dsssq.'],
+    ['........', '........', '........', '........', '....ss.m', '..xxse.q', '..xxxxq.', '..dsssq.'],
+    ['........', '........', '........', '........', '........', '.xxxxxse', 'dqqqqqqm', '........'],
+    HUMAN_STAND,
+  ];
   // A body with meat still on it lies flat with its eye shut (Paul's pick: it reads as
   // dead at full zoom, where X eyes or legs-up read as a blob); once the meat is gone,
   // a skull is left until the corpse rots away. By species.
   const CARCASS_BITMAPS = [
     ['........', '........', '........', '......x.', '.....xx.', '..xxxxxx', 'wxxxxxdx', '.xxxxxxx'],
     ['........', '........', '........', '.....x.x', '.....xxx', 'd...xxdx', 'dxxxxxxn', '.xxxxxdd'],
+    ['........', '........', '........', '......ss', 'dxxxxxsd', 'ssxxxqqm', '........', '........'],
   ];
   const SKULL_BITMAPS = [
     ['........', '........', '........', '..xxxx..', '.xxxxxxx', '.xdxxxxx', '..xxx.x.', '...x.x..'],
     ['........', '........', '..x..x..', '.xxxx...', 'xxxxxxxx', 'xdxxxxxx', '.xxx.x.x', '........'],
+    ['........', '........', '..xxxx..', '.xxxxxx.', '.xdxxdx.', '.xxxxxx.', '..xxxx..', '..x.x.x.'],
   ];
   // Sprout, middle, full: the three thirds of a blade's size.
   const GRASS_BITMAPS = [
@@ -70,9 +89,9 @@
   // up out of it, in the bunny's own colors (x body, d inner ear, e eye).
   const HOLE_BITMAP = ['........', '..rrrr..', '.rroorr.', 'rroooorr', 'rroooorr', '.rroorr.', '..rrrr..', '........'];
   const PEEK_BITMAP = ['..x..x..', '..d..d..', '.rxxxxr.', 'rrxexexr', 'rroooorr', '.rroorr.', '..rrrr..', '........'];
-  const BITMAPS = { hole: [HOLE_BITMAP], peek: [PEEK_BITMAP], bunny: BUNNY, wolf: WOLF, carcass: CARCASS_BITMAPS, skull: SKULL_BITMAPS, grass: GRASS_BITMAPS, grassLean: GRASS_LEAN };
+  const BITMAPS = { hole: [HOLE_BITMAP], peek: [PEEK_BITMAP], bunny: BUNNY, wolf: WOLF, human: HUMAN, carcass: CARCASS_BITMAPS, skull: SKULL_BITMAPS, grass: GRASS_BITMAPS, grassLean: GRASS_LEAN };
   AS.SPRITE_BITMAPS = BITMAPS;
-  AS.SPRITE_CODES = 'xdweynfpro';
+  AS.SPRITE_CODES = 'xdweynfprosqm';
   AS.SPRITE_SIZE = SIZE;
 
   // ---- palette ----------------------------------------------------------------------
@@ -83,6 +102,7 @@
   const ELDER_BRIGHTNESS = 0.72;
   const HOLE_RIM = '#8a6a45', HOLE_DARK = '#150f0a';
   const EYE = '#141210', AMBER = '#e8b84a', NOSE = '#1a1a1e', FANG = '#f2ece0', TONGUE = '#d99a9a';
+  const SKIN = '#d9a066', SHAFT = '#a07a4a', SPEARHEAD = '#d4d8dc';
   // Babies and corpses are drawn smaller than a tile, bottom-centered.
   const BABY_SCALE = 0.6, CORPSE_SCALE = 0.8;
   // Smallest edge of a scaled sprite, in px, so it never vanishes at tiny tile sizes.
@@ -104,9 +124,11 @@
   const HOLD = AS.SPRITE_HOLD = Object.freeze({ NONE: 0, FLINCH: 1, ACTION: 2, BIRTH: 3 });
   // Per species: the frame shown across each equal slice of a walking step (cycle), how many
   // sprite pixels the body rises in that slice (lift), and the frame used while fidgeting.
+  // winds: whether the species has a panting frame for being out of breath (a bunny rests instead).
   const ANIM = [
-    { cycle: [1, 1, 0], lift: [1, 1, 0], idle: FRAME.IDLE },          // bunny: hops
-    { cycle: [1, 1, 0, 0], lift: [0, 1, 0, 0], idle: FRAME.IDLE },    // wolf: strides, bobs once
+    { cycle: [1, 1, 0], lift: [1, 1, 0], idle: FRAME.IDLE, winds: false },          // bunny: hops
+    { cycle: [1, 1, 0, 0], lift: [0, 1, 0, 0], idle: FRAME.IDLE, winds: true },     // wolf: strides, bobs once
+    { cycle: [1, 1, 0, 0], lift: [0, 1, 0, 0], idle: FRAME.IDLE, winds: true },     // human: strides, bobs once
   ];
   // A sprint's step is two halves: legs out and airborne, then gathered.
   const RUN_CYCLE = [FRAME.RUN_A, FRAME.RUN_B], RUN_LIFT = [1, 0];
@@ -140,7 +162,7 @@
       return;
     }
     if (moving) { out[0] = pregnant ? FRAME.PREGNANT : FRAME.STAND; return; }
-    if (species === 1 && winded) { out[0] = FRAME.WINDED; return; }
+    if (a.winds && winded) { out[0] = FRAME.WINDED; return; }
     if (resting) { out[0] = FRAME.REST; return; }
     if (pregnant) { out[0] = FRAME.PREGNANT; return; }
     out[0] = clock % IDLE_PERIOD < IDLE_LEN ? a.idle : FRAME.STAND;
@@ -150,10 +172,12 @@
   // Animals: ((((species*2+sex)*3+stage)*2+faceLeft)*FRAMES+frame), then each species'
   // skull, the three grass thirds, the three leaning ones, each species' carcass, the hole,
   // and the bunny peeking out of it (by sex).
-  const ANIMAL_SPRITES = 2 * 2 * 3 * 2 * FRAMES;
-  const SKULL0 = ANIMAL_SPRITES, GRASS0 = SKULL0 + 2, LEAN0 = GRASS0 + 3, CARCASS0 = LEAN0 + 3;
-  const HOLE0 = CARCASS0 + 2, PEEK0 = HOLE0 + 1, COUNT = PEEK0 + 2;
+  const N_SPECIES = AS.SPECIES_COUNT;
+  const ANIMAL_SPRITES = N_SPECIES * 2 * 3 * 2 * FRAMES;
+  const SKULL0 = ANIMAL_SPRITES, GRASS0 = SKULL0 + N_SPECIES, LEAN0 = GRASS0 + 3, CARCASS0 = LEAN0 + 3;
+  const HOLE0 = CARCASS0 + N_SPECIES, PEEK0 = HOLE0 + 1, COUNT = PEEK0 + 2;
   const SHEET_COLS = 19;
+  const BY_SPECIES = [BUNNY, WOLF, HUMAN];
   AS.SPRITE_COUNT = COUNT;
   AS.SPRITE_FRAMES = FRAMES;
   AS.spriteSkull = species => SKULL0 + species;
@@ -207,7 +231,7 @@
     const off = ox + Math.floor((px - b) / 2), top = oy + px - b;
     const col = {
       x: base, d: shade(base, SHADE_DARK), w: shade(base, SHADE_LIGHT),
-      e: EYE, y: AMBER, n: NOSE, f: FANG, p: TONGUE, r: HOLE_RIM, o: HOLE_DARK,
+      e: EYE, y: AMBER, n: NOSE, f: FANG, p: TONGUE, r: HOLE_RIM, o: HOLE_DARK, s: SKIN, q: SHAFT, m: SPEARHEAD,
     };
     if (dim) for (const k of Object.keys(col)) col[k] = shade(col[k], dim);
     for (let j = 0; j < SIZE; j++) for (let i = 0; i < SIZE; i++) {
@@ -235,16 +259,16 @@
       canvas.height = rows * px;
       const g = canvas.getContext('2d');
       const at = (i, f) => f(sx(i) * px, sy(i) * px);
-      for (let sp = 0; sp < 2; sp++) for (let sx2 = 0; sx2 < 2; sx2++) for (let st = 0; st < 3; st++) {
+      for (let sp = 0; sp < N_SPECIES; sp++) for (let sx2 = 0; sx2 < 2; sx2++) for (let st = 0; st < 3; st++) {
         let base = AS.COLORS[AS.animalGlyph(sp, sx2, AS.STAGE.ADULT)];
         if (st === AS.STAGE.ELDER) base = shade(base, ELDER_BRIGHTNESS);
-        const frames = sp ? WOLF : BUNNY;
+        const frames = BY_SPECIES[sp];
         for (let fl = 0; fl < 2; fl++) for (let fr = 0; fr < FRAMES; fr++) {
           at(AS.spriteIndex(sp, sx2, st, fl, fr), (x, y) =>
             paint(g, x, y, px, frames[fr], base, fl === 1, st === AS.STAGE.BABY ? BABY_SCALE : 1));
         }
       }
-      for (let sp = 0; sp < 2; sp++) {
+      for (let sp = 0; sp < N_SPECIES; sp++) {
         const base = AS.COLORS[AS.animalGlyph(sp, 0, AS.STAGE.ADULT)];
         at(CARCASS0 + sp, (x, y) => paint(g, x, y, px, CARCASS_BITMAPS[sp], base, false, 1, CARCASS_BRIGHTNESS));
         at(SKULL0 + sp, (x, y) => paint(g, x, y, px, SKULL_BITMAPS[sp], AS.COLORS[AS.GLYPH.CORPSE], false, CORPSE_SCALE));

@@ -9,7 +9,7 @@
   // How far ahead, in tiles, the flee intent line points from the bunny.
   const FLEE_LOOKAHEAD = 4;
   // The escape directions FLEE weighs, as [cos, sin] of the turn from straight away from the
-  // wolf: straight first (it wins ties), then 45 and 90 degrees to either side.
+  // hunter: straight first (it wins ties), then 45 and 90 degrees to either side.
   const FLEE_TURNS = [[1, 0], [Math.SQRT1_2, Math.SQRT1_2], [Math.SQRT1_2, -Math.SQRT1_2], [0, 1], [0, -1]];
   // A tile of the escape path this near the edge of the world, or off it, counts as wall...
   const FLEE_WALL_MARGIN = 2;
@@ -76,7 +76,10 @@
 
   // Matchers and goals are created once; they read these instead of closing over a call.
   let mW = null, mMem = null, mSim = null, mSelf = 0, mGoalTile = 0;
-  const isWolf = t => mW.kind[t] === K.WOLF;
+  // Anything that hunts bunnies (species.csv's Prey rows: wolves and humans), by the bitmask
+  // AS.relations gives; the HIDE and FLEE decisions set mThreat first.
+  let mThreat = 0;
+  const isThreat = t => { const k = mW.kind[t]; return k >= K.BUNNY && ((mThreat >> (k - K.BUNNY)) & 1) === 1; };
   const isFreeHole = t => mW.hole[t] === 1 && mW.kind[t] === K.EMPTY;
   const isHoleTile = t => t === mGoalTile;
   // Bare ground a bunny can dig: nothing on it, not already a hole, not scorched.
@@ -140,16 +143,7 @@
     return W.inside(x, y) ? y * W.w + x : -1;
   }
 
-  // The adjacent blade with the most Size (ties go to neighbor order), or -1.
-  function bestAdjacentBlade(W, t) {
-    const k = W.neighbors4(t, nb);
-    let best = -1, bestSize = -1;
-    for (let i = 0; i < k; i++) {
-      const n = nb[i];
-      if (W.kind[n] === K.GRASS && W.gSize[n] > bestSize) { best = n; bestSize = W.gSize[n]; }
-    }
-    return best;
-  }
+  const bestAdjacentBlade = (W, t) => AS.bestAdjacentBlade(W, t);
 
   // One step of a wander run: keep going while the way ahead is open, otherwise pick a new
   // open direction and run length right away. Shared by WANDER and by SEEK_FOOD when it has
@@ -187,14 +181,15 @@
   // ---- the states -------------------------------------------------------------------------
 
   AS.registerStates('bunny', {
-    // "Stay still in the hole." Wolves can't bite a bunny on a hole or hunt it (wolf.js), so the
-    // bunny simply waits; once no wolf is in sight the next decision lets it get on with life.
+    // "Stay still in the hole." Hunters can't bite a bunny on a hole or hunt it (wolf.js), so the
+    // bunny simply waits; once no hunter is in sight the next decision lets it get on with life.
     HIDE: {
       enter(sim, s) {
         const W = sim.W;
         if (!W.hole[W.aTile[s]]) return false;
         mW = W;
-        return AS.nearestVisible(sim, W.aTile[s], AS.speciesStats(sim, s).VisionRange, isWolf) >= 0;
+        mThreat = AS.relations(sim.T).threat[AS.SPECIES.BUNNY];
+        return AS.nearestVisible(sim, W.aTile[s], AS.speciesStats(sim, s).VisionRange, isThreat) >= 0;
       },
       start: calmStart,
       act(sim, s) {
@@ -209,7 +204,8 @@
       enter(sim, s) {
         const W = sim.W, S = AS.speciesStats(sim, s);
         mW = W;
-        const wolf = AS.nearestVisible(sim, W.aTile[s], S.VisionRange, isWolf);
+        mThreat = AS.relations(sim.T).threat[AS.SPECIES.BUNNY];
+        const wolf = AS.nearestVisible(sim, W.aTile[s], S.VisionRange, isThreat);
         if (wolf < 0) return false;
         const m = mem(W);
         m.wolf[s] = wolf;
@@ -304,12 +300,7 @@
         W.aTargetTile[s] = blade;   // -1 once nothing is left; it waits for the next decision
         W.aTargetSlot[s] = -1;
         if (blade < 0 || W.aBiteLeft[s] > 0) return;
-        const removed = AS.grassBite(sim, blade, S.BiteSize);
-        // A bite of a blade smaller than BiteSize feeds in proportion to what it removed.
-        const full = W.aFullness[s] + S.BiteFood * removed / S.BiteSize;
-        W.aFullness[s] = full < S.FullnessMax ? full : S.FullnessMax;
-        W.aBiteLeft[s] = S.BiteCooldown;
-        sim.emit(EV.GRAZE, blade);
+        AS.grazeBite(sim, s, blade);
       },
     },
 

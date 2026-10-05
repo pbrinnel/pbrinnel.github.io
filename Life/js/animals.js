@@ -13,7 +13,7 @@
   const NO_STATE = AS.NO_STATE = 255;
 
   // Per species key: { STATE_NAME: { enter(sim, s) → bool, act(sim, s), start?(sim, s) } }.
-  const IMPL = AS.STATE_IMPL = { bunny: null, wolf: null };
+  const IMPL = AS.STATE_IMPL = Object.fromEntries(AS.SPECIES_KEY.map(k => [k, null]));
 
   AS.registerStates = function (key, impls) { IMPL[key] = impls; };
 
@@ -43,6 +43,24 @@
   };
 
   // ---- body helpers the species files share ---------------------------------------
+
+  // Who hunts and eats whom, from species.csv's Prey and EatsCarcass rows: per species code,
+  // a bitmask over species codes (bit q set = species q). threat[q] is every species that
+  // lists q as prey, which is what q runs from. Built once per table set.
+  const relationsOf = new WeakMap();
+  AS.relations = function (T) {
+    let r = relationsOf.get(T);
+    if (r) return r;
+    const n = AS.SPECIES_KEY.length;
+    r = { prey: new Int32Array(n), eats: new Int32Array(n), threat: new Int32Array(n) };
+    for (let sp = 0; sp < n; sp++) {
+      const S = T[AS.SPECIES_KEY[sp]];
+      for (const q of S.Prey || []) { r.prey[sp] |= 1 << q; r.threat[q] |= 1 << sp; }
+      for (const q of S.EatsCarcass || []) r.eats[sp] |= 1 << q;
+    }
+    relationsOf.set(T, r);
+    return r;
+  };
 
   AS.speciesStats = (sim, s) => sim.T[AS.SPECIES_KEY[sim.W.aSpecies[s]]];
 
@@ -75,7 +93,7 @@
   AS.stepTo = function (sim, s, t2) {
     const W = sim.W;
     if (W.aStepLeft[s] > 0 || W.kind[t2] !== KIND.EMPTY) return false;
-    if (W.hole[t2] && W.aSpecies[s] === AS.SPECIES.WOLF) return false;   // a hole is a wall to wolves
+    if (W.hole[t2] && !AS.canEnterHole(W.aSpecies[s])) return false;   // a hole is a wall to all but bunnies
     const v = AS.speedOf(sim, s);
     if (!(v > 0)) return false;
     const dur = 1 / v;
@@ -95,7 +113,31 @@
     return Math.ceil(sim.W.gSize[t] / S.BiteSize) * S.BiteCooldown;
   };
 
-  // Moves toward a 4-neighbor that may hold grass (DESIGN.md: wolves chew through grass
+  // The adjacent blade with the most Size (ties go to neighbor order), or -1.
+  const gnb = new Int32Array(4);
+  AS.bestAdjacentBlade = function (W, t) {
+    const k = W.neighbors4(t, gnb);
+    let best = -1, bestSize = -1;
+    for (let i = 0; i < k; i++) {
+      const n = gnb[i];
+      if (W.kind[n] === KIND.GRASS && W.gSize[n] > bestSize) { best = n; bestSize = W.gSize[n]; }
+    }
+    return best;
+  };
+
+  // One bite of a blade that feeds the animal: GrassFood (BiteFood where GrassFood is blank)
+  // for a full BiteSize, in proportion for a smaller blade. Bunnies graze and humans forage
+  // with this. The caller has checked the bite timer.
+  AS.grazeBite = function (sim, s, blade) {
+    const W = sim.W, S = AS.speciesStats(sim, s);
+    const removed = AS.grassBite(sim, blade, S.BiteSize);
+    const full = W.aFullness[s] + (S.GrassFood != null ? S.GrassFood : S.BiteFood) * removed / S.BiteSize;
+    W.aFullness[s] = full < S.FullnessMax ? full : S.FullnessMax;
+    W.aBiteLeft[s] = S.BiteCooldown;
+    sim.emit(EV.GRAZE, blade);
+  };
+
+  // Moves toward a 4-neighbor that may hold grass (DESIGN.md: wolves and humans chew through grass
   // when that's quicker). Empty: step. Grass: bite it down, no food, a grazing-sized mark;
   // the step comes on a later tick once the blade is gone. Returns whether it moved.
   AS.chewOrStep = function (sim, s, t2) {
@@ -110,7 +152,7 @@
     return false;
   };
 
-  // One bite of an adjacent animal: BiteDamage, and no food. A wolf eats the carcass its
+  // One bite of an adjacent animal: BiteDamage, and no food. A hunter eats the carcass its
   // kill leaves behind (wolf.js, FEED), not the live animal. Returns whether a bite landed;
   // a killing bite leaves a corpse and counts as a kill.
   AS.biteAnimal = function (sim, s, prey) {

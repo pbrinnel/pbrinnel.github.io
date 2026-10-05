@@ -1,55 +1,58 @@
-Stat,Unit,Bunny,Wolf,Grass,Notes
-WalkSpeed,tiles/s,2,2.5,,Free movement
-SprintSpeed,tiles/s,6,7,,Costs Stamina
-StaminaMax,points,100,100,,
-StaminaRefill,per s,8,4,,While not sprinting
-SprintCost,per s,25,20,,
-FullnessMax,points,100,100,,
-HungerRate,per s,2,0.9,,Bunny empty in ~2.5 days; wolf in ~5.6
-StarveDamage,HP per s,1,0.4,,HP lost while Fullness = 0; wolf lasts ~7 days on an empty stomach
-RestHunger,× HungerRate,0.5,0.5,,Hunger while standing still (resting, hiding, eating in place)
-SprintHunger,× HungerRate,1.5,1.5,,Hunger while sprinting; walking burns HungerRate
-HPMax,points,20,60,,
-HealRate,HP per s,0.5,0.5,,Only while Fullness > HealAbove
-HealAbove,% of FullnessMax,50,50,,Healing needs at least this much Fullness
-HungryAt,% of FullnessMax,70,80,,Below this an animal looks for food
-RestBelow,% of StaminaMax,30,30,,Below this it stops to rest
-RestUntil,% of StaminaMax,100,100,,A resting animal gets up at this Stamina
-SprintRange,tiles,,3,,A hunting wolf sprints once its prey is this close
-TrackSeconds,s,,0,,How long a hunting wolf keeps heading for where it last saw its bunny after losing sight of it; 0 = forgets at once
-HoleRange,tiles,8,,,A bunny that sees a wolf runs for a free warren hole this close; also how far from any hole it must be to found a new warren
-DigChance,per day,50%,,,Chance per day that a fed adult with no wolf in sight digs a warren hole; 0% = never
-DigSeconds,s,8,,,How long a digging bunny stands still before the hole opens
-WanderRun,tiles,1-3,4-10,,Steps taken in one direction before turning while wandering or prowling
-RoomPreference,×,1,1,,How strongly a wandering animal heads away from crowds of its own kind; 0 = random wandering
-DecidePerSec,per s,4,4,,How often an animal re-picks its state; it moves every tick
-Diet,,Grass,Bunny (killed; eats the carcass),Corpses (nearby),A wolf kills a bunny and then eats the carcass; bunnies only graze
-BiteDamage,HP,,20,,At or above a bunny's HPMax one bite kills; the bite itself gives no food
-BiteCooldown,s,1,0.5,,Time between bites
-BiteFood,Fullness per bite,15,20,,What the eater gains per bite of a blade; a wolf gains it per mouthful of a carcass
-BiteSize,Size per bite,0.25,0.5,,How much of a blade one bite removes; a wolf chews through grass this way but gains no food
-TimeToMature,days,3,15,1,Grass: days to reach full Size and start seeding
-Lifespan,days,7,120,10,
-ElderAt,% of Lifespan,80,80,,
-VisionRange,tiles,8,16,,
-PregnancyDays,days,1,3,,
-LitterSize,count,2-4,3-5,,
-MateCooldown,days,2,10,,Female only; starts after birth
-MateFullness,% of FullnessMax,60,70,,Both parents must be at least this full
-MateCost,% of FullnessMax,30,30,,Fullness each parent loses at mating
-RoamAfter,days,,1,,A wolf that hasn't seen a bunny this long roams: it keeps its heading in long runs until it finds prey or a wall; blank = never
-RoamRun,tiles,,40-80,,Length of a roaming wolf's runs (WanderRun otherwise)
-MateRange,tiles,,80,,A ready wolf hears and scents a ready mate this far away (howling, scent) and travels to it; blank = only mates in sight
-PackLimit,count,,8,,A female wolf breeds only if no more than this many other adult wolves are within TerritoryRange; blank = no limit
-TerritoryRange,tiles,,15,,Square (Chebyshev) distance for PackLimit
-BabySpeed,% of adult,50,50,,
-ElderSpeed,% of adult,75,75,,
-GrowthRate,Size per day,,,1,Grass Size runs 0 to 1
-SproutSize,Size,,,0.1,Size a new blade starts at; above 0 so even a sprout feeds a little
-SeedChance,per day,,,10%,Mature blade seeds one empty 4-neighbor tile
-SproutChance,per day,,,0.1%,Chance an empty tile grows a blade by itself (grass can return to bare land); 0% = off
-CorpseNutrient,per body,10,30,,How long and how hard a corpse feeds grass
-CorpseDecay,days,1,5,,Corpse disappears after this
-MeatOnBody,Fullness,60,0,,Food on a body for wolves to eat; a carcass keeps it until eaten or until the corpse rots
-CorpseRadius,tiles,3,3,,Grass inside grows and seeds faster
-CorpseBoost,× multiplier,3,3,,Applied to GrowthRate and SeedChance in radius
+Stat,Unit,Bunny,Wolf,Human,Grass,Notes
+WalkSpeed,tiles/s,2,2.5,2.2,,Free movement
+SprintSpeed,tiles/s,6,7,4.5,,Costs Stamina
+StaminaMax,points,100,100,400,,Humans are marathon hunters: slow but they hardly tire
+StaminaRefill,per s,8,4,6,,While not sprinting
+SprintCost,per s,25,20,8,,
+FullnessMax,points,100,100,100,,
+HungerRate,per s,2,0.9,0.6,,Bunny empty in ~2.5 days; wolf in ~5.6
+StarveDamage,HP per s,1,0.4,0.4,,HP lost while Fullness = 0; wolf lasts ~7 days on an empty stomach
+RestHunger,× HungerRate,0.5,0.5,0.5,,Hunger while standing still (resting, hiding, eating in place)
+SprintHunger,× HungerRate,1.5,1.5,1.5,,Hunger while sprinting; walking burns HungerRate
+HPMax,points,20,60,80,,
+HealRate,HP per s,0.5,0.5,0.5,,Only while Fullness > HealAbove
+HealAbove,% of FullnessMax,50,50,50,,Healing needs at least this much Fullness
+HungryAt,% of FullnessMax,70,80,70,,Below this an animal looks for food
+RestBelow,% of StaminaMax,30,30,30,,Below this it stops to rest
+RestUntil,% of StaminaMax,100,100,100,,A resting animal gets up at this Stamina
+SprintRange,tiles,,3,14,,A hunting wolf or human sprints once its prey is this close
+TrackSeconds,s,,0,15,,How long a hunting wolf or human keeps heading for where it last saw its prey after losing sight of it; 0 = forgets at once
+HoleRange,tiles,8,,,,A bunny that sees a wolf runs for a free warren hole this close; also how far from any hole it must be to found a new warren
+DigChance,per day,50%,,,,Chance per day that a fed adult with no wolf in sight digs a warren hole; 0% = never
+DigSeconds,s,8,,,,How long a digging bunny stands still before the hole opens
+WanderRun,tiles,1-3,4-10,4-10,,Steps taken in one direction before turning while wandering or prowling
+RoomPreference,×,1,1,1,,How strongly a wandering animal heads away from crowds of its own kind; 0 = random wandering
+DecidePerSec,per s,4,4,4,,How often an animal re-picks its state; it moves every tick
+Diet,,Grass,Bunny or Human (killed; eats the carcass),Bunny or Wolf (killed; eats the carcass); grass when no meat is in sight,Corpses (nearby),A wolf or human kills and then eats the carcass; bunnies only graze
+Prey,species,,Bunny Human,Bunny Wolf,,Species this one hunts (space-separated names); a bunny runs from every species that lists Bunny here
+EatsCarcass,species,,Bunny Human,Bunny Wolf,,Species whose carcasses this one eats; blank = no carcasses
+BiteDamage,HP,,20,100,,At or above the prey's HPMax one bite kills (a human's always does; a wolf needs several on a human); the bite itself gives no food
+BiteCooldown,s,1,0.5,0.5,,Time between bites
+BiteFood,Fullness per bite,15,20,20,,What the eater gains per bite of a blade (bunny); a wolf or human gains it per mouthful of a carcass
+GrassFood,Fullness per bite,,,4,,Food a blade of grass gives per bite at full BiteSize; blank = the animal uses BiteFood (bunnies)
+BiteSize,Size per bite,0.25,0.5,0.5,,How much of a blade one bite removes; a wolf or human chews through grass this way but gains no food from the chewing
+TimeToMature,days,3,15,10,1,Grass: days to reach full Size and start seeding
+Lifespan,days,7,120,200,10,
+ElderAt,% of Lifespan,80,80,80,,
+VisionRange,tiles,8,16,14,,
+PregnancyDays,days,1,3,,,
+LitterSize,count,2-4,3-5,,,
+MateCooldown,days,2,10,,,Female only; starts after birth
+MateFullness,% of FullnessMax,60,70,,,Both parents must be at least this full
+MateCost,% of FullnessMax,30,30,,,Fullness each parent loses at mating
+RoamAfter,days,,1,1,,A wolf or human that hasn't seen prey this long roams: it keeps its heading in long runs until it finds prey or a wall; blank = never
+RoamRun,tiles,,40-80,40-80,,Length of a roaming animal's runs (WanderRun otherwise)
+MateRange,tiles,,80,,,A ready wolf hears and scents a ready mate this far away (howling, scent) and travels to it; blank = only mates in sight
+PackLimit,count,,8,,,A female wolf breeds only if no more than this many other adult wolves are within TerritoryRange; blank = no limit
+TerritoryRange,tiles,,15,,,Square (Chebyshev) distance for PackLimit
+BabySpeed,% of adult,50,50,50,,
+ElderSpeed,% of adult,75,75,75,,
+GrowthRate,Size per day,,,,1,Grass Size runs 0 to 1
+SproutSize,Size,,,,0.1,Size a new blade starts at; above 0 so even a sprout feeds a little
+SeedChance,per day,,,,10%,Mature blade seeds one empty 4-neighbor tile
+SproutChance,per day,,,,0.1%,Chance an empty tile grows a blade by itself (grass can return to bare land); 0% = off
+CorpseNutrient,per body,10,30,30,,How long and how hard a corpse feeds grass
+CorpseDecay,days,1,5,5,,Corpse disappears after this
+MeatOnBody,Fullness,60,60,60,,Food on a body for whoever eats it (EatsCarcass); a carcass keeps it until eaten or until the corpse rots
+CorpseRadius,tiles,3,3,3,,Grass inside grows and seeds faster
+CorpseBoost,× multiplier,3,3,3,,Applied to GrowthRate and SeedChance in radius

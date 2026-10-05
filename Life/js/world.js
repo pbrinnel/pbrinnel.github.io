@@ -11,10 +11,18 @@
 (function (AS) {
   'use strict';
 
-  const KIND = AS.KIND = Object.freeze({ EMPTY: 0, GRASS: 1, CORPSE: 2, BUNNY: 3, WOLF: 4 });
-  // Animal species codes, used in `aSpecies` and `cSpecies`.
-  const SP = AS.SPECIES = Object.freeze({ BUNNY: 0, WOLF: 1 });
-  AS.SPECIES_KEY = Object.freeze(['bunny', 'wolf']);
+  const KIND = AS.KIND = Object.freeze({ EMPTY: 0, GRASS: 1, CORPSE: 2, BUNNY: 3, WOLF: 4, HUMAN: 5 });
+  // Animal species codes, used in `aSpecies` and `cSpecies`. The kind of a species' animals
+  // is ANIMAL_KIND0 + its code, so a new species is one entry in each list below.
+  const SP = AS.SPECIES = Object.freeze({ BUNNY: 0, WOLF: 1, HUMAN: 2 });
+  AS.SPECIES_KEY = Object.freeze(['bunny', 'wolf', 'human']);
+  AS.SPECIES_COUNT = AS.SPECIES_KEY.length;
+  AS.ANIMAL_KIND0 = KIND.BUNNY;
+  AS.kindOf = species => KIND.BUNNY + species;
+  // The world's live head count of each species, by code (W.bunnies, W.wolves, W.humans).
+  const POP_KEY = AS.POP_KEY = Object.freeze(['bunnies', 'wolves', 'humans']);
+  // Only bunnies may stand on a warren hole; to every other species it is a wall.
+  AS.canEnterHole = species => species === SP.BUNNY;
   AS.SEX = Object.freeze({ MALE: 0, FEMALE: 1 });
 
   const ANIMAL_START_CAPACITY = 1024;
@@ -106,6 +114,7 @@
       aFree: [],         // freed slots, reused before aHigh grows
       bunnies: 0,
       wolves: 0,
+      humans: 0,
     };
 
     function growAnimals(cap) {
@@ -167,7 +176,7 @@
     // Digs a hole on tile t. Bare ground only: no blade on it, no wolf standing there, not scorched.
     W.addHole = function (t, usedAt) {
       if (W.hole[t]) throw new Error(`tile ${t} is already a hole`);
-      if (W.kind[t] === KIND.GRASS || W.kind[t] === KIND.WOLF) throw new Error(`tile ${t} can't be dug (kind ${W.kind[t]})`);
+      if (W.kind[t] === KIND.GRASS || (W.kind[t] >= KIND.BUNNY && W.kind[t] !== KIND.BUNNY)) throw new Error(`tile ${t} can't be dug (kind ${W.kind[t]})`);
       if (W.scorch[t] > 0) throw new Error(`tile ${t} is scorched; it can't be dug`);
       W.hole[t] = 1;
       W.holeUsedAt[t] = usedAt || 0;
@@ -213,8 +222,8 @@
 
     // Returns the new slot. The caller fills in the rest of the animal's fields.
     W.addAnimal = function (t, species, sex) {
-      if (species === SP.WOLF && W.hole[t]) throw new Error(`tile ${t} is a warren hole; wolves can't enter`);
-      claim(t, species === SP.BUNNY ? KIND.BUNNY : KIND.WOLF);
+      if (W.hole[t] && !AS.canEnterHole(species)) throw new Error(`tile ${t} is a warren hole; only bunnies can enter`);
+      claim(t, AS.kindOf(species));
       let s = W.aFree.length ? W.aFree.pop() : W.aHigh++;
       if (s >= W.aCap) growAnimals(W.aCap * 2);
       for (const f of Object.keys(ANIMAL_FIELDS)) W[f][s] = 0;
@@ -228,7 +237,7 @@
       W.aTargetTile[s] = -1;
       W.aTargetSlot[s] = -1;
       W.aSlot[t] = s;
-      if (species === SP.BUNNY) W.bunnies++; else W.wolves++;
+      W[POP_KEY[species]]++;
       return s;
     };
 
@@ -237,14 +246,14 @@
       W.aAlive[s] = 0;
       W.aSlot[t] = -1;
       W.kind[t] = KIND.EMPTY;
-      if (W.aSpecies[s] === SP.BUNNY) W.bunnies--; else W.wolves--;
+      W[POP_KEY[W.aSpecies[s]]]--;
       W.aFree.push(s);
     };
 
     // Steps an animal to an empty tile. The caller times the step (aStepLeft, aStepDur).
     W.moveAnimal = function (s, t2) {
       const t = W.aTile[s];
-      if (W.hole[t2] && W.aSpecies[s] === SP.WOLF) throw new Error(`tile ${t2} is a warren hole; wolves can't enter`);
+      if (W.hole[t2] && !AS.canEnterHole(W.aSpecies[s])) throw new Error(`tile ${t2} is a warren hole; only bunnies can enter`);
       claim(t2, W.kind[t]);
       W.kind[t] = KIND.EMPTY;
       W.aSlot[t] = -1;

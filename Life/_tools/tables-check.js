@@ -38,6 +38,14 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
     ['wolf.WanderRun 4-10 → {4,10}', eq(T.wolf.WanderRun, { min: 4, max: 10 }), T.wolf.WanderRun],
     ['bunny.HealAbove 50 → 0.5', T.bunny.HealAbove === 0.5, T.bunny.HealAbove],
     ['bunny.BabySpeed 50 (% of adult) → 0.5', T.bunny.BabySpeed === 0.5, T.bunny.BabySpeed],
+    ['human states order', eq(T.states.human.map(s => s.name), ['FEED', 'HUNT', 'GIVE_UP', 'FORAGE', 'REST', 'PROWL']), T.states.human.map(s => s.name)],
+    ['Prey "Bunny Human" on Wolf → species codes [0,2]', eq(T.wolf.Prey, [0, 2]), T.wolf.Prey],
+    ['Prey blank on Bunny → null', T.bunny.Prey === null, T.bunny.Prey],
+    ['EatsCarcass is read per species (human eats Bunny and Wolf)', eq(T.human.EatsCarcass, [0, 1]), T.human.EatsCarcass],
+    ['human.GrassFood a number, bunny.GrassFood blank → null', T.human.GrassFood > 0 && T.bunny.GrassFood === null, [T.human.GrassFood, T.bunny.GrassFood]],
+    ['human mating rows blank → null (humans never breed)', T.human.LitterSize === null && T.human.MateFullness === null, [T.human.LitterSize, T.human.MateFullness]],
+    ['settings.AnimalWarnAt a positive number', T.world.AnimalWarnAt > 0, T.world.AnimalWarnAt],
+    ['settings.BrushRadius may be 0', parse({ settings: editCSV(se, 'BrushRadius', 'Value', '0') }).T.world.BrushRadius === 0, 0],
     ['grass states keep file order', eq(T.states.grass.map(s => s.name), ['GROW', 'SEED']), T.states.grass.map(s => s.name)],
   ];
   for (const [n, ok, v] of spot) out(ok, 'spot: ' + n, [JSON.stringify(v)]);
@@ -61,6 +69,13 @@ bad('Grass SeedChance 130%', sE('SeedChance', 'Grass', '130%'), ['SeedChance', '
 bad('Bunny LitterSize 4-2', sE('LitterSize', 'Bunny', '4-2'), ['LitterSize', 'Bunny']);
 bad('HungerRate row deleted', { species: dropRow(sp, 'HungerRate') }, ['HungerRate']);
 bad('duplicate WalkSpeed row', { species: sp + '\nWalkSpeed,tiles/s,9,9,,' }, ['WalkSpeed']);
+bad('Human column header renamed', { species: sp.replace('Bunny,Wolf,Human', 'Bunny,Wolf,Humen') }, ['Human']);
+bad('Prey names a species that does not exist', sE('Prey', 'Human', 'Bunny Goblin'), ['Prey', 'Human', 'Goblin']);
+bad('EatsCarcass names Grass (not an animal)', sE('EatsCarcass', 'Wolf', 'Grass'), ['EatsCarcass', 'Wolf', 'Grass']);
+bad('Human HPMax blank', sE('HPMax', 'Human', ''), ['HPMax', 'Human']);
+bad('Human BiteDamage blank', sE('BiteDamage', 'Human', ''), ['BiteDamage', 'Human']);
+bad('AnimalWarnAt 0', wE('AnimalWarnAt', '0'), ['AnimalWarnAt']);
+bad('AnimalWarnAt row deleted', { settings: dropRow(se, 'AnimalWarnAt') }, ['AnimalWarnAt']);
 bad('Wolf column header renamed', { species: sp.replace('Stat,Unit,Bunny,Wolf', 'Stat,Unit,Bunny,Wulf') }, ['Wolf']);
 bad('RestUntil < RestBelow (Bunny 20 vs 30)', sE('RestUntil', 'Bunny', '20'), ['RestUntil', 'RestBelow', 'unny']);
 bad('CorpseBoost 0.5 Bunny', sE('CorpseBoost', 'Bunny', '0.5'), ['CorpseBoost', 'unny']);

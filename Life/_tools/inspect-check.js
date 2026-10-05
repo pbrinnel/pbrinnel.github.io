@@ -130,6 +130,26 @@ const s2 = A.Sim(t2, 1); const g2 = s2.W.gList[0];
 const dd = A.describe(s2, { tile: g2, serial: s2.W.serial[g2], slot: -1 });
 check(dd.rows.some(r => r.name === 'Foo' && r.value === '—') && !dd.rows.some(r => r.name === 'Bar'), 'unread row shows —, unknown token never matches');
 
+// humans: the animal rows that apply (State, Target, Kills...), but none of a breeder's
+{
+  const hs = A.Sim(T, 3), HW = hs.W;
+  let ht = -1; for (let t = 0; t < HW.n; t++) if (HW.kind[t] === K.EMPTY && !HW.hole[t]) { ht = t; break; }
+  for (const sex of [0, 1]) {
+    const slot = A.spawnStarting(hs, A.SPECIES.HUMAN, ht + sex * 2); HW.aSex[slot] = sex;
+    const hd = A.describe(hs, { tile: HW.aTile[slot], serial: HW.aSerial[slot], slot }); allValues.push(hd);
+    check(/^(Male|Female) human #\d+$/.test(hd.title), 'human title: ' + hd.title);
+    const nm = names(hd);
+    check(['Fullness', 'Stamina', 'HP', 'State', 'Target', 'Kills'].every(n => nm.includes(n)), 'human rows: ' + nm);
+    check(!/Pregnant|MateCooldown|Parents|Children/.test(nm), `a ${sex ? 'female' : 'male'} human has no breeding rows`);
+    check(/^[A-Z_]+$/.test(val(hd, 'State')) || val(hd, 'State') === '—', 'human state shown: ' + val(hd, 'State'));
+  }
+  const wf = A.spawnStarting(hs, A.SPECIES.WOLF, ht + 6); HW.aSex[wf] = 1;
+  check(/Pregnant/.test(names(A.describe(hs, { tile: HW.aTile[wf], serial: HW.aSerial[wf], slot: wf }))), 'a female wolf still has Pregnant');
+  HW.removeAnimal(wf);
+  A.debugDropCorpse(hs, ht + 9, A.SPECIES.HUMAN);
+  const cd = A.describe(hs, { tile: ht + 9, serial: HW.serial[ht + 9], slot: -1 });
+  check(/^Human corpse #\d+$/.test(cd.title) && val(cd, 'Meat') === T.human.MeatOnBody.toFixed(1) + ' / ' + T.human.MeatOnBody, 'human corpse: ' + cd.title + ' ' + val(cd, 'Meat'));
+}
 const bads = []; for (const x of allValues) for (const r of x.rows) if (/NaN|undefined/.test(r.value + r.tip + r.range) || r.value === '') bads.push(r.name);
 check(bads.length === 0, 'no NaN/undefined/empty values ' + bads);
 console.log(bad ? 'FAILED ' + bad : 'ALL PASS');

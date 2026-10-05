@@ -144,7 +144,7 @@
     const list = $('numberList');
     list.textContent = '';
     for (const k of Object.keys(rows)) delete rows[k];
-    for (const g of ['Bunny', 'Wolf', 'Grass', 'World']) {
+    for (const g of ['Bunny', 'Wolf', 'Human', 'Grass', 'World']) {
       const box = el('div', 'group');
       box.appendChild(el('h3', null, g));
       for (const t of tun.filter(x => x.group === g)) {

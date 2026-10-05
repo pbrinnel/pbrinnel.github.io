@@ -1,4 +1,4 @@
-// The population graph: grass, bunnies and wolves over the whole run on one logarithmic
+// The population graph: grass, bunnies, wolves and humans over the whole run on one logarithmic
 // chart, in a floating window the Info tab's Graph button shows and hides. Drag it by its
 // title bar (mouse or touch); it stays inside the viewport and its place is remembered.
 //
@@ -23,7 +23,7 @@
   // Colors validated against #0a0c0a for color-blind safety; text never uses them.
   // Series icons in the legend, live labels and readout, CSS px, and the gap after one.
   const ICON_PX = 12, ICON_GAP = 4;
-  const COLORS = { grass: '#199e70', bunnies: '#d95926', wolves: '#3987e5' };
+  const COLORS = { grass: '#199e70', bunnies: '#d95926', wolves: '#3987e5', humans: '#c763b3' };
   const TEXT = '#d8d4c8', DIM = '#8a8d80', GRID = '#1f241d', AXIS = '#3a4036';
   const LINE_W = 2;
   const FONT_PX = 11;
@@ -35,6 +35,7 @@
     { key: 'grass', name: 'grass' },
     { key: 'bunnies', name: 'bunnies' },
     { key: 'wolves', name: 'wolves' },
+    { key: 'humans', name: 'humans' },
   ];
 
   // ---- pure math ----
@@ -390,13 +391,21 @@
 
       // Legend, always shown.
       ctx.textAlign = 'left';
+      // On a narrow window the line samples go (the icons and the lines' own colors still tell
+      // the series apart) so all four names fit.
+      const legendNeed = SERIES.reduce((w, s) => w + 19 + ICON_PX + ICON_GAP + ctx.measureText(s.name).width + 16, 0);
+      const compact = MARGIN.left + legendNeed > r.w;
       let lx = MARGIN.left;
       for (const s of SERIES) {
-        ctx.strokeStyle = COLORS[s.key]; ctx.lineWidth = LINE_W;
-        ctx.beginPath(); ctx.moveTo(lx, 10); ctx.lineTo(lx + 14, 10); ctx.stroke();
-        const ix = lx + 19 + icon(s.key, lx + 19, 10);
-        ctx.fillStyle = TEXT; ctx.fillText(s.name, ix, 10);
-        lx = ix + ctx.measureText(s.name).width + 16;
+        if (!compact) {
+          ctx.strokeStyle = COLORS[s.key]; ctx.lineWidth = LINE_W;
+          ctx.beginPath(); ctx.moveTo(lx, 10); ctx.lineTo(lx + 14, 10); ctx.stroke();
+        }
+        const x0 = compact ? lx : lx + 19;
+        const ix = x0 + icon(s.key, x0, 10);
+        ctx.fillStyle = TEXT;
+        ctx.fillText(s.name, ix, 10);
+        lx = ix + ctx.measureText(s.name).width + (compact ? 12 : 16);
       }
 
       // Crosshair and readout of the hour under the pointer.
@@ -429,7 +438,7 @@
       ctx.drawImage(cv, x, Math.round(y - ICON_PX / 2), ICON_PX, ICON_PX);
       return ICON_PX + ICON_GAP;
     }
-    // icons: { grass, bunnies, wolves } → canvases (any size; drawn at ICON_PX).
+    // icons: { grass, bunnies, wolves, humans } → canvases (any size; drawn at ICON_PX).
     g.setIcons = m => { icons = m; };
 
     return g;
