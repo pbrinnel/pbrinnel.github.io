@@ -156,7 +156,9 @@ watching the sim run. Everything else in this doc is decided.
   weeks (Paul, 5 Oct 2026: in large numbers they owned the board and bunnies had no chance).
   Wolf `Lifespan` is 60 days. Gross test, water on, 3 seeds x 60 days: before, bunnies died
   out in 2 of 3 seeds by day 49; with RoamHunger 5, StarveDamage 2 and Lifespan 60 all three
-  seeds kept every species (day 60: bunnies 173-1,262, wolves 73-81).
+  seeds kept every species (day 60: bunnies 173-1,262, wolves 73-81). Wolves were then a
+  little weak (Paul), so wolf `RoamAfter` went to 3 days, which gives them longer before
+  roaming and its hunger start: day 60 wolves 71-111 and rising, bunnies 322-648.
 - **Wolves find mates far beyond sight** (Paul, 4 Oct 2026): a ready wolf senses a ready
   mate within `MateRange` (howling and scent) and travels straight toward it, so wolves
   thinned to a scattered few can still pair up. Wolf litters are 3–5, nearer real wolves'

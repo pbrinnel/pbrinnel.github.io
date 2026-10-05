@@ -294,7 +294,8 @@ body.nuke-armed #map, body.paint-armed #map { cursor: crosshair; }
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  background: var(--insp-bg);
+  /* See-through, so the world keeps showing behind it while it's open. */
+  background: rgba(10, 12, 10, 0.7);
   border: 1px solid var(--hud-line);
   color: var(--fg);
   font-size: 13px;
@@ -304,17 +305,19 @@ body.nuke-armed #map, body.paint-armed #map { cursor: crosshair; }
   height: min(320px, calc(100vh - 16px));
   padding: 4px 8px 8px;
 }
+#graph.graph-small { width: min(300px, calc(100vw - 16px)); height: min(210px, calc(100vh - 16px)); }
 #graph[hidden] { display: none; }
 .graph-head { display: flex; align-items: center; gap: 8px; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
 .graph-head:active { cursor: grabbing; }
 .graph-title { color: var(--hud-on); flex: 1; }
-.graph-close { min-width: var(--hud-h); padding: 0; font-size: 18px; }
+.graph-close, .graph-size { min-width: var(--hud-h); padding: 0; font-size: 18px; }
 .graph-whole { font-size: 12px; }
 .graph-canvas { flex: 1; min-height: 0; width: 100%; display: block; touch-action: none; }
 
-/* Phone: the window spans the width, and a bit under half the height. */
+/* Phone: the window spans the width, and a bit under half the height (small: about a quarter). */
 @media (max-width: 600px) {
   #graph { width: calc(100vw - 16px); height: min(300px, 45vh); }
+  #graph.graph-small { width: calc(100vw - 16px); height: min(200px, 28vh); }
   .graph-whole { padding: 0 6px; }
 }
 

@@ -1,6 +1,7 @@
 // The population graph: grass, bunnies, wolves and humans over the whole run on one logarithmic
 // chart, in a floating window the Info tab's Graph button shows and hides. Drag it by its
-// title bar (mouse or touch); it stays inside the viewport and its place is remembered.
+// title bar (mouse or touch); it stays inside the viewport and its place is remembered. Its
+// +/− button switches it between big and small (style.css, .graph-small), remembered too.
 //
 // AS.Graph(T) → { open, toggle(), draw(sim, nowMs) }
 //   open    whether the window is showing
@@ -19,6 +20,7 @@
   const ZOOM_PER_WHEEL_NOTCH = 1.0015;   // factor = this ^ deltaY
   const REDRAW_MS = 200;          // idle redraw rate while the run grows
   const TARGET_TICKS = 6;         // about this many x ticks across the plot
+  const DAY_LABEL_PX = 48;        // room one day label needs, "0.035" with a gap
 
   // Colors validated against #0a0c0a for color-blind safety; text never uses them.
   // Series icons in the legend, live labels and readout, CSS px, and the gap after one.
@@ -30,6 +32,7 @@
   // top holds legend and readout; right holds the live labels (tick, icon, up to "999,999")
   const MARGIN = { left: 40, right: 90, top: 40, bottom: 22 };
   const POS_KEY = 'life-graph-pos';   // the window's remembered { x, y }, CSS px from the viewport's top-left
+  const SIZE_KEY = 'life-graph-size';
   const LABEL_GAP = 12;           // direct labels are kept at least this far apart, in px
   const SERIES = [
     { key: 'grass', name: 'grass' },
@@ -56,16 +59,16 @@
     for (let k = 0, D = topDecade(max); k <= D; k++) out.push(Math.pow(10, k));
     return out;
   }
-  // A 1, 2 or 5 times a power of ten near span / TARGET_TICKS.
-  function niceStep(span) {
-    const raw = Math.max(span / TARGET_TICKS, 1e-9);
+  // A 1, 2 or 5 times a power of ten near span / target (TARGET_TICKS unless given).
+  function niceStep(span, target = TARGET_TICKS) {
+    const raw = Math.max(span / target, 1e-9);
     const p = Math.pow(10, Math.floor(Math.log10(raw)));
     const f = raw / p;
     return (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10) * p;
   }
-  // Round day counts inside [d0, d1].
-  function dayTicks(d0, d1) {
-    const step = niceStep(d1 - d0), out = [];
+  // Round day counts inside [d0, d1], about `target` of them.
+  function dayTicks(d0, d1, target) {
+    const step = niceStep(d1 - d0, target), out = [];
     // Counted in whole steps, so no float drift (and no -0) creeps into the labels.
     for (let k = Math.max(0, Math.ceil(d0 / step - EPS_H)); k * step <= d1 + EPS_H; k++) out.push(k * step);
     return out;
@@ -143,10 +146,12 @@
     const wholeBtn = el('button', 'hud-btn graph-whole', 'Whole run');
     wholeBtn.type = 'button';
     wholeBtn.title = 'Fit the whole run';
+    const sizeBtn = el('button', 'hud-btn graph-size');
+    sizeBtn.type = 'button';
     const closeBtn = el('button', 'hud-btn graph-close', '×');
     closeBtn.type = 'button';
     closeBtn.title = 'Close';
-    head.append(title, wholeBtn, closeBtn);
+    head.append(title, wholeBtn, sizeBtn, closeBtn);
     head.title = 'Drag to move';
     const canvas = el('canvas', 'graph-canvas');
     panel.append(head, canvas);
@@ -223,6 +228,22 @@
       if (g.open) { placeUnderStrip(); applyPos(); dirty = true; }
     }
     closeBtn.addEventListener('click', toggle);
+    // Small unless the viewer chose big.
+    let small = true;
+    try { small = localStorage.getItem(SIZE_KEY) !== 'big'; } catch (e) { /* small */ }
+    function applySize() {
+      panel.classList.toggle('graph-small', small);
+      sizeBtn.textContent = small ? '+' : '−';
+      sizeBtn.title = small ? 'Bigger graph' : 'Smaller graph';
+    }
+    applySize();
+    sizeBtn.addEventListener('click', () => {
+      small = !small;
+      applySize();
+      try { localStorage.setItem(SIZE_KEY, small ? 'small' : 'big'); } catch (e) { /* not kept */ }
+      applyPos();
+      dirty = true;
+    });
     wholeBtn.addEventListener('click', () => {
       if (!simSeen) return;
       view = fitView(simSeen.history.length);
@@ -333,10 +354,12 @@
       }
       // X axis in days.
       ctx.textAlign = 'center';
+      // As many labels as fit (a small window has room for fewer), up to TARGET_TICKS.
+      const dayTarget = Math.max(2, Math.min(TARGET_TICKS, Math.floor((r.x1 - r.x0) / DAY_LABEL_PX)));
       // Zoomed in past a day per tick the labels need decimals.
-      const dayStep = niceStep((view.h1 - view.h0) / HOURS_PER_DAY);
+      const dayStep = niceStep((view.h1 - view.h0) / HOURS_PER_DAY, dayTarget);
       const decimals = dayStep < 1 ? Math.ceil(-Math.log10(dayStep) - 1e-9) : 0;
-      for (const d of dayTicks(view.h0 / HOURS_PER_DAY, view.h1 / HOURS_PER_DAY)) {
+      for (const d of dayTicks(view.h0 / HOURS_PER_DAY, view.h1 / HOURS_PER_DAY, dayTarget)) {
         const x = Math.round(X(d * HOURS_PER_DAY)) + 0.5;
         ctx.strokeStyle = GRID;
         ctx.beginPath(); ctx.moveTo(x, r.y0); ctx.lineTo(x, r.y1); ctx.stroke();

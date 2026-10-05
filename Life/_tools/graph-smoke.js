@@ -1,7 +1,7 @@
 const vm = require('vm'), fs = require('fs');
 const calls = {};
 const c2d = new Proxy({}, { get: (t, k) => k === 'measureText' ? () => ({ width: 40 }) : (...a) => { calls[k] = (calls[k] || 0) + 1; }, set: () => true });
-const mk = () => ({ children: [], style: { setProperty() {} }, listeners: {}, hidden: true, clientWidth: 420, clientHeight: 500, width: 0, height: 0,
+const mk = () => ({ children: [], style: { setProperty() {} }, classList: { toggle() {} }, listeners: {}, hidden: true, clientWidth: 420, clientHeight: 500, width: 0, height: 0,
   append(...c) { this.children.push(...c); }, appendChild(c) { this.children.push(c); }, addEventListener(t, f) { this.listeners[t] = f; },
   getContext() { return c2d; }, offsetWidth: 420, offsetHeight: 320, getBoundingClientRect() { return { left: this.style.left ? parseFloat(this.style.left) : 8, top: this.style.top ? parseFloat(this.style.top) : 48 }; } });
 const panel = mk();
