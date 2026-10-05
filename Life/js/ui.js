@@ -13,6 +13,8 @@
 //   ui.tab, ui.setTab(name | null)   the open tab
 //   ui.hidden, ui.setHidden(on)      Hide UI (the H key toggles it; never remembered across loads)
 //   ui.nuke, ui.setNuke(on)          NUKE MODE armed (main.js reads it through onNuke)
+//   ui.mode, ui.setMode(name)        the God tab's one armed mode: 'nuke', 'grass', 'bunny', 'wolf' or ''
+//                                    (onMode(name) on every change; onNuke(on) when nuke flips)
 //   ui.errors(errors, warnings)   the sim didn't start; show why
 //   ui.warnings(warnings)         the sim started; say quietly what the CSVs have extra
 //   ui.lock(on)                   true: speed buttons, Benchmark, Graph, debug tools and keys do nothing
@@ -72,7 +74,7 @@
   }
 
   AS.UI = function (opts) {
-    const { debug, speeds, onSpeed, onDebugTool, onCloseInspector, onBench, onGraph, onLines, onTab, onNuke } = opts;
+    const { debug, speeds, onSpeed, onDebugTool, onCloseInspector, onBench, onGraph, onLines, onTab, onNuke, onMode } = opts;
     const hudEl = document.getElementById('hud');
     const errorsEl = document.getElementById('errors');
     const inspEl = document.getElementById('inspector');
@@ -208,22 +210,40 @@
     }
 
     // ---- God tab ----
-    // Armed until toggled off, so repeated nukes work; main.js turns a tap on the world into
-    // a nuke while it is on.
-    let nukeOn = false;
-    const nukeBtn = el('button', 'hud-bench hud-nuke', 'NUKE MODE');
-    nukeBtn.type = 'button';
-    nukeBtn.title = 'While on, tapping the world drops a nuke there';
-    nukeBtn.addEventListener('click', () => { if (!locked) setNuke(!nukeOn); nukeBtn.blur(); });
-    tabPanels.god.appendChild(nukeBtn);
-    function setNuke(on) {
-      on = !!on;
-      if (on === nukeOn) return;
-      nukeOn = on;
-      nukeBtn.classList.toggle('on', on);
-      if (document.body) document.body.classList.toggle('nuke-armed', on);
-      if (onNuke) onNuke(on);
+    // One mode at a time: 'nuke', or a brush ('grass', 'bunny', 'wolf'), or '' for none.
+    // Armed until toggled off, so repeated nukes and strokes work; main.js turns a tap (or a
+    // drag, for a brush) on the world into that mode's action while it is on.
+    let mode = '';
+    const MODES = [
+      ['nuke', 'NUKE MODE', 'hud-nuke', 'While on, tapping the world drops a nuke there'],
+      ['grass', 'GRASS MODE', 'hud-brush', 'While on, tap or drag to plant grass of random ages on empty ground'],
+      ['bunny', 'RABBIT MODE', 'hud-brush', 'While on, tap or drag to add rabbits of random ages on empty ground'],
+      ['wolf', 'WOLF MODE', 'hud-brush', 'While on, tap or drag to add wolves of random ages on empty ground'],
+    ];
+    const modeBtns = {};
+    for (const [name, label, cls, tip] of MODES) {
+      const b = el('button', 'hud-bench ' + cls, label);
+      b.type = 'button';
+      b.title = tip;
+      b.addEventListener('click', () => { if (!locked) setMode(mode === name ? '' : name); b.blur(); });
+      tabPanels.god.appendChild(b);
+      modeBtns[name] = b;
     }
+    const nukeBtn = modeBtns.nuke;
+    function setMode(next) {
+      next = modeBtns[next] ? next : '';
+      if (next === mode) return;
+      const prev = mode;
+      mode = next;
+      for (const [name, b] of Object.entries(modeBtns)) b.classList.toggle('on', name === mode);
+      if (document.body) {
+        document.body.classList.toggle('nuke-armed', mode === 'nuke');
+        document.body.classList.toggle('paint-armed', mode !== '' && mode !== 'nuke');
+      }
+      if (onNuke && (prev === 'nuke' || mode === 'nuke')) onNuke(mode === 'nuke');
+      if (onMode) onMode(mode);
+    }
+    const setNuke = on => setMode(on ? 'nuke' : (mode === 'nuke' ? '' : mode));
 
     top.append(strip, tabStrip);
     hudEl.append(top, warnList);
@@ -409,7 +429,7 @@
     // Disabling the buttons also dims them; the handlers check `locked` as well.
     function lock(on) {
       locked = !!on;
-      for (const b of [...buttons, benchBtn, graphBtn, linesBtn, nukeBtn, ...toolButtons]) {
+      for (const b of [...buttons, benchBtn, graphBtn, linesBtn, ...Object.values(modeBtns), ...toolButtons]) {
         if (b) b.disabled = locked;
       }
     }
@@ -451,10 +471,11 @@
     }
 
     return {
-      hud, errors, warnings, inspector, lock, setTab, setHidden, setNuke, ended, setIcons,
+      hud, errors, warnings, inspector, lock, setTab, setHidden, setNuke, setMode, ended, setIcons,
       get tab() { return openTab; },
       get hidden() { return uiHidden; },
-      get nuke() { return nukeOn; },
+      get nuke() { return mode === 'nuke'; },
+      get mode() { return mode; },
     };
   };
 })(globalThis.AS);

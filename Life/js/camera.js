@@ -77,7 +77,11 @@
         };
       },
 
-      attach(onTap) { attach(onTap); },
+      // While true, a one-finger or mouse drag calls onStroke(fromX, fromY, toX, toY), in world
+      // tiles (fractions kept), instead of panning; taps, pinch, wheel and keys are unchanged.
+      strokes: false,
+
+      attach(onTap, onStroke) { attach(onTap, onStroke); },
 
       // Called once per frame by main.js; moves the view while pan keys are held.
       update(dtMs) {
@@ -147,7 +151,7 @@
       return slots[0].id === id ? slots[0] : slots[1].id === id ? slots[1] : null;
     }
 
-    function attach(onTap) {
+    function attach(onTap, onStroke) {
       const rect0 = () => canvas.getBoundingClientRect();
 
       canvas.addEventListener('pointerdown', e => {
@@ -190,7 +194,10 @@
         s.x = nx; s.y = ny;
         if (tapOk && Math.hypot(nx - startX, ny - startY) >= TAP_SLOP) tapOk = false;
         if (tapOk) return;
-        cam.panBy(nx - s.lastX, ny - s.lastY);
+        if (cam.strokes && onStroke) {
+          const a = cam.screenToTile(s.lastX, s.lastY), b = cam.screenToTile(nx, ny);
+          onStroke(a.x, a.y, b.x, b.y);
+        } else cam.panBy(nx - s.lastX, ny - s.lastY);
         s.lastX = nx; s.lastY = ny;
       });
 

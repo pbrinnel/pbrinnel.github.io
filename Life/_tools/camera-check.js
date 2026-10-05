@@ -4,7 +4,7 @@ let fails = 0;
 const ok = (c, m) => { if (!c) { fails++; console.log('FAIL', m); } else console.log('ok  ', m); };
 const near = (a, b, e = 1e-9) => Math.abs(a - b) <= e;
 
-function make(cw, ch, W = { w: 300, h: 200 }) {
+function make(cw, ch, W = { w: 300, h: 200 }, onStroke) {
   const handlers = {}, wh = {};
   const canvas = { clientWidth: cw, clientHeight: ch,
     addEventListener(t, f, o) { (handlers[t] ||= []).push(f); if (t === 'wheel') canvas.wheelOpts = o; },
@@ -16,7 +16,7 @@ function make(cw, ch, W = { w: 300, h: 200 }) {
   vm.runInContext(src, ctx);
   const cam = ctx.AS.Camera(canvas, W);
   const taps = [];
-  cam.attach((x, y) => taps.push([x, y]));
+  cam.attach((x, y) => taps.push([x, y]), onStroke);
   const fire = (t, e) => (handlers[t] || []).forEach(f => f(Object.assign({ pointerType: 'touch', button: 0, preventDefault() {} }, e)));
   return { cam, canvas, taps, fire, wh, W };
 }
@@ -95,6 +95,30 @@ function make(cw, ch, W = { w: 300, h: 200 }) {
   t.fire('pointerup', { pointerId: 1, clientX: 430, clientY: 300 });
   ok(near(t.cam.x, x0 - 30 / 16) && near(t.cam.y, y0), '30px drag pans 30/scale');
   ok(t.taps.length === 0, 'drag fires no tap');
+}
+{ // strokes: a one-pointer drag paints along its path instead of panning
+  const segs = [];
+  const u = make(800, 600, undefined, (...a) => segs.push(a));
+  u.cam.strokes = true;
+  u.fire('pointerdown', { pointerId: 1, clientX: 400, clientY: 300 });
+  u.fire('pointermove', { pointerId: 1, clientX: 405, clientY: 300 });
+  ok(segs.length === 0, 'a stroke waits for the tap slop');
+  u.fire('pointermove', { pointerId: 1, clientX: 432, clientY: 300 });
+  u.fire('pointermove', { pointerId: 1, clientX: 464, clientY: 300 });
+  u.fire('pointerup', { pointerId: 1, clientX: 464, clientY: 300 });
+  const a = u.cam.screenToTile(400, 300), b = u.cam.screenToTile(432, 300);
+  ok(segs.length === 2 && near(segs[0][0], a.x) && near(segs[0][2], b.x) && near(segs[1][0], b.x), 'stroke segments are chained from the press point');
+  ok(u.taps.length === 0, 'a stroke fires no tap');
+  const c0 = make(800, 600, undefined, () => {}); c0.cam.strokes = true;
+  const px = c0.cam.x;
+  c0.fire('pointerdown', { pointerId: 1, clientX: 400, clientY: 300 });
+  c0.fire('pointermove', { pointerId: 1, clientX: 450, clientY: 300 });
+  c0.fire('pointerup', { pointerId: 1, clientX: 450, clientY: 300 });
+  ok(near(c0.cam.x, px), 'a stroke does not pan');
+  const d0 = make(800, 600, undefined, () => {}); d0.cam.strokes = true;
+  d0.fire('pointerdown', { pointerId: 1, clientX: 400, clientY: 300 });
+  d0.fire('pointerup', { pointerId: 1, clientX: 400, clientY: 300 });
+  ok(d0.taps.length === 1, 'a tap while strokes are on is still a tap');
 }
 { // pinch
   const t = make(800, 600), x0 = t.cam.x, y0 = t.cam.y;

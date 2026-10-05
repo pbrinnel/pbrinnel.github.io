@@ -94,6 +94,7 @@
     ['CollapseDays', 'num'],
     ['NukeRadius', 'pos'],
     ['ScorchDays', 'pos'],
+    ['BrushRadius', 'pos'],
     ['Seed', 'seed'],
   ];
   // How the world is laid out on day 0 (sim.js populate, start.js).

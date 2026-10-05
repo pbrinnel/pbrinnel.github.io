@@ -15,6 +15,9 @@
   const ACHIEVED_WINDOW_S = 1;
   // A tap within this many tiles of an animal's drawn center picks it.
   const PICK_RADIUS = 0.75;
+  // Dabs along a brush stroke are at most this far apart (tiles): under a brush's own width,
+  // so the stroke is solid, and each dab costs only its still-empty tiles.
+  const BRUSH_STEP = 1;
   // The inspector refreshes this often; a new selection shows at once.
   const INSPECT_EVERY_MS = 100;
   const LINES_KEY = 'life-intent-lines';
@@ -39,6 +42,7 @@
   let savedTab;
   try { const v = localStorage.getItem(TAB_KEY); if (v !== null) savedTab = v === '' ? null : v; } catch (e) { /* default */ }
   let nukeOn = false;   // NUKE MODE: a tap on the world drops a nuke instead of selecting
+  let brush = '';   // GRASS / RABBIT / WOLF MODE: the kind a tap or drag paints, or ''
   let graph = null;   // made once the tables load; the HUD button may exist before that
 
   const ui = AS.UI({
@@ -52,6 +56,7 @@
     tab: savedTab,
     onTab: name => { try { localStorage.setItem(TAB_KEY, name || ''); } catch (e) { /* not kept */ } },
     onNuke: on => { nukeOn = on; },
+    onMode: m => { brush = m === 'grass' || m === 'bunny' || m === 'wolf' ? m : ''; },
     lines: linesOn,
     onLines: on => {
       linesOn = on;
@@ -118,6 +123,7 @@
   cam.attach((tx, ty, fx, fy) => {
     const W = sim.W;
     if (nukeOn) { if (tx >= 0) app.nukeAt(tx, ty); return; }
+    if (brush) { if (tx >= 0) app.paintAt(tx, ty); return; }
     if (tx >= 0 && (tool === 'corpse-bunny' || tool === 'corpse-wolf')) {
       AS.debugDropCorpse(sim, W.tile(tx, ty), tool === 'corpse-bunny' ? AS.SPECIES.BUNNY : AS.SPECIES.WOLF);
       return;
@@ -129,7 +135,7 @@
     // A hole with nothing on it is selectable too (it has no serial, so `hole` marks it).
     const bareHole = k === AS.KIND.EMPTY && W.hole[t] === 1;
     sel = k === AS.KIND.GRASS || k === AS.KIND.CORPSE || bareHole ? { tile: t, serial: W.serial[t], slot: -1, hole: bareHole } : null;
-  });
+  }, (x0, y0, x1, y1) => { if (brush) app.paintLine(x0, y0, x1, y1); });
 
   // The animal whose drawn center is nearest (fx, fy), in tiles, within PICK_RADIUS; or -1.
   function animalDrawnNear(W, fx, fy) {
@@ -171,6 +177,7 @@
 
   function frame(now) {
     const interval = now - last;
+    cam.strokes = brush !== '';   // a drag paints instead of panning while a brush is armed
     cam.update(Math.min(MAX_FRAME_S * 1000, interval));
     const realDt = Math.min(MAX_FRAME_S, interval / 1000);
     last = now;
@@ -225,6 +232,7 @@
   // For the console, the benchmark and test harnesses.
   //   app.load(sim)     swaps in another world (the benchmark's); the camera re-centers on it
   //   app.nukeAt(x, y)  a nuke on that tile (what a tap does in NUKE MODE)
+  //   app.paintAt(x, y), app.paintLine(x0, y0, x1, y1)   the brush of GRASS/RABBIT/WOLF MODE
   //   app.onFrame       null, or fn(intervalMs, tickMs, drawMs, ticks) after every frame
   // A run ends the moment a species dies out (Paul): the sim pauses and says which. Keep
   // watching resumes without asking again about the species already gone. A species a
@@ -262,6 +270,22 @@
       const out = AS.nuke(sim, sim.W.tile(tx, ty));
       renderer.blast(tx, ty, sim.T.world.NukeRadius, performance.now());
       return out;
+    },
+    // A brush dab: the armed kind on every eligible tile within BrushRadius of tile (tx, ty).
+    paintAt(tx, ty) {
+      return brush && tx >= 0 && ty >= 0 && tx < sim.W.w && ty < sim.W.h
+        ? AS.paintCircle(sim, brush, tx, ty, sim.T.world.BrushRadius) : 0;
+    },
+    // A brush stroke between two pointer samples (world tiles, fractions kept): a dab every
+    // BRUSH_STEP tiles along the segment, so a fast drag leaves no gaps.
+    paintLine(x0, y0, x1, y1) {
+      const n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / BRUSH_STEP));
+      let placed = 0;
+      for (let i = 0; i <= n; i++) {
+        const f = i / n;
+        placed += app.paintAt(Math.floor(x0 + (x1 - x0) * f), Math.floor(y0 + (y1 - y0) * f));
+      }
+      return placed;
     },
     load(next) {
       sim = next;

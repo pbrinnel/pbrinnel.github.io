@@ -224,6 +224,12 @@ watching the sim run. Everything else in this doc is decided.
   growing or dug, for up to `ScorchDays` at the center and less toward the rim, so the
   crater greens from its edges. The blast shows as an expanding ring and a fading orange
   glow within its circle, never a flash.
+- **GRASS MODE, RABBIT MODE, WOLF MODE** (God tab, Paul: keeping the balance becomes the
+  game). Tap to fill a circle of `BrushRadius` tiles, or drag to paint a stroke; every
+  empty tile that can hold it gets a blade or an animal of a random age (animals of
+  random sex, from newborn to elder, full and rested). Grass skips warren holes and
+  scorch; wolves skip holes. One God mode is on at a time; while a paint mode is on,
+  dragging paints instead of panning (pan with the keys).
 
 ---
 

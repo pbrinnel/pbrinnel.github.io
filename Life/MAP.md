@@ -33,7 +33,7 @@ load time: every file reads other files' `AS.*` inside functions, at call time.
 | `grass.js` | growth every tick; age, seeding, sprouting on empty tiles, old age in hourly slices; bites | `grassTick`, `grassBite`, `grassStage` |
 | `warren.js` | warren holes' clocks: marks a hole used while a bunny stands on it, collapses holes unused for `CollapseDays` (hourly); `holeWithin` | `warrenTick`, `holeWithin` |
 | `corpse.js` | decay, and the boost field grass drinks from | `corpseTick`, `corpseAdded`, `corpseBoost` |
-| `god.js` | God powers: `nuke(sim, tile)` destroys everything within `NukeRadius` (animals with no corpse and no event, blades, corpses, holes) and scorches the ground (`W.scorch`, days left, `ScorchDays` at the center, shorter to the rim); `grass.js` counts scorch down hourly and nothing grows or is dug on it | `nuke` |
+| `god.js` | God powers: `nuke(sim, tile)` destroys everything within `NukeRadius` (animals with no corpse and no event, blades, corpses, holes) and scorches the ground (`W.scorch`, days left, `ScorchDays` at the center, shorter to the rim); `grass.js` counts scorch down hourly and nothing grows or is dug on it; `paintCircle(sim, 'grass'\|'bunny'\|'wolf', cx, cy, r)` is the GRASS/RABBIT/WOLF MODE brush (empty eligible tiles only, random ages; radius `BrushRadius`) | `nuke`, `paintCircle` |
 | `sim.js` | the fixed tick, populate, events ring, population history | `Sim`, `TICK_HZ`, `DT`, `DAY_SECONDS`, `TICKS_PER_HOUR`, `EV`, `debugDropCorpse` |
 | `start.js` | the Meadows day-0 layout (`StartLayout`): meadow grass aged by depth, bunny colonies at meadow edges, wolf packs in the open; uses only `sim.rng` | `startMeadows` |
 | `sight.js` | line of sight through grass, nearest visible thing, local paths (plain and weighted for chewing) | `lineOfSight`, `nearestVisible`, `pathNext`, `pathNextWeighted` |
@@ -42,12 +42,12 @@ load time: every file reads other files' `AS.*` inside functions, at call time.
 | `bunny.js`, `wolf.js` | each species' states, by the names in `states.csv` | (register via `AS.registerStates`) |
 | `glyphs.js` | ids, palette and life stage shared by the sprites and HUD; the old glyph sheet (no longer drawn) | `GLYPH`, `COLORS`, `CELL_COLOR`, `GlyphSheet`, `stageOf`, … |
 | `sprites.js` | the 8×8 pixel-art sprites (bunny, wolf, corpse, grass) as bitmaps (ten frames per animal: stand, walk, idle, eat/bite, runA, runB, rest, winded, dead, pregnant; plus a dimmed dead-pose carcass per species, `spriteCarcass`), the pose-priority rule (`spritePose`, pure), per-slot facing, and the pre-rendered sprite sheet | `SpriteSheet`, `spritePose`, `spriteIndex`, `SpriteFacing`, `SPRITE_FRAME`, `SPRITE_HOLD`, … |
-| `camera.js` | pan/zoom/pinch/wheel/keys, tap → tile | `Camera` |
+| `camera.js` | pan/zoom/pinch/wheel/keys, tap → tile; `cam.strokes` makes a one-pointer drag call `onStroke` (the brush) instead of panning | `Camera` |
 | `render.js` | draw (scorched ground, and the nuke's ring and glow over real time, `blast()`): visible tiles from the sprite sheet, or cell mode zoomed out (its brighter far-view colors live at the top of render.js); animals glide and act out events (below); intent lines (off by default, the selected animal's always on); selection | `Renderer`, `CELL_PX`, `glideProgress` |
 | `inspect.js` | `variables.csv` → the inspector's rows for a selection | `describe`, `inspectWarnings` |
 | `graph.js` | the population graph as a draggable floating window (position kept in localStorage, clamped to the viewport; from `sim.history`) | `Graph`, `graphMath` |
 | `bench.js` | benchmark mode (grass series, animal series) | `runBench`, `benchMath` |
-| `ui.js` | the bar (speeds, day, Info/Debug/God tabs, Hide UI, `H`), the open tab's strip, NUKE MODE button, inspector panel, errors page, keys for speed | `UI` |
+| `ui.js` | the bar (speeds, day, Info/Debug/God tabs, Hide UI, `H`), the open tab's strip, God tab modes (NUKE, GRASS, RABBIT, WOLF: one at a time, `ui.mode`), inspector panel, errors page, keys for speed | `UI` |
 | `main.js` | boot, the frame loop, selection, wiring | `app`, `TICK_BUDGET_MS` |
 
 Sim files (`tables` … `wolf`, plus `glyphs` for `stageOf`) never touch the DOM, so the

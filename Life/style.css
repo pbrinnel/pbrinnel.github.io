@@ -99,7 +99,7 @@ html, body {
 .hud-show:hover, .hud-show:focus-visible { opacity: 0.9; }
 body.ui-off .hud-show { display: block; }
 body.ui-off #hud, body.ui-off #inspector, body.ui-off #graph { display: none; }
-body.nuke-armed #map { cursor: crosshair; }
+body.nuke-armed #map, body.paint-armed #map { cursor: crosshair; }
 .hud-glyph { color: var(--hud-dim); margin-right: 5px; }
 .hud-icon { width: 16px; height: 16px; margin-right: 5px; vertical-align: -3px; image-rendering: pixelated; }
 .hud-day { color: var(--fg); display: inline-block; min-width: 10ch; }
@@ -281,6 +281,8 @@ body.nuke-armed #map { cursor: crosshair; }
 .hud-graph.on, .hud-lines.on { color: var(--bg); background: var(--hud-on); border-color: var(--hud-on); }
 /* NUKE MODE armed: a steady orange-red fill, unmistakable and never animated. */
 .hud-nuke.on, .hud-nuke.on:hover { color: #fff3e8; background: #b8431a; border-color: #e0662f; }
+/* A brush armed: a steady fill like the graph's on state, so the active mode is plain. */
+.hud-brush.on, .hud-brush.on:hover { color: var(--bg); background: var(--hud-on); border-color: var(--hud-on); }
 
 /* ---- Population graph: a floating window ---- */
 /* Until it is dragged (or a place is remembered) it sits under the bar: JS sets --hud-bottom to

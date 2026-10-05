@@ -218,4 +218,22 @@ const stripOf = ids => ids.hud.all(e => e.className === 'hud-tabstrip')[0];
   nuke.fire('click');
   assert(!ui.nuke && !nuke.classList.contains('on') && !body.classList.contains('nuke-armed') && calls.join() === 'true,false'); ok('clicking again disarms it');
 }
+{ const modes = [], nukes = [];
+  const { ui, ids, body } = build(false, { onMode: m => modes.push(m), onNuke: on => nukes.push(on) });
+  const by = label => ids.hud.all(e => e.textContent === label && e.tagName === 'button' || e.textContent === label && e.className.includes('hud-bench'))[0];
+  const names = ['NUKE MODE', 'GRASS MODE', 'RABBIT MODE', 'WOLF MODE'], b = names.map(by);
+  assert(b.every(Boolean)); ok('the four God modes exist as buttons');
+  assert(ids.hud.all(e => e.textContent === 'WOLF MODE').length >= 1 && panelOf(ids, 'god').textContent.includes('RABBIT MODE')); ok('they sit in the God tab');
+  b[1].fire('click');
+  assert(ui.mode === 'grass' && b[1].classList.contains('on') && body.classList.contains('paint-armed') && !body.classList.contains('nuke-armed')); ok('GRASS MODE arms: highlighted, crosshair class');
+  b[0].fire('click');
+  assert(ui.mode === 'nuke' && ui.nuke && !b[1].classList.contains('on') && b[0].classList.contains('on') && !body.classList.contains('paint-armed') && body.classList.contains('nuke-armed') && nukes.join() === 'true'); ok('NUKE MODE turns GRASS MODE off');
+  b[2].fire('click');
+  assert(ui.mode === 'bunny' && !ui.nuke && nukes.join() === 'true,false' && !b[0].classList.contains('on')); ok('RABBIT MODE turns nuke off (onNuke(false))');
+  b[3].fire('click');
+  assert(ui.mode === 'wolf' && !b[2].classList.contains('on') && b[3].classList.contains('on')); ok('WOLF MODE turns RABBIT MODE off');
+  ui.lock(true); b[1].fire('click'); assert(ui.mode === 'wolf' && b.every(x => x.disabled)); ui.lock(false); ok('locked during the benchmark');
+  b[3].fire('click');
+  assert(ui.mode === '' && !b.some(x => x.classList.contains('on')) && !body.classList.contains('paint-armed') && modes.join() === 'grass,nuke,bunny,wolf,'); ok('clicking the active mode turns it off');
+}
 console.log('all passed');

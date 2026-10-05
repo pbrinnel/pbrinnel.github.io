@@ -14,4 +14,5 @@ WarrenRadius,4,A new hole is dug only within this many tiles of an existing hole
 CollapseDays,10,A hole no bunny has stood on for this long collapses into bare ground
 NukeRadius,75,God tab: a nuke destroys everything within this many tiles (a circle) of where it lands
 ScorchDays,8,God tab: days the ground at a nuke's center stays scorched (bare: nothing grows or is dug there); it shortens toward the rim so the crater greens from its edges
+BrushRadius,2,God tab: radius in tiles of the grass/rabbit/wolf brush
 Seed,,Blank = new random seed each run; the seed used is shown on screen so you can paste it here to replay that start
