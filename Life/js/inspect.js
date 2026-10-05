@@ -89,6 +89,7 @@
 
   const READERS = {
     Fullness: (sim, c) => outOf(sim.W.aFullness[c.s], c.Tsp.FullnessMax),
+    Water: (sim, c) => outOf(sim.W.aWater[c.s], c.Tsp.WaterMax),
     Stamina: (sim, c) => outOf(sim.W.aStamina[c.s], c.Tsp.StaminaMax),
     HP: (sim, c) => outOf(sim.W.aHP[c.s], c.Tsp.HPMax),
     // A corpse's age is the time since it died, which is its own clock (cAge).
@@ -123,6 +124,11 @@
     InHole: (sim, c) => sim.W.hole[c.t] ? 'Yes' : 'No',
     // How long since a bunny last stood on it; it collapses at CollapseDays.
     LastUsed: (sim, c) => days(sim.simSeconds / AS.DAY_SECONDS - sim.W.holeUsedAt[c.t] / AS.DAY_SECONDS) + ' days ago',
+    Cause: (sim, c) => {
+      const v = sim.W.cCause[c.t], C = AS.CAUSE;
+      if (v >= C.ATTACKED) return 'Attacked by a ' + AS.SPECIES_KEY[v - C.ATTACKED];
+      return { [C.OLD_AGE]: 'Old age', [C.STARVED]: 'Starved', [C.THIRST]: 'Died of thirst', [C.STARVED_THIRSTY]: 'Starved and thirsty', [C.DEBUG]: 'Dropped (debug)' }[v] || 'Unknown';
+    },
     Meat: (sim, c) => outOf(sim.W.cMeat[c.t], sim.T[AS.SPECIES_KEY[sim.W.cSpecies[c.t]]].MeatOnBody),
     Nutrient: (sim, c) => outOf(sim.W.cNut[c.t], sim.T[AS.SPECIES_KEY[sim.W.cSpecies[c.t]]].CorpseNutrient),
   };

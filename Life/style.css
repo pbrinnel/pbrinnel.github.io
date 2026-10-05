@@ -278,7 +278,7 @@ body.nuke-armed #map, body.paint-armed #map { cursor: crosshair; }
 .bench-subtitle { font-size: 14px; font-weight: normal; color: var(--hud-on); margin: 20px 0 0; }
 
 /* ---- Population graph ---- */
-.hud-graph.on, .hud-lines.on { color: var(--bg); background: var(--hud-on); border-color: var(--hud-on); }
+.hud-graph.on, .hud-lines.on, .hud-water.on { color: var(--bg); background: var(--hud-on); border-color: var(--hud-on); }
 /* NUKE MODE armed: a steady orange-red fill, unmistakable and never animated. */
 .hud-nuke.on, .hud-nuke.on:hover { color: #fff3e8; background: #b8431a; border-color: #e0662f; }
 /* A brush armed: a steady fill like the graph's on state, so the active mode is plain. */

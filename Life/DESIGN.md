@@ -62,12 +62,15 @@ watching the sim run. Everything else in this doc is decided.
   (`StartGrass` is the meadow share, `MeadowSize` the size of the largest). Meadows start
   partly filled with blades of every age, as a meadow that has been growing a while is,
   with a few lone seedlings in the open, so the start doesn't die back as one wave.
-  **Lakes** (Paul, 4 Oct 2026): `Lakes` irregular lakes about `LakeSize` tiles across are
-  laid first. Water is impassable to everything (but animals see across it), nothing is
-  ever placed on it, and nukes leave it. All land always stays one connected piece: a
-  lake that would cut off land is dropped, a tiny cut-off pocket becomes water. Grass
-  within `WaterRadius` of water grows and seeds `WaterBoost` times faster, so lakes are
-  ringed by meadow.
+  **Water** (Paul, 4–5 Oct 2026), off by default (`Water` in settings.csv; the Debug tab's
+  Water button switches it and starts a new world): `Lakes` irregular lakes about
+  `LakeSize` tiles across and `Rivers` winding rivers with land-bridge fords every
+  `BridgeEvery` tiles are laid first. Water is impassable to everything (but animals see
+  across it), nothing is ever placed on it, and nukes leave it. All land always stays one
+  connected piece: a lake or river that would cut off land is bridged or dropped, a tiny
+  cut-off pocket becomes water. A one-tile bare beach rings all water: grass never grows
+  there, so animals can always reach it to drink (Paul: shore grass blocked drinking).
+  `WaterBoost` (faster grass near water) is kept as a setting, set to 1 (off).
   Bunnies live in `BunnyColonies` colonies just outside meadow edges; wolves run in
   `WolfPacks` packs out in the open, away from the colonies. Populations start smaller and
   concentrated so animals still meet. `StartLayout` Scatter keeps the old even scatter
@@ -108,6 +111,14 @@ watching the sim run. Everything else in this doc is decided.
   bodies lingered too long; a quicker rot also leaves wolves less to scavenge). (One-bite kills that fed the wolf on the
   spot failed: a wolf's stomach holds 100 and it hunts below 80, so most of a big meal was
   wasted.)
+- **Thirst** (Paul, 5 Oct 2026; only in worlds with water): every animal has a water meter
+  that drains at `ThirstRate` (scaled by activity like hunger). Below `ThirstyAt` it goes
+  to drink, ranked just under fleeing and hiding and above food and mating: it heads for
+  the nearest water it knows of (within `WaterSense`, its knowledge of its land), stands
+  on the beach and drinks `DrinkRate` until full; water never runs out. At an empty meter
+  it loses `ThirstDamage` HP a second and can die; a dry animal doesn't heal.
+- **Cause of death** is kept on every corpse and shown in the inspector: Attacked by a
+  wolf (or a human), Starved, Died of thirst, Starved and thirsty, Old age.
 - **Hunger follows activity** (Paul, 4 Oct 2026): standing still (resting, hiding,
   eating in place) burns `RestHunger` times `HungerRate`, sprinting `SprintHunger` times,
   walking `HungerRate`. Animals that find no food rest more and so starve slower.
@@ -401,6 +412,13 @@ seeds and saves numbers back into `tables/`. What's been found, in order:
   0.4 (was 1): 3 of 3 seeds for 30 days with wolves at 95–96, against 2 of 3 with the old
   rules; each piece alone kept 3 of 3 but with fewer wolves (61–92). Paul rejected letting
   wolves eat unseen "small game" as phony.
+- Hunger and thirst drained too fast (Paul). All species' `HungerRate` and `ThirstRate` at
+  1/3 of their old values (bunny hunger 2 → 0.667, wolf 0.9 → 0.3). With water on (3
+  seeds × 30 days) 1/3 kept all three species with bunnies 173–554 and wolves 258–335
+  (1/2 left one seed with 2 bunnies; the old rates lost the bunnies on 2 seeds). With
+  water off it roughly doubles both populations by day 30 (wolves 318–341, bunnies
+  1,673–2,564, against 119–172 and 642–923). Thirst is now the main non-age bunny death
+  with water on.
 - Wolves stayed fragile at low numbers while bunnies and grass bounced back (Paul).
   Wolf `LitterSize` 3–5 (was 1–2) and `MateRange` 80: quick test (3 seeds × 30 days) kept
   3 of 3 either way; litters alone gave the most wolves (1.17× their start), both together

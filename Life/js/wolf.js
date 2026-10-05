@@ -233,6 +233,8 @@
   // ---- the states --------------------------------------------------------------------------
 
   const STATES = {
+    DRINK: AS.drinkState,
+
     // "Walk to the carcass; eat BiteFood from it every BiteCooldown until full or the meat is
     // gone." A feeding wolf gorges past HungryAt: stopping there would leave the rest of a
     // body to rot while the wolf walked off to hunt, and Fullness would sit wasted at the cap.

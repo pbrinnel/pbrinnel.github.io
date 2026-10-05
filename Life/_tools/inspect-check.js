@@ -47,13 +47,21 @@ check(d.rows[3].tip === '', 'Position tip empty: "' + d.rows[3].tip + '"');
 const ce = empties[1];
 W.addCorpse(ce, A.SPECIES.WOLF); A.corpseAdded(sim, ce);
 d = A.describe(sim, sel(ce)); allValues.push(d);
-check(names(d) === 'Age,Lifestage,Dead,Position,Nutrient,Meat', 'corpse rows: ' + names(d));
+check(names(d) === 'Age,Lifestage,Dead,Position,Nutrient,Cause,Meat', 'corpse rows: ' + names(d));
 check(/^Wolf corpse #\d+$/.test(d.title), 'corpse title: ' + d.title);
 check(val(d, 'Lifestage') === '—' && val(d, 'Dead') === 'Yes' && val(d, 'Age') === '0.00', 'corpse values');
 const CN = T.wolf.CorpseNutrient, cnText = m => String(m % 1 ? m.toFixed(1) : m);
 check(val(d, 'Nutrient') === `${CN.toFixed(1)} / ${cnText(CN)}`, 'nutrient ' + val(d, 'Nutrient'));
 W.cNut[ce] = 12.34;
 check(val(A.describe(sim, sel(ce)), 'Nutrient') === `12.3 / ${cnText(CN)}`, 'nutrient decimals');
+
+// cause of death: every cause is recorded on the corpse and put in words
+{
+  const C = A.CAUSE, words = [[C.OLD_AGE, 'Old age'], [C.STARVED, 'Starved'], [C.THIRST, 'Died of thirst'], [C.STARVED_THIRSTY, 'Starved and thirsty'],
+    [C.DEBUG, 'Dropped (debug)'], [C.ATTACKED + A.SPECIES.WOLF, 'Attacked by a wolf'], [C.ATTACKED + A.SPECIES.HUMAN, 'Attacked by a human']];
+  for (const [v, text] of words) { W.cCause[ce] = v; check(val(A.describe(sim, sel(ce)), 'Cause') === text, 'cause ' + v + ' reads "' + text + '"'); }
+  W.cCause[ce] = 0;
+}
 
 // meat: a bunny's carcass shows what is left of MeatOnBody; a wolf's has none to begin with
 const MW = T.wolf.MeatOnBody, MB = T.bunny.MeatOnBody, mtext = m => String(m % 1 ? m.toFixed(1) : m);
@@ -75,7 +83,7 @@ const mk = (t, sp, sx) => {
 };
 const selA = s => ({ tile: W.aTile[s], serial: W.aSerial[s], slot: s });
 const bm = mk(empties[2], 0, 0), bf = mk(empties[3], 0, 1), wm = mk(empties[4], 1, 0), wf = mk(empties[5], 1, 1);
-const R = 'Fullness,Stamina,HP,Age,Lifestage,Dead,State,Target,Position,Sex,';
+const R = 'Fullness,Water,Stamina,HP,Age,Lifestage,Dead,State,Target,Position,Sex,';
 const dbm = A.describe(sim, selA(bm)), dbf = A.describe(sim, selA(bf)), dwm = A.describe(sim, selA(wm)), dwf = A.describe(sim, selA(wf));
 allValues.push(dbm, dbf, dwm, dwf);
 check(names(dbm) === R + 'Parents,Children,InHole', 'male bunny: ' + names(dbm));

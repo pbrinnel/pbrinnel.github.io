@@ -31,6 +31,12 @@
     ['StarveDamage', 'num', ANIMALS],
     ['RestHunger', 'num', ANIMALS],
     ['SprintHunger', 'num', ANIMALS],
+    ['WaterMax', 'pos', ANIMALS],
+    ['ThirstRate', 'num', ANIMALS],
+    ['ThirstyAt', 'frac', ANIMALS],
+    ['DrinkRate', 'pos', ANIMALS],
+    ['ThirstDamage', 'num', ANIMALS],
+    ['WaterSense', 'num', ANIMALS],
     ['HPMax', 'pos', ANIMALS],
     ['HealRate', 'num', ANIMALS],
     ['HealAbove', 'frac', ANIMALS],
@@ -95,8 +101,12 @@
     ['StartGrass', 'frac'],
     ['StartGrassAge', 'num'],
     ['StartLayout', 'layout'],
+    ['Water', 'onoff'],
     ['Lakes', 'count'],
     ['LakeSize', 'pos'],
+    ['Rivers', 'count'],
+    ['RiverWidth', 'range'],
+    ['BridgeEvery', 'pos'],
     ['MeadowSize', 'pos'],
     ['BunnyColonies', 'count'],
     ['WolfPacks', 'count'],
@@ -299,6 +309,12 @@
         } else out[name] = n;
         continue;
       }
+      if (type === 'onoff') {
+        const v = { on: true, '1': true, yes: true, true: true, off: false, '0': false, no: false, false: false }[raw.toLowerCase()];
+        if (v === undefined) errors.push(`${where}: "${raw}" should be on or off.`);
+        else out[name] = v;
+        continue;
+      }
       if (type === 'layout') {
         const hit = LAYOUTS.find(l => l.toLowerCase() === raw.toLowerCase());
         if (!hit) errors.push(`${where}: "${raw}" should be one of ${LAYOUTS.join(', ')}.`);
@@ -306,9 +322,14 @@
         continue;
       }
       if (raw === '') { errors.push(`${where}: needs a value.`); continue; }
-      const c = convert(raw, type === 'frac' ? 'frac' : 'num', '');
+      const c = convert(raw, type === 'frac' || type === 'range' ? type : 'num', '');
       if (c.error) { errors.push(`${where}: ${c.error}.`); continue; }
       const v = c.value;
+      if (type === 'range') {
+        if (v.min < 1) errors.push(`${where}: "${raw}" should be at least 1 tile.`);
+        else out[name] = v;
+        continue;
+      }
       if ((type === 'side' || type === 'count') && !Number.isInteger(v)) {
         errors.push(`${where}: "${raw}" should be a whole number.`);
       } else if (type === 'side' && (v < MIN_SIDE || v > MAX_SIDE)) {

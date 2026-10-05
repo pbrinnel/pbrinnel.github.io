@@ -27,7 +27,13 @@
   AS.canEnterHole = species => species === SP.BUNNY;
   AS.SEX = Object.freeze({ MALE: 0, FEMALE: 1 });
 
+  // Why a corpse is a corpse (W.cCause, shown by the inspector's Cause row). A kill is ATTACKED
+  // plus the biter's species code, so a new species needs no new cause.
+  AS.CAUSE = Object.freeze({ UNKNOWN: 0, OLD_AGE: 1, STARVED: 2, THIRST: 3, STARVED_THIRSTY: 4, DEBUG: 5, ATTACKED: 16 });
+
   const ANIMAL_START_CAPACITY = 1024;
+  // wDist for a tile no water can be reached from.
+  const WATER_NONE = AS.WATER_NONE = 0xFFFF;
 
   // Fields of one animal, by array type. A new field is one line here. Countdown timers are
   // Float64: counted down by 1/30 s a tick, Float32 rounding lands a whole tick late.
@@ -44,6 +50,7 @@
     aStepDur: Float64Array,
     aAge: Float32Array,    // days
     aFullness: Float32Array,
+    aWater: Float32Array,  // the water meter, like Fullness; drained and refilled by animals.js and DRINK
     aStamina: Float32Array,
     aHP: Float32Array,
     aState: Uint8Array,    // index into T.states[species]
@@ -85,6 +92,7 @@
       cNut: new Float32Array(n),
       cMeat: new Float32Array(n),   // Fullness left on the body for wolves; written by addCorpse, wolf.js (eating)
       cAge: new Float32Array(n),    // days
+      cCause: new Uint8Array(n),    // AS.CAUSE: how it died; written by addCorpse
       cSpecies: new Uint8Array(n),
       cList: new Int32Array(n),
       cSlot: new Int32Array(n).fill(-1),
@@ -109,6 +117,20 @@
       // Grass growth multiplier by tile (1 = none), fixed at world build by setShore: the shore
       // of a lake grows grass faster. Static, so grass.js only reads it.
       shore: new Float32Array(n).fill(1),
+
+      // The beach: land tiles 4-adjacent to water (1 = beach), kept up to date by addWater. An
+      // animal drinks from one, so no blade may stand on one (addGrass refuses; grass.js, god.js
+      // and start.js skip them), or a lakeshore of grass would wall the animals off the water.
+      beach: new Uint8Array(n),
+
+      // Water, by tile, found once by buildWaterField (below) and read by DRINK: the walking
+      // distance to the nearest shore tile (a land tile touching water; 0 on one,
+      // WATER_NONE where no water can be reached), the next tile of the way there (-1 on a
+      // shore tile) and which shore tile that is. A guide only: it ignores animals, blades and
+      // holes. waterCount is how many tiles are water; with none there is no thirst at all.
+      waterCount: 0,
+      waterStale: false,
+      wDist: null, wNext: null, wShore: null,
 
       // The corpse tile that boosts each tile's grass, or -1. Written only by corpse.js.
       boostSrc: new Int32Array(n).fill(-1),
@@ -159,6 +181,7 @@
     W.addGrass = function (t, size, age) {
       if (W.hole[t]) throw new Error(`tile ${t} is a warren hole; no grass grows there`);
       if (W.scorch[t] > 0) throw new Error(`tile ${t} is scorched; no grass grows there`);
+      if (W.beach[t]) throw new Error(`tile ${t} is beach (touches water); no grass grows there`);
       claim(t, KIND.GRASS);
       W.serial[t] = W.nextSerial++;
       W.gSize[t] = size;
@@ -184,7 +207,40 @@
     W.addWater = function (t) {
       if (W.hole[t] || W.scorch[t] > 0) throw new Error(`tile ${t} can't take water`);
       claim(t, KIND.WATER);
+      W.waterCount++;
+      W.waterStale = true;
+      const nbw = new Int32Array(4), k = W.neighbors4(t, nbw);
+      for (let i = 0; i < k; i++) W.beach[nbw[i]] = 1;
     };
+
+    // Multi-source breadth-first search over land from every shore tile, so a thirsty animal
+    // anywhere knows which way the water is in O(1). Water never changes after the world is
+    // built, so this runs once, on first need after the lakes are in (animals.js calls it
+    // before any thirst work); a later addWater marks it stale and it runs again.
+    W.buildWaterField = function () {
+      W.waterStale = false;
+      if (!W.wDist) { W.wDist = new Uint16Array(n); W.wNext = new Int32Array(n); W.wShore = new Int32Array(n); }
+      const dist = W.wDist, next = W.wNext, shore = W.wShore, queue = new Int32Array(n), nb = new Int32Array(4);
+      dist.fill(WATER_NONE); next.fill(-1); shore.fill(-1);
+      let head = 0, tail = 0;
+      for (let t = 0; t < n; t++) {
+        if (W.kind[t] === KIND.WATER) continue;
+        const k = W.neighbors4(t, nb);
+        for (let i = 0; i < k; i++) {
+          if (W.kind[nb[i]] === KIND.WATER) { dist[t] = 0; shore[t] = t; queue[tail++] = t; break; }
+        }
+      }
+      while (head < tail) {
+        const t = queue[head++], k = W.neighbors4(t, nb);
+        for (let i = 0; i < k; i++) {
+          const u = nb[i];
+          if (dist[u] !== WATER_NONE || W.kind[u] === KIND.WATER) continue;
+          dist[u] = dist[t] + 1; next[u] = t; shore[u] = shore[t];
+          queue[tail++] = u;
+        }
+      }
+    };
+    W.ensureWaterField = () => { if (W.waterStale) W.buildWaterField(); };
 
     // Land within `radius` tiles (a circle) of any water tile grows grass `boost` times faster.
     // Done once after the lakes are in, so no tick does distance work.
@@ -228,8 +284,9 @@
     };
 
     // species is AS.SPECIES.*; the corpse's Nutrient, decay and boost come from that species.
-    W.addCorpse = function (t, species) {
+    W.addCorpse = function (t, species, cause) {
       claim(t, KIND.CORPSE);
+      W.cCause[t] = cause || 0;
       W.serial[t] = W.nextSerial++;
       W.cSpecies[t] = species;
       W.cNut[t] = T[AS.SPECIES_KEY[species]].CorpseNutrient;
@@ -250,6 +307,7 @@
       W.cNut[t] = 0;
       W.cMeat[t] = 0;
       W.cAge[t] = 0;
+      W.cCause[t] = 0;
     };
 
     // Returns the new slot. The caller fills in the rest of the animal's fields.

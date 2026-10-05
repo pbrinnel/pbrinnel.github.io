@@ -5,10 +5,16 @@ StaminaMax,points,100,100,400,,Humans are marathon hunters: slow but they hardly
 StaminaRefill,per s,8,4,6,,While not sprinting
 SprintCost,per s,25,20,8,,
 FullnessMax,points,100,100,100,,
-HungerRate,per s,2,0.9,0.6,,Bunny empty in ~2.5 days; wolf in ~5.6
+HungerRate,per s,0.667,0.3,0.2,,Bunny empty in ~7.5 days; wolf in ~17 (walking; standing still takes RestHunger of it)
 StarveDamage,HP per s,1,0.4,0.4,,HP lost while Fullness = 0; wolf lasts ~7 days on an empty stomach
 RestHunger,× HungerRate,0.5,0.5,0.5,,Hunger while standing still (resting, hiding, eating in place)
 SprintHunger,× HungerRate,1.5,1.5,1.5,,Hunger while sprinting; walking burns HungerRate
+WaterMax,points,100,100,100,,Size of the water meter (Water): an animal drinks it back up at a lake or river and it drains as it moves
+ThirstRate,per s,1.1,0.567,0.833,,Water lost per second walking; bunny empty in ~4.5 days; wolf in ~9; human in ~6. Standing still and sprinting scale it by RestHunger and SprintHunger. No water in the world = no thirst
+ThirstyAt,% of WaterMax,50,50,50,,Below this an animal looks for water, but only if it knows where some is (WaterSense)
+DrinkRate,per s,25,25,25,,Water gained per second while drinking at the shore; it drinks until the meter is full
+ThirstDamage,HP per s,1,0.4,0.4,,HP lost while Water = 0 (on top of any starving)
+WaterSense,tiles,40,80,80,,How far, walking, an animal knows its way to water without seeing it: its knowledge of its land
 HPMax,points,20,60,80,,
 HealRate,HP per s,0.5,0.5,0.5,,Only while Fullness > HealAbove
 HealAbove,% of FullnessMax,50,50,50,,Healing needs at least this much Fullness
@@ -56,5 +62,5 @@ CorpseDecay,days,1,5,5,,Corpse disappears after this
 MeatOnBody,Fullness,60,60,60,,Food on a body for whoever eats it (EatsCarcass); a carcass keeps it until eaten or until the corpse rots
 CorpseRadius,tiles,3,3,3,,Grass inside grows and seeds faster
 CorpseBoost,× multiplier,3,3,3,,Applied to GrowthRate and SeedChance in radius
-WaterRadius,tiles,,,,4,Grass within this many tiles of a lake grows and seeds faster (the shore)
-WaterBoost,× multiplier,,,,2,Applied to GrowthRate and SeedChance and SproutChance on the shore; multiplies with a corpse's boost
+WaterRadius,tiles,,,,4,Grass within this many tiles of water grows and seeds faster (the shore)
+WaterBoost,× multiplier,,,,1,Applied to GrowthRate and SeedChance and SproutChance on the shore; multiplies with a corpse's boost. 1 = no boost (Paul 4 Oct 2026: shore grass walled animals off the water). The beach itself (land touching water) never grows grass either way

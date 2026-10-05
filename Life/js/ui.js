@@ -6,7 +6,7 @@
 // and inspector (CSS, `ui-off` on <body>) and leaves a faint button in the corner.
 //
 // AS.UI({ debug, speeds, onSpeed(i), onDebugTool(mode), onBench(), onGraph(),
-//         lines (initial on/off), onLines(on),
+//         lines (initial on/off), onLines(on), water (initial on/off), onWater(on),
 //         tab (initial: 'info' | 'debug' | 'god' | null for closed; default 'info'), onTab(name | null),
 //         onNuke(on) }) → ui
 //   ui.hud({ speedIndex, achieved, day, seed, humansSeen, counts: { bunnies, wolves, humans, total, blades, corpses } })
@@ -52,7 +52,7 @@
   // The tabs, in bar order: key, label, tooltip.
   const TABS = [
     ['info', 'Info', 'Live counts and the population graph'],
-    ['debug', 'Debug', 'Lines, Benchmark and the seed'],
+    ['debug', 'Debug', 'Lines, Water, Benchmark and the seed'],
     ['god', 'God', 'Powers over the world'],
   ];
   const COUNTS = [
@@ -81,7 +81,7 @@
   }
 
   AS.UI = function (opts) {
-    const { debug, speeds, onSpeed, onDebugTool, onCloseInspector, onBench, onGraph, onLines, onTab, onNuke, onMode } = opts;
+    const { debug, speeds, onSpeed, onDebugTool, onCloseInspector, onBench, onGraph, onLines, onWater, onTab, onNuke, onMode } = opts;
     const hudEl = document.getElementById('hud');
     const errorsEl = document.getElementById('errors');
     const inspEl = document.getElementById('inspector');
@@ -173,6 +173,20 @@
         linesBtn.blur();
       });
       tabPanels.debug.appendChild(linesBtn);
+    }
+    // Water is laid when a world is built, so a flip starts a new world (main.js's onWater).
+    let waterBtn = null;
+    if (onWater) {
+      let waterOn = !!opts.water;
+      waterBtn = el('button', 'hud-bench hud-water', 'Water');
+      waterBtn.type = 'button';
+      waterBtn.title = 'Starts a new world with/without lakes, rivers and thirst';
+      waterBtn.classList.toggle('on', waterOn);
+      waterBtn.addEventListener('click', () => {
+        if (!locked) { waterOn = !waterOn; waterBtn.classList.toggle('on', waterOn); onWater(waterOn); }
+        waterBtn.blur();
+      });
+      tabPanels.debug.appendChild(waterBtn);
     }
     let benchBtn = null;
     if (onBench) {
@@ -490,7 +504,7 @@
     // Disabling the buttons also dims them; the handlers check `locked` as well.
     function lock(on) {
       locked = !!on;
-      for (const b of [...buttons, benchBtn, graphBtn, linesBtn, ...Object.values(modeBtns), ...toolButtons]) {
+      for (const b of [...buttons, benchBtn, graphBtn, linesBtn, waterBtn, ...Object.values(modeBtns), ...toolButtons]) {
         if (b) b.disabled = locked;
       }
       showRadius();

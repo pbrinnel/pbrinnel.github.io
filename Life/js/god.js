@@ -66,7 +66,7 @@
         const t = y * W.w + x;
         if (W.kind[t] !== K.EMPTY) continue;
         if (kind === 'grass') {
-          if (W.hole[t] || W.scorch[t] > 0) continue;
+          if (W.hole[t] || W.scorch[t] > 0 || W.beach[t]) continue;   // the beach stays bare for drinking
           const age = rng.next() * S.Lifespan;
           W.addGrass(t, Math.min(1, S.SproutSize + age * S.GrowthRate), age);
         } else {

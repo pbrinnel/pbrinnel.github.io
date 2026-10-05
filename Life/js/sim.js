@@ -120,7 +120,7 @@
     const W = sim.W;
     if (W.kind[t] === AS.KIND.GRASS) W.removeGrass(t);
     if (W.kind[t] !== AS.KIND.EMPTY) return false;
-    W.addCorpse(t, species);
+    W.addCorpse(t, species, AS.CAUSE.DEBUG);
     AS.corpseAdded(sim, t);
     return true;
   };

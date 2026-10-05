@@ -105,6 +105,7 @@
       free[j] = free[i]; free[i] = t;
       const b = W.addAnimal(t, species, rng.int(2));   // may grow the stores, so use W.* afresh
       W.aFullness[b] = S.FullnessMax;
+      W.aWater[b] = S.WaterMax;
       W.aHP[b] = S.HPMax;
       W.aStamina[b] = S.StaminaMax;
       W.aDecideLeft[b] = rng.next() / S.DecidePerSec;

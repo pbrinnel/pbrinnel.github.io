@@ -1,7 +1,8 @@
 Variable,Kind,Applies to,Range,Goes up when,Goes down when,At the limit
 Fullness,Dynamic,Bunny Wolf Human,0 – FullnessMax,Eats (BiteFood; a wolf or human from a carcass; GrassFood per bite of grass for a human),Every tick (HungerRate); mating (MateCost),0 → loses StarveDamage HP per s
+Water,Dynamic,Bunny Wolf Human,0 – WaterMax,Drinks at a lake or river (DrinkRate; spawns full),Every tick (ThirstRate; scaled like hunger by activity),0 → loses ThirstDamage HP per s
 Stamina,Dynamic,Bunny Wolf Human,0 – StaminaMax,Not sprinting (StaminaRefill),Sprinting (SprintCost),0 → walk only until Stamina is full again
-HP,Dynamic,Bunny Wolf Human,0 – HPMax,HealRate while Fullness > HealAbove,Bitten; starving,0 → dies
+HP,Dynamic,Bunny Wolf Human,0 – HPMax,HealRate while Fullness > HealAbove,Bitten; starving; thirst,0 → dies
 Age,Dynamic,All,0 – Lifespan (days),Every tick,—,Lifespan → dies of old age
 Lifestage,Dynamic,All,Baby / Adult / Elder,Age ≥ TimeToMature → Adult; Age ≥ ElderAt → Elder,—,Grass: Sprout / Mature / Elder
 Dead,Dynamic,All,true / false,HP 0; Age ≥ Lifespan; blade Size 0,—,Animal → corpse; blade → empty tile
@@ -16,6 +17,7 @@ Parents,Static,Bunny Wolf,two ids,—,—,For the inspector; none for the first 
 Children,Dynamic,Bunny Wolf,count,Each birth,—,
 Kills,Dynamic,Wolf Human,count,Each kill,—,
 Nutrient,Dynamic,Corpse,0 – CorpseNutrient,—,Drunk by boosted grass (one per unit of extra growth),0 or CorpseDecay days → corpse gone
+Cause,Static,Corpse,a cause,—,—,Set when the animal dies: attacked by a species that hunts it (a wolf or human); starved; died of thirst; starved and thirsty; old age; dropped (debug). A nuke leaves no corpse
 Meat,Dynamic,Corpse,0 – MeatOnBody,—,Eaten by a wolf or human (BiteFood per mouthful),0 or CorpseDecay days → nothing left to eat; the corpse is bones
 InHole,Dynamic,Bunny,yes / no,Walks onto a warren hole,Walks off it,A bunny in a hole can't be bitten or hunted
 LastUsed,Dynamic,Hole,0 – CollapseDays (days),Every tick no bunny stands on it,A bunny stands on it,CollapseDays → the hole collapses into bare ground

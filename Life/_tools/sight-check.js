@@ -10,7 +10,8 @@ function mk(w, ht, grassPct = '0%', seed = 1) {
   s = h.editCSV(s, 'WorldHeight', 'Value', String(ht));
   s = h.editCSV(s, 'StartGrass', 'Value', grassPct);
   s = h.editCSV(s, 'StartBunnies', 'Value', '0');
-  s = h.editCSV(s, 'Lakes', 'Value', '0');   // these hand-place things on tiles; lakes are water-check.js's
+  s = h.editCSV(s, 'Rivers', 'Value', '0');
+  s = h.editCSV(s, 'Lakes', 'Value', '0');   // these hand-place things on tiles; water is water-check.js's and thirst-check.js's
   s = h.editCSV(s, 'StartWolves', 'Value', '0');
   const { T, errors } = AS.parseTables({ ...texts, settings: s });
   if (errors.length) throw new Error(errors.join('\n'));

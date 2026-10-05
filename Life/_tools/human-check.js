@@ -26,7 +26,7 @@ function make(size, seed = 1, o = {}) {
   const { AS, texts } = loadAS();
   let s = editCSV(texts.settings, 'WorldWidth', 'Value', String(size));
   s = editCSV(s, 'WorldHeight', 'Value', String(size));
-  for (const [k, v] of [['StartGrass', '0%'], ['StartBunnies', '0'], ['StartWolves', '0'], ['Lakes', '0']]) s = editCSV(s, k, 'Value', v);
+  for (const [k, v] of [['StartGrass', '0%'], ['StartBunnies', '0'], ['StartWolves', '0'], ['Lakes', '0'], ['Rivers', '0']]) s = editCSV(s, k, 'Value', v);
   texts.settings = s;
   if (!o.hunger) for (const sp of ['Bunny', 'Wolf', 'Human']) texts.species = editCSV(texts.species, 'HungerRate', sp, '0');
   texts.species = editCSV(texts.species, 'SeedChance', 'Grass', '0%');

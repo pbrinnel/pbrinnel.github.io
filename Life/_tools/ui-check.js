@@ -167,6 +167,18 @@ const input = { speedIndex: 1, achieved: 1, day: 3.24, seed: 1234567, counts: { 
   const l = ids.hud.all(e => e.className.split(' ').includes('hud-lines'))[0];
   assert(l.classList.contains('on')); ok('Lines button starts on when the saved choice is on');
 }
+{ const calls = []; const { ids, ui } = build(false, { onWater: on => calls.push('water:' + on) });
+  const w = ids.hud.all(e => e.className.split(' ').includes('hud-water'))[0];
+  assert(w && w.textContent === 'Water'); assert(!w.classList.contains('on')); ok('Water button starts off when water is not set');
+  assert(/new world/i.test(w._title)); ok('Water button says it starts a new world');
+  w.fire('click'); assert(w.classList.contains('on')); w.fire('click'); assert(!w.classList.contains('on'));
+  assert.deepStrictEqual(calls, ['water:true', 'water:false']); ok('Water button toggles and reports its state (main.js starts the new world and remembers it)');
+  ui.lock(true); w.fire('click'); assert(calls.length === 2); ui.lock(false); ok('Water button does nothing while locked');
+}
+{ const { ids } = build(false, { onWater() {}, water: true });
+  const w = ids.hud.all(e => e.className.split(' ').includes('hud-water'))[0];
+  assert(w.classList.contains('on')); ok('Water button starts on when the saved choice is on');
+}
 
 // ---- tabs, Hide UI, NUKE MODE ----
 const tabBtn = (ids, label) => ids.hud.all(e => e.className.split(' ').includes('hud-tab') && e.textContent === label)[0];

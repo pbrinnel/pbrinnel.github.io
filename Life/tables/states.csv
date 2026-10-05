@@ -1,23 +1,26 @@
 Species,Priority,State,Enter when,Does
 Bunny,1,HIDE,On a hole and a wolf or human is within VisionRange,Stay still in the hole; nothing can bite it there or hunt it
 Bunny,2,FLEE,A wolf or human (anything that lists Bunny under Prey) is within VisionRange,Sprint to the nearest free hole within HoleRange that it can see; with none in reach sprint away from the nearest hunter, bending along a wall or around a corner instead of into it; walk when out of Stamina
-Bunny,3,EAT,Hungry (Fullness < HungryAt) and a blade is on a 4-neighbor tile,Bite the blade every BiteCooldown
-Bunny,4,SEEK_FOOD,Hungry and no blade adjacent,Walk toward the nearest visible blade
-Bunny,5,MATE,Adult; Fullness ≥ MateFullness; female's cooldown 0; not pregnant,Walk to nearest eligible bunny of the other sex; adjacent → mate
-Bunny,6,DIG,Adult; not hungry (Fullness ≥ HungryAt); no wolf in sight; a roll of DigChance per day comes up (or already digging),Dig a hole on a bare 4-neighbor tile for DigSeconds; the tile must be within WarrenRadius of an existing hole or no hole is within HoleRange (a new warren); stands still while it digs
-Bunny,7,REST,Stamina < RestBelow,Stand still until Stamina reaches RestUntil
-Bunny,8,WANDER,Otherwise,Walk a run of WanderRun tiles in a random direction
-Wolf,1,FEED,Hungry (Fullness < HungryAt) and a carcass of a species it eats (EatsCarcass: bunny or human) with meat is in sight; or already feeding and not yet full (Fullness < FullnessMax),Walk to the carcass; eat BiteFood from it every BiteCooldown until full or the meat is gone
-Wolf,2,HUNT,Hungry (Fullness < HungryAt) and sees prey (a bunny or human not in a hole); after losing sight it keeps going to the last-seen spot until it arrives or TrackSeconds pass,Walk toward it; sprint within SprintRange; bite when adjacent
-Wolf,3,GIVE_UP,Stamina 0 mid-chase,Stop and rest until Stamina reaches RestUntil; the prey gets away
-Wolf,4,MATE,As bunny (a partner in sight or within MateRange); and the female has no more than PackLimit other adult wolves within TerritoryRange (territory),Travel to the partner (beyond sight: straight toward it); adjacent → mate
-Wolf,5,REST,Stamina < RestBelow,Stand still until Stamina reaches RestUntil
-Wolf,6,PROWL,Otherwise,Wander in runs of WanderRun tiles (longer than bunnies); after RoamAfter days without seeing a bunny, keep heading the same way in runs of RoamRun
+Bunny,3,DRINK,Thirsty (Water < ThirstyAt) and water is known within WaterSense; or already drinking and not yet full (Water < WaterMax),"Walk to a land tile touching water (a guide to the nearest shore, local pathing for the last stretch) and drink DrinkRate per s until the meter is full"
+Bunny,4,EAT,Hungry (Fullness < HungryAt) and a blade is on a 4-neighbor tile,Bite the blade every BiteCooldown
+Bunny,5,SEEK_FOOD,Hungry and no blade adjacent,Walk toward the nearest visible blade
+Bunny,6,MATE,Adult; Fullness ≥ MateFullness; female's cooldown 0; not pregnant,Walk to nearest eligible bunny of the other sex; adjacent → mate
+Bunny,7,DIG,Adult; not hungry (Fullness ≥ HungryAt); no wolf in sight; a roll of DigChance per day comes up (or already digging),Dig a hole on a bare 4-neighbor tile for DigSeconds; the tile must be within WarrenRadius of an existing hole or no hole is within HoleRange (a new warren); stands still while it digs
+Bunny,8,REST,Stamina < RestBelow,Stand still until Stamina reaches RestUntil
+Bunny,9,WANDER,Otherwise,Walk a run of WanderRun tiles in a random direction
+Wolf,1,DRINK,Thirsty (Water < ThirstyAt) and water is known within WaterSense; or already drinking and not yet full (Water < WaterMax),"Walk to a land tile touching water (a guide to the nearest shore, local pathing for the last stretch) and drink DrinkRate per s until the meter is full"
+Wolf,2,FEED,Hungry (Fullness < HungryAt) and a carcass of a species it eats (EatsCarcass: bunny or human) with meat is in sight; or already feeding and not yet full (Fullness < FullnessMax),Walk to the carcass; eat BiteFood from it every BiteCooldown until full or the meat is gone
+Wolf,3,HUNT,Hungry (Fullness < HungryAt) and sees prey (a bunny or human not in a hole); after losing sight it keeps going to the last-seen spot until it arrives or TrackSeconds pass,Walk toward it; sprint within SprintRange; bite when adjacent
+Wolf,4,GIVE_UP,Stamina 0 mid-chase,Stop and rest until Stamina reaches RestUntil; the prey gets away
+Wolf,5,MATE,As bunny (a partner in sight or within MateRange); and the female has no more than PackLimit other adult wolves within TerritoryRange (territory),Travel to the partner (beyond sight: straight toward it); adjacent → mate
+Wolf,6,REST,Stamina < RestBelow,Stand still until Stamina reaches RestUntil
+Wolf,7,PROWL,Otherwise,Wander in runs of WanderRun tiles (longer than bunnies); after RoamAfter days without seeing a bunny, keep heading the same way in runs of RoamRun
 Grass,—,GROW,Always,Size rises by GrowthRate
 Grass,—,SEED,At full Size; roll SeedChance,New sprout on a random empty 4-neighbor tile
-Human,1,FEED,Hungry (Fullness < HungryAt) and a carcass of a species it eats with meat is in sight; or already feeding and not yet full (Fullness < FullnessMax),Walk to the carcass; eat BiteFood from it every BiteCooldown until full or the meat is gone
-Human,2,HUNT,Hungry and sees prey (a bunny or wolf not in a hole); after losing sight it keeps going to the last-seen spot until it arrives or TrackSeconds pass,Walk toward it; sprint within SprintRange; strike when adjacent (one blow kills)
-Human,3,GIVE_UP,Stamina 0 mid-chase,Stop and rest until Stamina reaches RestUntil; the prey gets away
-Human,4,FORAGE,Hungry and no meat or prey in sight but a blade is,Walk (chewing through grass) to the nearest blade; bite an adjacent blade for GrassFood each BiteCooldown
-Human,5,REST,Stamina < RestBelow,Stand still until Stamina reaches RestUntil
-Human,6,PROWL,Otherwise,Wander in runs of WanderRun tiles; after RoamAfter days without seeing prey keep heading the same way in runs of RoamRun
+Human,1,DRINK,Thirsty (Water < ThirstyAt) and water is known within WaterSense; or already drinking and not yet full (Water < WaterMax),"Walk to a land tile touching water (a guide to the nearest shore, local pathing for the last stretch) and drink DrinkRate per s until the meter is full"
+Human,2,FEED,Hungry (Fullness < HungryAt) and a carcass of a species it eats with meat is in sight; or already feeding and not yet full (Fullness < FullnessMax),Walk to the carcass; eat BiteFood from it every BiteCooldown until full or the meat is gone
+Human,3,HUNT,Hungry and sees prey (a bunny or wolf not in a hole); after losing sight it keeps going to the last-seen spot until it arrives or TrackSeconds pass,Walk toward it; sprint within SprintRange; strike when adjacent (one blow kills)
+Human,4,GIVE_UP,Stamina 0 mid-chase,Stop and rest until Stamina reaches RestUntil; the prey gets away
+Human,5,FORAGE,Hungry and no meat or prey in sight but a blade is,Walk (chewing through grass) to the nearest blade; bite an adjacent blade for GrassFood each BiteCooldown
+Human,6,REST,Stamina < RestBelow,Stand still until Stamina reaches RestUntil
+Human,7,PROWL,Otherwise,Wander in runs of WanderRun tiles; after RoamAfter days without seeing prey keep heading the same way in runs of RoamRun

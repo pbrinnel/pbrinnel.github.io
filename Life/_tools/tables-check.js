@@ -32,13 +32,13 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
     ['bunny.HungryAt 70 → 0.7', T.bunny.HungryAt === 0.7, T.bunny.HungryAt],
     ['wolf.HungryAt 60 → 0.6', T.wolf.HungryAt === 0.6, T.wolf.HungryAt],
     ['bunny.SprintRange blank → null', T.bunny.SprintRange === null, T.bunny.SprintRange],
-    ['bunny states priority order', eq(T.states.bunny.map(s => s.name), ['HIDE', 'FLEE', 'EAT', 'SEEK_FOOD', 'MATE', 'DIG', 'REST', 'WANDER']), T.states.bunny.map(s => s.name)],
-    ['wolf states order', eq(T.states.wolf.map(s => s.name), ['FEED', 'HUNT', 'GIVE_UP', 'MATE', 'REST', 'PROWL']), T.states.wolf.map(s => s.name)],
+    ['bunny states priority order', eq(T.states.bunny.map(s => s.name), ['HIDE', 'FLEE', 'DRINK', 'EAT', 'SEEK_FOOD', 'MATE', 'DIG', 'REST', 'WANDER']), T.states.bunny.map(s => s.name)],
+    ['wolf states order', eq(T.states.wolf.map(s => s.name), ['DRINK', 'FEED', 'HUNT', 'GIVE_UP', 'MATE', 'REST', 'PROWL']), T.states.wolf.map(s => s.name)],
     ['variables has every row', T.variables.length === base.variables.trim().split(/\r?\n/).length - 1, T.variables.length],
     ['wolf.WanderRun 4-10 → {4,10}', eq(T.wolf.WanderRun, { min: 4, max: 10 }), T.wolf.WanderRun],
     ['bunny.HealAbove 50 → 0.5', T.bunny.HealAbove === 0.5, T.bunny.HealAbove],
     ['bunny.BabySpeed 50 (% of adult) → 0.5', T.bunny.BabySpeed === 0.5, T.bunny.BabySpeed],
-    ['human states order', eq(T.states.human.map(s => s.name), ['FEED', 'HUNT', 'GIVE_UP', 'FORAGE', 'REST', 'PROWL']), T.states.human.map(s => s.name)],
+    ['human states order', eq(T.states.human.map(s => s.name), ['DRINK', 'FEED', 'HUNT', 'GIVE_UP', 'FORAGE', 'REST', 'PROWL']), T.states.human.map(s => s.name)],
     ['Prey "Bunny Human" on Wolf → species codes [0,2]', eq(T.wolf.Prey, [0, 2]), T.wolf.Prey],
     ['Prey blank on Bunny → null', T.bunny.Prey === null, T.bunny.Prey],
     ['EatsCarcass is read per species (human eats Bunny and Wolf)', eq(T.human.EatsCarcass, [0, 1]), T.human.EatsCarcass],
@@ -92,8 +92,8 @@ bad('Seed 1.5', wE('Seed', '1.5'), ['Seed']);
   let s = editCSV(se, 'StartGrass', 'Value', '99%'); s = editCSV(s, 'WorldWidth', 'Value', '10'); s = editCSV(s, 'WorldHeight', 'Value', '10');
   bad('overflow, 10x10 world, 99% grass, 150 bunnies', { settings: s }, ['StartGrass', 'StartBunnies']);
 }
-bad('two Bunny states share priority', { states: st.replace('Bunny,3,EAT', 'Bunny,1,EAT') }, ['Bunny', 'Priority']);
-bad('states: Bunny state with blank priority', { states: st.replace('Bunny,3,EAT', 'Bunny,,EAT') }, ['Bunny', 'EAT']);
+bad('two Bunny states share priority', { states: st.replace('Bunny,4,EAT', 'Bunny,1,EAT') }, ['Bunny', 'Priority']);
+bad('states: Bunny state with blank priority', { states: st.replace('Bunny,4,EAT', 'Bunny,,EAT') }, ['Bunny', 'EAT']);
 bad('states: duplicate state name', { states: st + '\nBunny,9,FLEE,x,y' }, ['Bunny', 'FLEE']);
 bad('empty species file', { species: '' }, ['species.csv']);
 bad('empty settings file', { settings: '' }, ['settings.csv']);

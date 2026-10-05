@@ -288,6 +288,9 @@
       },
     },
 
+    // Thirst outranks food but not fear: HIDE and FLEE come first (animals.js, AS.drinkState).
+    DRINK: AS.drinkState,
+
     // "Bite the blade every BiteCooldown." Stands still while it eats.
     EAT: {
       enter(sim, s) {

@@ -6,8 +6,12 @@ StartWolves,112,Meadows: split among the packs; Scatter: placed at random
 StartGrass,30%,Meadows: share of the world that is meadow (most of it starts as a blade); Scatter: share of tiles that start as a blade
 StartGrassAge,0,Scatter only: every starting blade is a sprout at this Age in days (0 = a new sprout at SproutSize); Meadows ages blades by how deep in the meadow they are
 StartLayout,Meadows,Meadows = meadows with open ground between, bunnies in colonies at meadow edges, wolves in packs in the open; Scatter = everything at random
-Lakes,6,Meadows only: how many lakes (water: nothing can enter or stand on it; it never blocks sight); Scatter has none
-LakeSize,16,Tiles; roughly how wide a lake is across (they are irregular blobs)
+Water,off,Meadows only: on = lakes and rivers (and beaches and thirst); off = no water anywhere and no thirst. The Debug tab's Water button overrides this for the page and starts a new world
+Lakes,12,Meadows only: how many lakes (water: nothing can enter or stand on it; it never blocks sight); Scatter has none
+LakeSize,28,Tiles; roughly how wide a lake is across (they are irregular blobs)
+Rivers,3,Meadows only: how many little rivers (water: like lakes); each winds in from a world edge across the map or to a lake; land bridges keep the land one piece
+RiverWidth,2-3,Tiles; how wide a river is (a range gives each river its own width)
+BridgeEvery,25,Tiles; a river is crossed by a land bridge (a ford) about this often along its length
 MeadowSize,48,Tiles; roughly how wide the largest meadows are
 BunnyColonies,13,Meadows only: how many colonies the starting bunnies live in
 WolfPacks,7,Meadows only: how many packs the starting wolves run in

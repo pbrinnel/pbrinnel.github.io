@@ -24,6 +24,7 @@ const CHECKS = [
   [path.join(TOOLS, 'warren-check.js'), [], []],
   [path.join(TOOLS, 'god-check.js'), [], []],
   [path.join(TOOLS, 'water-check.js'), [], []],
+  [path.join(TOOLS, 'thirst-check.js'), [], []],
   [path.join(TOOLS, 'inspect-check.js'), [], []],
   [path.join(TOOLS, 'camera-check.js'), [], []],
   [path.join(TOOLS, 'render-check.js'), [], []],

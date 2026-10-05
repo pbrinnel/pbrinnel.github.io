@@ -22,6 +22,7 @@
   // The inspector refreshes this often; a new selection shows at once.
   const INSPECT_EVERY_MS = 100;
   const LINES_KEY = 'life-intent-lines';
+  const WATER_KEY = 'life-water';
   // The open tab ('info', 'debug', 'god', or '' for closed), remembered per browser.
   const TAB_KEY = 'life-ui-tab';
 
@@ -37,6 +38,9 @@
   let tool = 'select';
   let sel = null;
   // Intent lines are the viewer's choice, kept per browser; off when storage is unavailable.
+  // Water (lakes, rivers, thirst) is the viewer's choice too: off unless they turned it on.
+  let waterOn = false;
+  try { waterOn = localStorage.getItem(WATER_KEY) === '1'; } catch (e) { /* stays off */ }
   let linesOn = false;
   try { linesOn = localStorage.getItem(LINES_KEY) === '1'; } catch (e) { /* stays off */ }
   // The open HUD tab is also the viewer's choice. Nothing stored (or storage blocked): Info.
@@ -59,6 +63,13 @@
     onTab: name => { try { localStorage.setItem(TAB_KEY, name || ''); } catch (e) { /* not kept */ } },
     onNuke: on => { nukeOn = on; },
     onMode: m => { brush = m === 'grass' || AS.SPECIES_KEY.includes(m) ? m : ''; },
+    water: waterOn,
+    onWater: on => {
+      waterOn = on;
+      try { localStorage.setItem(WATER_KEY, on ? '1' : '0'); } catch (e) { /* the choice just isn't kept */ }
+      // Water is laid when a world is built, so the switch starts a new world.
+      if (sim) { ui.ended(null); app.load(AS.Sim(T, T.world.Seed ?? AS.newSeed(), { water: waterOn })); setSpeed(runSpeed); }
+    },
     lines: linesOn,
     onLines: on => {
       linesOn = on;
@@ -92,7 +103,7 @@
 
   const seed = T.world.Seed ?? AS.newSeed();
   ui.setRadiusDefaults(T.world.NukeRadius, T.world.BrushRadius);
-  sim = AS.Sim(T, seed);
+  sim = AS.Sim(T, seed, { water: waterOn });
   const canvas = document.getElementById('map');
   const cam = AS.Camera(canvas, sim.W);
   const sheet = AS.SpriteSheet(T);
@@ -268,7 +279,7 @@
     ui.ended({
       titles: EXTINCT.filter(([k]) => gone.has(k)).map(([, t]) => t),
       day: sim.day,
-      onNew() { ui.ended(null); app.load(AS.Sim(T, T.world.Seed ?? AS.newSeed())); setSpeed(runSpeed); },
+      onNew() { ui.ended(null); app.load(AS.Sim(T, T.world.Seed ?? AS.newSeed(), { water: waterOn })); setSpeed(runSpeed); },
       onContinue() { ui.ended(null); setSpeed(runSpeed); },
     });
   }
