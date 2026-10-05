@@ -9,7 +9,8 @@
 //         lines (initial on/off), onLines(on),
 //         tab (initial: 'info' | 'debug' | 'god' | null for closed; default 'info'), onTab(name | null),
 //         onNuke(on) }) → ui
-//   ui.hud({ speedIndex, achieved, day, seed, counts: { bunnies, wolves, humans, total, blades, corpses } })
+//   ui.hud({ speedIndex, achieved, day, seed, humansSeen, counts: { bunnies, wolves, humans, total, blades, corpses } })
+//                                 (humansSeen: this world has had a human, so their count shows)
 //   ui.tab, ui.setTab(name | null)   the open tab
 //   ui.hidden, ui.setHidden(on)      Hide UI (the H key toggles it; never remembered across loads)
 //   ui.nuke, ui.setNuke(on)          NUKE MODE armed (main.js reads it through onNuke)
@@ -58,7 +59,7 @@
     ['', 'bunnies', 'bunnies'],
     ['', 'wolves', 'wolves'],
     ['', 'humans', 'humans'],
-    ['Total', 'total', 'all animals together (bunnies, wolves and humans)'],
+    ['Total', 'total', 'all animals together'],
     ['', 'blades', 'blades of grass'],
     ['', 'corpses', 'corpses'],
   ];
@@ -137,9 +138,9 @@
 
     // ---- Info tab ----
     const countsBox = el('span', 'hud-counts');
-    const countEls = {}, glyphEls = {};
+    const countEls = {}, glyphEls = {}, countBoxes = {};
     for (const [glyph, key, tip] of COUNTS) {
-      const c = el('span', 'hud-count');
+      const c = countBoxes[key] = el('span', 'hud-count');
       c.title = tip;
       glyphEls[key] = c.appendChild(el('span', 'hud-glyph', glyph));
       countEls[key] = el('span', `hud-num hud-num-${key}`, '');
@@ -394,6 +395,9 @@
       setStatus(st);
       setDay('Day ' + s.day.toFixed(1));
       for (const [, key] of COUNTS) setCount[key](fmtInt(s.counts[key]));
+      // Humans are optional: their count shows only once this world has had one.
+      const showHumans = !!s.humansSeen;
+      if (countBoxes.humans.hidden === showHumans) countBoxes.humans.hidden = !showHumans;
       setSeed(String(s.seed));
     }
 

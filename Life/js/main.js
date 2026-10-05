@@ -227,6 +227,7 @@
     const W = sim.W;
     ui.hud({
       speedIndex, achieved, day: sim.day, seed: sim.seed,
+      humansSeen: humansSeen || (humansSeen = W.humans > 0),
       counts: { bunnies: W.bunnies, wolves: W.wolves, humans: W.humans, total: W.bunnies + W.wolves + W.humans, blades: W.gCount, corpses: W.cCount },
     });
     // CPU time only: the browser's own compositing shows up in `interval`, not here.
@@ -248,8 +249,11 @@
   const EXTINCT = [['wolves', 'WOLVES EXTINCT'], ['bunnies', 'BUNNIES EXTINCT'], ['grass', 'GRASS EXTINCT']];
   const counts = W => ({ wolves: W.wolves, bunnies: W.bunnies, grass: W.gCount });
   let gone = new Set(), absent = new Set(), runSpeed = speedIndex;
+  // Whether this world has had a human (they're optional; the Info count hides until then).
+  let humansSeen = false;
   function resetEnded() {
     const n = counts(sim.W);
+    humansSeen = false;
     gone = new Set();
     absent = new Set(EXTINCT.filter(([k]) => n[k] === 0).map(([k]) => k));
   }

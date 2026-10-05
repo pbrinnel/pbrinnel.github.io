@@ -37,6 +37,7 @@
     { key: 'wolves', name: 'wolves' },
     { key: 'humans', name: 'humans' },
   ];
+  const SERIES_NO_HUMANS = SERIES.filter(s => s.key !== 'humans');
 
   // ---- pure math ----
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -300,6 +301,9 @@
       if (!dirty && now - lastDraw < REDRAW_MS) return;
       dirty = false; lastDraw = now;
       const hist = sim.history, n = hist.length;
+      // Humans are optional (placed only with HUMAN MODE): their line and legend appear only
+      // once a world has had one, so the graph doesn't advertise them.
+      const series = humansShown(sim, hist, n) ? SERIES : SERIES_NO_HUMANS;
       view = advance(view, n);
       const dpr = globalThis.devicePixelRatio || 1;
       sizeCanvas(dpr);
@@ -312,7 +316,7 @@
 
       // The scale is the whole run's top decade, so panning doesn't rescale the lines.
       let max = 0;
-      for (const s of SERIES) { const a = hist[s.key]; for (let i = 0; i < n; i++) if (a[i] > max) max = a[i]; }
+      for (const s of series) { const a = hist[s.key]; for (let i = 0; i < n; i++) if (a[i] > max) max = a[i]; }
       const yTop = yOf(Math.pow(10, topDecade(max)));
       const Y = c => r.y1 - yOf(c) / yTop * (r.y1 - r.y0);
       const span = view.h1 - view.h0;
@@ -347,7 +351,7 @@
       ctx.lineWidth = LINE_W; ctx.lineJoin = 'round';
       const width = Math.max(1, Math.round(r.x1 - r.x0));
       const perCol = span / width;
-      for (const s of SERIES) {
+      for (const s of series) {
         const a = hist[s.key];
         ctx.strokeStyle = COLORS[s.key];
         ctx.beginPath();
@@ -377,7 +381,7 @@
 
       // Direct labels at the live end.
       if (n > 0 && view.h1 >= liveEnd(n) - EPS_H) {
-        const ends = SERIES.map(s => ({ s, y: Y(hist[s.key][n - 1]), v: hist[s.key][n - 1] })).sort((p, q) => p.y - q.y);
+        const ends = series.map(s => ({ s, y: Y(hist[s.key][n - 1]), v: hist[s.key][n - 1] })).sort((p, q) => p.y - q.y);
         for (let i = 1; i < ends.length; i++) ends[i].ly = Math.max(ends[i].y, (ends[i - 1].ly ?? ends[i - 1].y) + LABEL_GAP);
         ends[0].ly = ends[0].y;
         ctx.textAlign = 'left';
@@ -392,11 +396,11 @@
       // Legend, always shown.
       ctx.textAlign = 'left';
       // On a narrow window the line samples go (the icons and the lines' own colors still tell
-      // the series apart) so all four names fit.
-      const legendNeed = SERIES.reduce((w, s) => w + 19 + ICON_PX + ICON_GAP + ctx.measureText(s.name).width + 16, 0);
+      // the series apart) so all the names fit.
+      const legendNeed = series.reduce((w, s) => w + 19 + ICON_PX + ICON_GAP + ctx.measureText(s.name).width + 16, 0);
       const compact = MARGIN.left + legendNeed > r.w;
       let lx = MARGIN.left;
-      for (const s of SERIES) {
+      for (const s of series) {
         if (!compact) {
           ctx.strokeStyle = COLORS[s.key]; ctx.lineWidth = LINE_W;
           ctx.beginPath(); ctx.moveTo(lx, 10); ctx.lineTo(lx + 14, 10); ctx.stroke();
@@ -417,7 +421,7 @@
         ctx.fillStyle = TEXT; ctx.textAlign = 'left';
         const day = `day ${(i / HOURS_PER_DAY).toFixed(1)}`;
         ctx.fillText(day, rx, 28); rx += ctx.measureText(day).width + 14;
-        for (const s of SERIES) {
+        for (const s of series) {
           const v = hist[s.key][i];
           ctx.fillStyle = COLORS[s.key]; ctx.beginPath(); ctx.arc(x, Y(v), 3, 0, Math.PI * 2); ctx.fill();
           ctx.strokeStyle = COLORS[s.key]; ctx.lineWidth = LINE_W;
@@ -426,6 +430,16 @@
           ctx.fillStyle = TEXT; ctx.fillText(t, ix, 28); rx = ix + ctx.measureText(t).width + 12;
         }
       }
+    }
+
+    // Whether this world has ever had a human, scanning only new history samples.
+    let seenSim = null, seenN = 0, seenHumans = false;
+    function humansShown(sim, hist, n) {
+      if (sim !== seenSim || n < seenN) { seenSim = sim; seenN = 0; seenHumans = false; }
+      const a = hist.humans;
+      if (a) for (; !seenHumans && seenN < n; seenN++) if (a[seenN] > 0) seenHumans = true;
+      seenN = n;
+      return seenHumans || (sim.W && sim.W.humans > 0);
     }
 
     // Each series is labeled with the sprite the world draws for it (main.js supplies

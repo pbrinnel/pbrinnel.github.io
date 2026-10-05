@@ -145,6 +145,8 @@ watching the sim run. Everything else in this doc is decided.
   `EatsCarcass`): wolves hunt bunnies and humans, humans hunt bunnies and wolves; no
   species eats its own kind. Like wolves, humans can't enter warren holes and trample
   through grass. Drawn as a little hunter with a spear. Humans dying out never ends a run.
+  They're optional and kept quiet (Paul): their Info count and graph line appear only once
+  a world has had a human.
 - **Wolf territories** (Paul, 4 Oct 2026): crowded wolves don't breed. A female wolf
   mates only if no more than `PackLimit` other adult wolves are within `TerritoryRange`
   tiles of her (a square). Nothing else about territories exists: wolves still go
