@@ -49,6 +49,11 @@ function audit(AS, sim, label) {
   let grass = 0, corpses = 0, animals = 0, holes = 0;
   for (let t = 0; t < W.n; t++) {
     const k = W.kind[t];
+    if (k === K.WATER) {
+      // Water holds nothing else: no animal, blade, corpse, hole or scorch.
+      check(W.aSlot[t] === -1 && W.gSlot[t] === -1 && W.cSlot[t] === -1 && W.hSlot[t] === -1, `${label}: water tile ${t} is in a store`);
+      check(!W.hole[t] && W.scorch[t] === 0 && W.serial[t] === 0, `${label}: water tile ${t} has a hole, scorch or serial`);
+    }
     if (k === K.GRASS) {
       grass++;
       const i = W.gSlot[t];

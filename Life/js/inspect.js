@@ -25,6 +25,7 @@
     grass: ['all', 'grass'],
     corpse: ['all', 'corpse'],
     hole: ['hole'],   // a hole has no age, stage or life to show
+    water: [],        // water is only its name: nothing in variables.csv applies to it
   };
   // Each species is a thing of its own; one that breeds has a female variant ('wolfF') that
   // also takes the "female" token. A species that never breeds (humans) has none, so a female
@@ -80,6 +81,7 @@
     const k = W.kind[tt];
     if (k === KIND.GRASS) return 'Blade at ' + where;
     if (k === KIND.CORPSE) return 'Corpse at ' + where;
+    if (k === KIND.WATER) return 'Water at ' + where;
     return 'Tile ' + where;
   }
 
@@ -180,6 +182,9 @@
       if (k === KIND.CORPSE) {
         thing = 'corpse';
         title = speciesName(W.cSpecies[t]) + ' corpse #' + serial(W.serial[t]);
+      } else if (k === KIND.WATER) {
+        thing = 'water';
+        title = 'Water';
       } else if (k === KIND.EMPTY && W.hole[t]) {
         thing = 'hole';
         title = 'Warren hole';

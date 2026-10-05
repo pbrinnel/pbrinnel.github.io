@@ -133,7 +133,7 @@ check(dd.rows.some(r => r.name === 'Foo' && r.value === '—') && !dd.rows.some(
 // humans: the animal rows that apply (State, Target, Kills...), but none of a breeder's
 {
   const hs = A.Sim(T, 3), HW = hs.W;
-  let ht = -1; for (let t = 0; t < HW.n; t++) if (HW.kind[t] === K.EMPTY && !HW.hole[t]) { ht = t; break; }
+  let ht = -1; for (let t = 0; t < HW.n; t++) if (HW.kind[t] === K.EMPTY && !HW.hole[t] && HW.tx(t) < HW.w - 10 && [2, 6, 9].every(d => HW.kind[t + d] === K.EMPTY)) { ht = t; break; }
   for (const sex of [0, 1]) {
     const slot = A.spawnStarting(hs, A.SPECIES.HUMAN, ht + sex * 2); HW.aSex[slot] = sex;
     const hd = A.describe(hs, { tile: HW.aTile[slot], serial: HW.aSerial[slot], slot }); allValues.push(hd);

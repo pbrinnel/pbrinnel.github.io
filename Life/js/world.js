@@ -11,7 +11,9 @@
 (function (AS) {
   'use strict';
 
-  const KIND = AS.KIND = Object.freeze({ EMPTY: 0, GRASS: 1, CORPSE: 2, BUNNY: 3, WOLF: 4, HUMAN: 5 });
+  // WATER sits below the animal kinds because the code tells an animal by `kind >= BUNNY`;
+  // every other test asks for EMPTY or for one named kind, so water is simply "taken".
+  const KIND = AS.KIND = Object.freeze({ EMPTY: 0, GRASS: 1, CORPSE: 2, WATER: 3, BUNNY: 4, WOLF: 5, HUMAN: 6 });
   // Animal species codes, used in `aSpecies` and `cSpecies`. The kind of a species' animals
   // is ANIMAL_KIND0 + its code, so a new species is one entry in each list below.
   const SP = AS.SPECIES = Object.freeze({ BUNNY: 0, WOLF: 1, HUMAN: 2 });
@@ -104,6 +106,10 @@
       // hole may be dug; animals walk over it. Only a ground property, so `kind` is untouched.
       scorch: new Float32Array(n),
 
+      // Grass growth multiplier by tile (1 = none), fixed at world build by setShore: the shore
+      // of a lake grows grass faster. Static, so grass.js only reads it.
+      shore: new Float32Array(n).fill(1),
+
       // The corpse tile that boosts each tile's grass, or -1. Written only by corpse.js.
       boostSrc: new Int32Array(n).fill(-1),
 
@@ -173,10 +179,36 @@
       W.gAge[t] = 0;
     };
 
-    // Digs a hole on tile t. Bare ground only: no blade on it, no wolf standing there, not scorched.
+    // Lakes, laid at world build only (start.js). Water is a tile kind of its own: nothing
+    // enters, stands on, is born on, grows on or is dug into it, and it never changes.
+    W.addWater = function (t) {
+      if (W.hole[t] || W.scorch[t] > 0) throw new Error(`tile ${t} can't take water`);
+      claim(t, KIND.WATER);
+    };
+
+    // Land within `radius` tiles (a circle) of any water tile grows grass `boost` times faster.
+    // Done once after the lakes are in, so no tick does distance work.
+    W.setShore = function (radius, boost) {
+      W.shore.fill(1);
+      const R2 = radius * radius, reach = Math.floor(radius);
+      for (let t = 0; t < n; t++) {
+        if (W.kind[t] !== KIND.WATER) continue;
+        const cx = t % w, cy = (t / w) | 0;
+        // Only a lake's rim can reach land, and its rim's circles cover whatever the inner tiles' would.
+        if ((cx > 0 && W.kind[t - 1] === KIND.WATER) && (cx < w - 1 && W.kind[t + 1] === KIND.WATER) &&
+            (cy > 0 && W.kind[t - w] === KIND.WATER) && (cy < h - 1 && W.kind[t + w] === KIND.WATER)) continue;
+        for (let y = Math.max(0, cy - reach); y <= Math.min(h - 1, cy + reach); y++) {
+          for (let x = Math.max(0, cx - reach); x <= Math.min(w - 1, cx + reach); x++) {
+            if ((x - cx) ** 2 + (y - cy) ** 2 <= R2) W.shore[y * w + x] = boost;
+          }
+        }
+      }
+    };
+
+    // Digs a hole on tile t. Bare ground only: no blade on it, no wolf standing there, no water, not scorched.
     W.addHole = function (t, usedAt) {
       if (W.hole[t]) throw new Error(`tile ${t} is already a hole`);
-      if (W.kind[t] === KIND.GRASS || (W.kind[t] >= KIND.BUNNY && W.kind[t] !== KIND.BUNNY)) throw new Error(`tile ${t} can't be dug (kind ${W.kind[t]})`);
+      if (W.kind[t] === KIND.GRASS || W.kind[t] === KIND.WATER || (W.kind[t] >= KIND.BUNNY && W.kind[t] !== KIND.BUNNY)) throw new Error(`tile ${t} can't be dug (kind ${W.kind[t]})`);
       if (W.scorch[t] > 0) throw new Error(`tile ${t} is scorched; it can't be dug`);
       W.hole[t] = 1;
       W.holeUsedAt[t] = usedAt || 0;

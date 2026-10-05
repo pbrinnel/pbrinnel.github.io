@@ -27,6 +27,7 @@ function make(size, edit, layout = 'Scatter') {
   s = editCSV(s, 'WorldHeight', 'Value', String(size));
   s = editCSV(s, 'StartGrass', 'Value', '0%');
   s = editCSV(s, 'StartBunnies', 'Value', '0');
+  s = editCSV(s, 'Lakes', 'Value', '0');   // these hand-place things on tiles; lakes are water-check.js's
   s = editCSV(s, 'StartWolves', 'Value', '0');
   s = editCSV(s, 'StartLayout', 'Value', layout);
   texts.settings = s;

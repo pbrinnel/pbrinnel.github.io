@@ -89,9 +89,17 @@
   // up out of it, in the bunny's own colors (x body, d inner ear, e eye).
   const HOLE_BITMAP = ['........', '..rrrr..', '.rroorr.', 'rroooorr', 'rroooorr', '.rroorr.', '..rrrr..', '........'];
   const PEEK_BITMAP = ['..x..x..', '..d..d..', '.rxxxxr.', 'rrxexexr', 'rroooorr', '.rroorr.', '..rrrr..', '........'];
-  const BITMAPS = { hole: [HOLE_BITMAP], peek: [PEEK_BITMAP], bunny: BUNNY, wolf: WOLF, human: HUMAN, carcass: CARCASS_BITMAPS, skull: SKULL_BITMAPS, grass: GRASS_BITMAPS, grassLean: GRASS_LEAN };
+  // Water: the whole tile in one blue (u), with a few lighter (v) and darker (k) pixels as
+  // still ripples. Three variants, picked by tile position, so a lake isn't a visible grid of
+  // one repeated tile; none of it moves.
+  const WATER_BITMAPS = [
+    ['uuuuuuuu', 'uuvvuuuu', 'uuuuuuku', 'ukuuuuuu', 'uuuuvvuu', 'uuuuuuuu', 'kuuvuuuu', 'uuuuuuuk'],
+    ['uuuuuuuu', 'uukuuuvu', 'uuuuuuuu', 'vvuuukuu', 'uuuuuuuu', 'ukuuuvvu', 'uuuuuuuu', 'uuuvuuuu'],
+    ['uvuuuuuu', 'uuuuukuu', 'kuuuuuuu', 'uuuuvvuu', 'uuuuuuuu', 'uuvuuuku', 'uuuuuuuu', 'uuuukuuu'],
+  ];
+  const BITMAPS = { hole: [HOLE_BITMAP], water: WATER_BITMAPS, peek: [PEEK_BITMAP], bunny: BUNNY, wolf: WOLF, human: HUMAN, carcass: CARCASS_BITMAPS, skull: SKULL_BITMAPS, grass: GRASS_BITMAPS, grassLean: GRASS_LEAN };
   AS.SPRITE_BITMAPS = BITMAPS;
-  AS.SPRITE_CODES = 'xdweynfprosqm';
+  AS.SPRITE_CODES = 'xdweynfprosqmuvk';
   AS.SPRITE_SIZE = SIZE;
 
   // ---- palette ----------------------------------------------------------------------
@@ -101,6 +109,7 @@
   const CARCASS_BRIGHTNESS = 0.65;
   const ELDER_BRIGHTNESS = 0.72;
   const HOLE_RIM = '#8a6a45', HOLE_DARK = '#150f0a';
+  const WATER_BASE = '#2b5c8c', WATER_LIGHT = '#3a6e9f', WATER_DARK = '#244f7c';
   const EYE = '#141210', AMBER = '#e8b84a', NOSE = '#1a1a1e', FANG = '#f2ece0', TONGUE = '#d99a9a';
   const SKIN = '#d9a066', SHAFT = '#a07a4a', SPEARHEAD = '#d4d8dc';
   // Babies and corpses are drawn smaller than a tile, bottom-centered.
@@ -171,11 +180,11 @@
   // ---- sheet layout -----------------------------------------------------------------
   // Animals: ((((species*2+sex)*3+stage)*2+faceLeft)*FRAMES+frame), then each species'
   // skull, the three grass thirds, the three leaning ones, each species' carcass, the hole,
-  // and the bunny peeking out of it (by sex).
+  // the bunny peeking out of it (by sex), and the three water variants.
   const N_SPECIES = AS.SPECIES_COUNT;
   const ANIMAL_SPRITES = N_SPECIES * 2 * 3 * 2 * FRAMES;
   const SKULL0 = ANIMAL_SPRITES, GRASS0 = SKULL0 + N_SPECIES, LEAN0 = GRASS0 + 3, CARCASS0 = LEAN0 + 3;
-  const HOLE0 = CARCASS0 + N_SPECIES, PEEK0 = HOLE0 + 1, COUNT = PEEK0 + 2;
+  const HOLE0 = CARCASS0 + N_SPECIES, PEEK0 = HOLE0 + 1, WATER0 = PEEK0 + 2, COUNT = WATER0 + WATER_BITMAPS.length;
   const SHEET_COLS = 19;
   const BY_SPECIES = [BUNNY, WOLF, HUMAN];
   AS.SPRITE_COUNT = COUNT;
@@ -186,6 +195,8 @@
   AS.spriteCarcass = species => CARCASS0 + species;
   AS.spriteHole = () => HOLE0;
   AS.spritePeek = sex => PEEK0 + sex;   // a bunny in a hole, by sex
+  // A water tile's variant from its position: a fixed scramble of x and y, never random.
+  AS.spriteWater = (x, y) => WATER0 + ((Math.imul(x, 73856093) ^ Math.imul(y, 19349663)) >>> 8) % WATER_BITMAPS.length;
 
   // Wind: now and then a band sweeps diagonally across the meadow and tufts in it lean.
   // `clock` is real seconds, so a gust looks the same at any sim speed. Grass otherwise
@@ -231,7 +242,7 @@
     const off = ox + Math.floor((px - b) / 2), top = oy + px - b;
     const col = {
       x: base, d: shade(base, SHADE_DARK), w: shade(base, SHADE_LIGHT),
-      e: EYE, y: AMBER, n: NOSE, f: FANG, p: TONGUE, r: HOLE_RIM, o: HOLE_DARK, s: SKIN, q: SHAFT, m: SPEARHEAD,
+      e: EYE, y: AMBER, n: NOSE, f: FANG, p: TONGUE, r: HOLE_RIM, o: HOLE_DARK, s: SKIN, q: SHAFT, m: SPEARHEAD, u: WATER_BASE, v: WATER_LIGHT, k: WATER_DARK,
     };
     if (dim) for (const k of Object.keys(col)) col[k] = shade(col[k], dim);
     for (let j = 0; j < SIZE; j++) for (let i = 0; i < SIZE; i++) {
@@ -277,6 +288,7 @@
       for (let sx2 = 0; sx2 < 2; sx2++) {
         at(PEEK0 + sx2, (x, y) => paint(g, x, y, px, PEEK_BITMAP, AS.COLORS[AS.animalGlyph(0, sx2, AS.STAGE.ADULT)], false, 1));
       }
+      for (let i = 0; i < WATER_BITMAPS.length; i++) at(WATER0 + i, (x, y) => paint(g, x, y, px, WATER_BITMAPS[i], WATER_BASE, false, 1));
       for (let i = 0; i < 3; i++) {
         at(GRASS0 + i, (x, y) => paint(g, x, y, px, GRASS_BITMAPS[i], GRASS_COLORS[i], false, 1));
         at(LEAN0 + i, (x, y) => paint(g, x, y, px, GRASS_LEAN[i], GRASS_COLORS[i], false, 1));

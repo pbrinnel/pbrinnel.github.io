@@ -62,6 +62,12 @@ watching the sim run. Everything else in this doc is decided.
   (`StartGrass` is the meadow share, `MeadowSize` the size of the largest). Meadows start
   partly filled with blades of every age, as a meadow that has been growing a while is,
   with a few lone seedlings in the open, so the start doesn't die back as one wave.
+  **Lakes** (Paul, 4 Oct 2026): `Lakes` irregular lakes about `LakeSize` tiles across are
+  laid first. Water is impassable to everything (but animals see across it), nothing is
+  ever placed on it, and nukes leave it. All land always stays one connected piece: a
+  lake that would cut off land is dropped, a tiny cut-off pocket becomes water. Grass
+  within `WaterRadius` of water grows and seeds `WaterBoost` times faster, so lakes are
+  ringed by meadow.
   Bunnies live in `BunnyColonies` colonies just outside meadow edges; wolves run in
   `WolfPacks` packs out in the open, away from the colonies. Populations start smaller and
   concentrated so animals still meet. `StartLayout` Scatter keeps the old even scatter

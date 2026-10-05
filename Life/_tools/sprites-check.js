@@ -55,6 +55,11 @@ add(AS.spriteHole(), 'hole');
 for (let sx = 0; sx < 2; sx++) add(AS.spritePeek(sx), `peek sex${sx}`);
 for (let t = 0; t < 3; t++) add(AS.spriteGrassLean(t), `grass lean ${t}`);
 for (let t = 0; t < 3; t++) add(AS.spriteGrass(t), `grass ${t}`);
+// Water: every variant turns up somewhere on a lake, by position alone.
+const waterSeen = new Set();
+for (let y = 0; y < 40; y++) for (let x = 0; x < 40; x++) waterSeen.add(AS.spriteWater(x, y));
+check(waterSeen.size === B.water.length, `all ${B.water.length} water variants are used (${waterSeen.size})`);
+for (const i of waterSeen) add(i, `water ${i}`);
 check(seen.size === AS.SPRITE_COUNT, `every index used once (${seen.size} of ${AS.SPRITE_COUNT})`);
 
 // Pose rule. Arguments: species, moving, sprinting, resting, winded, pregnant, hold, stepMs, p, clock.

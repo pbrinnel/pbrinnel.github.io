@@ -11,7 +11,7 @@
 
   // SeedChance is "seeds at least once per day", so it becomes a per-day hazard rate and the
   // hourly chance follows from it. Boost multiplies the rate, not the chance, so it can never
-  // push the chance past 1. Rebuilt when the tables change (one per sim in practice).
+  // push the chance past 1; the lakeshore's boost (W.shore) multiplies it the same way. Rebuilt when the tables change (one per sim in practice).
   let cachedT = null, hourlyRate = 0, seedsAlways = false, sproutRate = 0;
   // Per-day chance → per-hour hazard rate, so a boost multiplies the rate, not the chance.
   const hourlyHazard = c => (c > 0 && c < 1 ? -Math.log(1 - c) / HOURS_PER_DAY : 0);
@@ -29,17 +29,19 @@
     const { T, W, rng } = sim;
     if (T !== cachedT) prepare(T);
     const g = T.grass, gSize = W.gSize, gList = W.gList, boostSrc = W.boostSrc, cNut = W.cNut;
-    const base = g.GrowthRate * AS.DT_DAYS;
+    const base = g.GrowthRate * AS.DT_DAYS, shore = W.shore;
 
     for (let i = 0, n = W.gCount; i < n; i++) {
       const t = gList[i], s = gSize[t];
       if (s >= 1) continue;
-      let grown = s + base;
+      // A lakeshore's boost multiplies the base rate, so a corpse's boost multiplies on top of it.
+      const rate = base * shore[t];
+      let grown = s + rate;
       const src = boostSrc[t];
       if (src >= 0 && grown < 1) {
         // Each unit of extra growth costs the corpse one unit of Nutrient.
         const boost = sim.T[AS.SPECIES_KEY[W.cSpecies[src]]].CorpseBoost;
-        let extra = base * (boost - 1);
+        let extra = rate * (boost - 1);
         if (extra > 1 - grown) extra = 1 - grown;
         if (extra > cNut[src]) extra = cNut[src];
         if (extra > 0) { cNut[src] -= extra; grown += extra; }
@@ -58,7 +60,7 @@
       // land it has lost; a nearby corpse speeds that up like it speeds seeding.
       if (W.kind[t] === AS.KIND.EMPTY) {
         if (sproutRate > 0 && !W.hole[t] && burnt === 0) {
-          const ps = 1 - Math.exp(-sproutRate * (boostSrc[t] >= 0 ? AS.corpseBoost(sim, t) : 1));
+          const ps = 1 - Math.exp(-sproutRate * shore[t] * (boostSrc[t] >= 0 ? AS.corpseBoost(sim, t) : 1));
           if (rng.chance(ps)) W.addGrass(t, g.SproutSize, 0);
         }
         continue;
@@ -72,7 +74,7 @@
       else if (hourlyRate === 0) continue;
       else {
         const src = boostSrc[t];
-        p = 1 - Math.exp(-hourlyRate * (src >= 0 ? AS.corpseBoost(sim, t) : 1));
+        p = 1 - Math.exp(-hourlyRate * shore[t] * (src >= 0 ? AS.corpseBoost(sim, t) : 1));
       }
       if (p < 1 && !rng.chance(p)) continue;
       const k = W.neighbors4(t, nb);

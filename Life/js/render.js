@@ -32,6 +32,8 @@
   }
   const FAR_GRASS = ['#2c4a2c', '#3f7040', '#62a457'].map(abgr);
   const FAR_CORPSE = abgr('#6a6250'), FAR_GROUND = abgr('#121410'), FAR_HOLE = abgr('#3d2e20');
+  // Water is the one big blue field of the far view; the sprites' own blue, a little lifted.
+  const FAR_WATER = abgr('#2f6495');
   // Humans are a bright pink-violet no other species or ground uses, so a hunter stands out from far away.
   const FAR_ANIMAL = [['#e0a868', '#f2cc96'], ['#8fb2e0', '#c0d6f2'], ['#e08fd8', '#f0b8ea']].map(r => r.map(abgr));   // [species][sex]
 
@@ -216,12 +218,13 @@
       }
       const px = cell.px, kind = W.kind, size = W.gSize;
       const bg = FAR_GROUND, g0 = FAR_GRASS[0], g1 = FAR_GRASS[1], g2 = FAR_GRASS[2];
-      const corpse = FAR_CORPSE, holeAt = W.hole, scorch = W.scorch, fullDays = sim.T.world.ScorchDays;
+      const corpse = FAR_CORPSE, water = FAR_WATER, holeAt = W.hole, scorch = W.scorch, fullDays = sim.T.world.ScorchDays;
       const lo = 1 / 3, hi = 2 / 3;
       for (let t = 0, n = W.n; t < n; t++) {
         const k = kind[t];
         if (k === KIND.GRASS) { const z = size[t]; px[t] = z < lo ? g0 : z < hi ? g1 : g2; }
         else if (k === KIND.CORPSE) px[t] = corpse;
+        else if (k === KIND.WATER) px[t] = water;
         else if (scorch[t] > 0) px[t] = mixAbgr(bg, FAR_SCORCH, scorch[t] / fullDays);
         else px[t] = holeAt[t] ? FAR_HOLE : bg;   // empty ground (or a hole), or an animal that the loop below paints
       }
@@ -265,7 +268,8 @@
             if (W.cMeat[row + tx] > 0) id = AS.spriteCarcass(W.cSpecies[row + tx]);
             else if (nowMs < deathUntil[row + tx]) id = AS.spriteCarcass(W.cSpecies[row + tx]);
             else id = AS.spriteSkull(W.cSpecies[row + tx]);
-          } else continue;   // empty, or an animal (own pass)
+          } else if (k === KIND.WATER) id = AS.spriteWater(tx, ty);
+          else continue;   // empty, or an animal (own pass)
           const dx = Math.round(tx * s - ox), dw = Math.round((tx + 1) * s - ox) - dx;
           ctx.drawImage(img, sh.sx(id), sh.sy(id), px, px, dx, dy, dw, dh);
         }

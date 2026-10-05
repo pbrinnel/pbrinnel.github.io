@@ -7,7 +7,8 @@
 //   default is NukeRadius in settings.csv; 0 = just that tile) of `tile`: animals
 //   vanish with no corpse and no DEATH event (nothing is left to act out), blades, corpses
 //   and warren holes go, and the ground is scorched (W.scorch, days left): ScorchDays at the
-//   center, shorter toward the rim, so the crater greens from its edges inward.
+//   center, shorter toward the rim, so the crater greens from its edges inward. Water is left
+//   alone: it stays and is not scorched.
 //
 // AS.paintCircle(sim, kind, cx, cy, r, cap) → number placed       kind: 'grass' | 'bunny' | 'wolf' | 'human'
 //   The paint modes' brush: one new thing of that kind on every eligible tile within r tiles
@@ -37,6 +38,7 @@
         const t = y * W.w + x;
         out.tiles++;
         const k = W.kind[t];
+        if (k === AS.KIND.WATER) continue;   // water is not the nuke's to touch, and it can't scorch
         if (k >= AS.KIND.BUNNY) { W.removeAnimal(W.aSlot[t]); out.animals++; }
         else if (k === AS.KIND.GRASS) { W.removeGrass(t); out.blades++; }
         else if (k === AS.KIND.CORPSE) { AS.corpseRemove(sim, t); out.corpses++; }

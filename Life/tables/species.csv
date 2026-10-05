@@ -56,3 +56,5 @@ CorpseDecay,days,1,5,5,,Corpse disappears after this
 MeatOnBody,Fullness,60,60,60,,Food on a body for whoever eats it (EatsCarcass); a carcass keeps it until eaten or until the corpse rots
 CorpseRadius,tiles,3,3,3,,Grass inside grows and seeds faster
 CorpseBoost,× multiplier,3,3,3,,Applied to GrowthRate and SeedChance in radius
+WaterRadius,tiles,,,,4,Grass within this many tiles of a lake grows and seeds faster (the shore)
+WaterBoost,× multiplier,,,,2,Applied to GrowthRate and SeedChance and SproutChance on the shore; multiplies with a corpse's boost

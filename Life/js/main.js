@@ -140,7 +140,8 @@
     const t = W.tile(tx, ty), k = W.kind[t];
     // A hole with nothing on it is selectable too (it has no serial, so `hole` marks it).
     const bareHole = k === AS.KIND.EMPTY && W.hole[t] === 1;
-    sel = k === AS.KIND.GRASS || k === AS.KIND.CORPSE || bareHole ? { tile: t, serial: W.serial[t], slot: -1, hole: bareHole } : null;
+    // Water has no serial (0) and never changes, so its selection simply stays.
+    sel = k === AS.KIND.GRASS || k === AS.KIND.CORPSE || k === AS.KIND.WATER || bareHole ? { tile: t, serial: W.serial[t], slot: -1, hole: bareHole } : null;
   }, (x0, y0, x1, y1) => { if (brush) app.paintLine(x0, y0, x1, y1); });
 
   // The animal whose drawn center is nearest (fx, fy), in tiles, within PICK_RADIUS; or -1.
