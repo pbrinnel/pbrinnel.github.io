@@ -62,7 +62,7 @@ watching the sim run. Everything else in this doc is decided.
   (`StartGrass` is the meadow share, `MeadowSize` the size of the largest). Meadows start
   partly filled with blades of every age, as a meadow that has been growing a while is,
   with a few lone seedlings in the open, so the start doesn't die back as one wave.
-  **Water** (Paul, 4–5 Oct 2026), off by default (`Water` in settings.csv; the Debug tab's
+  **Water** (Paul, 4–5 Oct 2026), on by default since 5 Oct (`Water` in settings.csv; the Debug tab's
   Water button switches it and starts a new world): `Lakes` irregular lakes about
   `LakeSize` tiles across and `Rivers` winding rivers with land-bridge fords every
   `BridgeEvery` tiles are laid first. Water is impassable to everything (but animals see
@@ -150,7 +150,13 @@ watching the sim run. Everything else in this doc is decided.
   until they died). A wolf that hasn't seen a bunny for `RoamAfter` days heads for a
   random destination `RoamRun` tiles away in any direction, diagonals included, then
   another, until it finds prey (Paul, 5 Oct 2026: keeping a grid heading made big packs
-  sweep the map in parallel lines).
+  sweep the map in parallel lines). A roaming wolf is desperate: walking costs it
+  `RoamHunger` times the hunger, and starving (`StarveDamage`) kills in a day or two, so
+  wolves vacate hunted-out land by leaving or dying instead of patrolling the whole map for
+  weeks (Paul, 5 Oct 2026: in large numbers they owned the board and bunnies had no chance).
+  Wolf `Lifespan` is 60 days. Gross test, water on, 3 seeds x 60 days: before, bunnies died
+  out in 2 of 3 seeds by day 49; with RoamHunger 5, StarveDamage 2 and Lifespan 60 all three
+  seeds kept every species (day 60: bunnies 173-1,262, wolves 73-81).
 - **Wolves find mates far beyond sight** (Paul, 4 Oct 2026): a ready wolf senses a ready
   mate within `MateRange` (howling and scent) and travels straight toward it, so wolves
   thinned to a scattered few can still pair up. Wolf litters are 3–5, nearer real wolves'

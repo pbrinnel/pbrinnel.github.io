@@ -33,6 +33,8 @@
       m.preyFor = grow(m.preyFor, Uint32Array);     // the serial preyAt belongs to (slots are reused)
       m.roamTo = grow(m.roamTo, Int32Array);        // a roaming hunter's far destination tile
       m.roamFor = grow(m.roamFor, Uint32Array);     // the serial roamTo belongs to; another serial = none
+      m.roaming = grow(m.roaming, Uint8Array);      // set by PROWL: no prey seen for RoamAfter days
+      m.roamingFor = grow(m.roamingFor, Uint32Array); // the serial `roaming` belongs to
       m.cap = W.aCap;
     }
     return m;
@@ -48,7 +50,7 @@
     let r = byKey[key];
     if (!r) {
       const find = n => sim.T.states[key].findIndex(st => st.name === n);
-      r = byKey[key] = { HUNT: find('HUNT'), FEED: find('FEED'), GIVE_UP: find('GIVE_UP'), REST: find('REST') };
+      r = byKey[key] = { HUNT: find('HUNT'), FEED: find('FEED'), GIVE_UP: find('GIVE_UP'), REST: find('REST'), PROWL: find('PROWL') };
     }
     return r;
   }
@@ -220,6 +222,7 @@
     mPrey = AS.relations(sim.T).prey[W.aSpecies[s]];
     if (AS.nearestVisible(sim, t, S.VisionRange, isPrey) >= 0) m.preyAt[s] = now;
     const roaming = S.RoamAfter > 0 && now - m.preyAt[s] > S.RoamAfter * AS.DAY_SECONDS;
+    m.roaming[s] = roaming ? 1 : 0; m.roamingFor[s] = W.aSerial[s];
     if (roaming) {
       if (m.roamFor[s] !== W.aSerial[s]) { m.roamFor[s] = W.aSerial[s]; m.roamTo[s] = roamGoal(sim, t, S.RoamRun); }
       if (headToward(sim, s, m.roamTo[s])) return;
@@ -454,5 +457,12 @@
   // for breeders) and the helpers FORAGE moves with.
   const { MATE, ...SHARED } = STATES;
   AS.hunterStates = Object.freeze(SHARED);
+  // Whether hunter s is roaming (animals.js charges RoamHunger for it). Only PROWL sets it,
+  // so a hunter that has left PROWL to hunt, feed or rest isn't roaming.
+  AS.isRoaming = function (sim, s) {
+    const W = sim.W, m = mem(W);
+    return m.roaming[s] === 1 && m.roamingFor[s] === W.aSerial[s] && W.aState[s] === idx(sim, s).PROWL;
+  };
+
   AS.hunterKit = Object.freeze({ walkToward, prowlStep, calmStart });
 })(globalThis.AS);

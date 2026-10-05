@@ -344,8 +344,13 @@
       W.aAge[s] += AS.DT_DAYS;
       // Activity sets the burn: standing still (resting, hiding, eating in place) costs
       // RestHunger times HungerRate, sprinting SprintHunger times, walking HungerRate.
-      const burn = W.aSprint[s] ? S.SprintHunger : W.aStepLeft[s] > 0 ? 1 : S.RestHunger;
-      let full = W.aFullness[s] - S.HungerRate * burn * dt;
+      // A hunter that has gone RoamAfter days without seeing prey is desperate: walking costs
+      // it RoamHunger times as much, so hunters starve out of hunted-out land rather than
+      // patrol it for weeks.
+      const moving = W.aStepLeft[s] > 0;
+      const burn = W.aSprint[s] ? S.SprintHunger : moving ? 1 : S.RestHunger;
+      const hungerBurn = moving && !W.aSprint[s] && S.RoamHunger > 1 && AS.isRoaming(sim, s) ? S.RoamHunger : burn;
+      let full = W.aFullness[s] - S.HungerRate * hungerBurn * dt;
       if (full < 0) full = 0;
       W.aFullness[s] = full;
       // Thirst burns by the same activity factor as hunger. A world with no water has no

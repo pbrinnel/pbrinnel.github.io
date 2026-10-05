@@ -283,7 +283,7 @@ function landPieces(AS, W) {
   ok(foundW > 50 && wetW === 0, `pathNextWeighted with water at Infinity never steps onto it (${foundW} paths)`);
   // A wolf across the lake from a bunny sees it, hunts it, and stays on land the whole time.
   const wolf = AS.spawnStarting(sim, AS.SPECIES.WOLF, a);
-  W.aFullness[wolf] = 1;   // hungry, so it hunts rather than prowls
+  W.aFullness[wolf] = 30;  // hungry, so it hunts rather than prowls, but not starving through the scene
   let hunted = false, onWater = 0;
   for (let tick = 0; tick < 60 * AS.TICK_HZ; tick++) {
     sim.tick();

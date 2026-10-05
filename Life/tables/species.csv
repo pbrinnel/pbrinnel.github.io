@@ -6,7 +6,7 @@ StaminaRefill,per s,8,4,6,,While not sprinting
 SprintCost,per s,25,20,8,,
 FullnessMax,points,100,100,100,,
 HungerRate,per s,0.667,0.3,0.2,,Bunny empty in ~7.5 days; wolf in ~17 (walking; standing still takes RestHunger of it)
-StarveDamage,HP per s,1,0.4,0.4,,HP lost while Fullness = 0; wolf lasts ~7 days on an empty stomach
+StarveDamage,HP per s,1,2,0.4,,HP lost while Fullness = 0; a wolf lasts ~1.5 days on an empty stomach
 RestHunger,× HungerRate,0.5,0.5,0.5,,Hunger while standing still (resting, hiding, eating in place)
 SprintHunger,× HungerRate,1.5,1.5,1.5,,Hunger while sprinting; walking burns HungerRate
 WaterMax,points,100,100,100,,Size of the water meter (Water): an animal drinks it back up at a lake or river and it drains as it moves
@@ -38,7 +38,7 @@ BiteFood,Fullness per bite,15,20,20,,What the eater gains per bite of a blade (b
 GrassFood,Fullness per bite,,,4,,Food a blade of grass gives per bite at full BiteSize; blank = the animal uses BiteFood (bunnies)
 BiteSize,Size per bite,0.25,0.5,0.5,,How much of a blade one bite removes; a wolf or human chews through grass this way but gains no food from the chewing
 TimeToMature,days,3,15,10,1,Grass: days to reach full Size and start seeding
-Lifespan,days,7,120,200,10,
+Lifespan,days,7,60,200,10,
 ElderAt,% of Lifespan,80,80,80,,
 VisionRange,tiles,8,16,14,,
 PregnancyDays,days,1,3,,,
@@ -48,6 +48,7 @@ MateFullness,% of FullnessMax,60,70,,,Both parents must be at least this full
 MateCost,% of FullnessMax,30,30,,,Fullness each parent loses at mating
 RoamAfter,days,,1,1,,A wolf or human that hasn't seen prey this long roams: it heads for far destinations in any direction until it finds prey; blank = never
 RoamRun,tiles,,40-120,40-120,,How far away a roaming animal's destinations are, straight-line
+RoamHunger,× HungerRate,,5,,,Hunger while roaming (walking after RoamAfter days without seeing prey): a desperate hunter burns faster; blank = like walking
 MateRange,tiles,,80,,,A ready wolf hears and scents a ready mate this far away (howling, scent) and travels to it; blank = only mates in sight
 PackLimit,count,,8,,,A female wolf breeds only if no more than this many other adult wolves are within TerritoryRange; blank = no limit
 TerritoryRange,tiles,,15,,,Square (Chebyshev) distance for PackLimit

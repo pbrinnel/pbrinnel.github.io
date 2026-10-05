@@ -70,6 +70,7 @@
     ['MateCost', 'frac', BREEDERS],
     ['RoamAfter', 'num', []],        // blank = never roams
     ['RoamRun', 'range', []],
+    ['RoamHunger', 'num', []],       // blank = roaming burns like walking
     ['MateRange', 'num', []],        // blank = a mate must be in sight
     ['PackLimit', 'num', []],        // blank = no territory rule
     ['TerritoryRange', 'num', []],

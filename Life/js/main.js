@@ -38,9 +38,10 @@
   let tool = 'select';
   let sel = null;
   // Intent lines are the viewer's choice, kept per browser; off when storage is unavailable.
-  // Water (lakes, rivers, thirst) is the viewer's choice too: off unless they turned it on.
-  let waterOn = false;
-  try { waterOn = localStorage.getItem(WATER_KEY) === '1'; } catch (e) { /* stays off */ }
+  // Water (lakes, rivers, thirst) is the viewer's choice too: on unless they turned it off.
+  // The HUD is built before the tables load, so this default can't read settings.csv's Water.
+  let waterOn = true;
+  try { waterOn = localStorage.getItem(WATER_KEY) !== '0'; } catch (e) { /* stays on */ }
   let linesOn = false;
   try { linesOn = localStorage.getItem(LINES_KEY) === '1'; } catch (e) { /* stays off */ }
   // The open HUD tab is also the viewer's choice. Nothing stored (or storage blocked): Info.
