@@ -68,6 +68,9 @@
       m.stressAt = grow(m.stressAt, Float64Array, 1);
       m.scareAt = grow(m.scareAt, Float64Array, 1); // sim.simSeconds of the last scare counted
       m.stressFor = grow(m.stressFor, Uint32Array, 1); // the serial these three belong to
+      m.awayFrom = grow(m.awayFrom, Int32Array, 1); // where this trip began (TravelMin is measured from it)
+      m.natal = grow(m.natal, Uint8Array, 1);      // 1: this trip is its natal dispersal (settles on arrival)
+      m.dispFor = grow(m.dispFor, Uint32Array, 1); // the serial whose dispersal was decided (once a life)
       m.lead = grow(m.lead, Int32Array, 1);        // a companion's leader slot; -1 = it leads itself
       m.leadSerial = grow(m.leadSerial, Uint32Array, 1);
       m.cap = W.aCap;
@@ -198,22 +201,30 @@
     return W.wDist[t] <= GOAL_WATER;
   }
 
-  // A tile a random RoamRun away from t at a random angle, clamped to the world. In a world
-  // with water it is one of up to GOAL_TRIES such tiles within GOAL_WATER walking tiles of a
-  // shore if any is: a bunny can't live out of reach of water, and one sent into dry land
-  // turned back to its home lake to drink every time it got thirsty.
-  function farGoal(sim, t, run) {
-    const W = sim.W;
-    let g = -1;
+  // A destination for a trip that began at `from`: a tile a random `run` from t (at least
+  // minD) at a random angle, clamped to the world, and at least minD from `from` so a trip
+  // never doubles back home. In a world with water it is also within GOAL_WATER walking
+  // tiles of a shore if one of GOAL_TRIES such tiles is: a bunny can't live out of reach of
+  // water, and one sent into dry land turned back to its home lake to drink every time.
+  function farGoal(sim, t, run, from, minD) {
+    const W = sim.W, fx = from % W.w, fy = (from / W.w) | 0;
+    let g = -1, gFar = -1;
     for (let i = 0; i < GOAL_TRIES; i++) {
-      const a = sim.rng.next() * 2 * Math.PI, r = sim.rng.inRange(run);
+      const a = sim.rng.next() * 2 * Math.PI, r = Math.max(minD, sim.rng.inRange(run));
       const x = Math.min(W.w - 1, Math.max(0, Math.round(t % W.w + r * Math.cos(a))));
       const y = Math.min(W.h - 1, Math.max(0, Math.round(((t / W.w) | 0) + r * Math.sin(a))));
       g = y * W.w + x;
-      if (nearWater(W, g)) break;
+      if (Math.hypot(x - fx, y - fy) < minD) continue;
+      if (gFar < 0) gFar = g;
+      if (nearWater(W, g)) return g;
     }
-    return g;
+    return gFar >= 0 ? gFar : g;
   }
+
+  // How far, in tiles, a trip must take a bunny from where it began before it may settle:
+  // TravelMin of the world's longer side.
+  const travelMin = (W, S) => (S.TravelMin > 0 ? S.TravelMin : 0) * Math.max(W.w, W.h);
+  const farFrom = (W, t, from, d) => Math.hypot(t % W.w - from % W.w, ((t / W.w) | 0) - ((from / W.w) | 0)) >= d;
 
   // Stress (Paul): scares and hunger with nothing to eat add to it, and it halves every
   // StressHalfLife days, so scares that come faster than they fade build up (repeated
@@ -233,10 +244,12 @@
     const m = mem(sim.W);
     m.stress[s] = stressNow(sim, s, m) + amount;
   }
-  // The inspector's view: stress now (faded to this moment) and whether it is emigrating.
+  // The inspector's view: stress now (faded to this moment), whether it is away (emigrating
+  // or leaving home), and which.
   AS.bunnyStress = function (sim, s) {
     const m = mem(sim.W);
-    return { stress: stressNow(sim, s, m), away: m.awayFor[s] === sim.W.aSerial[s] };
+    const away = m.awayFor[s] === sim.W.aSerial[s];
+    return { stress: stressNow(sim, s, m), away, leavingHome: away && m.natal[s] === 1 };
   };
   // A scare: one per chase. Fleeing, hiding and fleeing again from the same wolf within
   // SCARE_GAP seconds is still the one chase.
@@ -266,6 +279,21 @@
       const now = sim.simSeconds, since = m.checkFor[s] === serial ? now - m.checkAt[s] : 0;
       m.checkFor[s] = serial; m.checkAt[s] = now;
       if (!(since > 0) || W.aAge[s] >= S.ElderAt * S.Lifespan) return false;
+      // Natal dispersal (Paul): grown up, a bunny born in this world leaves home once, with
+      // DisperseChance, for a spot DisperseRun away, and settles when it gets there.
+      // Decided once a life, at its first wander as an adult; the first generation, placed
+      // as adults where the world began, is already home.
+      let natal = false;
+      if (S.DisperseRun && m.dispFor[s] !== serial && W.aParentA[s] !== 0 && AS.stageOfSlot(sim, s) === AS.STAGE.ADULT) {
+        m.dispFor[s] = serial;
+        natal = S.DisperseChance > 0 && sim.rng.next() < S.DisperseChance;
+      }
+      if (natal) {
+        m.awayFor[s] = serial; m.lead[s] = -1; m.natal[s] = 1; m.checkAt[s] = now; m.awayFrom[s] = t;
+        m.awayTo[s] = farGoal(sim, t, S.DisperseRun, t, travelMin(W, S));
+        takeCompanion(sim, s, S, t, m);
+        return false;   // the trip starts on its next step
+      }
       // Stressed past LeaveStress it goes; crowded, it goes with LeaveChance a day.
       const stressed = S.LeaveStress > 0 && stressNow(sim, s, m) >= S.LeaveStress;
       if (!stressed) {
@@ -275,22 +303,18 @@
       m.stress[s] = 0;   // a fresh start where it settles
       m.awayFor[s] = serial;
       m.lead[s] = -1;
+      m.natal[s] = 0;
       m.checkAt[s] = now;
-      m.awayTo[s] = farGoal(sim, t, S.RoamRun);
-      mW = W; mSelf = s; mMem = m;
-      const ct = AS.nearestVisible(sim, t, S.VisionRange, isCompanion);
-      if (ct >= 0) {
-        const c = W.aSlot[ct];
-        m.awayFor[c] = W.aSerial[c]; m.lead[c] = s; m.leadSerial[c] = serial;
-        W.aRunLeft[c] = 0;
-      }
+      m.awayFrom[s] = t;
+      m.awayTo[s] = farGoal(sim, t, S.RoamRun, t, travelMin(W, S));
+      takeCompanion(sim, s, S, t, m);
     } else if (m.lead[s] >= 0) {
       return followStep(sim, s, m, t);
-    } else if (sim.simSeconds - m.checkAt[s] >= SETTLE_EVERY) {
+    } else if (!m.natal[s] && sim.simSeconds - m.checkAt[s] >= SETTLE_EVERY) {
       // Settling looks SettleRange around, much wider than sight, so a pair doesn't stop
       // just past its colony's edge and merge back in; and only near water, where it can live.
       m.checkAt[s] = sim.simSeconds;
-      if (crowdAt(W, t, Math.round(S.SettleRange)) <= S.SettleCrowd && nearWater(W, t)) {
+      if (farFrom(W, t, m.awayFrom[s], travelMin(W, S)) && crowdAt(W, t, Math.round(S.SettleRange)) <= S.SettleCrowd && nearWater(W, t)) {
         m.awayFor[s] = 0;
         W.aTargetTile[s] = -1;
         return false;
@@ -299,16 +323,21 @@
     if (W.aRunLeft[s] > 0) return false;
     const g = m.awayTo[s];
     W.aTargetTile[s] = g;
-    // There: a new destination, and a plain run before heading for it.
+    // There: a natal disperser is home; an emigrant takes a new destination, and a plain run
+    // before heading for it.
     const gx = g % W.w, gy = (g / W.w) | 0, tx = t % W.w, ty = (t / W.w) | 0;
     const left = Math.hypot(tx - gx, ty - gy);
-    if (left <= AWAY_GAIN) { m.awayTo[s] = farGoal(sim, t, S.RoamRun); return false; }
+    if (left <= AWAY_GAIN) {
+      if (m.natal[s] && farFrom(W, t, m.awayFrom[s], travelMin(W, S))) { m.awayFor[s] = 0; m.natal[s] = 0; W.aTargetTile[s] = -1; }
+      else m.awayTo[s] = farGoal(sim, t, m.natal[s] ? S.DisperseRun : S.RoamRun, m.awayFrom[s], travelMin(W, S));
+      return false;
+    }
     // Path, within sight, to a tile AWAY_GAIN nearer the destination: bunnies can't cross
     // grass, and a straight-line step stalls at every meadow. None within sight (walled in
     // by water or grass that way): try another destination after a plain run.
     mW = W; mGoalTile = g; mAwayNeed = (left - AWAY_GAIN) * (left - AWAY_GAIN);
     const best = AS.pathNext(sim, t, isNearerAway, S.VisionRange);
-    if (best < 0 || best === t) { m.awayTo[s] = farGoal(sim, t, S.RoamRun); return false; }
+    if (best < 0 || best === t) { m.awayTo[s] = farGoal(sim, t, m.natal[s] ? S.DisperseRun : S.RoamRun, m.awayFrom[s], travelMin(W, S)); return false; }
     AS.stepTo(sim, s, best);
     return true;
   }
@@ -325,6 +354,18 @@
       if (d < bestD) { best = u; bestD = d; }
     }
     return best;
+  }
+
+  // The nearest visible bunny of the other sex not already away comes along: a lone settler
+  // never finds a mate, and a pair can found a colony.
+  function takeCompanion(sim, s, S, t, m) {
+    const W = sim.W;
+    mW = W; mSelf = s; mMem = m;
+    const ct = AS.nearestVisible(sim, t, S.VisionRange, isCompanion);
+    if (ct < 0) return;
+    const c = W.aSlot[ct];
+    m.awayFor[c] = W.aSerial[c]; m.lead[c] = s; m.leadSerial[c] = W.aSerial[s]; m.natal[c] = 0;
+    W.aRunLeft[c] = 0;
   }
 
   // A companion keeps near its leader, and settles when the leader settles or dies.
@@ -356,7 +397,7 @@
     const W = sim.W;
     if (W.aStepLeft[s] > 0) return;
     const t = W.aTile[s], S = AS.speciesStats(sim, s);
-    if ((S.LeaveCrowd > 0 && S.LeaveChance > 0 || S.LeaveStress > 0) && emigrateStep(sim, s, S, t)) return;
+    if ((S.LeaveCrowd > 0 && S.LeaveChance > 0 || S.LeaveStress > 0 || S.DisperseRun) && emigrateStep(sim, s, S, t)) return;
     if (W.aRunLeft[s] > 0) {
       const ahead = dirTile(W, t, W.aRunDir[s]);
       if (ahead >= 0 && W.kind[ahead] === K.EMPTY) {

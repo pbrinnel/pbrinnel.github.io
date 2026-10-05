@@ -34,6 +34,9 @@ LeaveStress,stress,4,,,,A bunny whose stress reaches this sets off for new land 
 ScareStress,stress,1,,,,Stress one scare adds (starting to flee a hunter; once per chase)
 HungerStress,stress,0.5,,,,Stress added each time a hungry bunny can see no grass and wanders instead
 StressHalfLife,days,1,,,,Stress halves this often, so only scares or hunger coming faster than that build up
+DisperseChance,%,50%,100%,,,Chance a bunny or wolf born in the world leaves home once it grows up (natal dispersal); the first generation never does
+DisperseRun,tiles,90-150,50-150,,,How far from home a young adult heads when it leaves (straight-line); it is home when it gets there; blank = never leaves
+TravelMin,% of world size,20%,,,,A bunny leaving home or emigrating doesn't settle until it is at least this far (a share of the world's longer side) from where its trip began
 WanderRun,tiles,3-8,4-10,4-10,,Steps taken in one direction before turning while wandering or prowling
 RoomPreference,×,1,1,1,,How strongly a wandering animal heads away from crowds of its own kind; 0 = random wandering
 DecidePerSec,per s,4,4,4,,How often an animal re-picks its state; it moves every tick
@@ -55,7 +58,7 @@ MateCooldown,days,2,10,,,Female only; starts after birth
 MateFullness,% of FullnessMax,60,70,,,Both parents must be at least this full
 MateCost,% of FullnessMax,30,30,,,Fullness each parent loses at mating
 RoamAfter,days,,3,1,,A wolf or human that hasn't seen prey this long roams: it heads for far destinations in any direction until it finds prey; blank = never
-RoamRun,tiles,40-120,40-120,40-120,,How far away a roaming wolf's or human's, or an emigrating bunny's, destinations are, straight-line
+RoamRun,tiles,90-150,40-120,40-120,,How far away a roaming wolf's or human's, or an emigrating bunny's, destinations are, straight-line
 RoamHunger,× HungerRate,,5,,,Hunger while roaming (walking after RoamAfter days without seeing prey): a desperate hunter burns faster; blank = like walking
 MateRange,tiles,,80,,,A ready wolf hears and scents a ready mate this far away (howling, scent) and travels to it; blank = only mates in sight
 PackLimit,count,,8,,,A female wolf breeds only if no more than this many other adult wolves are within TerritoryRange; blank = no limit

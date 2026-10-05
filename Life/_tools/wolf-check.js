@@ -492,5 +492,31 @@ function realRun() {
   h.audit(a.AS, a.sim, 'wolf-check');
   ok(h.failures.length === 0, 'real: grid/store audit clean ' + h.failures.slice(0, 3).join('; '));
 }
+// --- Natal dispersal: grown up, one born in the world leaves home and settles far off; the
+// first generation (placed where the world began) stays. Both species. ---
+{
+  const RUN = { Bunny: 40, Wolf: 60 };
+  const { AS, sim, W } = make(200, 5, false, tx => {
+    for (const sp of ['Bunny', 'Wolf']) {
+      tx.species = editCSV(tx.species, 'DisperseRun', sp, String(RUN[sp]));
+      tx.species = editCSV(tx.species, 'DisperseChance', sp, '100%');
+    }
+    tx.species = editCSV(tx.species, 'DigChance', 'Bunny', '0%');
+    tx.species = editCSV(tx.species, 'LeaveChance', 'Bunny', '0%');
+  });
+  // Far apart, so neither sees, hunts or flees the other; males, so no mating.
+  const born = [bun(AS, sim, 60, 100), wolf(AS, sim, 140, 100)], first = [bun(AS, sim, 60, 40), wolf(AS, sim, 140, 160)];
+  for (const s of born) W.aParentA[s] = 1;   // any nonzero serial: born in this world
+  const start = [...born, ...first].map(s => W.aTile[s]);
+  tick(sim, secs(AS, 40));
+  const dist = i => Math.sqrt(d2(W, W.aTile[[...born, ...first][i]], start[i]));
+  const names = ['bunny', 'wolf'];
+  for (let i = 0; i < 2; i++) {
+    const run = RUN[i ? 'Wolf' : 'Bunny'];
+    ok(dist(i) >= run - 6, `disperse: a ${names[i]} born in the world leaves home: ${dist(i).toFixed(0)} tiles (DisperseRun ${run})`);
+    ok(dist(i + 2) < run - 10, `disperse: a first-generation ${names[i]} stays near home: ${dist(i + 2).toFixed(0)} tiles`);
+  }
+  ok(W.aTargetTile[born[0]] < 0 && W.aTargetTile[born[1]] < 0, 'disperse: both are home, with no destination left');
+}
 console.log(bad ? `\nFAIL (${bad})` : '\nALL PASS');
 process.exit(bad ? 1 : 0);

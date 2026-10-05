@@ -34,6 +34,9 @@
       m.roamTo = grow(m.roamTo, Int32Array);        // a roaming hunter's far destination tile
       m.roamFor = grow(m.roamFor, Uint32Array);     // the serial roamTo belongs to; another serial = none
       m.roaming = grow(m.roaming, Uint8Array);      // set by PROWL: no prey seen for RoamAfter days
+      m.dispTo = grow(m.dispTo, Int32Array);        // a natal disperser's destination tile
+      m.dispOn = grow(m.dispOn, Uint8Array);        // 1 while on that trip
+      m.dispFor = grow(m.dispFor, Uint32Array);     // the serial whose dispersal was decided (once a life)
       m.roamingFor = grow(m.roamingFor, Uint32Array); // the serial `roaming` belongs to
       m.cap = W.aCap;
     }
@@ -61,6 +64,8 @@
   const MEAT_EPS = 1e-4;
 
   const nb = new Int32Array(4), open = new Int32Array(4), grassDirs = new Int32Array(4);
+  // A natal disperser this near its destination (tiles) is there.
+  const DISPERSE_THERE = 2;
 
   // Matchers, goals and costs are created once and read these instead of closing over a call.
   let mSim = null, mW = null, mSelf = 0, mGoal = 0, mFrom = 0, mInvSpeed = 0;
@@ -223,6 +228,21 @@
     if (AS.nearestVisible(sim, t, S.VisionRange, isPrey) >= 0) m.preyAt[s] = now;
     const roaming = S.RoamAfter > 0 && now - m.preyAt[s] > S.RoamAfter * AS.DAY_SECONDS;
     m.roaming[s] = roaming ? 1 : 0; m.roamingFor[s] = W.aSerial[s];
+    // Natal dispersal (Paul): grown up, a hunter born in this world leaves home once, with
+    // DisperseChance, for a spot DisperseRun away in any direction, and is home when it gets
+    // there. Decided once a life, at its first prowl as an adult; the first generation is
+    // already home. Blocked (a lake), it picks another spot as far again.
+    if (S.DisperseRun && m.dispFor[s] !== W.aSerial[s] && W.aParentA[s] !== 0 && AS.stageOfSlot(sim, s) === AS.STAGE.ADULT) {
+      m.dispFor[s] = W.aSerial[s];
+      m.dispOn[s] = S.DisperseChance > 0 && sim.rng.next() < S.DisperseChance ? 1 : 0;
+      if (m.dispOn[s]) m.dispTo[s] = roamGoal(sim, t, S.DisperseRun);
+    }
+    if (m.dispOn[s] && m.dispFor[s] === W.aSerial[s]) {
+      const g = m.dispTo[s], dx = t % W.w - g % W.w, dy = ((t / W.w) | 0) - ((g / W.w) | 0);
+      if (dx * dx + dy * dy <= DISPERSE_THERE * DISPERSE_THERE) { m.dispOn[s] = 0; W.aTargetTile[s] = -1; }
+      else if (headToward(sim, s, g)) { W.aTargetTile[s] = g; return; }
+      else m.dispTo[s] = roamGoal(sim, t, S.DisperseRun);
+    }
     if (roaming) {
       if (m.roamFor[s] !== W.aSerial[s]) { m.roamFor[s] = W.aSerial[s]; m.roamTo[s] = roamGoal(sim, t, S.RoamRun); }
       if (headToward(sim, s, m.roamTo[s])) return;

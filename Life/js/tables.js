@@ -55,6 +55,9 @@
     ['ScareStress', 'num', []],
     ['HungerStress', 'num', []],
     ['StressHalfLife', 'pos', []],
+    ['DisperseChance', 'frac', []],
+    ['DisperseRun', 'range', []],    // blank = never leaves home
+    ['TravelMin', 'frac', []],       // blank = settles wherever the trip's rules allow
     ['DigSeconds', 'num', ['Bunny']],
     ['WanderRun', 'range', ANIMALS],
     ['RoomPreference', 'num', ANIMALS],

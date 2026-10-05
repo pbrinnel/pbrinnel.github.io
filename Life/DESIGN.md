@@ -146,6 +146,23 @@ watching the sim run. Everything else in this doc is decided.
   wandering), so crowded colonies and packs leak into empty land. A fleeing bunny with no
   hole in reach picks the escape direction that gains distance without running into a
   wall or corner.
+- **Young adults leave home** (natal dispersal; Paul, 5 Oct 2026: chunks of the map never
+  refilled, and a shared map of open land felt like a hivemind). A bunny or wolf born in the
+  world, on growing up, leaves home once with `DisperseChance` for a spot `DisperseRun`
+  tiles away (bunnies: near water, by the same knowledge of their land that finds water),
+  and is home when it gets there. A bunny's trip, leaving home or emigrating, must take it
+  at least `TravelMin` of the world's longer side from where it set off before it settles
+  (Paul: they weren't going far enough), and a leaving bunny takes a companion of the other
+  sex as an emigrant does: with every young bunny leaving alone that far, few settled
+  anywhere with a mate and bunnies crashed in 2 of 3 seeds (42-77 at day 60). With
+  companions, half of them leaving did better on average than all (bunnies 119-974 against
+  65-684 at day 60, bunny squares 8-44 against 3-26); every seed is noisy, and wolves do
+  well on bunnies spread wide (89-142 at day 60). It is a life stage, not a reaction to crowds, so every
+  generation sends explorers out while adults stay put. The first generation, placed where
+  the world began, never does. Spread in squares 30 tiles across (seeds 1-3, day 60, on vs
+  off): bunnies in 30/23/13 against 45/6/28, wolves in 33/36/23 against 34/31/26; wolves
+  start stronger with it (102-105 at day 20 against 66-72), which presses bunnies. Gross
+  test, 3 seeds x 60 days: every species alive.
 - **Bunnies leave big crowds** (Paul, 5 Oct 2026: they only grew existing colonies, never
   founded remote ones). A wandering bunny, not yet elderly, with `LeaveCrowd` or more
   bunnies within `VisionRange` sets off (`LeaveChance` a day) for destinations `RoamRun`

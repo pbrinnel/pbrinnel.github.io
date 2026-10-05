@@ -390,6 +390,8 @@ function wolf(AS, sim, x, y) {
   }
   ok(headed, 'leave: it sets off for a destination');
   ok(settledAt >= 0 && crowdAt(settledAt) <= B.SettleCrowd, `leave: it settles where no more than SettleCrowd ${B.SettleCrowd} are around (${settledAt >= 0 ? crowdAt(settledAt) : 'never settled'})`);
+  const minD = B.TravelMin * Math.max(W.w, W.h), went = settledAt >= 0 ? Math.hypot(settledAt % W.w - 14, ((settledAt / W.w) | 0) - 50) : 0;
+  ok(went >= minD - 1, `leave: it settles at least TravelMin from where it set off (${went.toFixed(0)} >= ${minD.toFixed(0)} tiles)`);
 }
 
 // --- Stress: repeated scares set a bunny emigrating; one scare doesn't ---
