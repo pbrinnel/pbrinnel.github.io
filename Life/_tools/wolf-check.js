@@ -501,6 +501,7 @@ function realRun() {
       tx.species = editCSV(tx.species, 'DisperseRun', sp, String(RUN[sp]));
       tx.species = editCSV(tx.species, 'DisperseChance', sp, '100%');
     }
+    tx.species = editCSV(tx.species, 'DisperseFar', 'Bunny', '');   // a fixed trip: DisperseRun tiles
     tx.species = editCSV(tx.species, 'DigChance', 'Bunny', '0%');
     tx.species = editCSV(tx.species, 'LeaveChance', 'Bunny', '0%');
   });

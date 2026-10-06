@@ -68,6 +68,7 @@
       m.stressAt = grow(m.stressAt, Float64Array, 1);
       m.scareAt = grow(m.scareAt, Float64Array, 1); // sim.simSeconds of the last scare counted
       m.stressFor = grow(m.stressFor, Uint32Array, 1); // the serial these three belong to
+      m.tripMin = grow(m.tripMin, Float64Array, 1); // a natal trip's own length: no settling nearer its start
       m.awayFrom = grow(m.awayFrom, Int32Array, 1); // where this trip began (TravelMin is measured from it)
       m.natal = grow(m.natal, Uint8Array, 1);      // 1: this trip is its natal dispersal (settles on arrival)
       m.dispFor = grow(m.dispFor, Uint32Array, 1); // the serial whose dispersal was decided (once a life)
@@ -201,16 +202,16 @@
     return W.wDist[t] <= GOAL_WATER;
   }
 
-  // A destination for a trip that began at `from`: a tile a random `run` from t (at least
-  // minD) at a random angle, clamped to the world, and at least minD from `from` so a trip
-  // never doubles back home. In a world with water it is also within GOAL_WATER walking
+  // A destination for a trip that began at `from`: a tile a random `run` from t at a random
+  // angle, clamped to the world, and at least minD from `from` so a trip never doubles back
+  // home. In a world with water it is also within GOAL_WATER walking
   // tiles of a shore if one of GOAL_TRIES such tiles is: a bunny can't live out of reach of
   // water, and one sent into dry land turned back to its home lake to drink every time.
   function farGoal(sim, t, run, from, minD) {
     const W = sim.W, fx = from % W.w, fy = (from / W.w) | 0;
     let g = -1, gFar = -1;
     for (let i = 0; i < GOAL_TRIES; i++) {
-      const a = sim.rng.next() * 2 * Math.PI, r = Math.max(minD, sim.rng.inRange(run));
+      const a = sim.rng.next() * 2 * Math.PI, r = sim.rng.inRange(run);
       const x = Math.min(W.w - 1, Math.max(0, Math.round(t % W.w + r * Math.cos(a))));
       const y = Math.min(W.h - 1, Math.max(0, Math.round(((t / W.w) | 0) + r * Math.sin(a))));
       g = y * W.w + x;
@@ -224,6 +225,13 @@
   // How far, in tiles, a trip must take a bunny from where it began before it may settle:
   // TravelMin of the world's longer side.
   const travelMin = (W, S) => (S.TravelMin > 0 ? S.TravelMin : 0) * Math.max(W.w, W.h);
+  // A natal trip's destination distance from t: what is left of its own trip length, with
+  // room to spare (it is home on crossing that line, not on reaching the spot).
+  const natalRun = (W, m, s, t) => {
+    const f = m.awayFrom[s], done = Math.hypot(t % W.w - f % W.w, ((t / W.w) | 0) - ((f / W.w) | 0));
+    const need = Math.round(Math.max(0, m.tripMin[s] - done) + 2 * AWAY_GAIN);
+    return { min: need, max: need };
+  };
   const farFrom = (W, t, from, d) => Math.hypot(t % W.w - from % W.w, ((t / W.w) | 0) - ((from / W.w) | 0)) >= d;
 
   // Stress (Paul): scares and hunger with nothing to eat add to it, and it halves every
@@ -284,13 +292,17 @@
       // Decided once a life, at its first wander as an adult; the first generation, placed
       // as adults where the world began, is already home.
       let natal = false;
-      if (S.DisperseRun && m.dispFor[s] !== serial && W.aParentA[s] !== 0 && AS.stageOfSlot(sim, s) === AS.STAGE.ADULT) {
+      if ((S.DisperseRun || S.DisperseFar > 0) && m.dispFor[s] !== serial && W.aParentA[s] !== 0 && AS.stageOfSlot(sim, s) === AS.STAGE.ADULT) {
         m.dispFor[s] = serial;
         natal = S.DisperseChance > 0 && sim.rng.next() < S.DisperseChance;
       }
       if (natal) {
         m.awayFor[s] = serial; m.lead[s] = -1; m.natal[s] = 1; m.checkAt[s] = now; m.awayFrom[s] = t;
-        m.awayTo[s] = farGoal(sim, t, S.DisperseRun, t, travelMin(W, S));
+        // Its own trip length (Paul): somewhere from TravelMin to DisperseFar of the world's
+        // longer side, and it doesn't settle short of it. DisperseFar blank: DisperseRun tiles.
+        const side = Math.max(W.w, W.h), lo = travelMin(W, S);
+        m.tripMin[s] = S.DisperseFar > 0 ? lo + sim.rng.next() * Math.max(0, S.DisperseFar * side - lo) : Math.max(lo, sim.rng.inRange(S.DisperseRun));
+        m.awayTo[s] = farGoal(sim, t, natalRun(W, m, s, t), t, m.tripMin[s]);
         takeCompanion(sim, s, S, t, m);
         return false;   // the trip starts on its next step
       }
@@ -320,16 +332,22 @@
         return false;
       }
     }
+    // A natal disperser is home once it is its trip length from where it set off, wherever
+    // it was aiming: a detour's new destination is measured from where it stands, so waiting
+    // to reach one could chase it forever.
+    if (m.natal[s] && farFrom(W, t, m.awayFrom[s], m.tripMin[s])) {
+      m.awayFor[s] = 0; m.natal[s] = 0; W.aTargetTile[s] = -1;
+      return false;
+    }
     if (W.aRunLeft[s] > 0) return false;
     const g = m.awayTo[s];
     W.aTargetTile[s] = g;
-    // There: a natal disperser is home; an emigrant takes a new destination, and a plain run
-    // before heading for it.
+    // There, and not yet far enough (natal) or not yet settled (emigrant): a new destination,
+    // and a plain run before heading for it.
     const gx = g % W.w, gy = (g / W.w) | 0, tx = t % W.w, ty = (t / W.w) | 0;
     const left = Math.hypot(tx - gx, ty - gy);
     if (left <= AWAY_GAIN) {
-      if (m.natal[s] && farFrom(W, t, m.awayFrom[s], travelMin(W, S))) { m.awayFor[s] = 0; m.natal[s] = 0; W.aTargetTile[s] = -1; }
-      else m.awayTo[s] = farGoal(sim, t, m.natal[s] ? S.DisperseRun : S.RoamRun, m.awayFrom[s], travelMin(W, S));
+      m.awayTo[s] = farGoal(sim, t, m.natal[s] ? natalRun(W, m, s, t) : S.RoamRun, m.awayFrom[s], m.natal[s] ? m.tripMin[s] : travelMin(W, S));
       return false;
     }
     // Path, within sight, to a tile AWAY_GAIN nearer the destination: bunnies can't cross
@@ -337,7 +355,7 @@
     // by water or grass that way): try another destination after a plain run.
     mW = W; mGoalTile = g; mAwayNeed = (left - AWAY_GAIN) * (left - AWAY_GAIN);
     const best = AS.pathNext(sim, t, isNearerAway, S.VisionRange);
-    if (best < 0 || best === t) { m.awayTo[s] = farGoal(sim, t, m.natal[s] ? S.DisperseRun : S.RoamRun, m.awayFrom[s], travelMin(W, S)); return false; }
+    if (best < 0 || best === t) { m.awayTo[s] = farGoal(sim, t, m.natal[s] ? natalRun(W, m, s, t) : S.RoamRun, m.awayFrom[s], m.natal[s] ? m.tripMin[s] : travelMin(W, S)); return false; }
     AS.stepTo(sim, s, best);
     return true;
   }
@@ -397,7 +415,7 @@
     const W = sim.W;
     if (W.aStepLeft[s] > 0) return;
     const t = W.aTile[s], S = AS.speciesStats(sim, s);
-    if ((S.LeaveCrowd > 0 && S.LeaveChance > 0 || S.LeaveStress > 0 || S.DisperseRun) && emigrateStep(sim, s, S, t)) return;
+    if ((S.LeaveCrowd > 0 && S.LeaveChance > 0 || S.LeaveStress > 0 || S.DisperseRun || S.DisperseFar > 0) && emigrateStep(sim, s, S, t)) return;
     if (W.aRunLeft[s] > 0) {
       const ahead = dirTile(W, t, W.aRunDir[s]);
       if (ahead >= 0 && W.kind[ahead] === K.EMPTY) {

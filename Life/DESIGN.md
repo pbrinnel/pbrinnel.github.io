@@ -152,8 +152,14 @@ watching the sim run. Everything else in this doc is decided.
   tiles away (bunnies: near water, by the same knowledge of their land that finds water),
   and is home when it gets there. A bunny's trip, leaving home or emigrating, must take it
   at least `TravelMin` of the world's longer side from where it set off before it settles
-  (Paul: they weren't going far enough), and a leaving bunny takes a companion of the other
-  sex as an emigrant does: with every young bunny leaving alone that far, few settled
+  (Paul: they weren't going far enough). A young bunny draws its own trip length, from
+  `TravelMin` to `DisperseFar` of that side, and is home the moment it is that far from
+  where it set off, whatever spot it was aiming at (a detour's new spot is measured from
+  where it stands, and waiting to reach one chased it forever). Paul first asked for 1/5 to
+  2/3 of the map; bunnies live 7 days, and young ones reached a median 37 tiles (90% under
+  66) before dying of old age, so none arrived. At 5%-15% (22-67 tiles now), a third arrive
+  (median 38 tiles), and 3 seeds kept bunnies 220-682 and wolves 76-98 at day 60. A leaving
+  bunny takes a companion of the other sex as an emigrant does: with every young bunny leaving alone that far, few settled
   anywhere with a mate and bunnies crashed in 2 of 3 seeds (42-77 at day 60). With
   companions, half of them leaving did better on average than all (bunnies 119-974 against
   65-684 at day 60, bunny squares 8-44 against 3-26); every seed is noisy, and wolves do

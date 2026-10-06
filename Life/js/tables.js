@@ -57,6 +57,7 @@
     ['StressHalfLife', 'pos', []],
     ['DisperseChance', 'frac', []],
     ['DisperseRun', 'range', []],    // blank = never leaves home
+    ['DisperseFar', 'frac', []],     // blank = DisperseRun tiles
     ['TravelMin', 'frac', []],       // blank = settles wherever the trip's rules allow
     ['DigSeconds', 'num', ['Bunny']],
     ['WanderRun', 'range', ANIMALS],
