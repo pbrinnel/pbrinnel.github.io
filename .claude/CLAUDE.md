@@ -11,6 +11,18 @@ Paul's site, paulbrinnel.com. GitHub Pages serves `master` directly, so whatever
 - Paul pushes. Commit when he asks, then tell him it's ready to push.
 - Other Claude sessions may be working in this folder at the same time. Before committing, check `git status` and `git diff`, and commit only your own changes.
 
+## The games are offline (since 8 Oct 2026)
+
+`brandon.html` and `fourkeys.html` are parked in `_offline/`, which Jekyll doesn't publish,
+so both URLs 404. Everything they load (`js/fourkeys/`, `fonts/fourkeys/`, `images/brandon/`)
+stayed where it was, so they need no edits to come back. Both leaderboard workers were left
+running. To restore, Paul runs:
+
+    git mv _offline/brandon.html _offline/fourkeys.html . && git commit -m "Restore the games"
+
+and pushes. Then delete this section. Until then, the paths in the two sections below mean
+`_offline/`, and nothing players can reach is affected by edits there.
+
 ## brandon.html
 
 A game with a shared online leaderboard.
