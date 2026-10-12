@@ -118,6 +118,9 @@
       // of a lake grows grass faster. Static, so grass.js only reads it.
       shore: new Float32Array(n).fill(1),
 
+      // How deep the water on a tile is, in meters (0 on land). Any depth makes the tile water.
+      wDepth: new Float32Array(n),
+
       // Height of the ground in meters (0 to settings.csv Relief), laid once at world build
       // by terrain.js. Lakes and rivers are where it holds and drains water.
       elev: new Float32Array(n),

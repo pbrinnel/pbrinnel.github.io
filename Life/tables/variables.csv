@@ -9,7 +9,7 @@ Lifestage,Dynamic,All,Baby / Adult / Elder,Age ≥ TimeToMature → Adult; Age �
 Dead,Dynamic,All,true / false,HP 0; Age ≥ Lifespan; blade Size 0,—,Animal → corpse; blade → empty tile
 State,Dynamic,Bunny Wolf Human,see states.csv,—,—,What it is doing now
 Target,Dynamic,Bunny Wolf Human,an agent or tile,—,—,Drawn as the intent line
-Position,Dynamic,All Hole,tile x y,—,—,
+Position,Dynamic,Tile,tile x y,—,—,
 Sex,Static,Bunny Wolf Human,Male / Female,—,—,50/50 at birth
 Pregnant,Dynamic,Female,days left,Mating,Every tick,0 → gives birth if there's room; waits if not
 MateCooldown,Dynamic,Female,days left,Giving birth,Every tick,0 → can mate
@@ -22,3 +22,6 @@ Cause,Static,Corpse,a cause,—,—,Set when the animal dies: attacked by a spec
 Meat,Dynamic,Corpse,0 – MeatOnBody,—,Eaten by a wolf or human (BiteFood per mouthful),0 or CorpseDecay days → nothing left to eat; the corpse is bones
 InHole,Dynamic,Bunny,yes / no,Walks onto a warren hole,Walks off it,A bunny in a hole can't be bitten or hunted
 LastUsed,Dynamic,Hole,0 – CollapseDays (days),Every tick no bunny stands on it,A bunny stands on it,CollapseDays → the hole collapses into bare ground
+Elevation,Static,Tile,0 – Relief (m),—,—,"How high the ground is; water settles in the low places (the topo lines are every 5 m of it)"
+Ground,Static,Tile,Ground / Beach / Water / Warren hole,—,—,"Beach: land touching water, kept bare so animals can drink there"
+Depth,Dynamic,Water,0 – (m),—,—,"How deep the water stands: lakes level from their surface, rivers deeper the more ground drains through them. Shown by its shade: lighter shallow, darker deep"

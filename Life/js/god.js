@@ -57,6 +57,7 @@
   AS.paintCircle = function (sim, kind, cx, cy, r, cap) {
     const { W, T, rng } = sim, K = AS.KIND;
     const reach = Math.floor(r), r2 = r * r;
+    if (kind === 'water') return pourWater(sim, cx, cy, r);
     const species = AS.SPECIES_KEY.indexOf(kind);   // -1 for 'grass'
     const S = kind === 'grass' ? T.grass : T[kind];
     let placed = 0;
@@ -84,4 +85,28 @@
     }
     return placed;
   };
+
+  // WATER MODE (Paul, 11 Oct 2026): water POUR_DEPTH meters deep on bare ground and on grass
+  // (which drowns) within r of (cx, cy); never on an animal, a corpse, a warren hole or
+  // scorched ground. Blades left on the new shore go too, since the beach stays bare for
+  // drinking. The grass-shore boost (W.shore) stays as the world was built.
+  const POUR_DEPTH = 1;
+  function pourWater(sim, cx, cy, r) {
+    const W = sim.W, K = AS.KIND, reach = Math.floor(r), r2 = r * r, nb = new Int32Array(4);
+    let placed = 0;
+    for (let y = Math.max(0, cy - reach); y <= Math.min(W.h - 1, cy + reach); y++) {
+      for (let x = Math.max(0, cx - reach); x <= Math.min(W.w - 1, cx + reach); x++) {
+        if ((x - cx) ** 2 + (y - cy) ** 2 > r2) continue;
+        const t = y * W.w + x;
+        if (W.hole[t] || W.scorch[t] > 0) continue;
+        if (W.kind[t] === K.GRASS) W.removeGrass(t);
+        if (W.kind[t] !== K.EMPTY) continue;
+        W.addWater(t);
+        W.wDepth[t] = POUR_DEPTH;
+        placed++;
+        for (let i = 0, k = W.neighbors4(t, nb); i < k; i++) if (W.kind[nb[i]] === K.GRASS) W.removeGrass(nb[i]);
+      }
+    }
+    return placed;
+  }
 })(globalThis.AS);

@@ -7,8 +7,9 @@
 //
 // AS.UI({ debug, speeds, onSpeed(i), onDebugTool(mode), onBench(), onGraph(), onMinimap(),
 //         lines (initial on/off), onLines(on), water (initial on/off), onWater(on),
-//         elevation (initial on/off), onElevation(on): the topo lines,
+//         elevation (initial on/off), onElevation(on): the topo lines, contourStep (m), onContourStep(m),
 //         inspect ('off' | 'click' | 'hover'), onInspect(mode): the properties window,
+//         inspectEmpty (initial on/off), onInspectEmpty(on): bare tiles can be picked,
 //         tab (initial: 'info' | 'debug' | 'god' | null for closed; default 'info'), onTab(name | null),
 //         onNuke(on), onLocate(key, on): a count's ring toggle ('bunnies', 'wolves', 'humans', 'blades', 'corpses') }) → ui
 //   ui.hud({ speedIndex, achieved, day, seed, humansSeen, counts: { bunnies, wolves, humans, total, blades, corpses } })
@@ -16,7 +17,7 @@
 //   ui.tab, ui.setTab(name | null)   the open tab
 //   ui.hidden, ui.setHidden(on)      Hide UI (the H key toggles it; never remembered across loads)
 //   ui.nuke, ui.setNuke(on)          NUKE MODE armed (main.js reads it through onNuke)
-//   ui.mode, ui.setMode(name)        the Create/Destroy tab's one armed mode: 'nuke', 'grass', 'bunny', 'wolf', 'human' or ''
+//   ui.mode, ui.setMode(name)        the Create/Destroy tab's one armed mode: 'nuke', 'grass', 'bunny', 'wolf', 'human', 'water' or ''
 //                                    (onMode(name) on every change; onNuke(on) when nuke flips)
 //   ui.setRadiusDefaults(nuke, brush)  the Radius slider's starting values (settings.csv); a radius the
 //                                    viewer chose earlier (kept per mode in localStorage) wins. Called once the tables load.
@@ -54,8 +55,8 @@
   // The tabs, in bar order: key, label, tooltip.
   const TABS = [
     ['info', 'Show/Hide', 'Counts, rings on the map, the graph, the minimap, topo lines and the properties window'],
-    ['debug', 'Debug', 'Lines, Water, Benchmark and the seed'],
     ['god', 'Create/Destroy', 'Powers over the world'],
+    ['debug', 'Debug', 'Lines, Water, Benchmark and the seed'],
   ];
   const COUNTS = [
     ['', 'bunnies', 'bunnies'],
@@ -83,7 +84,7 @@
   }
 
   AS.UI = function (opts) {
-    const { debug, speeds, onSpeed, onDebugTool, onCloseInspector, onBench, onGraph, onLines, onWater, onTab, onNuke, onMode, onLocate, onElevation, onInspect, onMinimap } = opts;
+    const { debug, speeds, onSpeed, onDebugTool, onCloseInspector, onBench, onGraph, onLines, onWater, onTab, onNuke, onMode, onLocate, onElevation, onInspect, onInspectEmpty, onMinimap, onContourStep } = opts;
     const hudEl = document.getElementById('hud');
     const errorsEl = document.getElementById('errors');
     const inspEl = document.getElementById('inspector');
@@ -138,6 +139,27 @@
     showBtn.addEventListener('click', () => { setHidden(false); showBtn.blur(); });
     if (document.body) document.body.appendChild(showBtn);
 
+    // Every tab is a stack of labeled rows (Paul, 11 Oct 2026: the tabs keep growing): a row's
+    // name, then its controls, wrapping as needed. A new control joins a row or starts one.
+    function section(tab, title, tip) {
+      const sec = el('div', 'hud-sec hud-sec-' + title.toLowerCase().replace(/[^a-z]+/g, '-'));
+      const head = el('span', 'hud-sec-title', title);
+      if (tip) head.title = tip;
+      const body = el('div', 'hud-sec-body');
+      sec.append(head, body);
+      tabPanels[tab].appendChild(sec);
+      return body;
+    }
+    const showCounts = section('info', 'Counts', 'Tap a count to ring every one of that kind on the map');
+    const showWindows = section('info', 'Windows');
+    const showElev = section('info', 'Elevation');
+    const showProps = section('info', 'Properties', 'The properties window: what something is and how it is doing');
+    const godModes = section('god', 'Modes');
+    const godSize = section('god', 'Size');
+    const dbgOverlays = section('debug', 'Overlays');
+    const dbgWorld = section('debug', 'World');
+    const dbgTools = section('debug', 'Tools');
+
     // ---- Show/Hide tab (key 'info') ----
     const countsBox = el('span', 'hud-counts');
     const countEls = {}, glyphEls = {}, countBoxes = {};
@@ -168,7 +190,7 @@
       c.appendChild(countEls[key]);
       countsBox.appendChild(c);
     }
-    tabPanels.info.appendChild(countsBox);
+    showCounts.appendChild(countsBox);
 
     // The window closes itself too (its ×), so the button reads the window's state in hud().
     let graphBtn = null;
@@ -177,7 +199,7 @@
       graphBtn.type = 'button';
       graphBtn.title = 'Population over the whole run';
       graphBtn.addEventListener('click', () => { if (!locked) onGraph(); graphBtn.blur(); });
-      tabPanels.info.appendChild(graphBtn);
+      showWindows.appendChild(graphBtn);
     }
 
     // Likewise the minimap: its × closes it too, so hud() reads the window's state.
@@ -188,7 +210,7 @@
       miniBtn.type = 'button';
       miniBtn.title = 'The whole world, with a box on what you see: click it to go there';
       miniBtn.addEventListener('click', () => { if (!locked) onMinimap(); miniBtn.blur(); });
-      tabPanels.info.appendChild(miniBtn);
+      showWindows.appendChild(miniBtn);
     }
 
     // ---- Debug tab ----
@@ -204,13 +226,13 @@
         if (!locked) { linesOn = !linesOn; linesBtn.classList.toggle('on', linesOn); onLines(linesOn); }
         linesBtn.blur();
       });
-      tabPanels.debug.appendChild(linesBtn);
+      dbgOverlays.appendChild(linesBtn);
     }
     // Topo lines (render.js): every few meters of the ground's height. Kept per viewer.
     let elevBtn = null;
     if (onElevation) {
       let elevOn = !!opts.elevation;
-      elevBtn = el('button', 'hud-bench hud-elev', 'Elevation');
+      elevBtn = el('button', 'hud-bench hud-elev', 'Topo lines');
       elevBtn.type = 'button';
       elevBtn.title = 'Show topo lines: how high the ground is';
       elevBtn.classList.toggle('on', elevOn);
@@ -218,14 +240,35 @@
         if (!locked) { elevOn = !elevOn; elevBtn.classList.toggle('on', elevOn); onElevation(elevOn); }
         elevBtn.blur();
       });
-      tabPanels.info.appendChild(elevBtn);
+      showElev.appendChild(elevBtn);
+    }
+    // How far apart the topo lines are, down to a line every CONTOUR_STEPS[0] m for every
+    // little rise. A slider over a few round spacings; kept per viewer by main.js.
+    let contourInput = null;
+    if (onContourStep) {
+      const CONTOUR_STEPS = [0.5, 1, 2, 5, 10, 20];
+      const box = el('span', 'hud-slider');
+      const label = el('span', 'hud-slider-label', '');
+      contourInput = el('input', 'hud-slider-input');
+      contourInput.type = 'range';
+      contourInput.min = '0';
+      contourInput.max = String(CONTOUR_STEPS.length - 1);
+      contourInput.step = '1';
+      const at = Math.max(0, CONTOUR_STEPS.indexOf(opts.contourStep));
+      contourInput.value = String(at < 0 ? 3 : at);
+      contourInput.setAttribute('aria-label', 'Meters between topo lines');
+      box.title = 'Meters between topo lines (every fifth is bolder)';
+      const show = () => { label.textContent = 'a line every ' + CONTOUR_STEPS[+contourInput.value] + ' m'; };
+      show();
+      contourInput.addEventListener('input', () => { show(); if (!locked) onContourStep(CONTOUR_STEPS[+contourInput.value]); });
+      box.append(label, contourInput);
+      showElev.appendChild(box);
     }
     // The properties window: Off, Click (select to inspect) or Hover (what is under the
     // mouse). One of three, kept per viewer by main.js.
     const inspBtns = [];
     if (onInspect) {
       const box = el('span', 'hud-insp');
-      box.appendChild(el('span', 'hud-insp-label', 'Properties'));
       let mode = opts.inspect || 'click';
       for (const [key, label, tip] of [['off', 'Off', 'No properties window'], ['click', 'Click', 'Click or tap something to see its properties'], ['hover', 'Hover', 'See the properties of what the mouse is over (a tap still picks on a touch screen)']]) {
         const b = el('button', 'hud-bench hud-insp-btn', label);
@@ -243,7 +286,21 @@
         inspBtns.push(b);
         box.appendChild(b);
       }
-      tabPanels.info.appendChild(box);
+      showProps.appendChild(box);
+    }
+    // Inspect Empty Tiles: bare ground can be picked too, to see the tile's own properties.
+    let emptyBtn = null;
+    if (onInspectEmpty) {
+      let on = !!opts.inspectEmpty;
+      emptyBtn = el('button', 'hud-bench hud-insp-empty', 'Inspect Empty Tiles');
+      emptyBtn.type = 'button';
+      emptyBtn.title = 'Let a click (or hover) on bare ground show that tile: its position, elevation and ground';
+      emptyBtn.classList.toggle('on', on);
+      emptyBtn.addEventListener('click', () => {
+        if (!locked) { on = !on; emptyBtn.classList.toggle('on', on); onInspectEmpty(on); }
+        emptyBtn.blur();
+      });
+      showProps.appendChild(emptyBtn);
     }
     // Water is laid when a world is built, so a flip starts a new world (main.js's onWater).
     let waterBtn = null;
@@ -257,7 +314,7 @@
         if (!locked) { waterOn = !waterOn; waterBtn.classList.toggle('on', waterOn); onWater(waterOn); }
         waterBtn.blur();
       });
-      tabPanels.debug.appendChild(waterBtn);
+      dbgWorld.appendChild(waterBtn);
     }
     let benchBtn = null;
     if (onBench) {
@@ -265,13 +322,13 @@
       benchBtn.type = 'button';
       benchBtn.title = 'Measure how large a world this device keeps smooth';
       benchBtn.addEventListener('click', () => { if (!locked) onBench(); benchBtn.blur(); });
-      tabPanels.debug.appendChild(benchBtn);
+      dbgTools.appendChild(benchBtn);
     }
     const seedBox = el('span', 'hud-seed');
     seedBox.title = 'Paste into Seed in tables/settings.csv to replay this start';
     const seedNum = el('span', 'hud-seednum', '');
     seedBox.append('Seed ', seedNum);
-    tabPanels.debug.appendChild(seedBox);
+    dbgWorld.appendChild(seedBox);
 
     const warnBtn = el('button', 'hud-warn', '');
     warnBtn.type = 'button';
@@ -279,7 +336,7 @@
     const warnList = el('ul', 'hud-warnlist');
     warnList.hidden = true;
     warnBtn.addEventListener('click', () => { warnList.hidden = !warnList.hidden; warnBtn.blur(); });
-    tabPanels.debug.appendChild(warnBtn);
+    dbgTools.appendChild(warnBtn);
 
     const toolButtons = [];
     if (debug) {
@@ -298,7 +355,7 @@
         toolButtons.push(b);
         return b;
       });
-      tabPanels.debug.appendChild(tools);
+      dbgTools.appendChild(tools);
     }
 
     // ---- Create/Destroy tab (key 'god') ----
@@ -312,6 +369,7 @@
       ['bunny', 'RABBIT MODE', 'hud-brush', 'While on, tap or drag to add rabbits of random ages on empty ground'],
       ['wolf', 'WOLF MODE', 'hud-brush', 'While on, tap or drag to add wolves of random ages on empty ground'],
       ['human', 'HUMAN MODE', 'hud-brush', 'While on, tap or drag to add adult humans on empty ground'],
+      ['water', 'WATER MODE', 'hud-brush', 'While on, tap or drag to pour water (1 m deep) on bare ground or grass'],
     ];
     const modeBtns = {};
     for (const [name, label, cls, tip] of MODES) {
@@ -319,7 +377,7 @@
       b.type = 'button';
       b.title = tip;
       b.addEventListener('click', () => { if (!locked) setMode(mode === name ? '' : name); b.blur(); });
-      tabPanels.god.appendChild(b);
+      godModes.appendChild(b);
       modeBtns[name] = b;
     }
     const nukeBtn = modeBtns.nuke;
@@ -343,7 +401,7 @@
     radiusInput.disabled = true;
     radiusInput.setAttribute('aria-label', 'Radius in tiles');
     radiusBox.append(radiusLabel, radiusInput);
-    tabPanels.god.appendChild(radiusBox);
+    godSize.appendChild(radiusBox);
     const clampRadius = v => Math.max(0, Math.min(RADIUS_MAX, Math.round(Number(v) || 0)));
     const radiusOf = name => name in radii ? radii[name] : clampRadius(radiusDefaults[name]);
     function showRadius() {
@@ -389,6 +447,9 @@
     const setNuke = on => setMode(on ? 'nuke' : (mode === 'nuke' ? '' : mode));
 
     top.append(strip, tabStrip);
+    // The side panel starts just under the bar, whose height can change (it wraps when narrow).
+    const placeSide = () => document.documentElement.style.setProperty('--hud-bar', strip.offsetHeight + 'px');
+    if (typeof ResizeObserver === 'function') new ResizeObserver(placeSide).observe(strip);
     hudEl.append(top, warnList);
     // Taps on the HUD belong to the HUD, not to the map under it.
     for (const t of ['pointerdown', 'pointerup', 'wheel']) {
@@ -406,6 +467,8 @@
         tabBtns[key].classList.toggle('on', key === name);
       }
       tabStrip.hidden = name === null;
+      // On a computer the open tab is a side panel; the graph and minimap step aside (CSS).
+      if (document.body) document.body.classList.toggle('side-open', name !== null);
       if (onTab && !quiet) onTab(name);
     }
     // The first tab is set quietly: onTab is for the viewer's changes (main.js remembers them).
@@ -535,6 +598,12 @@
         rowKey = key;
         inspList.textContent = '';
         rowEls = rows.map(r => {
+          // A heading starts a section (the Tile under the selection): its name, no value.
+          if (r.heading) {
+            const head = el('div', 'insp-sub', r.name);
+            inspList.appendChild(head);
+            return { row: head, setValue() {}, setRange() {}, tip: '' };
+          }
           const row = el('div', 'insp-row');
           const val = el('span', 'insp-value', '');
           const range = el('span', 'insp-range', '');
@@ -579,7 +648,7 @@
     // Disabling the buttons also dims them; the handlers check `locked` as well.
     function lock(on) {
       locked = !!on;
-      for (const b of [...buttons, benchBtn, graphBtn, miniBtn, linesBtn, elevBtn, ...inspBtns, waterBtn, ...Object.values(modeBtns), ...toolButtons]) {
+      for (const b of [...buttons, benchBtn, graphBtn, miniBtn, linesBtn, elevBtn, contourInput, ...inspBtns, emptyBtn, waterBtn, ...Object.values(modeBtns), ...toolButtons]) {
         if (b) b.disabled = locked;
       }
       showRadius();

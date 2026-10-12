@@ -25,6 +25,8 @@
   const ELEV_KEY = 'life-elevation';
   const INSPECT_KEY = 'life-inspect';
   const INSPECT_MODES = ['off', 'click', 'hover'];
+  const INSPECT_EMPTY_KEY = 'life-inspect-empty';
+  const CONTOUR_KEY = 'life-contour-m';
   const WATER_KEY = 'life-water';
   // The open tab ('info', 'debug', 'god', or '' for closed), remembered per browser.
   const TAB_KEY = 'life-ui-tab';
@@ -49,6 +51,12 @@
   // The properties window: Off, Click (select to inspect) or Hover. Click unless chosen.
   let inspectMode = 'click';
   try { const v = localStorage.getItem(INSPECT_KEY); if (INSPECT_MODES.includes(v)) inspectMode = v; } catch (e) { /* click */ }
+  // Inspect Empty Tiles: off unless chosen.
+  let inspectEmpty = false;
+  try { inspectEmpty = localStorage.getItem(INSPECT_EMPTY_KEY) === '1'; } catch (e) { /* off */ }
+  // Meters between topo lines: the viewer's slider, else the renderer's own spacing.
+  let contourStep = null;
+  try { const v = Number(localStorage.getItem(CONTOUR_KEY)); if (v > 0) contourStep = v; } catch (e) { /* default */ }
   // Topo lines: on unless the viewer turned them off.
   let elevOn = true;
   try { elevOn = localStorage.getItem(ELEV_KEY) !== '0'; } catch (e) { /* stays on */ }
@@ -77,7 +85,7 @@
     onNuke: on => { nukeOn = on; },
     // A count's toggle: the kinds to ring on the map, handed to the renderer every frame.
     onLocate: (key, on) => { if (on) located.add(key); else located.delete(key); },
-    onMode: m => { brush = m === 'grass' || AS.SPECIES_KEY.includes(m) ? m : ''; },
+    onMode: m => { brush = m === 'grass' || m === 'water' || AS.SPECIES_KEY.includes(m) ? m : ''; },
     water: waterOn,
     onWater: on => {
       waterOn = on;
@@ -90,6 +98,17 @@
       inspectMode = m;
       sel = null;   // a new mode starts with nothing picked
       try { localStorage.setItem(INSPECT_KEY, m); } catch (e) { /* the choice just isn't kept */ }
+    },
+    inspectEmpty,
+    onInspectEmpty: on => {
+      inspectEmpty = on;
+      if (!on && sel && sel.empty) sel = null;
+      try { localStorage.setItem(INSPECT_EMPTY_KEY, on ? '1' : '0'); } catch (e) { /* the choice just isn't kept */ }
+    },
+    contourStep: contourStep || 5,
+    onContourStep: m => {
+      contourStep = m;
+      try { localStorage.setItem(CONTOUR_KEY, String(m)); } catch (e) { /* the choice just isn't kept */ }
     },
     elevation: elevOn,
     onElevation: on => {
@@ -186,7 +205,9 @@
     // A hole with nothing on it is selectable too (it has no serial, so `hole` marks it).
     const bareHole = k === AS.KIND.EMPTY && W.hole[t] === 1;
     // Water has no serial (0) and never changes, so its selection simply stays.
-    return k === AS.KIND.GRASS || k === AS.KIND.CORPSE || k === AS.KIND.WATER || bareHole ? { tile: t, serial: W.serial[t], slot: -1, hole: bareHole } : null;
+    if (k === AS.KIND.GRASS || k === AS.KIND.CORPSE || k === AS.KIND.WATER || bareHole) return { tile: t, serial: W.serial[t], slot: -1, hole: bareHole };
+    // Inspect Empty Tiles: bare ground is picked as the tile itself (its properties only).
+    return inspectEmpty ? { tile: t, serial: 0, slot: -1, empty: true } : null;
   }
 
   // Hover mode: a mouse over the map (no button held) picks what is under it. The pick runs
@@ -229,6 +250,7 @@
   function liveSelection() {
     if (!sel) return null;
     const W = sim.W;
+    if (sel.empty) return sel;   // a tile stays picked whatever comes to stand or grow on it
     if (sel.slot >= 0) {
       if (!W.aAlive[sel.slot] || W.aSerial[sel.slot] !== sel.serial) return (sel = null);
       sel.tile = W.aTile[sel.slot];
@@ -284,6 +306,7 @@
     const live = liveSelection();
     renderer.setIntentLines(linesOn);
     renderer.setContours(elevOn);
+    if (contourStep) renderer.setContourStep(contourStep);
     // Pips stay below the HUD bar, which covers the canvas's top.
     let top = 0;
     if (located.size && !document.body.classList.contains('ui-off')) { const hud = document.getElementById('hud'); if (hud) top = hud.getBoundingClientRect().bottom; }
@@ -375,7 +398,7 @@
     paintAt(tx, ty) {
       if (!brush || tx < 0 || ty < 0 || tx >= sim.W.w || ty >= sim.W.h) return 0;
       const r = radiusOf(brush);
-      if (brush === 'grass') return AS.paintCircle(sim, brush, tx, ty, r);
+      if (brush === 'grass' || brush === 'water') return AS.paintCircle(sim, brush, tx, ty, r);
       if (crowdOpen) return 0;   // the card is up: the stroke stays stopped until it is answered
       const W = sim.W, cap = { room: app.animalLimit - (W.bunnies + W.wolves + W.humans), hit: false };
       const placed = AS.paintCircle(sim, brush, tx, ty, r, cap);

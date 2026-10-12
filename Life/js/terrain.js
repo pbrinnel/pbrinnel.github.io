@@ -29,8 +29,11 @@
   const FLOOD_EPS = 1e-4;         // m: the slope the flood gives a flat, so every tile drains somewhere
   const WIDE_RIVER = 4;           // a river draining this many times RiverDrain is two tiles wide
   const FORD_LEN = 3;             // tiles of clear land a ford leaves along the river
-  const POCKET_MAX = 40;
-  const SPILL_PASSES = 8;         // rounds of hollows filling and spilling into the next ones down          // a cut-off land piece this small is filled in rather than bridged
+  const POCKET_MAX = 40;          // a cut-off land piece this small is filled in rather than bridged
+  const SPILL_PASSES = 8;         // rounds of hollows filling and spilling into the next ones down
+  const MIN_DEPTH = 0.05;         // m: the shallowest a lake's edge is
+  const RIVER_DEPTH = [0.3, 2];   // m: a river at RiverDrain, and the deepest any river runs
+  const POCKET_DEPTH = 0.3;       // m: a small land pocket filled in to keep the land one piece
   const BRIDGE_TRIES = 40;        // land pieces mended before giving up
   const SEED_SALT = 0x5eed7e44;   // keeps the ground's generator apart from sim.rng
 
@@ -163,7 +166,7 @@
   // now full, until no more fill. A tile that RiverDrain tiles or more drain through, out of
   // the water, is river, two wide past WIDE_RIVER times that, with a ford every BridgeEvery
   // tiles along it. Returns the lakes' centers.
-  function settleWater(W, S, F, recv, wet) {
+  function settleWater(W, S, F, recv, wet, depth) {
     const n = W.n, E = W.elev, nb = new Int32Array(4);
     const raised = t => F[t] - E[t] > FLOOD_EPS * 10;
     // The hollows: id per tile (-1 outside one), each one's floor, brim and size.
@@ -216,7 +219,10 @@
       const b = bowl[t];
       if (b < 0 || brim[b] - floor[b] < S.LakeDepth || !(S.Rain > 0)) continue;
       const level = full[b] ? brim[b] : floor[b] + Math.min(1, fill[b]) * (brim[b] - floor[b]);
-      if (E[t] <= level || full[b]) { wet[t] = LAKE; sx[b] += t % W.w; sy[b] += (t / W.w) | 0; cnt[b]++; }
+      if (E[t] <= level || full[b]) {
+        wet[t] = LAKE; sx[b] += t % W.w; sy[b] += (t / W.w) | 0; cnt[b]++;
+        depth[t] = Math.max(MIN_DEPTH, level - E[t]);   // the water stands level across the lake
+      }
     }
     const lakes = [];
     for (let b = 0; b < floor.length; b++) if (cnt[b]) lakes.push({ x: sx[b] / cnt[b], y: sy[b] / cnt[b] });
@@ -233,13 +239,15 @@
     for (let t = 0; t < n; t++) {
       if (!river[t] || along[t] % every < FORD_LEN) continue;
       wet[t] = RIVER;
+      // A river runs deeper the more ground drains through it.
+      depth[t] = Math.min(RIVER_DEPTH[1], RIVER_DEPTH[0] * Math.sqrt(drain[t] / S.RiverDrain));
       // A big river is two tiles wide: across its flow, onto the lower side.
       if (drain[t] >= S.RiverDrain * WIDE_RIVER && down[t] >= 0) {
         const x = t % W.w, y = (t / W.w) | 0, across = down[t] % W.w !== x;   // flowing sideways: widen up or down
         const a = across ? (y > 0 ? t - W.w : -1) : (x > 0 ? t - 1 : -1);
         const b = across ? (y < W.h - 1 ? t + W.w : -1) : (x < W.w - 1 ? t + 1 : -1);
         const side = a < 0 ? b : b < 0 ? a : (E[a] <= E[b] ? a : b);
-        if (side >= 0 && !wet[side]) wet[side] = RIVER;
+        if (side >= 0 && !wet[side]) { wet[side] = RIVER; depth[side] = depth[t]; }
       }
     }
     return lakes;
@@ -324,9 +332,14 @@
     if (!water) return [];
     const { F, recv } = flood(W);
     const wet = new Uint8Array(W.n);
-    const lakes = settleWater(W, S, F, recv, wet);
+    const depth = new Float32Array(W.n);
+    const lakes = settleWater(W, S, F, recv, wet, depth);
     keepLandWhole(W, wet);
-    for (let t = 0; t < W.n; t++) if (wet[t]) W.addWater(t);
+    for (let t = 0; t < W.n; t++) {
+      if (!wet[t]) continue;
+      W.addWater(t);
+      W.wDepth[t] = depth[t] > 0 ? depth[t] : POCKET_DEPTH;   // a filled-in pocket has no depth of its own
+    }
     W.setShore(T.grass.WaterRadius, T.grass.WaterBoost);
     return lakes;
   };

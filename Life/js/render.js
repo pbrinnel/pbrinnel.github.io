@@ -33,7 +33,12 @@
   const FAR_GRASS = ['#2c4a2c', '#3f7040', '#62a457'].map(abgr);
   const FAR_CORPSE = abgr('#6a6250'), FAR_GROUND = abgr('#121410'), FAR_HOLE = abgr('#3d2e20');
   // Water is the one big blue field of the far view; the sprites' own blue, a little lifted.
-  const FAR_WATER = abgr('#2f6495');
+  const FAR_WATER_HEX = '#2f6495';
+  // By depth band (AS.waterBand), shaded as the sprites are: shallow lighter, deep darker.
+  const FAR_WATERS = [0, 1, 2].map(b => {
+    const f = AS.WATER_DEPTH_SHADES[b], c = [1, 3, 5].map(i => parseInt(FAR_WATER_HEX.slice(i, i + 2), 16));
+    return abgr('#' + c.map(v => Math.round(f <= 1 ? v * f : v + (255 - v) * (f - 1))).map(v => Math.min(255, v).toString(16).padStart(2, '0')).join(''));
+  });
   // Humans are a bright pink-violet no other species or ground uses, so a hunter stands out from far away.
   const FAR_ANIMAL = [['#e0a868', '#f2cc96'], ['#8fb2e0', '#c0d6f2'], ['#e08fd8', '#f0b8ea']].map(r => r.map(abgr));   // [species][sex]
 
@@ -79,11 +84,12 @@
   // count with the same color.
   const LOCATE_COLORS = AS.LOCATE_COLORS = Object.freeze({ blades: '25,158,112', bunnies: '217,89,38', wolves: '57,135,229', humans: '199,99,179', corpses: '200,200,190' });
 
-  // Topo lines (Paul, 11 Oct 2026, over shading): a thin line every CONTOUR_M meters of
+  // Topo lines (Paul, 11 Oct 2026, over shading): a thin line every few meters (CONTOUR_M until
+  // the viewer's slider picks another spacing) of
   // W.elev, every CONTOUR_BOLD_EVERY-th one bolder, under the grass and animals and never
   // over water. Worked out once per world by marching squares over tile centers, kept in
   // CONTOUR_CHUNK-tile squares so a frame strokes only what is on screen.
-  const CONTOUR_M = 5;
+  const CONTOUR_M = 5;                    // the spacing until the viewer picks one (setContourStep)
   const CONTOUR_BOLD_EVERY = 5;
   const CONTOUR_RGB = '176,186,150';
   const CONTOUR_ALPHA = 0.3, CONTOUR_BOLD_ALPHA = 0.54;
@@ -245,13 +251,13 @@
       }
       const px = cell.px, kind = W.kind, size = W.gSize;
       const bg = FAR_GROUND, g0 = FAR_GRASS[0], g1 = FAR_GRASS[1], g2 = FAR_GRASS[2];
-      const corpse = FAR_CORPSE, water = FAR_WATER, holeAt = W.hole, scorch = W.scorch, fullDays = sim.T.world.ScorchDays;
+      const corpse = FAR_CORPSE, waters = FAR_WATERS, depth = W.wDepth, holeAt = W.hole, scorch = W.scorch, fullDays = sim.T.world.ScorchDays;
       const lo = 1 / 3, hi = 2 / 3;
       for (let t = 0, n = W.n; t < n; t++) {
         const k = kind[t];
         if (k === KIND.GRASS) { const z = size[t]; px[t] = z < lo ? g0 : z < hi ? g1 : g2; }
         else if (k === KIND.CORPSE) px[t] = corpse;
-        else if (k === KIND.WATER) px[t] = water;
+        else if (k === KIND.WATER) px[t] = waters[AS.waterBand(depth[t])];
         else if (scorch[t] > 0) px[t] = mixAbgr(bg, FAR_SCORCH, scorch[t] / fullDays);
         else px[t] = holeAt[t] ? FAR_HOLE : bg;   // empty ground (or a hole), or an animal that the loop below paints
       }
@@ -296,7 +302,7 @@
             if (W.cMeat[row + tx] > 0) id = AS.spriteCarcass(W.cSpecies[row + tx]);
             else if (nowMs < deathUntil[row + tx]) id = AS.spriteCarcass(W.cSpecies[row + tx]);
             else id = AS.spriteSkull(W.cSpecies[row + tx]);
-          } else if (k === KIND.WATER) id = AS.spriteWater(tx, ty);
+          } else if (k === KIND.WATER) id = AS.spriteWater(tx, ty, AS.waterBand(W.wDepth[row + tx]));
           else continue;   // empty, or an animal (own pass)
           const dx = Math.round(tx * s - ox), dw = Math.round((tx + 1) * s - ox) - dx;
           ctx.drawImage(img, sh.sx(id), sh.sy(id), px, px, dx, dy, dw, dh);
@@ -397,11 +403,14 @@
     }
 
     // ---- topo lines ----
-    let contoursOn = false;
-    const contourCache = new WeakMap();   // world → { cw, chunks: [{ thin, bold } | null] }
+    let contoursOn = false, contourStep = CONTOUR_M;
+    const contourCache = new WeakMap();   // world → Map(spacing → { cw, ch, thin, bold })
     function contoursFor(W) {
-      let c = contourCache.get(W);
+      let byStep = contourCache.get(W);
+      if (!byStep) { byStep = new Map(); contourCache.set(W, byStep); }
+      let c = byStep.get(contourStep);
       if (c) return c;
+      const step = contourStep;
       const cw = Math.ceil(W.w / CONTOUR_CHUNK), ch = Math.ceil(W.h / CONTOUR_CHUNK);
       const thin = [], bold = [];
       for (let i = 0; i < cw * ch; i++) { thin.push([]); bold.push([]); }
@@ -415,8 +424,8 @@
         const a = E[i0], b = E[i0 + 1], c2 = E[i0 + w + 1], d = E[i0 + w];
         const lo = Math.min(a, b, c2, d), hi = Math.max(a, b, c2, d);
         const chunk = ((y / CONTOUR_CHUNK) | 0) * cw + ((x / CONTOUR_CHUNK) | 0);
-        for (let n = Math.max(1, Math.ceil(lo / CONTOUR_M)); n * CONTOUR_M < hi; n++) {
-          const L = n * CONTOUR_M;
+        for (let n = Math.max(1, Math.ceil(lo / step)); n * step < hi; n++) {
+          const L = n * step;
           const k = (a > L) | (b > L) << 1 | (c2 > L) << 2 | (d > L) << 3, p = P[k];
           if (!p) continue;
           // Edge crossings: 0 top (a-b), 1 right (b-c), 2 bottom (d-c), 3 left (a-d).
@@ -429,7 +438,7 @@
         }
       }
       c = { cw, ch, thin: thin.map(a => Float32Array.from(a)), bold: bold.map(a => Float32Array.from(a)) };
-      contourCache.set(W, c);
+      byStep.set(step, c);
       return c;
     }
     function drawContours(sim, cam, dpr, near) {
@@ -568,6 +577,9 @@
     return {
       setIntentLines(on) { intentLines = !!on; },
       setContours(on) { contoursOn = !!on; },
+      // Meters between topo lines (each spacing is worked out once per world, then kept).
+      setContourStep(m) { if (m > 0) contourStep = m; },
+      get contourStep() { return contourStep; },
       // The far view's one-pixel-per-tile picture of the world, brought up to date (the minimap draws it).
       farCanvas(sim) { fillCells(sim); return cell.canvas; },
       get contours() { return contoursOn; },

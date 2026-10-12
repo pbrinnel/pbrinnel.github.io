@@ -110,6 +110,13 @@
   const ELDER_BRIGHTNESS = 0.72;
   const HOLE_RIM = '#8a6a45', HOLE_DARK = '#150f0a';
   const WATER_BASE = '#2b5c8c', WATER_LIGHT = '#3a6e9f', WATER_DARK = '#244f7c';
+  // How each depth band is shaded from those (Paul, 11 Oct 2026: water shows its depth the way
+  // grass shows its size): shallow lighter, deep darker. Below WATER_MID_M meters is shallow,
+  // from WATER_DEEP_M deep.
+  const WATER_DEPTHS = [1.28, 1, 0.7];
+  const WATER_MID_M = 1, WATER_DEEP_M = 4;
+  AS.waterBand = d => (d < WATER_MID_M ? 0 : d < WATER_DEEP_M ? 1 : 2);
+  AS.WATER_DEPTH_SHADES = WATER_DEPTHS;
   const EYE = '#141210', AMBER = '#e8b84a', NOSE = '#1a1a1e', FANG = '#f2ece0', TONGUE = '#d99a9a';
   const SKIN = '#d9a066', SHAFT = '#a07a4a', SPEARHEAD = '#d4d8dc';
   // Babies and corpses are drawn smaller than a tile, bottom-centered.
@@ -180,11 +187,12 @@
   // ---- sheet layout -----------------------------------------------------------------
   // Animals: ((((species*2+sex)*3+stage)*2+faceLeft)*FRAMES+frame), then each species'
   // skull, the three grass thirds, the three leaning ones, each species' carcass, the hole,
-  // the bunny peeking out of it (by sex), and the three water variants.
+  // the bunny peeking out of it (by sex), and the water (three depths × three variants).
   const N_SPECIES = AS.SPECIES_COUNT;
   const ANIMAL_SPRITES = N_SPECIES * 2 * 3 * 2 * FRAMES;
   const SKULL0 = ANIMAL_SPRITES, GRASS0 = SKULL0 + N_SPECIES, LEAN0 = GRASS0 + 3, CARCASS0 = LEAN0 + 3;
-  const HOLE0 = CARCASS0 + N_SPECIES, PEEK0 = HOLE0 + 1, WATER0 = PEEK0 + 2, COUNT = WATER0 + WATER_BITMAPS.length;
+  // Water comes in WATER_DEPTHS shades (shallow, mid, deep), each in every ripple variant.
+  const HOLE0 = CARCASS0 + N_SPECIES, PEEK0 = HOLE0 + 1, WATER0 = PEEK0 + 2, COUNT = WATER0 + WATER_DEPTHS.length * WATER_BITMAPS.length;
   const SHEET_COLS = 19;
   const BY_SPECIES = [BUNNY, WOLF, HUMAN];
   AS.SPRITE_COUNT = COUNT;
@@ -195,8 +203,9 @@
   AS.spriteCarcass = species => CARCASS0 + species;
   AS.spriteHole = () => HOLE0;
   AS.spritePeek = sex => PEEK0 + sex;   // a bunny in a hole, by sex
-  // A water tile's variant from its position: a fixed scramble of x and y, never random.
-  AS.spriteWater = (x, y) => WATER0 + ((Math.imul(x, 73856093) ^ Math.imul(y, 19349663)) >>> 8) % WATER_BITMAPS.length;
+  // A water tile's sprite: its depth band (AS.waterBand: 0 shallow, 1 mid, 2 deep) and a ripple
+  // variant from its position, a fixed scramble of x and y, never random.
+  AS.spriteWater = (x, y, band = 1) => WATER0 + band * WATER_BITMAPS.length + ((Math.imul(x, 73856093) ^ Math.imul(y, 19349663)) >>> 8) % WATER_BITMAPS.length;
 
   // Wind: now and then a band sweeps diagonally across the meadow and tufts in it lean.
   // `clock` is real seconds, so a gust looks the same at any sim speed. Grass otherwise
@@ -288,7 +297,9 @@
       for (let sx2 = 0; sx2 < 2; sx2++) {
         at(PEEK0 + sx2, (x, y) => paint(g, x, y, px, PEEK_BITMAP, AS.COLORS[AS.animalGlyph(0, sx2, AS.STAGE.ADULT)], false, 1));
       }
-      for (let i = 0; i < WATER_BITMAPS.length; i++) at(WATER0 + i, (x, y) => paint(g, x, y, px, WATER_BITMAPS[i], WATER_BASE, false, 1));
+      for (let d = 0; d < WATER_DEPTHS.length; d++) for (let i = 0; i < WATER_BITMAPS.length; i++) {
+        at(WATER0 + d * WATER_BITMAPS.length + i, (x, y) => paint(g, x, y, px, WATER_BITMAPS[i], WATER_BASE, false, 1, WATER_DEPTHS[d]));
+      }
       for (let i = 0; i < 3; i++) {
         at(GRASS0 + i, (x, y) => paint(g, x, y, px, GRASS_BITMAPS[i], GRASS_COLORS[i], false, 1));
         at(LEAN0 + i, (x, y) => paint(g, x, y, px, GRASS_LEAN[i], GRASS_COLORS[i], false, 1));

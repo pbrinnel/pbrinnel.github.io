@@ -4,7 +4,8 @@
 // world's stores and format it. A variable in the CSV with no reader here still shows, as
 // "—", and inspectWarnings tells Paul so at startup.
 //
-//   AS.describe(sim, sel) → null, or { title, rows: [{ name, value, range, tip }] }
+//   AS.describe(sim, sel) → null, or { title, rows: [{ name, value, range, tip, heading? }] }
+//                           (a heading row starts the Tile section: the ground under the selection)
 //   AS.inspectWarnings(T) → string[]
 (function (AS) {
   'use strict';
@@ -15,9 +16,11 @@
   const DAYS_DECIMALS = 2;
   const SIZE_DECIMALS = 2;
   const POINT_DECIMALS = 1;   // Fullness, Stamina, HP, Nutrient
+  const ELEV_DECIMALS = 1;    // meters
+  const DEPTH_DECIMALS = 2;   // meters of water
 
   // What "Applies to" may say. Anything else is a typo and matches nothing.
-  const TOKENS = ['all', ...AS.SPECIES_KEY, 'grass', 'corpse', 'female', 'hole'];
+  const TOKENS = ['all', ...AS.SPECIES_KEY, 'grass', 'corpse', 'female', 'hole', 'tile', 'water'];
 
   // The kinds of selectable thing. 'bunnyF' is a female bunny, and so on, so the "female"
   // token can be decided once per kind instead of once per row.
@@ -25,7 +28,8 @@
     grass: ['all', 'grass'],
     corpse: ['all', 'corpse'],
     hole: ['hole'],   // a hole has no age, stage or life to show
-    water: [],        // water is only its name: nothing in variables.csv applies to it
+    water: ['water'], // its depth; then the tile's rows
+    tile: ['tile'],   // the ground under any selection, shown after the selection's own rows
   };
   // Each species is a thing of its own; one that breeds has a female variant ('wolfF') that
   // also takes the "female" token. A species that never breeds (humans) has none, so a female
@@ -114,6 +118,12 @@
     },
     Target: targetText,
     Position: (sim, c) => position(sim.W, c.t),
+    Elevation: (sim, c) => num(sim.W.elev[c.t], ELEV_DECIMALS) + ' m',
+    Depth: (sim, c) => num(sim.W.wDepth[c.t], DEPTH_DECIMALS) + ' m',
+    Ground: (sim, c) => {
+      const W = sim.W, t = c.t;
+      return W.kind[t] === KIND.WATER ? 'Water' : W.hole[t] ? 'Warren hole' : W.beach[t] ? 'Beach' : 'Ground';
+    },
     Sex: (sim, c) => sim.W.aSex[c.s] === SEX.FEMALE ? 'Female' : 'Male',
     // A due litter with no room yet is still a pregnancy (DESIGN.md: the birth waits).
     Pregnant: (sim, c) => sim.W.aLitter[c.s] > 0 && !(sim.W.aPregnant[c.s] > 0)
@@ -190,7 +200,9 @@
     } else {
       const t = sel.tile, k = W.kind[t];
       ctx = { t, s: -1, Tsp: null };
-      if (k === KIND.CORPSE) {
+      if (sel.empty) {
+        thing = 'tile';
+      } else if (k === KIND.CORPSE) {
         thing = 'corpse';
         title = speciesName(W.cSpecies[t]) + ' corpse #' + serial(W.serial[t]);
       } else if (k === KIND.WATER) {
@@ -204,13 +216,14 @@
         title = 'Blade of grass #' + serial(W.serial[t]);
       }
     }
-    const list = listsFor(T)[thing];
-    const rows = new Array(list.length);
-    for (let i = 0; i < list.length; i++) {
-      const r = list[i];
-      rows[i] = { name: r.name, value: safe(r.read, sim, ctx), range: r.range, tip: r.tip };
-    }
-    return { title, rows };
+    // Every selection shows its own rows, then the tile it is on (Paul, 11 Oct 2026); an
+    // empty tile, picked with Inspect Empty Tiles on, shows only the tile.
+    const lists = listsFor(T), list = sel.empty ? [] : lists[thing], tile = lists.tile;
+    const rows = [];
+    for (const r of list) rows.push({ name: r.name, value: safe(r.read, sim, ctx), range: r.range, tip: r.tip });
+    if (!sel.empty) rows.push({ name: 'Tile', heading: true, value: '', range: '', tip: '' });
+    for (const r of tile) rows.push({ name: r.name, value: safe(r.read, sim, ctx), range: r.range, tip: r.tip });
+    return { title: sel.empty ? 'Tile ' + position(W, ctx.t) : title, rows };
   };
 
   AS.inspectWarnings = function (T) {

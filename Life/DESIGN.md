@@ -75,8 +75,13 @@ watching the sim run. Everything else in this doc is decided.
   seed (Paul: every world feels different under the same rules; the ranges get dialed in
   later). Tuned so water covers about 4-10% of the map, as the hand-laid lakes did. Topo
   lines show the height (Paul chose them over shaded ground in a mockup): a thin line every
-  5 m, every fifth bolder, under grass and animals, off water; the Elevation toggle (Show/Hide tab,
-  kept per viewer, on at first) shows or hides them. Water is impassable to everything (but animals see
+  5 m (the viewer's slider picks 0.5-20 m), every fifth bolder, under grass and animals, off water; the Elevation toggle (Show/Hide tab,
+  kept per viewer, on at first) shows or hides them. **Water has a depth** (Paul, 11 Oct
+  2026), in meters: a lake's is its level minus the ground (it stands level across the
+  lake), a river's grows with the ground draining through it. Any depth makes a tile water.
+  It shows like grass's size: shallow water lighter, mid, deep darker (bands at 1 m and
+  4 m), in the sprites and the far view, and the properties window gives it (Depth). For
+  now depths are set at world build; flowing, drinking and refilling come next. Water is impassable to everything (but animals see
   across it), nothing is ever placed on it, and nukes leave it. All land always stays one
   connected piece: a lake or river that would cut off land is bridged or dropped, a tiny
   cut-off pocket becomes water. A one-tile bare beach rings all water: grass never grows
@@ -304,15 +309,24 @@ watching the sim run. Everything else in this doc is decided.
   ground clears it. Live values only, no life history.
 - **Controls in tabs** (Paul, 4 Oct 2026): the top bar always shows Pause, the speeds and
   the day, then three tabs and Hide UI. One tab's strip is open at a time. Named by what
-  they hold (Paul, 11 Oct 2026; they were Info, Debug, God):
-  - **Show/Hide:** everything in it toggles what you see. Live counts of bunnies, wolves,
-    humans, the total, blades and corpses (each count also rings its kind on the map), the
-    Graph, the Minimap, Elevation (topo lines), and **Properties: Off, Click or Hover**: no
+  they hold, in this order (Paul, 11 Oct 2026; they were Info, Debug, God). Each tab is a
+  stack of labeled rows (a row's name, its controls under or after it), so new controls
+  join a row or start one (Paul: the tabs keep growing). On a computer the open tab is a
+  side panel down the left, under the bar (Paul: across the top it hid too much of the
+  world); the graph and minimap sit to its right unless dragged. On a phone it is a sheet
+  under the bar, at most 40% of the screen, scrolling inside itself:
+  - **Show/Hide:** everything in it toggles what you see. **Counts** of bunnies, wolves,
+    humans, the total, blades and corpses (each count also rings its kind on the map).
+    **Windows:** Graph, Minimap. **Elevation:** Topo lines, and a slider for their spacing,
+    from a line every 0.5 m (every little rise) to every 20 m. **Properties: Off, Click or Hover**: no
     properties window; click or tap something to see it (as before); or the window shows
     whatever the mouse is over (a tap still picks, so a phone works as with Click). Kept per
-    viewer.
-  - **Debug:** Lines, Water, Benchmark, the seed.
-  - **Create/Destroy:** tools for interfering with the sim.
+    viewer. Every selection's properties end with a **Tile** section: the ground under it
+    (Position, Elevation, Ground: ground, beach, water or warren hole). **Inspect Empty
+    Tiles**, also kept per viewer, lets a click or hover on bare ground pick the tile itself,
+    which shows only those rows.
+  - **Create/Destroy:** **Modes** (the tools for interfering with the sim) and **Size** (Radius).
+  - **Debug:** **Overlays** (Lines), **World** (Water, the seed), **Tools** (Benchmark).
 - **Minimap** (Paul, 11 Oct 2026): the whole world, always zoomed all the way out, in a small
   window with a box on what the screen shows; click or drag on it to go there. Animals of
   the kinds whose rings are on show as dots. Small (2 tiles a pixel) or big (1), by its +/−
@@ -339,6 +353,10 @@ watching the sim run. Everything else in this doc is decided.
   random sex, from newborn to elder, full and rested). Grass skips warren holes and
   scorch; wolves skip holes. One God mode is on at a time; while a paint mode is on,
   dragging paints instead of panning (pan with the keys).
+- **WATER MODE** (Create/Destroy tab, Paul, 11 Oct 2026): tap or drag to pour water, 1 m
+  deep, on bare ground or grass (which drowns), never on an animal, a corpse, a warren hole
+  or scorched ground; blades left on the new shore go too, as the beach stays bare. Sized by
+  the Radius slider like the other brushes.
 - **Radius slider** (Create/Destroy tab): sets the size for whichever mode is on, 0 (a single tile,
   one agent per tap) to 75 tiles (Paul), a circle smaller than the crowd limit; each mode remembers its own (paint modes start at
   `BrushRadius`, the nuke at `NukeRadius`).

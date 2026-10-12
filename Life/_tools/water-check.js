@@ -386,7 +386,8 @@ function landPieces(AS, W) {
   const vm = require('vm');
   vm.runInContext(text, vm.createContext({ AS }), {});   // adds AS.describe next to the sim's own files
   const d = AS.describe(sim, { tile: w, serial: 0, slot: -1, hole: false });
-  ok(d && d.title === 'Water' && d.rows.length === 0, 'tapping water selects it and the inspector says "Water"');
+  const ground = d && d.rows.find(r => r.name === 'Ground');
+  ok(d && d.title === 'Water' && ground && ground.value === 'Water' && d.rows.some(r => r.name === 'Elevation'), 'tapping water selects it: the inspector says "Water", with the tile under it');
 }
 
 console.log(bad ? `\n${bad} FAILED` : '\nAll water checks passed');

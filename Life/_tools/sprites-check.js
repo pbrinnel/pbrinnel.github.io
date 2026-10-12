@@ -55,10 +55,11 @@ add(AS.spriteHole(), 'hole');
 for (let sx = 0; sx < 2; sx++) add(AS.spritePeek(sx), `peek sex${sx}`);
 for (let t = 0; t < 3; t++) add(AS.spriteGrassLean(t), `grass lean ${t}`);
 for (let t = 0; t < 3; t++) add(AS.spriteGrass(t), `grass ${t}`);
-// Water: every variant turns up somewhere on a lake, by position alone.
-const waterSeen = new Set();
-for (let y = 0; y < 40; y++) for (let x = 0; x < 40; x++) waterSeen.add(AS.spriteWater(x, y));
-check(waterSeen.size === B.water.length, `all ${B.water.length} water variants are used (${waterSeen.size})`);
+// Water: in each depth band (AS.waterBand) every variant turns up somewhere, by position alone.
+const waterSeen = new Set(), bands = AS.WATER_DEPTH_SHADES.length;
+for (let b = 0; b < bands; b++) for (let y = 0; y < 40; y++) for (let x = 0; x < 40; x++) waterSeen.add(AS.spriteWater(x, y, b));
+check(waterSeen.size === B.water.length * bands, `all ${B.water.length} water variants are used in each of ${bands} depths (${waterSeen.size})`);
+check(AS.waterBand(0.1) === 0 && AS.waterBand(2) === 1 && AS.waterBand(30) === 2, 'depth bands: shallow, mid, deep');
 for (const i of waterSeen) add(i, `water ${i}`);
 check(seen.size === AS.SPRITE_COUNT, `every index used once (${seen.size} of ${AS.SPRITE_COUNT})`);
 

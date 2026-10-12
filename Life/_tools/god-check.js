@@ -194,5 +194,31 @@ W.scorch[t0] = 0;
   for (let i = 0; i < 4 * DAY; i++) sim5.tick();
   ok(W5.bunnies + W5.wolves + W5.humans !== live, 'a running world changes its animal count freely (births and deaths do not consult the limit)');
 }
+// ---- WATER MODE: water on bare ground and grass, never on animals, corpses, holes or scorch ----
+{
+  const { AS: A6, texts: t6 } = load();
+  let s6 = t6.settings;
+  for (const [k, v] of [['WorldWidth', '80'], ['WorldHeight', '60'], ['StartGrass', '0%'], ['StartBunnies', '0'], ['StartWolves', '0'], ['Rain', '0%'], ['RiverDrain', '0']]) s6 = editCSV(s6, k, 'Value', v);
+  t6.settings = s6;
+  const { T: T6 } = A6.parseTables(t6);
+  const sim6 = A6.Sim(T6, 3), W6 = sim6.W, K6 = A6.KIND;
+  const at = (x, y) => W6.tile(x, y);
+  W6.addGrass(at(40, 30), 1, 0);                         // drowned
+  W6.addGrass(at(40, 26), 1, 0);                         // just outside radius 3: left on the new shore, so cleared
+  W6.addGrass(at(50, 30), 1, 0);                         // far away: untouched
+  const bun = A6.spawnStarting(sim6, A6.SPECIES.BUNNY, at(41, 30));
+  A6.debugDropCorpse(sim6, at(39, 30), A6.SPECIES.BUNNY);
+  W6.addHole(at(40, 31), 0);
+  const placed = A6.paintCircle(sim6, 'water', 40, 30, 3);
+  const waterAt = (x, y) => W6.kind[at(x, y)] === K6.WATER;
+  ok(placed > 0 && W6.waterCount === placed && waterAt(40, 30) && W6.wDepth[at(40, 30)] > 0, `WATER MODE pours ${placed} tiles of water, with a depth, over grass too`);
+  ok(W6.aAlive[bun] && W6.aTile[bun] === at(41, 30) && W6.kind[at(39, 30)] === K6.CORPSE && W6.hole[at(40, 31)] && !waterAt(40, 31), 'it never covers an animal, a corpse or a warren hole');
+  let bladeOnBeach = 0; for (let t = 0; t < W6.n; t++) if (W6.beach[t] && W6.kind[t] === K6.GRASS) bladeOnBeach++;
+  ok(bladeOnBeach === 0 && W6.kind[at(50, 30)] === K6.GRASS, 'the new shore is bare (the beach rule); grass away from it stays');
+  const f0 = failures.length; audit(A6, sim6, 'after WATER MODE');
+  for (let i = 0; i < 2 * A6.TICK_HZ * A6.DAY_SECONDS; i++) sim6.tick();
+  audit(A6, sim6, 'two days after WATER MODE');
+  ok(failures.length === f0, 'the grid and stores audit after pouring water, and two days on' + (failures.length > f0 ? ': ' + failures[f0] : ''));
+}
 console.log(bad ? `${bad} FAILED` : 'all passed');
 process.exit(bad ? 1 : 0);

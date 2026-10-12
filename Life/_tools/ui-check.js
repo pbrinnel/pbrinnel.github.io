@@ -130,8 +130,9 @@ const input = { speedIndex: 1, achieved: 1, day: 3.24, seed: 1234567, counts: { 
 { const { ui, ids, doc, calls, tools } = build(true);
   const bench = ids.hud.all(e => e.className === 'hud-bench')[0];
   const info = ids.hud.all(e => e.className === 'hud-panel hud-panel-debug')[0];
-  const names = info.children.map(c => c.className);
-  assert(names.indexOf('hud-bench') < names.indexOf('hud-seed') && names.indexOf('hud-seed') < names.indexOf('hud-tools')); ok('Debug tab: Lines/Benchmark, then the seed, then the debug tools');
+  // The tab is labeled rows now (Overlays, World, Tools), so read every element in order.
+  const names = info.all(() => true).map(c => c.className);
+  assert(names.indexOf('hud-seed') < names.indexOf('hud-bench') && names.indexOf('hud-bench') < names.indexOf('hud-tools')); ok('Debug tab: the World row (seed) before the Tools row (Benchmark, then the debug tools)');
   bench.fire('click'); assert.deepStrictEqual(calls, ['bench']); ok('Benchmark button calls onBench');
   calls.length = 0;
   const kd = e => doc.listeners.keydown.forEach(f => f({ ctrlKey: false, metaKey: false, altKey: false, target: {}, preventDefault() {}, ...e }));
@@ -189,7 +190,7 @@ const stripOf = ids => ids.hud.all(e => e.className === 'hud-tabstrip')[0];
   const barText = bar.children.map(c => c.className).join('|');
   for (const c of ['hud-speeds', 'hud-status', 'hud-day', 'hud-tabs', 'hud-hide']) assert(barText.includes(c), c);
   assert(!bar.all(e => e.className.includes('hud-count') || e.className.includes('hud-lines') || e.className.includes('hud-nuke')).length); ok('the bar holds speeds, day, tabs and Hide UI, none of the tab contents');
-  assert.deepStrictEqual(ids.hud.all(e => e.className.split(' ').includes('hud-tab')).map(b => b.textContent), ['Show/Hide', 'Debug', 'Create/Destroy']); ok('three tabs: Show/Hide, Debug, Create/Destroy');
+  assert.deepStrictEqual(ids.hud.all(e => e.className.split(' ').includes('hud-tab')).map(b => b.textContent), ['Show/Hide', 'Create/Destroy', 'Debug']); ok('three tabs: Show/Hide, Create/Destroy, Debug');
   assert.strictEqual(ids.hud.all(e => e.className.includes('hud-hide'))[0].textContent, 'Hide UI'); ok('a Hide UI button');
 }
 { const { ui, ids } = build(false, { onLines() {} });
