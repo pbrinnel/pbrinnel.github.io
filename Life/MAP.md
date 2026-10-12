@@ -353,6 +353,15 @@ never flash: see DESIGN.md, Photosensitivity.
   last is that old); when a gust cycle would be shorter than `CYCLE_HOLDS` holds at this
   speed, blades lean by the average share instead. Left and right lean variants are extra
   sheet sprites (`spriteGrassLean`, `spriteGrassLeanLeft`). The far view doesn't lean.
+- **Fire** (render.js, sprites.js): a burning tile draws its blade or body darkened by
+  `AS.fireLook(stage)` (`fireStage` from fire.js: below `FIRE_LOOK_AT` engulfing, the thing
+  shows, charring through `CHAR_LEVELS` pre-darkened sheet sprites under tongues, then mid
+  flames; above it, full flames hide it), the flame swaying a frame at most every
+  `FLAME_HOLD_MS` of real time on each tile's own clock (`flameFrame`). Scorched ground fades
+  only in its last `min(ScorchDays, FireScorchDays)` days; recently burnt tiles glow with
+  embers (`FIRE_EMBER_HOURS`), and every scorched tile has ash pixels placed by a tile hash.
+  The far view colors burning tiles by stage and embers fading to scorch. `AS.spriteFlame()`
+  is the PAINT and Info icon; 'fires' is a locate kind.
 - **Overlays** (render.js): scorched ground; the Radius slider's fading preview
   (`radiusPreview`, `RADIUS_*`); topo lines from `W.elev` when on (`setContours`, spacing
   `setContourStep`, each spacing cached per world, `CONTOUR_*`: marching squares in
@@ -378,7 +387,7 @@ never flash: see DESIGN.md, Photosensitivity.
     (`onLines`); Properties Off/Click/Hover through `onInspect`; Inspect Empty Tiles through
     `onInspectEmpty`.
   - **PAINT** (paint-tab.js, in the window ui.js makes): the modes (NUKE, GRASS, RABBIT,
-    WOLF, HUMAN, WATER: one at a time, `ui.mode`;
+    WOLF, HUMAN, WATER, FIRE: one at a time, `ui.mode`;
     icons once `setIcons` runs (main.js `ICON_SPRITE`), the name kept as `aria-label` and in
     the tooltip; the nuke icon is sprites.js `spriteNuke`) with a Radius slider (0–100; each
     mode keeps its own value in localStorage, defaults from `NukeRadius`/`BrushRadius`) and
@@ -388,10 +397,10 @@ never flash: see DESIGN.md, Photosensitivity.
   - The properties window (properties.js, `ui.inspector`): a heading row renders as a
     section title. The cards and the error page (cards.js: `ui.ended`, `ui.crowd`,
     `ui.errors`). Keys for speed and Hide UI are ui.js's.
-- **PAINT's powers** (paint.js): `paintCircle(sim, 'grass'|'bunny'|'wolf'|'human'|'water',
+- **PAINT's powers** (paint.js): `paintCircle(sim, 'grass'|'bunny'|'wolf'|'human'|'water'|'fire',
   cx, cy, r, cap?)` is the brush (empty eligible tiles only; random ages, but a species
   with no `LitterSize` (humans) stays adult; radius 0 = one tile; `cap = { room, hit }`
-  stops animals at the soft limit; `water` goes through `pourWater`). `nuke(sim, tile,
+  stops animals at the soft limit; `water` goes through `pourWater`, `fire` through `AS.ignite` alone). `nuke(sim, tile,
   radius?)` destroys everything within the radius (the slider's, default `NukeRadius`):
   animals with no corpse and no event, blades, corpses, holes, and scorches the ground
   (`W.scorch`, days left, `ScorchDays` at the center, shorter to the rim).

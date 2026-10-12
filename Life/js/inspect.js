@@ -122,8 +122,10 @@
     Depth: (sim, c) => num(sim.W.wDepth[c.t], DEPTH_DECIMALS) + ' m',
     Ground: (sim, c) => {
       const W = sim.W, t = c.t;
-      return W.wDepth[t] > 0 ? 'Water' : W.hole[t] ? 'Warren hole' : W.beach[t] ? 'Beach' : 'Ground';
+      return W.flow[t] === AS.FLOW.FIRE ? 'On fire' : W.wDepth[t] > 0 ? 'Water' : W.hole[t] ? 'Warren hole' : W.beach[t] ? 'Beach' : 'Ground';
     },
+    // How far through its burn a blade or corpse is; 'No' when it isn't burning.
+    Burning: (sim, c) => sim.W.flow[c.t] === AS.FLOW.FIRE ? Math.round(AS.fireStage(sim.W, c.t) * 100) + '%' : 'No',
     Sex: (sim, c) => sim.W.aSex[c.s] === SEX.FEMALE ? 'Female' : 'Male',
     // A due litter with no room yet is still a pregnancy (DESIGN.md: the birth waits).
     Pregnant: (sim, c) => sim.W.aLitter[c.s] > 0 && !(sim.W.aPregnant[c.s] > 0)

@@ -16,9 +16,9 @@
 //         onRadius(mode, tiles): the Radius slider moved (for the preview),
 //         windows (the tab windows open at first: keys of 'info', 'paint', 'debug'; default ['info']),
 //         onWindows(keys): the open ones, after the viewer opens or closes one,
-//         onNuke(on), onLocate(key, on): a count's ring toggle ('bunnies', 'wolves', 'humans', 'blades', 'corpses') }) → ui
-//   ui.hud({ speedIndex, achieved, day, seed, humansSeen, counts: { bunnies, wolves, humans, total, blades, corpses } })
-//                                 (humansSeen: this world has had a human, so their count shows)
+//         onNuke(on), onLocate(key, on): a count's ring toggle ('bunnies', 'wolves', 'humans', 'blades', 'corpses', 'fires') }) → ui
+//   ui.hud({ speedIndex, achieved, day, seed, humansSeen, firesSeen, counts: { bunnies, wolves, humans, total, blades, corpses, fires } })
+//                                 (humansSeen: this world has had a human, so their count shows; firesSeen: likewise a fire)
 //     optional wind: { from (radians, the bearing it blows from), kmh }: the Info window's Wind row, an arrow
 //     the way it blows and words ("breeze, 14 km/h from the west"); without it the row stays hidden
 //   ui.windows, ui.setWindow(key, on)  the tab windows open (each tab button toggles its own)
@@ -35,7 +35,7 @@
 //   ui.warnings(warnings)         the sim started; say quietly what the CSVs have extra
 //   ui.lock(on)                   true: speed buttons, Benchmark, Graph, debug tools and keys do nothing
 //   ui.setIcons(draw)             swaps the count letters for sprite icons: draw(key, canvas)
-//                                 paints the icon for 'bunnies', 'wolves', 'humans', 'blades' or 'corpses'
+//                                 paints the icon for 'bunnies', 'wolves', 'humans', 'blades', 'corpses', 'fires' or the paint modes
 //   ui.ended(info)                the run is over: info = { titles: ['WOLVES EXTINCT', …], day,
 //                                 onNew(), onContinue() }; null hides it
 //   ui.inspector(desc)            null hides the panel; else { title, rows: [{ name, value, range, tip }] }
@@ -87,6 +87,7 @@
     ['Total', 'total', 'all animals together'],
     ['', 'blades', 'blades of grass'],
     ['', 'corpses', 'corpses'],
+    ['', 'fires', 'tiles burning'],
   ];
 
   AS.UI = function (opts) {
@@ -496,6 +497,9 @@
       // Humans are optional: their count shows only once this world has had one.
       const showHumans = !!s.humansSeen;
       if (countBoxes.humans.hidden === showHumans) countBoxes.humans.hidden = !showHumans;
+      // Fire is the same: the count shows once this world has had a fire.
+      const showFires = !!s.firesSeen;
+      if (countBoxes.fires.hidden === showFires) countBoxes.fires.hidden = !showFires;
       setSeed(String(s.seed));
       if (s.wind) {
         if (windRow.hidden) windRow.hidden = false;

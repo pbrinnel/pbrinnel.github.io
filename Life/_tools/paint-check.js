@@ -238,4 +238,30 @@ W.scorch[t0] = 0;
   for (let i = 0; i < A7.TICK_HZ * A7.DAY_SECONDS; i++) sim7.tick();
   ok(W7.water && W7.waterCount > 0 && W7.waterCount !== placed, `pouring gives it the rules, and the water spreads (${placed} → ${W7.waterCount} tiles)`);
 }
+// ---- FIRE MODE: lights what will burn, through AS.ignite alone ----
+{
+  const { AS: A8, sim: sim8, W: W8, K: K8 } = stage({ bare: false, size: [60, 40], seed: 5,
+    settings: { StartGrass: '0%', StartBunnies: 0, StartWolves: 0, Rain: 0 } });
+  const at = (x, y) => W8.tile(x, y);
+  W8.addGrass(at(30, 20), 1, 0);                         // fuel
+  A8.debugDropCorpse(sim8, at(31, 20), A8.SPECIES.BUNNY); // fuel
+  W8.addHole(at(29, 20), 0);                             // a warren hole: no fuel
+  W8.addGrass(at(30, 19), 1, 0);
+  W8.water.H[at(30, 22)] += 1; W8.water.listWet(); A8.syncWater(sim8);   // a puddle in the circle
+  const bun = A8.spawnStarting(sim8, A8.SPECIES.BUNNY, at(31, 21));
+  W8.addGrass(at(40, 20), 1, 0);                         // outside the circle
+  const crowd = () => W8.bunnies + W8.wolves + W8.humans;
+  const animals0 = crowd();
+  const lit = A8.paintCircle(sim8, 'fire', 30, 20, 2);
+  const burning = t => W8.flow[t] === A8.FLOW.FIRE;
+  ok(burning(at(30, 20)) && burning(at(31, 20)) && burning(at(30, 19)), 'FIRE MODE lights the grass and the corpse in the circle');
+  ok(lit === 3 && W8.fCount === 3, `it returns how many caught (${lit}) and nothing else burns (${W8.fCount})`);
+  ok(!burning(at(29, 20)) && !burning(at(30, 22)) && !burning(at(40, 20)), 'it skips a hole, water and grass outside the circle');
+  ok(!burning(at(32, 20)) && !burning(at(28, 20)) && W8.kind[at(32, 20)] === K8.EMPTY, 'it skips bare ground');
+  ok(W8.aAlive[bun] && !burning(at(31, 21)) && crowd() === animals0, 'it leaves an animal alone, and adds none');
+  ok(A8.paintCircle(sim8, 'fire', 30, 20, 2) === 0, 'tiles already burning are not lit twice');
+  audit(A8, sim8, 'after FIRE MODE');
+  for (let i = 0; i < A8.TICK_HZ * A8.DAY_SECONDS; i++) sim8.tick();
+  audit(A8, sim8, 'a day after FIRE MODE');
+}
 done('all passed');

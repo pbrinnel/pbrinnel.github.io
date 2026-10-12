@@ -52,6 +52,21 @@
     const ch = sh => Math.round(((a >>> sh) & 255) * (1 - f) + ((b >>> sh) & 255) * f);
     return (0xff000000 | (ch(16) << 16) | (ch(8) << 8) | ch(0)) >>> 0;
   }
+
+  // Fire's far-view colors (Paul's pick, option E of the fire mockup): burning tiles by how hard
+  // they burn (catching, then mid flames to the last part), a tile that burnt out recently
+  // glowing as embers, then the scorch above. The close-up palette is AS.FIRE_PALETTE.
+  const FAR_FIRE_MID = abgr('#b8461e'), FAR_FIRE_HIGH = abgr('#e07a34'), FAR_EMBER = abgr('#6a2a14');
+  // A tile that burnt out within the last FIRE_EMBER_HOURS of in-world time still glows: its
+  // scorch is within that long of FireScorchDays (the most a fire leaves). Up close, the glow
+  // is EMBER_PIXELS pixels that go out one by one as the hours pass; each is lit about a third
+  // of the time, stepping with the sway clock (sprites.js, FLAME_HOLD_MS).
+  const FIRE_EMBER_HOURS = 12;
+  const EMBER_PIXELS = 3, EMBER_FIRST_ROW = 5, EMBER_LIT_EVERY = 3;
+  // Scattered ash on scorched ground: ASH_PIXELS gray pixels in the lower rows of the tile,
+  // placed by a hash of the tile (and fading with the scorch, like the ground under it).
+  const ASH_PIXELS = 4, ASH_FIRST_ROW = 4, ASH_ROWS = 4;
+  const SALT_ASH_X = 10, SALT_ASH_Y = 20, SALT_EMBER_X = 30;
   const SCORCH_FADE_STEPS = 8;   // sprite mode quantizes the fade to this many alphas, so a big crater doesn't pay a state change per tile
 
   // The explosion, drawn over real time so it lasts the same at any sim speed. A thin ring
@@ -81,8 +96,10 @@
   const LOCATE_PIP_CSS_PX = 5;
   const LOCATE_PIPS_MAX = 200;
   // The graph's colors (graph.js), so a ring matches the kind's line; ui.js marks a toggled
-  // count with the same color.
-  const LOCATE_COLORS = AS.LOCATE_COLORS = Object.freeze({ blades: '25,158,112', bunnies: '217,89,38', wolves: '57,135,229', humans: '199,99,179', corpses: '200,200,190' });
+  // count with the same color. Fires have no line: they take the flames' yellow from the fire
+  // palette, since the orange the bunnies' line uses is taken.
+  const rgbOf = hex => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)).join(',');
+  const LOCATE_COLORS = AS.LOCATE_COLORS = Object.freeze({ blades: '25,158,112', bunnies: '217,89,38', wolves: '57,135,229', humans: '199,99,179', corpses: '200,200,190', fires: rgbOf(AS.FIRE_PALETTE.y) });
 
   // Topo lines (Paul, 11 Oct 2026, over shading): a thin line every few meters (CONTOUR_M until
   // the viewer's slider picks another spacing) of
@@ -120,7 +137,7 @@
   // A bite timer that rose by more than this since the last frame means a bite landed.
   const BITE_RISE = 1e-6;
 
-  const KIND = AS.KIND, EV = AS.EV, HOLD = AS.SPRITE_HOLD, FRAME = AS.SPRITE_FRAME;
+  const KIND = AS.KIND, FLOW = AS.FLOW, EV = AS.EV, HOLD = AS.SPRITE_HOLD, FRAME = AS.SPRITE_FRAME;
 
   // How far through its current step an animal is, 0–1. alpha is how far real time is
   // between the last tick and the next, so a step glides smoothly at any speed.
@@ -255,6 +272,11 @@
       return AS.stageOf(sim.T[AS.SPECIES_KEY[W.aSpecies[s]]], W.aAge[s]);
     }
 
+    // Scorch shows fully dark until it has this many days left, then fades: the shorter of the
+    // nuke's and a fire's, so a fire's burnt ground is as dark as a crater, and a crater still
+    // greens from its rim (less scorch there) inward.
+    const scorchFadeDays = sim => Math.min(sim.T.world.ScorchDays, sim.T.world.FireScorchDays);
+
     function fillCells(sim) {
       const W = sim.W;
       if (cell.w !== W.w || cell.h !== W.h) {
@@ -267,14 +289,19 @@
       }
       const px = cell.px, kind = W.kind, size = W.gSize;
       const bg = FAR_GROUND, g0 = FAR_GRASS[0], g1 = FAR_GRASS[1], g2 = FAR_GRASS[2];
-      const corpse = FAR_CORPSE, waters = FAR_WATERS, depth = W.wDepth, holeAt = W.hole, scorch = W.scorch, fullDays = sim.T.world.ScorchDays;
+      const corpse = FAR_CORPSE, waters = FAR_WATERS, depth = W.wDepth, holeAt = W.hole, scorch = W.scorch, fullDays = scorchFadeDays(sim);
       const lo = 1 / 3, hi = 2 / 3;
+      const flow = W.flow, fireDays = sim.T.world.FireScorchDays, emberDays = FIRE_EMBER_HOURS / 24;
       for (let t = 0, n = W.n; t < n; t++) {
         const k = kind[t];
-        if (k === KIND.GRASS) { const z = size[t]; px[t] = z < lo ? g0 : z < hi ? g1 : g2; }
+        if (flow[t] === FLOW.FIRE) px[t] = AS.fireLook(AS.fireStage(W, t)).flame >= AS.FLAME.MID ? FAR_FIRE_HIGH : FAR_FIRE_MID;
+        else if (k === KIND.GRASS) { const z = size[t]; px[t] = z < lo ? g0 : z < hi ? g1 : g2; }
         else if (k === KIND.CORPSE) px[t] = corpse;
         else if (depth[t] > 0) px[t] = waters[AS.waterBand(depth[t])];   // under a wading animal too
-        else if (scorch[t] > 0) px[t] = mixAbgr(bg, FAR_SCORCH, scorch[t] / fullDays);
+        else if (scorch[t] > 0) {
+          const ground = mixAbgr(bg, FAR_SCORCH, Math.min(1, scorch[t] / fullDays)), left = scorch[t];
+          px[t] = left > fireDays - emberDays && left <= fireDays ? mixAbgr(ground, FAR_EMBER, (left - (fireDays - emberDays)) / emberDays) : ground;
+        }
         else px[t] = holeAt[t] ? FAR_HOLE : bg;   // empty ground (or a hole), or an animal that the loop below paints
       }
       for (let s = 0, hiSlot = W.aHigh; s < hiSlot; s++) {
@@ -289,7 +316,7 @@
       const s = cam.scale * dpr;
       const sh = sheet.get(Math.max(1, Math.round(s)));
       const img = sh.canvas, px = sh.px;
-      const kind = W.kind, size = W.gSize;
+      const kind = W.kind, size = W.gSize, flow = W.flow;
       // Pixel art: nearest-neighbor, so a tile drawn a pixel wider than the sprite doesn't
       // blur or pull in the neighboring sprite's edge.
       ctx.imageSmoothingEnabled = false;
@@ -301,6 +328,11 @@
         for (let tx = v.x0; tx <= v.x1; tx++) {
           const k = kind[row + tx];
           let id;
+          if (flow[row + tx] === FLOW.FIRE) {
+            const bx = Math.round(tx * s - ox);
+            drawBurning(W, row + tx, tx, ty, img, sh, px, bx, dy, Math.round((tx + 1) * s - ox) - bx, dh, nowMs);
+            continue;
+          }
           if (W.hole[row + tx]) {
             // The hole is ground: it goes under a corpse that lies on it, and under any animal.
             const dx = Math.round(tx * s - ox), dw = Math.round((tx + 1) * s - ox) - dx;
@@ -326,6 +358,7 @@
         }
       }
       drawScorch(sim, v, s, ox, oy);
+      drawAshAndEmbers(sim, v, s, ox, oy, nowMs);
       if (intentLines) drawIntent(sim, v, s, ox, oy, dpr, -1);
       else if (sel && sel.slot >= 0 && W.aAlive[sel.slot]) drawIntent(sim, v, s, ox, oy, dpr, sel.slot);
       // Animals, over the ground. Slots are stable, so this is one pass over the used range.
@@ -416,9 +449,76 @@
       ctx.globalAlpha = 1;
     }
 
-    // Scorched tiles under everything else. Alpha is the share of ScorchDays left, in steps.
+    // A burning tile (option E): the burning thing charred by how far along the fire is, with
+    // flames over it; in the last part full flames hide it. The look comes from the sim's stage
+    // (AS.fireLook); the sway is real time, per tile (AS.flameFrame).
+    function drawBurning(W, t, tx, ty, img, sh, px, dx, dy, dw, dh, nowMs) {
+      const look = AS.fireLook(AS.fireStage(W, t));
+      if (look.char >= 0) {
+        let id;
+        if (W.kind[t] === KIND.GRASS) id = AS.spriteCharGrass(AS.grassGlyph(W.gSize[t]) - AS.GLYPH.GRASS_0, look.char);
+        else if (W.cMeat[t] > 0 || nowMs < deathUntil[t]) id = AS.spriteCharCarcass(W.cSpecies[t], look.char);
+        else id = AS.spriteCharSkull(W.cSpecies[t], look.char);
+        ctx.drawImage(img, sh.sx(id), sh.sy(id), px, px, dx, dy, dw, dh);
+      }
+      const fid = AS.spriteFire(look.flame, AS.flameFrame(nowMs, tx, ty));
+      ctx.drawImage(img, sh.sx(fid), sh.sy(fid), px, px, dx, dy, dw, dh);
+    }
+
+    // Ash on every scorched tile, and embers on the ones that burnt out lately (from FireScorchDays
+    // down by FIRE_EMBER_HOURS), over the scorch. Ash is batched per alpha step: it fades with
+    // the scorch over FireScorchDays (a nuke's deeper scorch keeps it whole).
+    const ashRects = Array.from({ length: SCORCH_FADE_STEPS + 1 }, () => []);
+    const emberTiles = [];
+    function drawAshAndEmbers(sim, v, s, ox, oy, nowMs) {
+      const W = sim.W, scorch = W.scorch, fireDays = sim.T.world.FireScorchDays, emberDays = FIRE_EMBER_HOURS / 24;
+      for (const r of ashRects) r.length = 0;
+      emberTiles.length = 0;
+      let any = false;
+      for (let ty = v.y0; ty <= v.y1; ty++) {
+        const dy = Math.round(ty * s - oy), dh = Math.round((ty + 1) * s - oy) - dy;
+        const row = ty * W.w;
+        for (let tx = v.x0; tx <= v.x1; tx++) {
+          const left = scorch[row + tx];
+          if (!(left > 0)) continue;
+          const dx = Math.round(tx * s - ox), dw = Math.round((tx + 1) * s - ox) - dx;
+          const u = Math.max(1, Math.round(dw / AS.SPRITE_SIZE)), uh = Math.max(1, Math.round(dh / AS.SPRITE_SIZE));
+          const list = ashRects[Math.max(1, Math.ceil(Math.min(1, left / fireDays) * SCORCH_FADE_STEPS))];
+          for (let k = 0; k < ASH_PIXELS; k++) {
+            const ax = Math.floor(AS.spriteHash(tx, ty, SALT_ASH_X + k) * AS.SPRITE_SIZE);
+            const ay = ASH_FIRST_ROW + Math.floor(AS.spriteHash(tx, ty, SALT_ASH_Y + k) * ASH_ROWS);
+            list.push(dx + Math.round(ax * dw / AS.SPRITE_SIZE), dy + Math.round(ay * dh / AS.SPRITE_SIZE), u, uh);
+          }
+          any = true;
+          if (left > fireDays - emberDays && left <= fireDays) emberTiles.push(tx, ty, dx, dy, dw, dh, (left - (fireDays - emberDays)) / emberDays);
+        }
+      }
+      if (!any) return;
+      ctx.fillStyle = AS.FIRE_PALETTE.a;
+      for (let q = 1; q <= SCORCH_FADE_STEPS; q++) {
+        const list = ashRects[q];
+        if (!list.length) continue;
+        ctx.globalAlpha = q / SCORCH_FADE_STEPS;
+        ctx.beginPath();
+        for (let i = 0; i < list.length; i += 4) ctx.rect(list[i], list[i + 1], list[i + 2], list[i + 3]);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      for (let i = 0; i < emberTiles.length; i += 7) {
+        const tx = emberTiles[i], ty = emberTiles[i + 1], dx = emberTiles[i + 2], dy = emberTiles[i + 3], dw = emberTiles[i + 4], dh = emberTiles[i + 5], f = emberTiles[i + 6];
+        const step = AS.flameStep(nowMs, tx, ty), u = Math.max(1, Math.round(dw / AS.SPRITE_SIZE)), uh = Math.max(1, Math.round(dh / AS.SPRITE_SIZE));
+        for (let k = 0; k < EMBER_PIXELS && f > k / EMBER_PIXELS; k++) {
+          const ex = Math.floor(AS.spriteHash(tx, ty, SALT_EMBER_X + k) * AS.SPRITE_SIZE);
+          ctx.fillStyle = (step + k) % EMBER_LIT_EVERY === 0 ? AS.FIRE_PALETTE.e : AS.FIRE_PALETTE.k;
+          ctx.fillRect(dx + Math.round(ex * dw / AS.SPRITE_SIZE), dy + Math.round((EMBER_FIRST_ROW + k) * dh / AS.SPRITE_SIZE), u, uh);
+        }
+      }
+    }
+
+    // Scorched tiles under everything else, fully dark until the last scorchFadeDays, then
+    // fading out in steps.
     function drawScorch(sim, v, s, ox, oy) {
-      const W = sim.W, scorch = W.scorch, fullDays = sim.T.world.ScorchDays;
+      const W = sim.W, scorch = W.scorch, fullDays = scorchFadeDays(sim);
       let lastQ = 0;
       for (let ty = v.y0; ty <= v.y1; ty++) {
         const dy = Math.round(ty * s - oy), dh = Math.round((ty + 1) * s - oy) - dy;
@@ -594,6 +694,11 @@
           }
           ring(pos[0], pos[1]);
         }
+      } else if (key === 'fires') {
+        for (let ty = y0; ty <= y1; ty++) {
+          const row = ty * W.w;
+          for (let tx = x0; tx <= x1; tx++) if (W.flow[row + tx] === FLOW.FIRE) ring(tx, ty);
+        }
       } else {
         const kind = key === 'blades' ? KIND.GRASS : KIND.CORPSE;
         for (let ty = y0; ty <= y1; ty++) {
@@ -729,7 +834,7 @@
       },
       // Show the size a radius covers (tiles; a nuke's in its own color), fading from nowMs.
       radiusPreview(r, nuke, nowMs) { preview = { r, nuke: !!nuke, t0: nowMs }; },
-      // The kinds to ring ('bunnies', 'wolves', 'humans', 'blades', 'corpses'): a Set, read
+      // The kinds to ring ('bunnies', 'wolves', 'humans', 'blades', 'corpses', 'fires'): a Set, read
       // every frame; top is how many CSS px of the canvas's top the HUD covers, so pips stay below it.
       locate(kinds, top) { located = kinds && kinds.size ? kinds : null; locTop = top || 0; },
       get located() { return located ? [...located] : []; },

@@ -304,8 +304,8 @@ last only as long as their lives.
   `CorpseDecay` ends, whichever comes first, so a bigger body feeds more grass.
 
 ## Fire and wind (planned)
-Decided by Paul, 12 Oct 2026. Wind is built; fire is not yet. Fire comes first of the
-weather systems, and wind is real weather, not an animation.
+Decided by Paul, 12 Oct 2026. Wind and fire are built; animals and fire, and the ash, are
+next. Fire comes first of the weather systems, and wind is real weather, not an animation.
 
 - **Wind is in the sim** (built). The world has a wind, a direction and a strength that drift
   slowly over the world's time from its seed: breezes most of the time, stronger spells now
@@ -430,7 +430,7 @@ weather systems, and wind is real weather, not an animation.
 Keeping the balance becomes the game. **Modes** (the brushes and the nuke), one at a time,
 and **Size** (the Radius slider).
 - **The modes are icons** (12 Oct 2026): the world's own sprites for grass, rabbit, wolf,
-  human and water, and a pixel mushroom cloud for the nuke, which keeps a red edge so it
+  human, water and fire, and a pixel mushroom cloud for the nuke, which keeps a red edge so it
   never reads as just another brush; each names itself in its tooltip.
 - **GRASS MODE, RABBIT MODE, WOLF MODE, HUMAN MODE:** tap to fill a circle of the brush's
   radius, or drag to paint a stroke; every empty tile that can hold it gets a blade or an
@@ -438,6 +438,10 @@ and **Size** (the Radius slider).
   humans always adult). Grass skips warren holes, scorch and the beach; wolves and humans
   skip holes. While a paint mode is on, dragging paints instead of panning (pan with the
   keys).
+- **FIRE MODE** (12 Oct 2026): tap or drag to set grass and bodies alight in the brush's
+  circle; it spreads from there by itself. Bare ground, water, holes and animals don't catch.
+  Info shows how many tiles are burning (with its ring toggle) once a world has had a fire,
+  and the properties window says how far through its burn a blade or body is.
 - **WATER MODE** (11 Oct 2026): tap or drag to pour water, 1 m deep, on bare ground or
   grass (which drowns), never on an animal, a corpse, a warren hole or scorched ground;
   blades left on the new shore go too, as the beach stays bare. It goes into the same water

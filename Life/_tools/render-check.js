@@ -106,5 +106,96 @@ function rig(sim) {
   rec.ids.length = 0; r.draw(sim2, cam, sheet, null, 0, 40000, 1);
   check(!rec.ids.includes(AS.spriteCarcass(AS.SPECIES.BUNNY)) && rec.ids.includes(AS.spriteSkull(AS.SPECIES.BUNNY)), 'carcass: a skull once the meat is gone');
 }
+
+// Fire (option E): a burning tile draws the burning thing charred, then a flame; at and above
+// the engulf stage only the full flame. The sway is real time. The far view colors it by stage.
+{
+  const sim3 = AS.Sim(T, 11), W3 = sim3.W;
+  ctx.window = { devicePixelRatio: 1 };
+  const { r, cam, sheet, rec } = rig(sim3);
+  // A tile with a blade, and one with a body, both away from the edge.
+  let blade = -1, body = -1;
+  for (let t = 0; t < W3.n; t++) {
+    if (blade < 0 && W3.kind[t] === AS.KIND.GRASS && !W3.hole[t] && W3.flow[t] === AS.FLOW.NONE) blade = t;
+  }
+  let victim = -1;
+  for (let s = 0; s < W3.aHigh; s++) if (W3.aAlive[s] && W3.aSpecies[s] === AS.SPECIES.BUNNY) { victim = s; break; }
+  body = W3.aTile[victim];
+  AS.killAnimal(sim3, victim);
+  check(W3.kind[body] === AS.KIND.CORPSE && AS.ignite(sim3, body), 'a corpse can be set alight');
+  check(AS.ignite(sim3, blade), 'a blade can be set alight');
+  const tileIds = (t, nowMs) => {
+    rec.ids.length = 0; rec.tiles.length = 0;
+    r.draw(sim3, cam, sheet, null, 0, nowMs, 1);
+    const x = (t % W3.w) * 10, y = ((t / W3.w) | 0) * 10;
+    return rec.ids.filter((_, i) => rec.tiles[i][0] === x && rec.tiles[i][1] === y);
+  };
+  const third = AS.grassGlyph(W3.gSize[blade]) - AS.GLYPH.GRASS_0;
+  let looks = 0;
+  // Puts tile t at `stage` of its burn. Ages and burn times are float32, so stage × time can
+  // land a hair under stage (whatever BurnHours is): nudge the age up until fireStage agrees.
+  const setStage = (t, stage) => {
+    let age = stage * W3.fireTime[t];
+    W3.fireAge[t] = age;
+    while (AS.fireStage(W3, t) < stage) { age = age * (1 + 1e-7) + 1e-9; W3.fireAge[t] = age; }
+  };
+  for (const stage of [0, 0.1, 0.3, 0.5, 0.6, 0.79, 0.8, 0.9, 1]) {
+    for (const t of [blade, body]) setStage(t, stage);
+    const look = AS.fireLook(stage), frame = AS.flameFrame(5000, blade % W3.w, (blade / W3.w) | 0);
+    const got = tileIds(blade, 5000);
+    const want = look.char >= 0 ? [AS.spriteCharGrass(third, look.char), AS.spriteFire(look.flame, frame)] : [AS.spriteFire(look.flame, frame)];
+    check(JSON.stringify(got) === JSON.stringify(want), `blade at stage ${stage}: ${want} drawn (got ${got})`);
+    check(!got.includes(AS.spriteGrass(third)) && !got.includes(AS.spriteGrassLean(third)), `blade at stage ${stage}: its plain sprite never shows`);
+    const bgot = tileIds(body, 5000), bl = bgot.length;
+    const fid = AS.spriteFire(look.flame, AS.flameFrame(5000, body % W3.w, (body / W3.w) | 0));
+    check(bgot[bl - 1] === fid && (look.char >= 0 ? bl === 2 : bl === 1), `body at stage ${stage}: charred body (if still in view), then flame`);
+    if (look.char >= 0) check(bgot[0] === AS.spriteCharCarcass(AS.SPECIES.BUNNY, look.char), 'a body with meat burns as a carcass');
+    looks++;
+  }
+  // The flame sprite swaps with the sway clock, and at most once per hold of real time.
+  W3.fireAge[blade] = 0.5 * W3.fireTime[blade];
+  const seenFrames = [];
+  for (let ms = 0; ms < 30000; ms += 1000 / 60) {
+    const g = tileIds(blade, ms), f = g[g.length - 1];
+    if (seenFrames.length === 0 || seenFrames[seenFrames.length - 1][1] !== f) seenFrames.push([ms, f]);
+    if (ms > 3000) break;
+  }
+  const gaps = seenFrames.slice(1).map((e, i) => e[0] - seenFrames[i][0]);
+  check(seenFrames.length >= 4 && Math.min(...gaps.slice(1)) >= AS.FLAME_HOLD_MS - 17, `the drawn flame changes no faster than every ${AS.FLAME_HOLD_MS} ms (${gaps.map(Math.round)}; the first runs from the start of the clock)`);
+
+  // Rings: 'fires' has a color in the fire palette and rings only burning tiles.
+  check(/^\d+,\d+,\d+$/.test(AS.LOCATE_COLORS.fires), 'fires has a ring color');
+  check(AS.LOCATE_COLORS.fires !== AS.LOCATE_COLORS.bunnies && Object.values(AS.LOCATE_COLORS).filter(c => c === AS.LOCATE_COLORS.fires).length === 1, 'the fires ring color is its own');
+  check(AS.LOCATE_COLORS.fires === [1, 3, 5].map(i => parseInt(AS.FIRE_PALETTE.y.slice(i, i + 2), 16)).join(','), 'the ring color is the flames\' yellow');
+  const arcs = [];
+  const g2 = new Proxy({}, { get(_, k) { if (k === 'arc') return () => arcs.push(1); if (k === 'canvas') return c2; return () => {}; }, set() { return true; } });
+  const c2 = { width: W3.w * 10, height: W3.h * 10, clientWidth: W3.w * 10, clientHeight: W3.h * 10, getContext: () => g2 };
+  const r2 = AS.Renderer(c2);
+  const cam2 = { x: 0, y: 0, scale: 10, visible: () => ({ x0: 0, y0: 0, x1: W3.w - 1, y1: W3.h - 1 }) };
+  r2.locate(new Set(['fires']), 0);
+  r2.draw(sim3, cam2, sheet, null, 0, 0, 1);
+  check(arcs.length === W3.fCount && W3.fCount === 2, `'fires' rings each burning tile (${arcs.length} rings, ${W3.fCount} fires)`);
+  r2.locate(new Set(), 0);
+
+  // The far view: burning tiles by stage, embers on tiles burnt out within FIRE_EMBER_HOURS, then plain scorch.
+  let image = null;
+  const fakeCanvas = { width: 0, height: 0, getContext: () => ({ createImageData: (w, h) => ({ data: new Uint8ClampedArray(w * h * 4) }), putImageData: img => { image = img; } }) };
+  ctx.document = { createElement: () => fakeCanvas };
+  const px32 = t => new Uint32Array(image.data.buffer)[t];
+  const farAt = (t, stage) => { setStage(t, stage); r2.farCanvas(sim3); return px32(t); };
+  const catching = farAt(blade, 0.1), mid = farAt(blade, 0.6), full = farAt(blade, 0.95);
+  check(catching !== mid && mid === full, `far view: catching is dimmer than the mid flames and the last part (#${catching.toString(16)} ${mid.toString(16)} ${full.toString(16)})`);
+  check(farAt(blade, 0.3) === catching && farAt(blade, 0.52) === catching && farAt(blade, 0.53) === mid, 'far view changes color where the look does');
+  const fireDays = sim3.T.world.FireScorchDays;
+  // Burn the blade out by hand: a fresh scorch glows, an old one doesn't.
+  W3.removeFire(blade); W3.removeGrass(blade);
+  W3.scorch[blade] = fireDays;
+  r2.farCanvas(sim3); const fresh = px32(blade);
+  W3.scorch[blade] = fireDays * 0.5; r2.farCanvas(sim3); const old = px32(blade);
+  W3.scorch[blade] = fireDays - 12 / 24 * 0.5; r2.farCanvas(sim3); const dimmer = px32(blade);
+  const red = c => c & 255;
+  check(red(fresh) > red(dimmer) && red(dimmer) > red(old), `far view: embers glow on fresh scorch and dim to plain scorch (${red(fresh)} > ${red(dimmer)} > ${red(old)})`);
+  console.log(`fire: ${looks} stages drawn, far colors catching/mid/full/ember ${catching.toString(16)}/${mid.toString(16)}/${full.toString(16)}/${fresh.toString(16)}`);
+}
 console.log(bad ? `FAIL (${bad})` : `PASS (${ids.length} glyphs, 12 animal combos, ${cases.length} grass cases)`);
 process.exit(bad ? 1 : 0);

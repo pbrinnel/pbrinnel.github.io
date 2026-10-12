@@ -7,7 +7,9 @@
 // the renderer never flips at draw time. Codes: x base color, d darker (shade), w lighter
 // (highlight), e eye, y amber eye, n nose, f fang, p pink (tongue), s skin, q spear
 // shaft, m spearhead. Colors come from AS.COLORS (glyphs.js),
-// so the species and sexes still read the same as the HUD.
+// so the species and sexes still read the same as the HUD. The flames have a code set of
+// their own (r o y w: deep red, orange, yellow, pale core), since their colors belong to fire
+// and not to any species.
 //
 // The sheet is DOM-free until a canvas is asked for, so Node checks can load this file for
 // the pose rule and the index helpers.
@@ -102,9 +104,39 @@
   // The PAINT window's nuke button (Paul, 12 Oct 2026: icons for the modes): a mushroom cloud
   // in the blast's orange, the only icon with no thing of its own in the world.
   const NUKE_BITMAP = ['..wwww..', '.wxxxxw.', 'wxxddxxw', '.xxxxxx.', '...xx...', '...xx...', '..xxxx..', '.dddddd.'];
-  const BITMAPS = { nuke: [NUKE_BITMAP], hole: [HOLE_BITMAP], water: WATER_BITMAPS, peek: [PEEK_BITMAP], bunny: BUNNY, wolf: WOLF, human: HUMAN, carcass: CARCASS_BITMAPS, skull: SKULL_BITMAPS, grass: GRASS_BITMAPS, grassLean: GRASS_LEAN, grassLeanLeft: GRASS_LEAN_LEFT };
+  // Fire (Paul's pick, option E of the fire mockup, 12 Oct 2026): flames over a burning tile in
+  // two sway frames each (the second leans a pixel), by how far through its burn the tile is:
+  // tongues on the thing as it catches, taller tongues, flames with it showing through, and
+  // last full flames with a deep red base, so nothing of it shows. Each is lowered to sit on
+  // the tile's lower half as the fire starts low and climbs.
+  const blank = n => Array.from({ length: n }, () => '........');
+  const lowered = (m, n) => blank(n).concat(m.slice(0, SIZE - n));
+  const TONGUES_SMALL = [
+    ['........', '........', '..o.....', '.oy..o..', '........', '........', '........', '........'],
+    ['........', '........', '...o....', '..yo.o..', '........', '........', '........', '........'],
+  ].map(m => lowered(m, 2));
+  const TONGUES_TALL = [
+    ['..o.....', '.oyo..o.', '.oywooyo', 'royywyor', '.r.rr.r.', '........', '........', '........'],
+    ['.....o..', '.o..oyo.', 'oyoowyo.', 'royywyor', '.r.rr.r.', '........', '........', '........'],
+  ].map(m => lowered(m, 1));
+  const FLAMES_MID = [
+    ['........', '........', '........', '...o....', '..oy..o.', '..oyo.oo', '.royyoor', '.rooyyor'],
+    ['........', '........', '........', '....o...', '.o..yo..', 'oo.oyo..', 'rooyyor.', 'royyoor.'],
+  ];
+  // The lower half is solid red under the flames, so the burning thing is hidden entirely.
+  const ENGULF_FROM = 4;
+  const FLAMES_FULL = [
+    ['........', '...o....', '..oy....', '..oyo.o.', '.oyw.oyo', '.oywyoyo', 'royywyor', 'rooyyyor'],
+    ['........', '....o...', '....yo..', '.o.oyo..', 'oyo.wyo.', 'oyoywyo.', 'royywyor', 'royyyoor'],
+  ].map(m => m.map((row, j) => (j < ENGULF_FROM ? row : row.replace(/\./g, 'r'))));
+  // Sheet order: small tongues, tall tongues, mid flames, full flames; two sway frames each.
+  const FIRE_BITMAPS = [].concat(TONGUES_SMALL, TONGUES_TALL, FLAMES_MID, FLAMES_FULL);
+  const FLAME = Object.freeze({ TONGUES_SMALL: 0, TONGUES_TALL: 1, MID: 2, FULL: 3 });
+  AS.FLAME = FLAME;
+  const BITMAPS = { fire: FIRE_BITMAPS, nuke: [NUKE_BITMAP], hole: [HOLE_BITMAP], water: WATER_BITMAPS, peek: [PEEK_BITMAP], bunny: BUNNY, wolf: WOLF, human: HUMAN, carcass: CARCASS_BITMAPS, skull: SKULL_BITMAPS, grass: GRASS_BITMAPS, grassLean: GRASS_LEAN, grassLeanLeft: GRASS_LEAN_LEFT };
   AS.SPRITE_BITMAPS = BITMAPS;
   AS.SPRITE_CODES = 'xdweynfprosqmuvk';
+  AS.SPRITE_FIRE_CODES = 'royw';
   AS.SPRITE_SIZE = SIZE;
 
   // ---- palette ----------------------------------------------------------------------
@@ -115,6 +147,12 @@
   const ELDER_BRIGHTNESS = 0.72;
   const HOLE_RIM = '#8a6a45', HOLE_DARK = '#150f0a';
   const NUKE_COLOR = '#e0662f';
+  // Fire's colors, muted on purpose: a big fire is warm, never a white flare (Paul's mockup).
+  // r o y w are the flames; k a dim ember, e a lit one, a is ash. render.js draws embers and ash.
+  const FIRE_PALETTE = AS.FIRE_PALETTE = Object.freeze({ r: '#7e2812', o: '#c8581c', y: '#e09a3a', w: '#efc97a', k: '#3a1a0e', e: '#d0602a', a: '#56524a' });
+  // How dark a burning thing gets while the fire on it grows (brightness, one per look that
+  // still shows it): the first is a hint of char, the last nearly black.
+  const CHAR_BRIGHTNESS = [0.8, 0.6, 0.42];
   const WATER_BASE = '#2b5c8c', WATER_LIGHT = '#3a6e9f', WATER_DARK = '#244f7c';
   // How each depth band is shaded from those (Paul, 11 Oct 2026: water shows its depth the way
   // grass shows its size): shallow lighter, deep darker. Below WATER_MID_M meters is shallow,
@@ -206,16 +244,44 @@
   AS.spriteRowPx = (px, stage, j) => { const b = scaledPx(px, stage); return px - b + Math.round(j * b / SIZE); };
   AS.spriteColPx = (px, stage, i) => { const b = scaledPx(px, stage); return Math.floor((px - b) / 2) + Math.round(i * b / SIZE); };
 
+  // ---- fire's look ----------------------------------------------------------------------
+  // What a burning tile shows for how far through its burn it is (AS.fireStage, 0..1). Pure,
+  // so render.js and the checks share the one mapping. `char` is which charring of the burning
+  // thing shows (an index into CHAR_BRIGHTNESS), or -1 when full flames hide it; `flame` is
+  // which flame sits over it (AS.FLAME). The thing stays in view for the first
+  // FIRE_ENGULF_AT of its burn (about 80%).
+  const FIRE_CATCH_UNTIL = 0.25, FIRE_TALL_UNTIL = 0.53, FIRE_ENGULF_AT = 0.8;
+  AS.FIRE_LOOK_AT = Object.freeze({ CATCH_UNTIL: FIRE_CATCH_UNTIL, TALL_UNTIL: FIRE_TALL_UNTIL, ENGULF_AT: FIRE_ENGULF_AT });
+  const LOOKS = Object.freeze([
+    Object.freeze({ char: 0, flame: FLAME.TONGUES_SMALL }),
+    Object.freeze({ char: 1, flame: FLAME.TONGUES_TALL }),
+    Object.freeze({ char: 2, flame: FLAME.MID }),
+    Object.freeze({ char: -1, flame: FLAME.FULL }),
+  ]);
+  AS.fireLook = stage => (stage < FIRE_CATCH_UNTIL ? LOOKS[0] : stage < FIRE_TALL_UNTIL ? LOOKS[1] : stage < FIRE_ENGULF_AT ? LOOKS[2] : LOOKS[3]);
+
+  // Photosensitivity (DESIGN.md): a flame, and each ember, changes at most once per
+  // FLAME_HOLD_MS of real time, whatever the sim speed, and each tile on its own offset so a
+  // fire never changes all at once. A step counts up by one every hold; the flame shows its
+  // parity, an ember its step mod 3.
+  const FLAME_HOLD_MS = AS.FLAME_HOLD_MS = 800;
+  const SALT_FLAME = 4;
+  AS.flameStep = (nowMs, x, y) => Math.floor((nowMs + hash01(x, y, SALT_FLAME) * FLAME_HOLD_MS) / FLAME_HOLD_MS);
+  AS.flameFrame = (nowMs, x, y) => AS.flameStep(nowMs, x, y) & 1;
+
   // ---- sheet layout -----------------------------------------------------------------
   // Animals: ((((species*2+sex)*3+stage)*2+faceLeft)*FRAMES+frame), then each species'
   // skull, the three grass thirds, the three leaning right, the three leaning left, each species' carcass, the hole,
-  // the bunny peeking out of it (by sex), the water (three depths × three variants), and the
-  // nuke icon.
+  // the bunny peeking out of it (by sex), the water (three depths × three variants), the
+  // nuke icon, the eight flames (four kinds × two sway frames), and last the charred things:
+  // for each charring (CHAR_BRIGHTNESS) the three grass thirds, then each species' carcass,
+  // then each species' skull.
   const N_SPECIES = AS.SPECIES_COUNT;
   const ANIMAL_SPRITES = N_SPECIES * 2 * 3 * 2 * FRAMES;
   const SKULL0 = ANIMAL_SPRITES, GRASS0 = SKULL0 + N_SPECIES, LEAN0 = GRASS0 + 3, LEAN_LEFT0 = LEAN0 + 3, CARCASS0 = LEAN_LEFT0 + 3;
   // Water comes in WATER_DEPTHS shades (shallow, mid, deep), each in every ripple variant.
-  const HOLE0 = CARCASS0 + N_SPECIES, PEEK0 = HOLE0 + 1, WATER0 = PEEK0 + 2, NUKE0 = WATER0 + WATER_DEPTHS.length * WATER_BITMAPS.length, COUNT = NUKE0 + 1;
+  const HOLE0 = CARCASS0 + N_SPECIES, PEEK0 = HOLE0 + 1, WATER0 = PEEK0 + 2, NUKE0 = WATER0 + WATER_DEPTHS.length * WATER_BITMAPS.length;
+  const FIRE0 = NUKE0 + 1, CHAR0 = FIRE0 + FIRE_BITMAPS.length, CHARRED_THINGS = 3 + 2 * N_SPECIES, COUNT = CHAR0 + CHAR_BRIGHTNESS.length * CHARRED_THINGS;
   const SHEET_COLS = 19;
   const BY_SPECIES = [BUNNY, WOLF, HUMAN];
   // The row of a species' standing eye, and the columns a frame's row covers ([first, last],
@@ -239,6 +305,14 @@
   AS.spriteCarcass = species => CARCASS0 + species;
   AS.spriteHole = () => HOLE0;
   AS.spriteNuke = () => NUKE0;
+  // One flame sprite (the mid flames' first frame) for the PAINT and Info icons.
+  AS.spriteFlame = () => FIRE0 + 2 * FLAME.MID;
+  AS.spriteFire = (flame, frame) => FIRE0 + 2 * flame + frame;
+  // A burning thing at charring `level` (0..CHAR_BRIGHTNESS.length-1, from AS.fireLook).
+  AS.spriteCharGrass = (third, level) => CHAR0 + level * CHARRED_THINGS + third;
+  AS.spriteCharCarcass = (species, level) => CHAR0 + level * CHARRED_THINGS + 3 + species;
+  AS.spriteCharSkull = (species, level) => CHAR0 + level * CHARRED_THINGS + 3 + N_SPECIES + species;
+  AS.CHAR_LEVELS = CHAR_BRIGHTNESS.length;
   AS.spritePeek = sex => PEEK0 + sex;   // a bunny in a hole, by sex
   // A water tile's sprite: its depth band (AS.waterBand: 0 shallow, 1 mid, 2 deep) and a ripple
   // variant from its position, a fixed scramble of x and y, never random.
@@ -274,6 +348,7 @@
   const MAX_SPAWNS_PER_FRAME = 64;   // a frame at Max speed spans many cycles; only the ones still on screen matter
   const SALT_SIDE = 1, SALT_SLOT = 2, SALT_OFFSET = 3;
   const hash01 = (x, y, k) => (Math.imul(Math.imul(x, 73856093) ^ Math.imul(y, 19349663) ^ Math.imul(k, 83492791), 2654435761) >>> 8) / 16777216;
+  AS.spriteHash = hash01;   // a tile's fixed scramble, 0..1: where its ash and embers fall
 
   AS.GUSTS = Object.freeze({ HOLD_MS, FULL_KMH, CYCLE_HOLDS, SIDE_BLUR, MAX_SHARE });
 
@@ -383,14 +458,14 @@
 
   // Paints one bitmap into the px x px cell at (ox, oy) of g. A scaled sprite is bottom-
   // centered in its cell; its pixels land on whole device pixels.
-  function paint(g, ox, oy, px, map, base, flip, scale, dim) {
+  function paint(g, ox, oy, px, map, base, flip, scale, dim, pal) {
     const b = Math.max(MIN_SCALED_PX, Math.round(px * scale));
     const off = ox + Math.floor((px - b) / 2), top = oy + px - b;
-    const col = {
+    const col = pal || {
       x: base, d: shade(base, SHADE_DARK), w: shade(base, SHADE_LIGHT),
       e: EYE, y: AMBER, n: NOSE, f: FANG, p: TONGUE, r: HOLE_RIM, o: HOLE_DARK, s: SKIN, q: SHAFT, m: SPEARHEAD, u: WATER_BASE, v: WATER_LIGHT, k: WATER_DARK,
     };
-    if (dim) for (const k of Object.keys(col)) col[k] = shade(col[k], dim);
+    if (dim && !pal) for (const k of Object.keys(col)) col[k] = shade(col[k], dim);
     for (let j = 0; j < SIZE; j++) for (let i = 0; i < SIZE; i++) {
       const c = map[j][i];
       if (c === '.') continue;
@@ -437,6 +512,15 @@
       }
       for (let d = 0; d < WATER_DEPTHS.length; d++) for (let i = 0; i < WATER_BITMAPS.length; i++) {
         at(WATER0 + d * WATER_BITMAPS.length + i, (x, y) => paint(g, x, y, px, WATER_BITMAPS[i], WATER_BASE, false, 1, WATER_DEPTHS[d]));
+      }
+      FIRE_BITMAPS.forEach((m, i) => at(FIRE0 + i, (x, y) => paint(g, x, y, px, m, null, false, 1, 0, FIRE_PALETTE)));
+      for (let lv = 0; lv < CHAR_BRIGHTNESS.length; lv++) {
+        const dim = CHAR_BRIGHTNESS[lv];
+        for (let i = 0; i < 3; i++) at(AS.spriteCharGrass(i, lv), (x, y) => paint(g, x, y, px, GRASS_BITMAPS[i], GRASS_COLORS[i], false, 1, dim));
+        for (let sp = 0; sp < N_SPECIES; sp++) {
+          at(AS.spriteCharCarcass(sp, lv), (x, y) => paint(g, x, y, px, CARCASS_BITMAPS[sp], AS.COLORS[AS.animalGlyph(sp, 0, AS.STAGE.ADULT)], false, 1, CARCASS_BRIGHTNESS * dim));
+          at(AS.spriteCharSkull(sp, lv), (x, y) => paint(g, x, y, px, SKULL_BITMAPS[sp], AS.COLORS[AS.GLYPH.CORPSE], false, CORPSE_SCALE, dim));
+        }
       }
       for (let i = 0; i < 3; i++) {
         at(GRASS0 + i, (x, y) => paint(g, x, y, px, GRASS_BITMAPS[i], GRASS_COLORS[i], false, 1));

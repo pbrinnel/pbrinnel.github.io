@@ -89,7 +89,7 @@
     onNuke: on => { nukeOn = on; },
     // A count's toggle: the kinds to ring on the map, handed to the renderer every frame.
     onLocate: (key, on) => { if (on) located.add(key); else located.delete(key); },
-    onMode: m => { brush = m === 'grass' || m === 'water' || AS.SPECIES_KEY.includes(m) ? m : ''; },
+    onMode: m => { brush = m === 'grass' || m === 'water' || m === 'fire' || AS.SPECIES_KEY.includes(m) ? m : ''; },
     water: waterOn,
     onWater: on => {
       waterOn = on;
@@ -190,6 +190,7 @@
     corpses: AS.spriteSkull(AS.SPECIES.BUNNY),
     water: AS.spriteWater(0, 0, 0),
     nuke: AS.spriteNuke(),
+    fires: AS.spriteFlame(),
   };
   function drawIcon(key, cv) {
     // A whole number of device pixels per sprite pixel keeps the pixel art crisp.
@@ -355,7 +356,8 @@
     ui.hud({
       speedIndex, achieved, day: sim.day, seed: sim.seed, wind: sim.wind,
       humansSeen: humansSeen || (humansSeen = W.humans > 0),
-      counts: { bunnies: W.bunnies, wolves: W.wolves, humans: W.humans, total: W.bunnies + W.wolves + W.humans, blades: W.gCount, corpses: W.cCount },
+      firesSeen: firesSeen || (firesSeen = W.fCount > 0),
+      counts: { bunnies: W.bunnies, wolves: W.wolves, humans: W.humans, total: W.bunnies + W.wolves + W.humans, blades: W.gCount, corpses: W.cCount, fires: W.fCount },
     });
     // CPU time only: the browser's own compositing shows up in `interval`, not here.
     if (app.onFrame) {
@@ -378,9 +380,12 @@
   let gone = new Set(), absent = new Set(), runSpeed = speedIndex;
   // Whether this world has had a human (they're optional; the Info count hides until then).
   let humansSeen = false;
+  // Likewise for fire: the Info count shows once this world has had a burning tile.
+  let firesSeen = false;
   function resetEnded() {
     const n = counts(sim.W);
     humansSeen = false;
+    firesSeen = false;
     gone = new Set();
     absent = new Set(EXTINCT.filter(([k]) => n[k] === 0).map(([k]) => k));
   }
@@ -429,7 +434,7 @@
     paintAt(tx, ty) {
       if (!brush || tx < 0 || ty < 0 || tx >= sim.W.w || ty >= sim.W.h) return 0;
       const r = radiusOf(brush);
-      if (brush === 'grass' || brush === 'water') return AS.paintCircle(sim, brush, tx, ty, r);
+      if (brush === 'grass' || brush === 'water' || brush === 'fire') return AS.paintCircle(sim, brush, tx, ty, r);
       if (crowdOpen) return 0;   // the card is up: the stroke stays stopped until it is answered
       const W = sim.W, cap = { room: app.animalLimit - (W.bunnies + W.wolves + W.humans), hit: false };
       const placed = AS.paintCircle(sim, brush, tx, ty, r, cap);

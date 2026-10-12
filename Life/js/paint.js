@@ -10,7 +10,7 @@
 //   center, shorter toward the rim, so the crater greens from its edges inward. Water is left
 //   alone: it stays, and wet ground (an animal wading included) is not scorched.
 //
-// AS.paintCircle(sim, kind, cx, cy, r, cap) → number placed       kind: 'grass' | 'bunny' | 'wolf' | 'human'
+// AS.paintCircle(sim, kind, cx, cy, r, cap) → number placed       kind: 'grass' | 'bunny' | 'wolf' | 'human' | 'water' | 'fire'
 //   The paint modes' brush: one new thing of that kind on every eligible tile within r tiles
 //   (a circle) of (cx, cy), each of a random age. Eligible = bare (nothing on it and no water, so nothing is
 //   ever displaced); grass also skips holes and scorch, wolves and humans skip holes (bunnies may stand
@@ -18,6 +18,10 @@
 //   single tile (cx, cy). cap is optional, { room }: animals (not grass) stop going down at
 //   room, which counts down as they are placed, and cap.hit becomes true if an eligible tile
 //   was left empty for want of room (main.js's soft limit on the animal total).
+//   'water' pours water instead (placed = tiles poured on), and 'fire' sets alight every tile
+//   in the circle that will burn (placed = tiles that caught), through AS.ignite alone, so
+//   fire's own rules decide: grass and corpses with no water and no hole; bare ground, water
+//   and animals are skipped. Neither takes a cap.
 (function (AS) {
   'use strict';
 
@@ -58,6 +62,7 @@
     const { W, T, rng } = sim, K = AS.KIND;
     const reach = Math.floor(r), r2 = r * r;
     if (kind === 'water') return pourWater(sim, cx, cy, r);
+    if (kind === 'fire') return lightFires(sim, cx, cy, r);
     const species = AS.SPECIES_KEY.indexOf(kind);   // -1 for 'grass'
     const S = kind === 'grass' ? T.grass : T[kind];
     let placed = 0;
@@ -85,6 +90,20 @@
     }
     return placed;
   };
+
+  // FIRE MODE: every tile within r of (cx, cy) that AS.ignite accepts catches. ignite is the
+  // only judge of what burns, so the brush can never light something fire's rules forbid.
+  function lightFires(sim, cx, cy, r) {
+    const W = sim.W, reach = Math.floor(r), r2 = r * r;
+    let lit = 0;
+    for (let y = Math.max(0, cy - reach); y <= Math.min(W.h - 1, cy + reach); y++) {
+      for (let x = Math.max(0, cx - reach); x <= Math.min(W.w - 1, cx + reach); x++) {
+        if ((x - cx) ** 2 + (y - cy) ** 2 > r2) continue;
+        if (AS.ignite(sim, y * W.w + x)) lit++;
+      }
+    }
+    return lit;
+  }
 
   // WATER MODE (Paul, 11-12 Oct 2026: it should flow): POUR_DEPTH meters more water on every
   // tile within r of (cx, cy), into the world's water rules (water.js), which take it from

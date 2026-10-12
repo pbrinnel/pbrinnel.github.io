@@ -10,7 +10,7 @@
 (function (AS) {
   'use strict';
 
-  // One mode at a time: 'nuke', or a brush ('grass', 'bunny', 'wolf', 'human', 'water'), or ''
+  // One mode at a time: 'nuke', or a brush ('grass', 'bunny', 'wolf', 'human', 'water', 'fire'), or ''
   // for none. Armed until toggled off, so repeated nukes and strokes work; main.js turns a tap
   // (or a drag, for a brush) on the world into that mode's action while it is on. Each button
   // shows its name until setIcons gives it its icon (Paul, 12 Oct 2026); the name stays its
@@ -23,6 +23,7 @@
     ['wolf', 'WOLF MODE', 'hud-brush', 'wolves', 'Tap or drag to add wolves of random ages on empty ground'],
     ['human', 'HUMAN MODE', 'hud-brush', 'humans', 'Tap or drag to add adult humans on empty ground'],
     ['water', 'WATER MODE', 'hud-brush', 'water', 'Tap or drag to pour water (1 m deep); it flows from there'],
+    ['fire', 'FIRE MODE', 'hud-brush', 'fires', 'Tap or drag to set grass and bodies alight; it spreads from there by itself'],
   ];
   // Paul's cap: a round 75, whose circle (~17,700 tiles) stays under the crowd limit.
   const RADIUS_MAX = 75;

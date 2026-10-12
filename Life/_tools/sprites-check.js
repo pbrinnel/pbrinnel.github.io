@@ -21,16 +21,18 @@ B.grassLeanLeft.forEach((m, i) => maps.push([`grass lean left ${i}`, m]));
 B.grass.forEach((m, i) => maps.push([`grass ${i}`, m]));
 B.water.forEach((m, i) => maps.push([`water ${i}`, m]));
 B.nuke.forEach((m, i) => maps.push([`nuke icon ${i}`, m]));
+const FIRE_ALLOWED = new Set(AS.SPRITE_FIRE_CODES + '.');   // flames have their own code set
+B.fire.forEach((m, i) => maps.push([`flame ${i}`, m, FIRE_ALLOWED]));
 check(B.bunny.length === AS.SPRITE_FRAMES && B.wolf.length === AS.SPRITE_FRAMES && B.human.length === AS.SPRITE_FRAMES, 'every species has SPRITE_FRAMES frames');
 check(B.carcass.length === AS.SPECIES_COUNT && B.skull.length === AS.SPECIES_COUNT, 'a carcass and a skull per species');
 // The human carries a spear in every pose but the fallen one: spearhead (m) or shaft (q) shows.
 B.human.forEach((m, i) => { if (i !== AS.SPRITE_FRAME.DEAD) check(m.some(r => /[qm]/.test(r)), `human frame ${i} shows its spear`); });
 check(B.grass.length === 3, 'three grass bitmaps');
-for (const [name, m] of maps) {
+for (const [name, m, allowed = ALLOWED] of maps) {
   check(m.length === SIZE, `${name}: ${SIZE} rows, got ${m.length}`);
   m.forEach((row, j) => {
     check(row.length === SIZE, `${name} row ${j}: ${SIZE} chars, got ${row.length}`);
-    for (const c of row) check(ALLOWED.has(c), `${name} row ${j}: unknown code '${c}'`);
+    for (const c of row) check(allowed.has(c), `${name} row ${j}: unknown code '${c}'`);
   });
   check(m.some(r => /[^.]/.test(r)), `${name} is not blank`);
 }
@@ -53,6 +55,14 @@ for (let sx = 0; sx < 2; sx++) add(AS.spritePeek(sx), `peek sex${sx}`);
 for (let t = 0; t < 3; t++) add(AS.spriteGrassLean(t), `grass lean ${t}`);
 for (let t = 0; t < 3; t++) add(AS.spriteGrassLeanLeft(t), `grass lean left ${t}`);
 for (let t = 0; t < 3; t++) add(AS.spriteGrass(t), `grass ${t}`);
+// Fire: eight flames (four kinds, two sway frames) and every charring of a blade, carcass and skull.
+check(B.fire.length === 8, 'eight flame bitmaps: four kinds, two sway frames each');
+for (let f = 0; f < 4; f++) for (let fr = 0; fr < 2; fr++) add(AS.spriteFire(f, fr), `flame ${f} frame ${fr}`);
+check(AS.spriteFlame() === AS.spriteFire(AS.FLAME.MID, 0), 'spriteFlame is the mid flame\'s first frame');
+for (let lv = 0; lv < AS.CHAR_LEVELS; lv++) {
+  for (let t = 0; t < 3; t++) add(AS.spriteCharGrass(t, lv), `charred grass ${t} level ${lv}`);
+  for (let sp = 0; sp < AS.SPECIES_COUNT; sp++) { add(AS.spriteCharCarcass(sp, lv), `charred carcass ${sp} level ${lv}`); add(AS.spriteCharSkull(sp, lv), `charred skull ${sp} level ${lv}`); }
+}
 // Water: in each depth band (AS.waterBand) every variant turns up somewhere, by position alone.
 const waterSeen = new Set(), bands = AS.WATER_DEPTH_SHADES.length;
 for (let b = 0; b < bands; b++) for (let y = 0; y < 40; y++) for (let x = 0; x < 40; x++) waterSeen.add(AS.spriteWater(x, y, b));
@@ -194,6 +204,54 @@ check(B.grassLeanLeft.length === 3, 'three left-leaning grass bitmaps');
     let after = ''; for (const [x, y] of tiles) after += gu.leans(x, y);
     check(after === mid, 'paused: the picture is frozen');
   }
+}
+// Fire's look by stage (option E): the burning thing stays in view for the first 80% of its
+// burn, charring darker, then full flames hide it. Monotone: never lighter, never shorter.
+{
+  const L = AS.fireLook, A = AS.FIRE_LOOK_AT;
+  check(A.ENGULF_AT === 0.8, 'the thing is in view for 80% of its burn');
+  check(L(0).char === 0 && L(0).flame === AS.FLAME.TONGUES_SMALL, 'a tile that has just caught: small tongues, a hint of char');
+  check(L(A.CATCH_UNTIL - 1e-9).flame === AS.FLAME.TONGUES_SMALL && L(A.CATCH_UNTIL).flame === AS.FLAME.TONGUES_TALL, 'tall tongues from CATCH_UNTIL');
+  check(L(A.TALL_UNTIL).flame === AS.FLAME.MID && L(A.TALL_UNTIL).char === 2, 'mid flames from TALL_UNTIL, darkest char');
+  check(L(0.79).char === 2 && L(0.79).flame === AS.FLAME.MID, 'just under 0.8: still visible, mid flames');
+  check(L(0.8).char === -1 && L(1).char === -1 && L(0.8).flame === AS.FLAME.FULL, 'at and above 0.8: full flames, nothing of it shows');
+  let prev = L(0), steps = 0;
+  for (let i = 1; i <= 1000; i++) {
+    const cur = L(i / 1000);
+    check(cur.flame >= prev.flame && (cur.char >= prev.char || cur.char === -1), `look never goes back at ${i / 1000}`);
+    if (cur !== prev) steps++;
+    prev = cur;
+    if (cur.char >= 0) check(cur.char < AS.CHAR_LEVELS, 'char level has a sprite');
+  }
+  check(steps === 3, `four looks over a burn (${steps + 1})`);
+  // The full flame's lower half is solid, so the engulfed thing cannot show through.
+  check(B.fire.slice(6).every(m => m.slice(4).every(r => !r.includes('.'))), 'full flames fill the lower half of the tile');
+  check(B.fire.slice(0, 6).some(m => m.some(r => r.includes('.')) ), 'tongues and mid flames leave the thing visible');
+}
+// Sway (Photosensitivity): a tile's flame frame, and its ember steps, change at most once per
+// FLAME_HOLD_MS of real time, each tile on its own offset. 30 s at 60 fps over many tiles.
+{
+  const HOLD = AS.FLAME_HOLD_MS, FRAME_MS = 1000 / 60, tiles = [];
+  for (let k = 0; k < 300; k++) tiles.push([(k * 7) % 53, (k * 13) % 37]);
+  const lastF = tiles.map(([x, y]) => AS.flameFrame(0, x, y)), lastS = tiles.map(([x, y]) => AS.flameStep(0, x, y)), at = tiles.map(() => -Infinity);
+  let minGap = Infinity, changes = 0;
+  const phases = new Set();
+  for (let ms = 0; ms < 30000; ms += FRAME_MS) {
+    tiles.forEach(([x, y], i) => {
+      const f = AS.flameFrame(ms, x, y), st = AS.flameStep(ms, x, y);
+      check(st - lastS[i] <= 1, 'a step never jumps by more than one at 60 fps');
+      if (st !== lastS[i]) { minGap = Math.min(minGap, ms - at[i]); at[i] = ms; changes++; }
+      void f; lastS[i] = st; lastF[i] = f;
+    });
+  }
+  tiles.forEach(([x, y]) => phases.add(AS.flameStep(0, x, y) + ':' + Math.round(AS.spriteHash(x, y, 4) * 20)));
+  check(minGap >= HOLD - FRAME_MS - 1e-6, `no tile changes twice within ${HOLD} ms (shortest ${minGap.toFixed(1)} ms)`);
+  check(changes >= tiles.length * 36 && changes <= tiles.length * 38, `each tile changes about every ${HOLD} ms (${(changes / tiles.length).toFixed(1)} per tile in 30 s)`);
+  // Not in unison: at any moment the tiles are spread over the hold.
+  const at0 = new Set(tiles.map(([x, y]) => Math.round((((10000 + AS.spriteHash(x, y, 4) * HOLD) % HOLD) / HOLD) * 10)));
+  check(at0.size >= 8, `tiles change at different moments (${at0.size} of 10 slots hit)`);
+  check(phases.size > 5, 'the offsets differ per tile');
+  console.log(`flames: shortest real gap between changes ${minGap.toFixed(1)} ms, ${(changes / tiles.length).toFixed(1)} changes per tile in 30 s`);
 }
 // Idle offsets spread over the period.
 const offs = new Set();

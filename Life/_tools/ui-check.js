@@ -4,6 +4,7 @@ let writes = 0;
 class ClassList {
   constructor(o) { this.o = o; this.s = new Set(); }
   toggle(c, on) { const had = this.s.has(c); on = on === undefined ? !had : on; writes++; on ? this.s.add(c) : this.s.delete(c); this.o._cls = [...this.s].join(' '); }
+  add(c) { this.toggle(c, true); }
   contains(c) { return this.s.has(c); }
 }
 class El {
@@ -48,7 +49,7 @@ function build(debug, extra = {}) {
 // The speed buttons only (not the tabs, Hide UI or the debug tools).
 const btns = (ids) => ids.hud.all(e => e.className === 'hud-speeds')[0].children;
 let n = 0; const ok = m => console.log('ok', ++n, m);
-const input = { speedIndex: 1, achieved: 1, day: 3.24, seed: 1234567, counts: { bunnies: 0, wolves: 0, humans: 0, total: 0, blades: 23999, corpses: 1234567 } };
+const input = { speedIndex: 1, achieved: 1, day: 3.24, seed: 1234567, counts: { bunnies: 0, wolves: 0, humans: 0, total: 0, blades: 23999, corpses: 1234567, fires: 0 } };
 
 { const { ui, ids } = build(true);   // with ?debug, so the seed (Debug tab) is on the page
   ui.hud(input); const w = writes; ui.hud(input);
@@ -201,7 +202,7 @@ const winOf = (ids, key) => ids.hud.all(e => e.className === 'hud-tabstrip hud-w
 }
 { const { ui, ids } = build(true, { onLines() {} });
   assert.strictEqual(ui.windows.join(','), 'info'); assert(!winOf(ids, 'info').hidden && winOf(ids, 'debug').hidden && winOf(ids, 'paint').hidden); ok('Info is open by default, alone');
-  assert(panelOf(ids, 'info').textContent.includes('Graph') && panelOf(ids, 'info').all(e => e.className === "hud-glyph").length === 6); ok('Info holds the six counts (humans and the Total included) and the Graph button');
+  assert(panelOf(ids, 'info').textContent.includes('Graph') && panelOf(ids, 'info').all(e => e.className === "hud-glyph").length === 7); ok('Info holds the seven counts (humans, fires and the Total included) and the Graph button');
   assert(panelOf(ids, 'info').all(e => e.className.includes('hud-lines')).length === 1 && panelOf(ids, 'debug').textContent.includes('Benchmark') && panelOf(ids, 'debug').textContent.includes('Seed')); ok('Info holds Intent lines; Debug holds Benchmark and the Seed');
   assert(panelOf(ids, 'paint').textContent.includes('NUKE MODE')); ok('PAINT holds NUKE MODE');
 }
@@ -272,9 +273,25 @@ const winOf = (ids, key) => ids.hud.all(e => e.className === 'hud-tabstrip hud-w
   assert(ids.hud.all(e => e.className === 'hud-num hud-num-total').length === 1 && ids.hud.all(e => e.className === 'hud-num hud-num-humans').length === 1); ok('Total and humans are counts like the others (fixed width in CSS)');
   const icons = [];
   ui.setIcons((key, cv) => { icons.push(key); });
-  assert.strictEqual(icons.join(','), 'bunnies,wolves,humans,blades,corpses,nuke,blades,bunnies,wolves,humans,water'); ok('icons for every count but the Total (which keeps its word), then one for each PAINT mode');
+  assert.strictEqual(icons.join(','), 'bunnies,wolves,humans,blades,corpses,fires,nuke,blades,bunnies,wolves,humans,water,fires'); ok('icons for every count but the Total (which keeps its word), then one for each PAINT mode');
   const nuke = ids.hud.all(e => e.className.includes('hud-nuke'))[0];
   assert(nuke.textContent === '' && nuke.className.includes('hud-mode-icon') && nuke.getAttribute('aria-label') === 'NUKE MODE' && (nuke._title || nuke.title).startsWith('NUKE MODE: ')); ok('a mode button becomes its icon, keeping its name as its label and in its tooltip');
+}
+// ---- fires: FIRE MODE, and the fire count that waits for the first fire ----
+{ const located = [];
+  const { ui, ids } = build(false, { onLocate: (k, on) => located.push(k + ':' + on) });
+  const fm = ids.hud.all(e => e.className.includes('hud-brush') && e.getAttribute('aria-label') === 'FIRE MODE')[0];
+  assert(fm && /^FIRE MODE: tap or drag to set grass and bodies alight/.test(fm._title || fm.title)); ok('FIRE MODE is a PAINT brush with its label and tooltip');
+  fm.fire('click'); assert(ui.mode === 'fire' && fm.classList.contains('on')); ok('clicking it arms the fire mode');
+  const box = ids.hud.all(e => e.className.split(' ').includes('hud-count') && e.all(c => c.className === 'hud-num hud-num-fires').length)[0];
+  ui.hud({ ...input, counts: { ...input.counts, fires: 0 } });
+  assert(box.hidden === true); ok('the fires count is hidden until this world has had a fire');
+  ui.hud({ ...input, firesSeen: true, counts: { ...input.counts, fires: 12 } });
+  assert(box.hidden === false && box.textContent.includes('12') && (box._title || box.title).includes('tiles burning')); ok('then it shows, with its tooltip');
+  ui.hud({ ...input, firesSeen: true, counts: { ...input.counts, fires: 0 } });
+  assert(box.hidden === false); ok('and stays once seen, at 0');
+  box.fire('click'); box.fire('click');
+  assert.deepStrictEqual(located, ['fires:true', 'fires:false']); ok('its ring toggle calls onLocate(fires)');
 }
 // ---- the Radius slider: per-mode memory, defaults, keeping, the benchmark lock ----
 { const { ui, ids } = build(false);
