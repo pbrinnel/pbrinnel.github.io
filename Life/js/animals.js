@@ -16,7 +16,18 @@
   // Per species key: { STATE_NAME: { enter(sim, s) → bool, act(sim, s), start?(sim, s) } }.
   const IMPL = AS.STATE_IMPL = Object.fromEntries(AS.SPECIES_KEY.map(k => [k, null]));
 
-  AS.registerStates = function (key, impls) { IMPL[key] = impls; };
+  AS.registerStates = function (key, impls) { IMPL[key] = impls; statesT = null; };
+
+  // Each species' states in states.csv order, as their { enter, act, start } objects, for
+  // whichever table set was asked last: the tick needs one per animal per tick, so not by name.
+  let statesT = null, statesBy = null;
+  function statesOf(T) {
+    if (T !== statesT) {
+      statesT = T;
+      statesBy = AS.SPECIES_KEY.map(k => (IMPL[k] && T.states[k] ? T.states[k].map(st => IMPL[k][st.name]) : null));
+    }
+    return statesBy;
+  }
 
   // A species places animals only once its states exist; a milestone adds one at a time.
   AS.speciesReady = key => IMPL[key] !== null;
@@ -182,10 +193,10 @@
 
   // ---- the tick -----------------------------------------------------------------------
 
-  function decide(sim, s, key) {
-    const W = sim.W, list = sim.T.states[key], impl = IMPL[key];
+  function decide(sim, s, list) {
+    const W = sim.W;
     for (let i = 0; i < list.length; i++) {
-      const st = impl[list[i].name];
+      const st = list[i];
       if (st.enter(sim, s)) {
         if (W.aState[s] !== i) {
           W.aState[s] = i;
@@ -205,13 +216,13 @@
   const countDown = (v, dt) => { const r = v - dt; return Math.abs(r) < TIMER_EPS ? 0 : r; };
 
   AS.animalsTick = function (sim) {
-    const W = sim.W, T = sim.T, dt = AS.DT;
+    const W = sim.W, T = sim.T, dt = AS.DT, states = statesOf(T);
     // Thirst reads the way-to-water field. Nothing in this loop makes it stale, so it is
     // brought up to date once, here, when there is water and anyone to drink it.
     if (W.waterCount > 0 && AS.POP_KEY.some(k => W[k] > 0)) W.ensureWaterField();
     for (let s = 0, hi = W.aHigh; s < hi; s++) {
       if (!W.aAlive[s]) continue;
-      const key = AS.SPECIES_KEY[W.aSpecies[s]], S = T[key];
+      const sp = W.aSpecies[s], S = T[AS.SPECIES_KEY[sp]];
 
       // Body.
       W.aAge[s] += AS.DT_DAYS;
@@ -267,12 +278,12 @@
       // Mind: re-pick the state a few times a second, act every tick.
       W.aDecideLeft[s] -= dt;
       if (W.aDecideLeft[s] <= 0) {
-        decide(sim, s, key);
+        decide(sim, s, states[sp]);
         W.aDecideLeft[s] += 1 / S.DecidePerSec;
       }
       const wade = S.WadeDepth || 0, swimming = W.wDepth[W.aTile[s]] > wade;
       if (swimming && !AS.swimsNow(sim, s)) { AS.wadeOut(sim, s); continue; }
-      if (W.aState[s] !== NO_STATE) IMPL[key][T.states[key][W.aState[s]].name].act(sim, s);
+      if (W.aState[s] !== NO_STATE) states[sp][W.aState[s]].act(sim, s);
       // Swimming with nowhere to go (a plain wander, say) is no reason to stay in: out.
       if (swimming && W.aAlive[s] && W.wDepth[W.aTile[s]] > wade && W.aStepLeft[s] <= 0 && W.aTargetTile[s] < 0) AS.wadeOut(sim, s);
     }
