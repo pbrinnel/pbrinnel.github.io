@@ -48,7 +48,9 @@ load time: every file reads other files' `AS.*` inside functions, at call time.
 | `terrain-worker.js` | not a page script: main.js runs it as a Worker to grow a world off the main thread ([Water](#water)) | — |
 | `start.js` | the Meadows day-0 layout (`StartLayout`): the ground and water first (`AS.layTerrain`), then meadow grass (never on the beach) aged by depth, bunny colonies at meadow edges, wolf packs in the open (never humans); uses only `sim.rng` | `startMeadows` |
 | `sight.js` | line of sight through grass, nearest visible thing, local paths (plain and weighted for chewing) | `lineOfSight`, `nearestVisible`, `pathNext`, `pathNextWeighted` |
-| `animals.js` | every animal's body, steps, the decide loop, bites, death, spawning; wading, swimming and going around; thirst and DRINK; `relations(T)` (who hunts and eats whom); the shared grass bite `grazeBite` | `animalsTick`, `registerStates`, `checkStates`, `stepTo`, `chewOrStep`, `canStand`, `canEnter`, `edgeStep`, `edgeReset`, `biteAnimal`, `killAnimal`, `spawnStarting`, `relations`, `grazeBite`, `bestAdjacentBlade`, `drinkState`, … |
+| `animals.js` | every animal's body (hunger, thirst, healing, stamina, swimming's cost, age), the decide loop, bites, death, spawning; `relations(T)` (who hunts and eats whom); the shared grass bite `grazeBite` | `animalsTick`, `registerStates`, `checkStates`, `speciesStats`, `speedOf`, `setSprint`, `biteAnimal`, `killAnimal`, `spawnStarting`, `relations`, `grazeBite`, `bestAdjacentBlade`, … |
+| `moving.js` | how animals get from tile to tile: steps and their time, wading and swimming, chewing through grass, going around, walking out of deep water | `stepTo`, `chewOrStep`, `chewSeconds`, `canStand`, `canEnter`, `wadeOf`, `swimsNow`, `edgeStep`, `edgeReset`, `wadeOut` |
+| `drink.js` | the DRINK state every species shares | `drinkState` |
 | `breed.js` | mating and births, shared by the species that breed (a species with no `LitterSize`, humans, never mates); the female's territory rule (`PackLimit`/`TerritoryRange`) in `canMate` | `canMate`, `mate`, `tryBirth` |
 | `bunny.js`, `wolf.js`, `human.js` | each species' states, by the names in `states.csv` ([Behavior](#behavior)). wolf.js's FEED, HUNT, GIVE_UP, REST and PROWL are the hunter states (`AS.hunterStates`), so human.js registers them too and adds FORAGE | (register via `AS.registerStates`) |
 | `glyphs.js` | ids, palette and life stage (`stageOf`) shared by the sprites and HUD; the old glyph sheet (no longer drawn) | `GLYPH`, `COLORS`, `CELL_COLOR`, `GlyphSheet`, `stageOf`, … |
@@ -111,7 +113,7 @@ Animals tell their own kind by `kind >= BUNNY`. Tiles are `t = y * W.w + x`.
 the dense lists. Grass fields: grass.js. Hole fields: world.js (`addHole`/`removeHole`),
 `holeUsedAt` also warren.js. Corpse fields and `boostSrc`: corpse.js (`cMeat` also
 wolf.js, FEED). Water: water.js through world.js `setDepth`/`addWater`. Animal fields:
-animals.js, breed.js, bunny.js, wolf.js, human.js. Everything else (render, inspect,
+animals.js, moving.js, drink.js, breed.js, bunny.js, wolf.js, human.js. Everything else (render, inspect,
 graph, ui, bench) only reads.
 
 ## Time
@@ -179,7 +181,7 @@ graph, ui, bench) only reads.
   when `waterStale`): `wDist` (walking distance to the nearest beach tile, 0 on one,
   `AS.WATER_NONE` where unreachable), `wNext`, `wShore`; wet tiles (by depth) are its
   water; a guide that ignores animals and blades.
-- **Wading and swimming** (animals.js): stepping is one rule, `AS.canStand(W, t, wade)`:
+- **Wading and swimming** (moving.js): stepping is one rule, `AS.canStand(W, t, wade)`:
   EMPTY, or WATER no deeper than `AS.wadeOf` (`WadeDepth`); stepTo, chewOrStep, `pathNext`
   (the walker is the animal on `from`), wolf.js's `cost`/`canWalk`/prowl and bunny.js's
   wander, flee and trips all use it. Births, grass, holes and painting (except WATER MODE)
@@ -187,12 +189,12 @@ graph, ui, bench) only reads.
   would swim now (`AS.swimsNow`: `SwimCost` set, not winded, Stamina above `RestBelow`, and
   either `SwimAt` reached (or already in) or fleeing, `AS.isFleeing` from bunny.js). A step
   from land into deep water also needs land two tiles ahead within the swimming reach of
-  its Stamina (`crossable`); wolf.js re-plans on land when refused. The body tick drains
-  `SwimCost` there and, at 0 Stamina, `DrownDamage` HP; `move` uses `SwimSpeed`. wolf.js
+  its Stamina (`crossable`); wolf.js re-plans on land when refused. The body tick
+  (animals.js) drains `SwimCost` there and, at 0 Stamina, `DrownDamage` HP; `move` uses `SwimSpeed`. wolf.js
   `cost`/`canWalk` take swimmable water at `mInvSwim`; bunny.js FLEE steps use `canEnter`.
   An animal in deep water that isn't swimming now, or swims with no step under way and no
   target, runs `wadeOut` (the nearest standable tile within `OUT_RANGE`).
-- **Thirst** (animals.js): `aWater` (like Fullness: `WaterMax`, drained each tick by
+- **Thirst** (the meter in animals.js, DRINK in drink.js): `aWater` (like Fullness: `WaterMax`, drained each tick by
   `ThirstRate` times the same activity factor as hunger, only when the world has water; 0
   loses `ThirstDamage` HP/s and stops healing). **DRINK** is `AS.drinkState`, shared by
   every species' file: enters below `ThirstyAt` when wading or when `wDist` is within
@@ -277,7 +279,7 @@ graph, ui, bench) only reads.
   bunny's own length is `tripMin` (`TravelMin`..`DisperseFar` of that side; DisperseRun
   tiles if DisperseFar is blank); it is home on crossing it, and detours aim only as far as
   is left (`natalRun`).
-- **Going around** (animals.js `AS.edgeStep(sim, s, goal, key, canEnter)`): a step toward a
+- **Going around** (moving.js `AS.edgeStep(sim, s, goal, key, canEnter)`): a step toward a
   goal the path search can't reach; greedy while a 4-neighbor gets closer, else edge
   following with the animal's hand (`aSerial & 1`: 1 right, 0 left) on the obstacle,
   leaving the edge once closer than where it met it; `EdgeFollow` steps of edge per trip
@@ -418,6 +420,7 @@ never flash: see DESIGN.md, Photosensitivity.
 | `node Life/_tools/thirst-check.js` | the water meter, DRINK, the water field, the crowd at one lake, no-water worlds (Water off is the Rain 0% / RiverDrain 0 world), and cause of death |
 | `node Life/_tools/harness.js [days] [seed]` | runs a seed, audits grid ↔ stores every day, checks same seed → same world. `require('./harness.js')` gives `load()` (the sim's files in a Node VM, plus any extra `js/` files), `audit()`, `run()`, `editCSV()`, `SIM_FILES` to other scripts |
 | `kit.js` | what the checks share: `stage()` builds a bare world (nothing placed, no water rules) from the real tables with the test's edits, `quiet.*` switches off grass growth, hunger or digging, `tally()` counts ok/FAIL lines and exits with the verdict, plus `at`, `tick`, `secs`, `days`, `stateName`. A new check starts here |
+| `node Life/_tools/files-check.js` | life.html loads every `js/` file with one `?v=`, and the harness's and the lab worker's sim file lists match the page's order. Add a new file to all three |
 | `*-check.js` | one per module (tables, grass, sight, bunny, breed, wolf, human, warren, god, water, thirst, inspect, camera, render, ui, graph, bench). Each loads the real files in a Node VM. `bench-check.js --slow` also builds the biggest benchmark worlds and prints Node tick timings |
 | `node Life/_tools/profile-tick.js` | where tick time goes at a few world sizes |
 | `node Life/_tools/run-bench.js desktop\|phone\|capped30` | the in-page benchmark in a real windowed Chrome (throwaway profile); prints results, saves a screenshot to `.claude/life-shots/` |

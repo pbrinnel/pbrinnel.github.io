@@ -97,7 +97,7 @@
     }
   }
 
-  // A bunny running from a hunter: the only time one takes to deep water (animals.js swimsNow).
+  // A bunny running from a hunter: the only time one takes to deep water (moving.js swimsNow).
   AS.isFleeing = function (sim, s) {
     if (sim.W.aSpecies[s] !== AS.SPECIES.BUNNY) return false;
     indices(sim.T);
@@ -597,7 +597,7 @@
       },
     },
 
-    // Thirst outranks food but not fear: HIDE and FLEE come first (animals.js, AS.drinkState).
+    // Thirst outranks food but not fear: HIDE and FLEE come first (drink.js, AS.drinkState).
     DRINK: AS.drinkState,
 
     // "Bite the blade every BiteCooldown." Stands still while it eats.

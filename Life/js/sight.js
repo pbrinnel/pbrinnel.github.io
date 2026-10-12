@@ -98,7 +98,7 @@
 
   // The first step of a shortest path from `from` to the nearest tile where goal(t) is true,
   // walking 4-directionally through tiles the walker can stand on (empty ones, and water no
-  // deeper than the animal on `from` wades: animals.js canStand) and never leaving the circle
+  // deeper than the animal on `from` wades: moving.js canStand) and never leaving the circle
   // of `range` around `from`. Returns `from` if goal(from) already holds, or -1 if no goal is
   // reachable. goal is tested only on tiles the walker could stand on (and `from`).
   //

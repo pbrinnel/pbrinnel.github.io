@@ -1,5 +1,5 @@
 'use strict';
-// Thirst (animals.js: the water meter, the DRINK state, cause of death; world.js: the water
+// Thirst (animals.js: the water meter and cause of death; drink.js: the DRINK state; world.js: the water
 // field): the meter drains with activity, a thirsty animal walks to a shore and drinks to full,
 // one too far from known water doesn't go, a dry animal loses HP and dies of thirst, DRINK sits
 // between the safety states and the food states, a crowd at one small lake all drink, worlds

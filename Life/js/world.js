@@ -248,7 +248,7 @@
     // Water's depth on a tile, as the water rules (water.js) move it during play. Getting
     // wet drowns a blade, floods a warren hole and puts out scorched ground; a corpse must
     // already be gone (corpse.js lets its grass boost go first); an animal stays (it wades, or
-    // animals.js walks it out if the water is too deep for it). A tile with nothing on it
+    // moving.js walks it out if the water is too deep for it). A tile with nothing on it
     // shows as water while it has any. The bare beach follows the shore: a blade on land that
     // comes to touch water dies. wetFlips counts shores moved, for whatever caches a picture
     // of them (render.js's topo lines); wetMoved tells water.js to rebuild the way-to-water
@@ -388,7 +388,7 @@
     // Returns the new slot. The caller fills in the rest of the animal's fields.
     W.addAnimal = function (t, species, sex) {
       if (W.hole[t] && !AS.canEnterHole(species)) throw new Error(`tile ${t} is a warren hole; only bunnies can enter`);
-      claim(t, AS.kindOf(species), true);   // painted into water: it wades, or animals.js walks it out
+      claim(t, AS.kindOf(species), true);   // painted into water: it wades, or moving.js walks it out
       let s = W.aFree.length ? W.aFree.pop() : W.aHigh++;
       if (s >= W.aCap) growAnimals(W.aCap * 2);
       for (const f of Object.keys(ANIMAL_FIELDS)) W[f][s] = 0;
@@ -418,7 +418,7 @@
     };
 
     // Steps an animal to an empty tile, or into water (how deep is the caller's rule:
-    // animals.js canStand). The caller times the step (aStepLeft, aStepDur).
+    // moving.js canStand). The caller times the step (aStepLeft, aStepDur).
     W.moveAnimal = function (s, t2) {
       const t = W.aTile[s];
       if (W.hole[t2] && !AS.canEnterHole(W.aSpecies[s])) throw new Error(`tile ${t2} is a warren hole; only bunnies can enter`);

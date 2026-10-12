@@ -1,7 +1,7 @@
 // The wolf's states (states.csv, Species = Wolf), which are also the states humans hunt and
 // rest with (human.js adds FORAGE and registers the rest under 'human'). Same contract as
 // bunny.js: enter() in Priority order a few times a second, act() every tick, movement only
-// through animals.js's helpers. A hunter may walk through grass by chewing it (DESIGN.md
+// through moving.js's helpers. A hunter may walk through grass by chewing it (DESIGN.md
 // "World"), so it moves with AS.chewOrStep and plans with AS.pathNextWeighted, which counts
 // the bites against detours. Who a hunter hunts and eats is species.csv's Prey and
 // EatsCarcass rows (AS.relations), not anything named here.
@@ -72,9 +72,9 @@
 
   // Matchers, goals and costs are created once and read these instead of closing over a call.
   // mSkip: the serial of the target this animal is ignoring (0 = none; see forget).
-  // mWade: how deep this animal wades (animals.js wadeOf).
+  // mWade: how deep this animal wades (moving.js wadeOf).
   let mInvWade = 0, mInvSwim = 0;   // seconds a step into water it wades, or swims, takes
-  let mSwim = false;                // it would swim now (animals.js swimsNow)
+  let mSwim = false;                // it would swim now (moving.js swimsNow)
   let mSim = null, mW = null, mSelf = 0, mGoal = 0, mFrom = 0, mInvSpeed = 0, mSkip = 0, mWade = 0;
   // The species this animal hunts and the carcasses it eats, as AS.relations bitmasks.
   let mPrey = 0, mEats = 0;
@@ -107,7 +107,7 @@
 
   // Where a hunter can step: open ground, water it wades, or a blade it chews away first;
   // never a hole.
-  // Deep water only where it would swim and get across (animals.js canEnter).
+  // Deep water only where it would swim and get across (moving.js canEnter).
   const canWalk = t => (AS.canStand(mW, t, mWade) || mW.kind[t] === K.GRASS || (mSwim && mW.kind[t] === K.WATER && AS.canEnter(mSim, mSelf, t))) && !mW.hole[t];
   // One step toward a goal the path search can't reach, going around what's in the way
   // (AS.edgeStep). Returns false once it gives up.

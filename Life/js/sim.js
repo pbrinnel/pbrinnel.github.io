@@ -83,7 +83,7 @@
     return sim;
   };
 
-  // DESIGN.md "Setup": grass scattered evenly, then animals on random empty tiles.
+  // DESIGN.md "Making a world": grass scattered evenly, then animals on random empty tiles.
   // One shuffle of all tiles feeds both, so nothing lands on a taken tile.
   function populate(sim, opts) {
     const { T, W, rng } = sim;

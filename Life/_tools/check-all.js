@@ -19,6 +19,7 @@ const QUICK = process.argv.includes('--quick');
 const CHECKS = [
   { file: path.join(TOOLS, 'harness.js'), args: ['12'], quickArgs: ['3'] },   // grid/store audits + same seed → same world
   { file: path.join(TOOLS, 'tables-check.js') },       // CSV loading, units, error messages
+  { file: path.join(TOOLS, 'files-check.js') },        // page, harness and lab load the same files
   { file: path.join(TOOLS, 'grass-check.js') },
   { file: path.join(TOOLS, 'sight-check.js'), flags: ['--expose-gc'] },
   { file: path.join(TOOLS, 'bunny-check.js') },

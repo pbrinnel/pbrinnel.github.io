@@ -186,7 +186,7 @@
 
   // Water reaching a tile drowns its blade, floods its hole and washes its corpse away
   // (world.js setDepth, after corpse.js lets the corpse's grass boost go); an animal stays
-  // and wades or steps out (animals.js).
+  // and wades or steps out (moving.js).
   AS.syncWater = function (sim) {
     const W = sim.W, H = W.water.H, D = W.wDepth, n = W.n;
     for (let t = 0; t < n; t++) {
