@@ -1,8 +1,9 @@
 // The grid and every agent store, as flat typed arrays (struct of arrays).
 //
 // A tile has layers. `kind` is the solid layer: at most one blade, corpse or animal, and EMPTY
-// when none. `flow` is the flow layer: at most one flowing thing (water, for now). A wading
-// animal is a solid in water's flow. `kind` is the truth about who is where. Only the add/remove/move
+// when none. `flow` is the flow layer: at most one flowing thing (water or fire). A wading
+// animal is a solid in water's flow; a burning blade or corpse is a solid in fire's. `kind`
+// is the truth about who is where. Only the add/remove/move
 // functions in this file write `kind`, `aSlot` or the dense lists; everything else writes
 // its own fields and calls these to change occupancy, so the grid can't drift from the
 // stores.
@@ -17,8 +18,8 @@
   // `kind >= BUNNY`.
   const KIND = AS.KIND = Object.freeze({ EMPTY: 0, GRASS: 1, CORPSE: 2, BUNNY: 3, WOLF: 4, HUMAN: 5 });
   // What the flow layer holds: at most one flow per tile, so a new flow is one more entry and
-  // no tile is ever two of them.
-  const FLOW = AS.FLOW = Object.freeze({ NONE: 0, WATER: 1 });
+  // no tile is ever two of them (water and fire never share a tile).
+  const FLOW = AS.FLOW = Object.freeze({ NONE: 0, WATER: 1, FIRE: 2 });
   // Animal species codes, used in `aSpecies` and `cSpecies`. The kind of a species' animals
   // is ANIMAL_KIND0 + its code, so a new species is one entry in each list below.
   const SP = AS.SPECIES = Object.freeze({ BUNNY: 0, WOLF: 1, HUMAN: 2 });
@@ -90,7 +91,8 @@
     const W = {
       w, h, n,
       kind: new Uint8Array(n),      // the solid layer (AS.KIND)
-      // The flow layer (AS.FLOW). WATER exactly where wDepth > 0; only setDepth and addWater write it.
+      // The flow layer (AS.FLOW). WATER exactly where wDepth > 0; only setDepth and addWater write
+      // it. FIRE exactly where the tile is in fList; only addFire and removeFire write that.
       flow: new Uint8Array(n),
       serial: new Uint32Array(n),   // serial of the blade or corpse on a tile
       nextSerial: 1,                // 0 means "nobody", so serials start at 1
@@ -125,6 +127,15 @@
       hList: new Int32Array(n),
       hSlot: new Int32Array(n).fill(-1),
       hCount: 0,
+
+      // Fire, by tile, same pattern: fList holds the burning tiles densely, so only they do
+      // work. A burning tile holds a blade or a corpse (its fuel; fire.js decides what burns).
+      // fireAge is hours burning, fireTime hours this tile's fuel burns, set when it caught.
+      fireAge: new Float32Array(n),
+      fireTime: new Float32Array(n),
+      fList: new Int32Array(n),
+      fSlot: new Int32Array(n).fill(-1),
+      fCount: 0,
 
       // Scorched ground, by tile: days left. A nuke sets it (paint.js), the hourly grass pass counts
       // it down (grass.js). While it is above 0 no blade may stand, seed or sprout there and no
@@ -287,6 +298,7 @@
       W.gList[i] = last;
       W.gSlot[last] = i;
       W.gSlot[t] = -1;
+      if (W.flow[t] === FLOW.FIRE) W.removeFire(t);   // whoever took the blade took the fire's fuel
       W.kind[t] = KIND.EMPTY;
       W.serial[t] = 0;
       W.gSize[t] = 0;
@@ -305,6 +317,7 @@
       const was = W.wDepth[t] > 0, now = d > 0;
       W.wDepth[t] = now ? d : 0;
       if (was === now) return;
+      if (now && W.flow[t] === FLOW.FIRE) W.removeFire(t);   // water puts fire out
       W.flow[t] = now ? FLOW.WATER : FLOW.NONE;
       if (now) {
         if (W.kind[t] === KIND.CORPSE) throw new Error(`tile ${t}: remove the corpse before the water comes`);
@@ -326,6 +339,34 @@
       W.beach[u] = beach;
       if (beach && W.kind[u] === KIND.GRASS) W.removeGrass(u);
     }
+
+    // Sets the blade or corpse on tile t burning for `burnHours` in-world hours (fire.js works
+    // out how long: ignite is the one way a fire starts). Needs fuel and an empty flow layer,
+    // so it never starts on water; a warren hole never burns (a bunny in it is safe).
+    W.addFire = function (t, burnHours) {
+      const k = W.kind[t];
+      if (k !== KIND.GRASS && k !== KIND.CORPSE) throw new Error(`tile ${t} has nothing to burn (kind ${k})`);
+      if (W.flow[t] !== FLOW.NONE) throw new Error(`tile ${t} is taken (flow ${W.flow[t]})`);
+      if (W.hole[t]) throw new Error(`tile ${t} is a warren hole; it doesn't burn`);
+      W.flow[t] = FLOW.FIRE;
+      W.fireAge[t] = 0;
+      W.fireTime[t] = burnHours;
+      W.fSlot[t] = W.fCount;
+      W.fList[W.fCount++] = t;
+    };
+
+    // The fire on tile t is out: burnt through (fire.js scorches the ground), put out by water,
+    // or its fuel taken. The solid stays as it is.
+    W.removeFire = function (t) {
+      if (W.flow[t] !== FLOW.FIRE) throw new Error(`no fire on tile ${t}`);
+      const i = W.fSlot[t], last = W.fList[--W.fCount];
+      W.fList[i] = last;
+      W.fSlot[last] = i;
+      W.fSlot[t] = -1;
+      W.flow[t] = FLOW.NONE;
+      W.fireAge[t] = 0;
+      W.fireTime[t] = 0;
+    };
 
     // Water laid on a bare tile, `depth` meters deep (LAID_DEPTH when not given: the
     // checks' hand-built worlds): at world build (terrain.js), before anything else is placed.
@@ -424,6 +465,7 @@
       W.cList[i] = last;
       W.cSlot[last] = i;
       W.cSlot[t] = -1;
+      if (W.flow[t] === FLOW.FIRE) W.removeFire(t);   // likewise
       free(t);
       W.serial[t] = 0;
       W.cNut[t] = 0;

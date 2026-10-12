@@ -11,7 +11,7 @@ const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..');
 // glyphs.js is DOM-free until a sheet is built, and holds the life-stage helper animals use.
-const SIM_FILES = ['tables', 'rng', 'world', 'grass', 'corpse', 'warren', 'weather', 'sim', 'paint', 'water', 'terrain', 'start', 'sight', 'animals', 'moving', 'drink', 'breed', 'bunny', 'wolf', 'human', 'glyphs'];
+const SIM_FILES = ['tables', 'rng', 'world', 'grass', 'corpse', 'warren', 'weather', 'sim', 'fire', 'paint', 'water', 'terrain', 'start', 'sight', 'animals', 'moving', 'drink', 'breed', 'bunny', 'wolf', 'human', 'glyphs'];
 
 // overrides: CSV texts to use instead of the files; extra: more js/ files to load after the sim's.
 function load(overrides = {}, extra = []) {
@@ -48,13 +48,24 @@ function check(cond, msg) { if (!cond) failures.push(msg); return cond; }
 function audit(AS, sim, label) {
   const W = sim.W, K = AS.KIND;
   let grass = 0, corpses = 0, animals = 0, holes = 0;
-  let wet = 0;
+  let wet = 0, fires = 0;
   const nb = new Int32Array(4);
   for (let t = 0; t < W.n; t++) {
     const k = W.kind[t];
     // The layers agree: the flow layer holds water exactly where there is depth; a wet tile's
     // solid layer is empty or a wading animal, and it has no blade, corpse, hole or scorch.
     check((W.flow[t] === AS.FLOW.WATER) === (W.wDepth[t] > 0), `${label}: tile ${t} flow ${W.flow[t]}, depth ${W.wDepth[t]}`);
+    // Fire is a flow too: exactly the tiles in fList, each burning a blade or a corpse on dry
+    // ground that isn't a hole, with an age not past its burn time.
+    if (W.flow[t] === AS.FLOW.FIRE) {
+      fires++;
+      check(W.fList[W.fSlot[t]] === t, `${label}: burning tile ${t} missing from fList`);
+      check(k === K.GRASS || k === K.CORPSE, `${label}: tile ${t} burns kind ${k}`);
+      check(W.wDepth[t] === 0 && !W.hole[t], `${label}: burning tile ${t} is wet or a hole`);
+      check(W.fireTime[t] > 0 && W.fireAge[t] >= 0 && W.fireAge[t] <= W.fireTime[t] + 1e-3, `${label}: burning tile ${t} age ${W.fireAge[t]} of ${W.fireTime[t]}`);
+    } else {
+      check(W.fSlot[t] === -1, `${label}: tile ${t} has fSlot but no fire`);
+    }
     if (W.wDepth[t] > 0) {
       wet++;
       check(k === K.EMPTY || k >= K.BUNNY, `${label}: wet tile ${t} holds kind ${k}`);
@@ -111,6 +122,7 @@ function audit(AS, sim, label) {
   }
   check(grass === W.gCount, `${label}: ${grass} blades on grid, gCount ${W.gCount}`);
   check(holes === W.hCount, `${label}: ${holes} holes on grid, hCount ${W.hCount}`);
+  check(fires === W.fCount, `${label}: ${fires} burning tiles on grid, fCount ${W.fCount}`);
   check(wet === W.waterCount, `${label}: ${wet} wet tiles, waterCount ${W.waterCount}`);
   check(corpses === W.cCount, `${label}: ${corpses} corpses on grid, cCount ${W.cCount}`);
   check(animals === W.bunnies + W.wolves + W.humans, `${label}: animal counts`);

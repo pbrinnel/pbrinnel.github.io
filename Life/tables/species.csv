@@ -88,3 +88,4 @@ CorpseDecay,days,1,5,5,,Corpse disappears after this
 MeatOnBody,Fullness,60,60,60,,Food on a body for whoever eats it (EatsCarcass); a carcass keeps it until eaten or until the corpse rots
 CorpseRadius,tiles,3,3,3,,Grass inside grows and seeds faster
 CorpseBoost,× multiplier,3,3,3,,Applied to GrowthRate and SeedChance in radius
+BurnHours,hours,6,10,10,4,"In-world hours it burns once alight: a full blade of grass (a smaller blade burns less, down to a fifth of this) or a body (a corpse burns this long whatever is left of it)"

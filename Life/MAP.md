@@ -43,6 +43,7 @@ load time: every file reads other files' `AS.*` inside functions, at call time.
 | `warren.js` | warren holes' clocks: marks a hole used while a bunny stands on it, collapses holes unused for `CollapseDays` (hourly) | `warrenTick`, `holeWithin` |
 | `weather.js` | the world's wind (`sim.wind = { from, kmh, toX, toY }`, `sim.weather`): three mean-reverting walks per in-world hour around the world's typical wind (`Wind`, a range) and a prevailing direction from the seed, capped at typical × `WindSpells`, changing over `WindChangeHours`; its own generator (never `sim.rng`, so worlds play out the same whatever the wind does); `windWords`, `windFromName` for the UI | `Wind`, `weatherTick`, `windWords`, `windFromName`, `WIND` |
 | `sim.js` | the fixed tick, populate, events ring, population history | `Sim`, `TICK_HZ`, `DT`, `DAY_SECONDS`, `TICKS_PER_HOUR`, `EV`, `debugDropCorpse` |
+| `fire.js` | fire, a Flow-layer agent: `ignite(sim, t)` (the one way a fire starts), `fireTick` (every `FIRE_EVERY` ticks: each burning tile ages and may light its 8 neighbors at `FireSpread` × fuel × soil dryness × wind ÷ distance per hour, then burns out to `FireScorchDays` of scorch, its blade or corpse gone), `fireStage` (0..1 through its burn, for the drawing); rolls `sim.rng` only while something burns | `ignite`, `fireTick`, `fireStep`, `fireStage`, `FIRE` |
 | `paint.js` | PAINT's powers: the brushes and the nuke ([The page](#the-page)) | `nuke`, `paintCircle` |
 | `water.js` | the water rules ([Water](#water)) | `Water`, `waterTick`, `syncWater`, `TILE_M`, `WATER_TINY`, `WATER_STEP_DAYS` |
 | `terrain.js` | every world's ground, grown before day 0, and its first water ([Water](#water)) | `growTerrain`, `layTerrain`, `terrainOf`, `terrainShape` |
@@ -81,8 +82,10 @@ load time: every file reads other files' `AS.*` inside functions, at call time.
 - **Solid:** `W.kind[t]` (`AS.KIND`: EMPTY, GRASS, CORPSE, BUNNY, WOLF, HUMAN; an animal's
   kind is `AS.kindOf(species)`), at most one per tile, the truth about who is where. Animals
   tell their own kind by `kind >= BUNNY`.
-- **Flow:** `W.flow[t]` (`AS.FLOW`: NONE, WATER; fire comes next), at most one per tile;
-  water's amount is `wDepth`. `W.isBare(t)`: no solid and no flow (where a blade sprouts, a
+- **Flow:** `W.flow[t]` (`AS.FLOW`: NONE, WATER, FIRE), at most one per tile; water's
+  amount is `wDepth`; fire's state is `fireAge`/`fireTime` (hours) with a dense list
+  `fList`/`fSlot`/`fCount`, written only by `addFire`/`removeFire` (taking the blade or
+  corpse, or water arriving, puts the fire out). A burning blade neither grows nor seeds. `W.isBare(t)`: no solid and no flow (where a blade sprouts, a
   hole is dug, a baby is born, a brush paints); `W.isOpenWater(t)`: water with nothing in it.
 - **Ground:** height (`elev`), holes, scorch, beach, and the soil water (`W.water.G`).
 - **Air:** the world's wind (`sim.wind`, weather.js).
@@ -135,7 +138,7 @@ graph, ui, bench) only reads.
 
 - **Tick:** fixed `AS.DT` = 1/30 s of sim time (`TICK_HZ`); a day is `DAY_SECONDS` = 20 s.
   `sim.tick()` does, in order: record history at the start of each in-world hour →
-  `weatherTick` → `corpseTick` → `grassTick` → `warrenTick` → `waterTick` → `animalsTick`.
+  `weatherTick` → `corpseTick` → `grassTick` → `warrenTick` → `waterTick` → `fireTick` → `animalsTick`.
 - **Grass:** growth/age/seed/sprout/old-age once per in-world hour, spread over
   `TICKS_PER_HOUR` ticks by tile (`t % TICKS_PER_HOUR`).
 - **Water:** a step every `STEP_TICKS` ticks ([Water](#water)).

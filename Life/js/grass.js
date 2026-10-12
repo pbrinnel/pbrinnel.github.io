@@ -52,7 +52,8 @@
         }
         continue;
       }
-      if (W.kind[t] !== AS.KIND.GRASS || W.serial[t] >= firstNew) continue;
+      // A burning blade is fuel now: it neither grows nor seeds (nor ages: fire.js ends it).
+      if (W.kind[t] !== AS.KIND.GRASS || W.serial[t] >= firstNew || W.flow[t] === AS.FLOW.FIRE) continue;
       const s = gSize[t];
       if (s < 1) {
         let grown = s + rate;

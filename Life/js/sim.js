@@ -80,6 +80,9 @@
       AS.grassTick(sim);
       AS.warrenTick(sim);
       AS.waterTick(sim);
+      // After the grass, corpse and water passes so fire sees this tick's fuel and wet ground (a
+      // tile water just reached is already out and can't catch), before the animals move.
+      AS.fireTick(sim);
       AS.animalsTick(sim);
       sim.tickCount++;
     };
