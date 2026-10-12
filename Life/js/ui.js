@@ -386,23 +386,26 @@
     }
 
     // ---- PAINT tab (key 'god') ----
-    // One mode at a time: 'nuke', or a brush ('grass', 'bunny', 'wolf', 'human'), or '' for none.
-    // Armed until toggled off, so repeated nukes and strokes work; main.js turns a tap (or a
-    // drag, for a brush) on the world into that mode's action while it is on.
+    // One mode at a time: 'nuke', or a brush ('grass', 'bunny', 'wolf', 'human', 'water'), or ''
+    // for none. Armed until toggled off, so repeated nukes and strokes work; main.js turns a tap
+    // (or a drag, for a brush) on the world into that mode's action while it is on. Each button
+    // shows its name until setIcons gives it its icon (Paul, 12 Oct 2026); the name stays its
+    // label for screen readers and leads its tooltip.
     let mode = '';
     const MODES = [
-      ['nuke', 'NUKE MODE', 'hud-nuke', 'While on, tapping the world drops a nuke there'],
-      ['grass', 'GRASS MODE', 'hud-brush', 'While on, tap or drag to plant grass of random ages on empty ground'],
-      ['bunny', 'RABBIT MODE', 'hud-brush', 'While on, tap or drag to add rabbits of random ages on empty ground'],
-      ['wolf', 'WOLF MODE', 'hud-brush', 'While on, tap or drag to add wolves of random ages on empty ground'],
-      ['human', 'HUMAN MODE', 'hud-brush', 'While on, tap or drag to add adult humans on empty ground'],
-      ['water', 'WATER MODE', 'hud-brush', 'While on, tap or drag to pour water (1 m deep) on bare ground or grass'],
+      ['nuke', 'NUKE MODE', 'hud-nuke', 'nuke', 'Tapping the world drops a nuke there'],
+      ['grass', 'GRASS MODE', 'hud-brush', 'blades', 'Tap or drag to plant grass of random ages on empty ground'],
+      ['bunny', 'RABBIT MODE', 'hud-brush', 'bunnies', 'Tap or drag to add rabbits of random ages on empty ground'],
+      ['wolf', 'WOLF MODE', 'hud-brush', 'wolves', 'Tap or drag to add wolves of random ages on empty ground'],
+      ['human', 'HUMAN MODE', 'hud-brush', 'humans', 'Tap or drag to add adult humans on empty ground'],
+      ['water', 'WATER MODE', 'hud-brush', 'water', 'Tap or drag to pour water (1 m deep); it flows from there'],
     ];
     const modeBtns = {};
-    for (const [name, label, cls, tip] of MODES) {
+    for (const [name, label, cls, , tip] of MODES) {
       const b = el('button', 'hud-bench ' + cls, label);
       b.type = 'button';
-      b.title = tip;
+      b.title = label + ': ' + tip.charAt(0).toLowerCase() + tip.slice(1);
+      b.setAttribute('aria-label', label);
       b.addEventListener('click', () => { if (!locked) setMode(mode === name ? '' : name); b.blur(); });
       godModes.appendChild(b);
       modeBtns[name] = b;
@@ -692,17 +695,27 @@
       showRadius();
     }
 
-    // The letters stand in until the sprite sheet exists (it needs the tables); then each
-    // becomes a small canvas with the same sprite the world draws.
+    // The letters and mode names stand in until the sprite sheet exists (it needs the tables);
+    // then each becomes a small canvas with the same sprite the world draws.
     function setIcons(draw) {
-      for (const [label, key] of COUNTS) {
-        if (label) continue;   // the total is a word, not a sprite
+      const icon = key => {
         const cv = document.createElement('canvas');
         cv.className = 'hud-icon';
         cv.setAttribute('aria-hidden', 'true');
         draw(key, cv);
+        return cv;
+      };
+      for (const [label, key] of COUNTS) {
+        if (label) continue;   // the total is a word, not a sprite
+        const cv = icon(key);
         glyphEls[key].replaceWith(cv);
         glyphEls[key] = cv;
+      }
+      for (const [name, , , key] of MODES) {
+        const b = modeBtns[name];
+        b.textContent = '';
+        b.appendChild(icon(key));
+        b.classList.toggle('hud-mode-icon', true);
       }
     }
 

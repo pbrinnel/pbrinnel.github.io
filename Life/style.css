@@ -353,9 +353,18 @@ body.nuke-armed #map, body.paint-armed #map { cursor: crosshair; }
 /* Any toggle in a tab shows it is on the same way (NUKE MODE overrides it below). */
 .hud-bench.on, .hud-bench.on:hover { color: var(--bg); background: var(--hud-on); border-color: var(--hud-on); }
 /* NUKE MODE armed: a steady orange-red fill, unmistakable and never animated. */
+/* The PAINT modes as icons (setIcons): square buttons, the icon centered. NUKE keeps a red
+   edge even when off, so it never reads as just another brush. */
+.hud-bench.hud-mode-icon { min-width: 0; width: 36px; padding: 0; display: inline-grid; place-items: center; }
+.hud-mode-icon .hud-icon { margin: 0; vertical-align: 0; }
+.hud-nuke { border-color: #8a3a1c; }
+.hud-nuke:hover { border-color: #e0662f; }
 .hud-nuke.on, .hud-nuke.on:hover { color: #fff3e8; background: #b8431a; border-color: #e0662f; }
 /* A brush armed: a steady fill like the graph's on state, so the active mode is plain. */
 .hud-brush.on, .hud-brush.on:hover { color: var(--bg); background: var(--hud-on); border-color: var(--hud-on); }
+/* Armed, an icon keeps its own colors: a tint behind it and a doubled edge, not a fill. */
+.hud-bench.hud-mode-icon.on, .hud-bench.hud-mode-icon.on:hover { background: rgba(232, 217, 160, 0.16); border-color: var(--hud-on); box-shadow: inset 0 0 0 1px var(--hud-on); }
+.hud-nuke.hud-mode-icon.on, .hud-nuke.hud-mode-icon.on:hover { background: rgba(184, 67, 26, 0.32); border-color: #e0662f; box-shadow: inset 0 0 0 1px #e0662f; }
 
 /* ---- Population graph: a floating window ---- */
 /* Until it is dragged (or a place is remembered) it sits under the bar: JS sets --hud-bottom to

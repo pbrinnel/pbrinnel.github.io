@@ -25,6 +25,8 @@ B.hole.forEach((m, i) => maps.push([`hole ${i}`, m]));
 B.peek.forEach((m, i) => maps.push([`peek ${i}`, m]));
 B.grassLean.forEach((m, i) => maps.push([`grass lean ${i}`, m]));
 B.grass.forEach((m, i) => maps.push([`grass ${i}`, m]));
+B.water.forEach((m, i) => maps.push([`water ${i}`, m]));
+B.nuke.forEach((m, i) => maps.push([`nuke icon ${i}`, m]));
 check(B.bunny.length === AS.SPRITE_FRAMES && B.wolf.length === AS.SPRITE_FRAMES && B.human.length === AS.SPRITE_FRAMES, 'every species has SPRITE_FRAMES frames');
 check(B.carcass.length === AS.SPECIES_COUNT && B.skull.length === AS.SPECIES_COUNT, 'a carcass and a skull per species');
 // The human carries a spear in every pose but the fallen one: spearhead (m) or shaft (q) shows.
@@ -52,6 +54,7 @@ for (let sp = 0; sp < AS.SPECIES_COUNT; sp++) for (let sx = 0; sx < 2; sx++) for
 for (let sp = 0; sp < AS.SPECIES_COUNT; sp++) add(AS.spriteSkull(sp), `skull ${sp}`);
 for (let sp = 0; sp < AS.SPECIES_COUNT; sp++) add(AS.spriteCarcass(sp), `carcass ${sp}`);
 add(AS.spriteHole(), 'hole');
+add(AS.spriteNuke(), 'nuke icon');
 for (let sx = 0; sx < 2; sx++) add(AS.spritePeek(sx), `peek sex${sx}`);
 for (let t = 0; t < 3; t++) add(AS.spriteGrassLean(t), `grass lean ${t}`);
 for (let t = 0; t < 3; t++) add(AS.spriteGrass(t), `grass ${t}`);

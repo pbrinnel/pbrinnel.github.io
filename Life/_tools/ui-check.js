@@ -15,7 +15,8 @@ class El {
   set hidden(v) { writes++; this._hidden = !!v; } get hidden() { return this._hidden; }
   set title(v) { writes++; this._title = v; }
   appendChild(c) { writes++; this.children.push(c); c.parent = this; return c; }
-  setAttribute() {}
+  setAttribute(k, v) { (this.attrs || (this.attrs = {}))[k] = String(v); }
+  getAttribute(k) { return this.attrs && k in this.attrs ? this.attrs[k] : null; }
   replaceWith(n) { if (this.parent) this.parent.children = this.parent.children.map(c => c === this ? n : c); n.parent = this.parent; }
   remove() { if (this.parent) this.parent.children = this.parent.children.filter(c => c !== this); this.parent = null; }
   append(...cs) { for (const c of cs) { writes++; const k = typeof c === 'string' ? Object.assign(new El('#text'), { _text: c }) : c; k.parent = this; this.children.push(k); } }
@@ -269,7 +270,9 @@ const winOf = (ids, key) => ids.hud.all(e => e.className === 'hud-tabstrip hud-w
   assert(ids.hud.all(e => e.className === 'hud-num hud-num-total').length === 1 && ids.hud.all(e => e.className === 'hud-num hud-num-humans').length === 1); ok('Total and humans are counts like the others (fixed width in CSS)');
   const icons = [];
   ui.setIcons((key, cv) => { icons.push(key); });
-  assert.deepStrictEqual(icons, ['bunnies', 'wolves', 'humans', 'blades', 'corpses']); ok('icons for every count but the Total, which keeps its word');
+  assert.strictEqual(icons.join(','), 'bunnies,wolves,humans,blades,corpses,nuke,blades,bunnies,wolves,humans,water'); ok('icons for every count but the Total (which keeps its word), then one for each PAINT mode');
+  const nuke = ids.hud.all(e => e.className.includes('hud-nuke'))[0];
+  assert(nuke.textContent === '' && nuke.className.includes('hud-mode-icon') && nuke.getAttribute('aria-label') === 'NUKE MODE' && (nuke._title || nuke.title).startsWith('NUKE MODE: ')); ok('a mode button becomes its icon, keeping its name as its label and in its tooltip');
 }
 // ---- the Radius slider: per-mode memory, defaults, keeping, the benchmark lock ----
 { const { ui, ids } = build(false);

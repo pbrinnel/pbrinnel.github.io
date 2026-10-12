@@ -97,7 +97,10 @@
     ['uuuuuuuu', 'uukuuuvu', 'uuuuuuuu', 'vvuuukuu', 'uuuuuuuu', 'ukuuuvvu', 'uuuuuuuu', 'uuuvuuuu'],
     ['uvuuuuuu', 'uuuuukuu', 'kuuuuuuu', 'uuuuvvuu', 'uuuuuuuu', 'uuvuuuku', 'uuuuuuuu', 'uuuukuuu'],
   ];
-  const BITMAPS = { hole: [HOLE_BITMAP], water: WATER_BITMAPS, peek: [PEEK_BITMAP], bunny: BUNNY, wolf: WOLF, human: HUMAN, carcass: CARCASS_BITMAPS, skull: SKULL_BITMAPS, grass: GRASS_BITMAPS, grassLean: GRASS_LEAN };
+  // The PAINT window's nuke button (Paul, 12 Oct 2026: icons for the modes): a mushroom cloud
+  // in the blast's orange, the only icon with no thing of its own in the world.
+  const NUKE_BITMAP = ['..wwww..', '.wxxxxw.', 'wxxddxxw', '.xxxxxx.', '...xx...', '...xx...', '..xxxx..', '.dddddd.'];
+  const BITMAPS = { nuke: [NUKE_BITMAP], hole: [HOLE_BITMAP], water: WATER_BITMAPS, peek: [PEEK_BITMAP], bunny: BUNNY, wolf: WOLF, human: HUMAN, carcass: CARCASS_BITMAPS, skull: SKULL_BITMAPS, grass: GRASS_BITMAPS, grassLean: GRASS_LEAN };
   AS.SPRITE_BITMAPS = BITMAPS;
   AS.SPRITE_CODES = 'xdweynfprosqmuvk';
   AS.SPRITE_SIZE = SIZE;
@@ -109,6 +112,7 @@
   const CARCASS_BRIGHTNESS = 0.65;
   const ELDER_BRIGHTNESS = 0.72;
   const HOLE_RIM = '#8a6a45', HOLE_DARK = '#150f0a';
+  const NUKE_COLOR = '#e0662f';
   const WATER_BASE = '#2b5c8c', WATER_LIGHT = '#3a6e9f', WATER_DARK = '#244f7c';
   // How each depth band is shaded from those (Paul, 11 Oct 2026: water shows its depth the way
   // grass shows its size): shallow lighter, deep darker. Below WATER_MID_M meters is shallow,
@@ -203,12 +207,13 @@
   // ---- sheet layout -----------------------------------------------------------------
   // Animals: ((((species*2+sex)*3+stage)*2+faceLeft)*FRAMES+frame), then each species'
   // skull, the three grass thirds, the three leaning ones, each species' carcass, the hole,
-  // the bunny peeking out of it (by sex), and the water (three depths × three variants).
+  // the bunny peeking out of it (by sex), the water (three depths × three variants), and the
+  // nuke icon.
   const N_SPECIES = AS.SPECIES_COUNT;
   const ANIMAL_SPRITES = N_SPECIES * 2 * 3 * 2 * FRAMES;
   const SKULL0 = ANIMAL_SPRITES, GRASS0 = SKULL0 + N_SPECIES, LEAN0 = GRASS0 + 3, CARCASS0 = LEAN0 + 3;
   // Water comes in WATER_DEPTHS shades (shallow, mid, deep), each in every ripple variant.
-  const HOLE0 = CARCASS0 + N_SPECIES, PEEK0 = HOLE0 + 1, WATER0 = PEEK0 + 2, COUNT = WATER0 + WATER_DEPTHS.length * WATER_BITMAPS.length;
+  const HOLE0 = CARCASS0 + N_SPECIES, PEEK0 = HOLE0 + 1, WATER0 = PEEK0 + 2, NUKE0 = WATER0 + WATER_DEPTHS.length * WATER_BITMAPS.length, COUNT = NUKE0 + 1;
   const SHEET_COLS = 19;
   const BY_SPECIES = [BUNNY, WOLF, HUMAN];
   // The row of a species' standing eye, and the columns a frame's row covers ([first, last],
@@ -230,6 +235,7 @@
   AS.spriteGrassLean = third => LEAN0 + third;
   AS.spriteCarcass = species => CARCASS0 + species;
   AS.spriteHole = () => HOLE0;
+  AS.spriteNuke = () => NUKE0;
   AS.spritePeek = sex => PEEK0 + sex;   // a bunny in a hole, by sex
   // A water tile's sprite: its depth band (AS.waterBand: 0 shallow, 1 mid, 2 deep) and a ripple
   // variant from its position, a fixed scramble of x and y, never random.
@@ -322,6 +328,7 @@
         at(SKULL0 + sp, (x, y) => paint(g, x, y, px, SKULL_BITMAPS[sp], AS.COLORS[AS.GLYPH.CORPSE], false, CORPSE_SCALE));
       }
       at(HOLE0, (x, y) => paint(g, x, y, px, HOLE_BITMAP, HOLE_RIM, false, 1));
+      at(NUKE0, (x, y) => paint(g, x, y, px, NUKE_BITMAP, NUKE_COLOR, false, 1));
       for (let sx2 = 0; sx2 < 2; sx2++) {
         at(PEEK0 + sx2, (x, y) => paint(g, x, y, px, PEEK_BITMAP, AS.COLORS[AS.animalGlyph(0, sx2, AS.STAGE.ADULT)], false, 1));
       }

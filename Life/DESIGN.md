@@ -373,7 +373,10 @@ watching the sim run. Everything else in this doc is decided.
     Tiles**, also kept per viewer, lets a click or hover on bare ground pick the tile itself,
     which shows only those rows. **Tables:** the table-warnings button, when there are any.
   - **PAINT** (was Create/Destroy): **Modes** (the brushes and the nuke) and **Size**
-    (Radius). Moving the Radius slider shows a circle that size in the middle of the map,
+    (Radius). The modes are icons (Paul, 12 Oct 2026): the world's own sprites for grass,
+    rabbit, wolf, human and water, and a pixel mushroom cloud for the nuke, which keeps a red
+    edge so it never reads as just another brush; each names itself in its tooltip. Moving
+    the Radius slider shows a circle that size in the middle of the map,
     held half a second and then faded out over 1.4 s (Paul, 12 Oct 2026).
   - **Debug**, only with `?debug` in the address (Paul, 12 Oct 2026: not needed for now):
     **World** (Water, the seed), **Tools** (Benchmark, the debug tools).

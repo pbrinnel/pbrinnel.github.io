@@ -171,6 +171,8 @@
     humans: AS.spriteIndex(AS.SPECIES.HUMAN, AS.SEX.MALE, AS.STAGE.ADULT, 0, AS.SPRITE_FRAME.STAND),
     blades: AS.spriteGrass(2),
     corpses: AS.spriteSkull(AS.SPECIES.BUNNY),
+    water: AS.spriteWater(0, 0, 0),
+    nuke: AS.spriteNuke(),
   };
   function drawIcon(key, cv) {
     // A whole number of device pixels per sprite pixel keeps the pixel art crisp.
