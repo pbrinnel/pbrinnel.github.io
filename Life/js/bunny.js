@@ -82,16 +82,24 @@
   // The state indices come from the CSV order, so find REST and DIG by name once per table
   // set. digHazard turns DigChance (per day) into a rate, the way grass.js does SeedChance, so a
   // roll at each decision adds up to DigChance a day however often decisions come.
-  let idxT = null, restIdx = -1, digIdx = -1, digPerDecision = 0;
+  let idxT = null, restIdx = -1, digIdx = -1, fleeIdx = -1, digPerDecision = 0;
   function indices(T) {
     if (idxT !== T) {
       idxT = T;
       restIdx = T.states.bunny.findIndex(st => st.name === 'REST');
+      fleeIdx = T.states.bunny.findIndex(st => st.name === 'FLEE');
       digIdx = T.states.bunny.findIndex(st => st.name === 'DIG');
       const c = T.bunny.DigChance, perDay = T.bunny.DecidePerSec * AS.DAY_SECONDS;
       digPerDecision = c >= 1 ? 1 : c > 0 ? 1 - Math.exp(Math.log(1 - c) / perDay) : 0;
     }
   }
+
+  // A bunny running from a hunter: the only time one takes to deep water (animals.js swimsNow).
+  AS.isFleeing = function (sim, s) {
+    if (sim.W.aSpecies[s] !== AS.SPECIES.BUNNY) return false;
+    indices(sim.T);
+    return sim.W.aState[s] === fleeIdx;
+  };
 
   // ---- shared pieces ---------------------------------------------------------------------
 
@@ -515,7 +523,7 @@
           ey = ey < 0 ? 0 : ey >= W.h ? W.h - 1 : ey;
           if (c > 0) {
             const fx = Math.round(tx + cx), fy = Math.round(ty + cy);
-            if (!W.inside(fx, fy) || !AS.canStand(W, fy * w + fx, AS.wadeOf(sim, s))) continue;
+            if (!W.inside(fx, fy) || !AS.canEnter(sim, s, fy * w + fx)) continue;
           }
           const score = Math.sqrt((ex - wx) * (ex - wx) + (ey - wy) * (ey - wy)) - FLEE_WALL_COST * near;
           if (score > bestScore) { bestScore = score; bestC = c; bex = ex; bey = ey; }
@@ -532,10 +540,9 @@
         const k = W.neighbors4(t, nb);
         const d0 = (tx - wx) * (tx - wx) + (ty - wy) * (ty - wy);
         let best = -1, bestD = bestC === 0 ? d0 : Infinity;
-        const wade = AS.wadeOf(sim, s);
         for (let i = 0; i < k; i++) {
           const n = nb[i];
-          if (!AS.canStand(W, n, wade)) continue;
+          if (!AS.canEnter(sim, s, n)) continue;
           const dx = (n % w) - wx, dy = ((n / w) | 0) - wy, d2 = dx * dx + dy * dy;
           if (bestC === 0) {
             if (d2 > bestD) { bestD = d2; best = n; }

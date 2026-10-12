@@ -452,8 +452,9 @@ const d2 = (W, a, b) => (W.tx(a) - W.tx(b)) ** 2 + (W.ty(a) - W.ty(b)) ** 2;
   // A river down the map at x = RX, with one ford at y = FORD, farther than the wolf can see.
   const RX = 22, FORD = 72, Y0 = 40;
   function riverWorld(seed, ford, rightHanded) {
-    // The carcass must outlast the walk around.
-    const env = make(80, seed, false, tx => { tx.species = editCSV(tx.species, 'CorpseDecay', 'Bunny', '100'); });
+    // The carcass must outlast the walk around, and these wolves can't swim (water-check.js
+    // has swimming): the river is a wall.
+    const env = make(80, seed, false, tx => { tx.species = editCSV(editCSV(tx.species, 'CorpseDecay', 'Bunny', '100'), 'SwimCost', 'Wolf', ''); });
     const { AS, sim, W } = env;
     for (let y = 0; y < W.h; y++) if (y !== ford) W.addWater(at(W, RX, y));
     let w = wolf(AS, sim, RX - 2, Y0, { full: 10 });
@@ -487,8 +488,9 @@ const d2 = (W, a, b) => (W.tx(a) - W.tx(b)) ** 2 + (W.ty(a) - W.ty(b)) ** 2;
   ok(sname(R.sim, R.w, 'wolf') !== 'FEED', `around: having given up, it forgets that carcass (${sname(R.sim, R.w, 'wolf')})`);
 }
 {
-  // No ford at all, a bunny just across: the wolf may look, but it doesn't stand and stare.
-  const { AS, sim, W } = make(60, 32);
+  // No ford at all, a bunny just across (and a wolf that can't swim): the wolf may look, but
+  // it doesn't stand and stare.
+  const { AS, sim, W } = make(60, 32, false, tx => { tx.species = editCSV(tx.species, 'SwimCost', 'Wolf', ''); });
   for (let y = 0; y < W.h; y++) W.addWater(at(W, 30, y));
   const w = wolf(AS, sim, 28, 30, { full: 10 });
   const b = bun(AS, sim, 33, 30);

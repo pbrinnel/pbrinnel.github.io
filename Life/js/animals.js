@@ -98,18 +98,39 @@
     return k === KIND.EMPTY || (k === KIND.WATER && W.wDepth[t] <= wade);
   };
 
-  // One step to a 4-neighbor it can stand on, if the last step has finished. Returns
-  // whether it moved. The step's time comes from the speed at the moment it starts.
+  // Swimming (Paul, 12 Oct 2026: wolves swim well and rabbits badly, as they do). Water
+  // deeper than an animal wades costs it SwimCost Stamina a second (no sprinting, no refill)
+  // and it moves at SwimSpeed; with no Stamina left it loses DrownDamage HP a second. It goes
+  // in by choice only with at least SwimAt of its Stamina; a species without SwimAt goes in
+  // only to flee (AS.isFleeing, bunny.js). Once in, it carries on while its Stamina is above
+  // RestBelow, then makes for the nearest ground it can stand on (wadeOut). SwimCost blank:
+  // it never swims, and deep water is a wall to it.
+  const inDeep = (sim, s) => sim.W.wDepth[sim.W.aTile[s]] > AS.wadeOf(sim, s);
+  AS.swimsNow = function (sim, s) {
+    const W = sim.W, S = AS.speciesStats(sim, s);
+    if (S.SwimCost == null || W.aWinded[s]) return false;
+    const st = W.aStamina[s] / S.StaminaMax;
+    if (!(st > S.RestBelow)) return false;
+    if (S.SwimAt == null) return !!(AS.isFleeing && AS.isFleeing(sim, s));
+    return inDeep(sim, s) || st >= S.SwimAt;
+  };
+  // Whether animal s can step onto t now: ground or water it can stand on, or deeper water
+  // it would swim.
+  AS.canEnter = (sim, s, t) => AS.canStand(sim.W, t, AS.wadeOf(sim, s)) || (sim.W.kind[t] === KIND.WATER && AS.swimsNow(sim, s));
+
+  // One step to a 4-neighbor it can enter, if the last step has finished. Returns whether it
+  // moved. The step's time comes from the speed at the moment it starts.
   AS.stepTo = function (sim, s, t2) {
     const W = sim.W;
-    if (W.aStepLeft[s] > 0 || !AS.canStand(W, t2, AS.wadeOf(sim, s))) return false;
+    if (W.aStepLeft[s] > 0 || !AS.canEnter(sim, s, t2)) return false;
     return move(sim, s, t2);
   };
   function move(sim, s, t2) {
-    const W = sim.W;
+    const W = sim.W, S = AS.speciesStats(sim, s);
     if (W.hole[t2] && !AS.canEnterHole(W.aSpecies[s])) return false;   // a hole is a wall to all but bunnies
     let v = AS.speedOf(sim, s);
-    if (W.wDepth[t2] > 0) { const f = AS.speciesStats(sim, s).WadeSpeed; if (f != null) v *= f; }
+    const d = W.wDepth[t2];
+    if (d > 0) { const f = d > AS.wadeOf(sim, s) ? S.SwimSpeed : S.WadeSpeed; if (f != null) v *= f; }
     if (!(v > 0)) return false;
     const dur = 1 / v;
     W.moveAnimal(s, t2);
@@ -435,10 +456,12 @@
 
   // ---- out of deep water --------------------------------------------------------------
 
-  // An animal in water deeper than it wades (the water rose, or was poured on it) does
-  // nothing else until it is out (Paul, 11 Oct 2026: animals step out): the nearest tile it
-  // can stand on within sight, through water of any depth, at its wading speed; none in
-  // sight, the shallowest neighbor that is shallower than here.
+  // An animal in water deeper than it wades that isn't swimming on purpose (the water rose or
+  // was poured on it, or it is tiring: AS.swimsNow) does nothing else until it is out (Paul,
+  // 11 Oct 2026: animals step out): the nearest tile it can stand on within OUT_RANGE (it
+  // knows its land well beyond sight, as WaterSense says), through water of any depth; none
+  // there, the shallowest neighbor that is shallower than here.
+  const OUT_RANGE = 40;
   let oW = null, oWade = 0, oHoles = false;
   const outCost = t => {
     const k = oW.kind[t];
@@ -451,7 +474,7 @@
     if (W.aStepLeft[s] > 0) return;
     const t = W.aTile[s];
     oW = W; oWade = AS.wadeOf(sim, s); oHoles = AS.canEnterHole(W.aSpecies[s]);
-    let next = AS.pathNextWeighted(sim, t, isStandable, AS.speciesStats(sim, s).VisionRange, outCost);
+    let next = AS.pathNextWeighted(sim, t, isStandable, Math.max(OUT_RANGE, AS.speciesStats(sim, s).VisionRange), outCost);
     if (next === t) next = -1;
     if (next < 0) {
       let best = W.wDepth[t];
@@ -523,10 +546,16 @@
       // A dry animal doesn't heal, or a wolf's HealRate would outweigh its small ThirstDamage forever.
       else if (full > S.HealAbove * S.FullnessMax && hp < S.HPMax && !thirsty) hp = Math.min(S.HPMax, hp + S.HealRate * dt);
       if (thirsty) hp -= S.ThirstDamage * dt;
+      const deep = W.wDepth[W.aTile[s]] > (S.WadeDepth || 0) && S.SwimCost != null;
+      if (deep && W.aStamina[s] === 0) hp -= S.DrownDamage * dt;
       W.aHP[s] = hp;
       if (hp <= 0 || W.aAge[s] >= S.Lifespan) { AS.killAnimal(sim, s, bodyCause(sim, s)); continue; }
 
-      if (W.aSprint[s]) {
+      if (deep) {
+        W.aSprint[s] = 0;
+        const st = W.aStamina[s] - S.SwimCost * dt;
+        if (st <= 0) { W.aStamina[s] = 0; W.aWinded[s] = 1; } else W.aStamina[s] = st;
+      } else if (W.aSprint[s]) {
         const st = W.aStamina[s] - S.SprintCost * dt;
         if (st <= 0) { W.aStamina[s] = 0; W.aSprint[s] = 0; W.aWinded[s] = 1; } else W.aStamina[s] = st;
       } else if (W.aStamina[s] < S.StaminaMax) {
@@ -547,9 +576,11 @@
         decide(sim, s, key);
         W.aDecideLeft[s] += 1 / S.DecidePerSec;
       }
-      const d = W.wDepth[W.aTile[s]];
-      if (d > 0 && d > AS.wadeOf(sim, s)) { wadeOut(sim, s); continue; }
+      const swimming = inDeep(sim, s);
+      if (swimming && !AS.swimsNow(sim, s)) { wadeOut(sim, s); continue; }
       if (W.aState[s] !== NO_STATE) IMPL[key][T.states[key][W.aState[s]].name].act(sim, s);
+      // Swimming with nowhere to go (a plain wander, say) is no reason to stay in: out.
+      if (swimming && W.aAlive[s] && inDeep(sim, s) && W.aStepLeft[s] <= 0 && W.aTargetTile[s] < 0) wadeOut(sim, s);
     }
   };
 })(globalThis.AS);

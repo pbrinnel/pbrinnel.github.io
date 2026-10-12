@@ -38,6 +38,10 @@
     ['WaterLiters', 'num', []],      // blank = drinking takes no water
     ['WadeDepth', 'num', []],        // blank = never wades
     ['WadeSpeed', 'ratio', []],      // blank = no slower in water
+    ['SwimCost', 'num', []],         // blank = never swims
+    ['SwimSpeed', 'ratio', []],      // blank = no slower swimming
+    ['SwimAt', 'frac', []],          // blank = swims only to flee
+    ['DrownDamage', 'num', []],
     ['ThirstDamage', 'num', ANIMALS],
     ['WaterSense', 'num', ANIMALS],
     ['HPMax', 'pos', ANIMALS],

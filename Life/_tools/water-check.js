@@ -143,10 +143,11 @@ function landPieces(AS, W) {
 // ---- Several days of a Meadows world: the water keeps moving and settled, animals wade only
 // the shallows, and the audit holds ----
 {
-  let animalsSeen = 0, deep = 0, wading = 0, births = 0, nearWater = 0, drift = 0, blinking = 0, tiles = 0;
+  let hz = 0, animalsSeen = 0, deep = 0, nonSwimmer = 0, longest = 0, wading = 0, births = 0, nearWater = 0, drift = 0, blinking = 0, tiles = 0;
   for (const seed of [4, 5, 6]) {
     const { AS, sim, W } = make(seed);
-    const wet0 = W.waterCount;
+    const wet0 = W.waterCount, inDeep = [];
+    hz = AS.TICK_HZ;
     const was = new Uint8Array(W.n), flips = new Uint16Array(W.n);
     for (let t = 0; t < W.n; t++) was[t] = W.wDepth[t] > 0 ? 1 : 0;
     let peak = 0;
@@ -159,7 +160,10 @@ function landPieces(AS, W) {
         if (!W.aAlive[s]) continue;
         animalsSeen++;
         const d = W.wDepth[W.aTile[s]];
-        if (d > 0) { wading++; if (d > AS.wadeOf(sim, s)) deep++; }
+        if (d > 0) {
+          wading++;
+          if (d > AS.wadeOf(sim, s)) { deep++; if (AS.speciesStats(sim, s).SwimCost == null) nonSwimmer++; inDeep[s] = (inDeep[s] || 0) + 12; longest = Math.max(longest, inDeep[s]); } else inDeep[s] = 0;
+        } else inDeep[s] = 0;
         if (W.beach[W.aTile[s]]) nearWater++;
       }
     }
@@ -172,8 +176,9 @@ function landPieces(AS, W) {
     ok(failures.length === f0, `seed ${seed}: the grid and stores audit with the water moving${failures.length > f0 ? ': ' + failures[f0] : ''}`);
   }
   ok(animalsSeen > 1000 && births > 0 && nearWater > 0, `the run had animals to watch (${animalsSeen} sightings, ${nearWater} on a shore, ${wading} wading)`);
-  // Water that rises over an animal leaves it in deep water until it has walked out.
-  ok(deep <= animalsSeen / 1000, `animals stand in water deeper than they wade almost never (${deep} sightings)`);
+  // Deep water is swimming: only for swimmers, and never for long (a crossing, a flight, or
+  // the water rising over it until it walks out).
+  ok(nonSwimmer === 0 && longest <= 60 * hz, `only swimmers are ever in deep water, and none stays a minute (${deep} sightings swimming, longest ${(longest / hz).toFixed(0)} s)`);
   // Day 0 is at rest (Paul: nothing settling to watch on day 1), at the game's own PreRunDays;
   // these worlds settle for QUICK_DAYS only, so this allows them more.
   ok(drift < 0.25, `the water's extent moves little in the first 4 days (most: ${(100 * drift).toFixed(1)}%)`);
@@ -264,8 +269,8 @@ function landPieces(AS, W) {
 // ---- Sight crosses water, and paths go around it ----
 {
   // A bare 40 x 20 world with a wall of water at x = 20 except a gap at the bottom, deeper
-  // than anything wades (Water off: no rules to move it).
-  const { AS, sim, W, K } = make(1, [set('WorldWidth', 40), set('WorldHeight', 20), set('StartGrass', 0), set('StartBunnies', 0), set('StartWolves', 0), set('Water', 'off')]);
+  // than anything wades (Water off: no rules to move it); these wolves can't swim.
+  const { AS, sim, W, K } = make(1, [set('WorldWidth', 40), set('WorldHeight', 20), set('StartGrass', 0), set('StartBunnies', 0), set('StartWolves', 0), set('Water', 'off'), ['species', 'SwimCost', 'Wolf', '']]);
   const DEEP = 1 + Math.max(...AS.SPECIES_KEY.map(k => sim.T[k].WadeDepth || 0));
   for (let y = 0; y < 15; y++) W.addWater(W.tile(20, y), DEEP);
   const a = W.tile(12, 5), b = W.tile(28, 5);
@@ -307,7 +312,7 @@ function landPieces(AS, W) {
     if (W.wDepth[W.aTile[wolf]] > 0) onWater++;
     if (W.aTargetTile[wolf] >= 0) hunted = true;
   }
-  ok(hunted && onWater === 0, 'a wolf that sees a bunny across deep water hunts it and never enters the water');
+  ok(hunted && onWater === 0, 'a wolf that can\'t swim sees a bunny across deep water, hunts it and never enters the water');
 }
 
 // ---- Grass likes water ----
@@ -391,6 +396,53 @@ function landPieces(AS, W) {
   ok(Math.abs(W.aStepDur[wolf] - dryDur / T.wolf.WadeSpeed) < 1e-9, `a step into water takes 1 / WadeSpeed as long (${W.aStepDur[wolf].toFixed(3)} s)`);
   W.aStepLeft[wolf] = 0;
   ok(AS.stepTo(sim, wolf, across) && W.kind[W.tile(20, 6)] === AS.KIND.WATER, 'and out the other side, leaving water behind it');
+}
+
+// ---- Swimming: wolves well, bunnies badly; Stamina runs out, then they drown ----
+{
+  const world = (w, h, edits = []) => make(1, [set('WorldWidth', w), set('WorldHeight', h), set('StartGrass', 0), set('StartBunnies', 0), set('StartWolves', 0), set('Water', 'off'), ...edits]);
+  // A river across the map, deeper than anything wades, no ford; a carcass across it.
+  const river = stamina => {
+    const env = world(40, 12, [['species', 'CorpseDecay', 'Bunny', '100']]);
+    const { AS, sim, W, T } = env;
+    const DEEP = 1 + T.human.WadeDepth;
+    for (let y = 0; y < W.h; y++) for (const x of [20, 21, 22]) W.addWater(W.tile(x, y), DEEP);
+    W.addCorpse(W.tile(25, 6), AS.SPECIES.BUNNY, 0);
+    const wolf = AS.spawnStarting(sim, AS.SPECIES.WOLF, W.tile(18, 6));
+    W.aFullness[wolf] = 10; W.aStamina[wolf] = stamina * T.wolf.StaminaMax;
+    const full0 = W.aFullness[wolf];
+    let swam = false, lowest = W.aStamina[wolf], fed = false, wentInWith = Infinity, before = W.aStamina[wolf], wasDeep = false;
+    for (let i = 0; i < 30 * AS.TICK_HZ && !fed; i++) {
+      sim.tick();
+      const deep = W.wDepth[W.aTile[wolf]] > T.wolf.WadeDepth;
+      if (deep) { swam = true; lowest = Math.min(lowest, W.aStamina[wolf]); }
+      if (deep && !wasDeep) wentInWith = Math.min(wentInWith, before);
+      wasDeep = deep; before = W.aStamina[wolf];
+      fed = W.aFullness[wolf] > full0;
+    }
+    return { swam, fed, lowest, wentInWith, T };
+  };
+  const a = river(1);
+  ok(a.swam && a.fed && a.lowest < a.T.wolf.StaminaMax, `a rested wolf swims a river to a carcass across it (Stamina down to ${a.lowest.toFixed(0)})`);
+  const b = river((a.T.wolf.SwimAt + a.T.wolf.RestBelow) / 2), need = a.T.wolf.SwimAt * a.T.wolf.StaminaMax;
+  ok(b.fed && b.wentInWith >= need - 1e-9, `one short of SwimAt waits on the bank until it has it, then swims (went in with ${b.wentInWith.toFixed(1)}, SwimAt ${need})`);
+  // A world all deep water, no land anywhere: each swims until its Stamina is gone, then drowns.
+  const { AS, sim, W, T } = world(30, 20);
+  for (let t = 0; t < W.n; t++) W.addWater(t, 1 + T.human.WadeDepth);
+  const bun = AS.spawnStarting(sim, AS.SPECIES.BUNNY, W.tile(10, 10)), wolf = AS.spawnStarting(sim, AS.SPECIES.WOLF, W.tile(20, 10));
+  const bunSer = W.aSerial[bun], wolfSer = W.aSerial[wolf];
+  const alive = (s, ser) => W.aAlive[s] && W.aSerial[s] === ser;
+  let bunAt = -1, wolfAt = -1;
+  for (let i = 0; i < 120 * AS.TICK_HZ && (bunAt < 0 || wolfAt < 0); i++) {
+    sim.tick();
+    if (bunAt < 0 && !alive(bun, bunSer)) bunAt = i / AS.TICK_HZ;
+    if (wolfAt < 0 && !alive(wolf, wolfSer)) wolfAt = i / AS.TICK_HZ;
+  }
+  const lasts = S => S.StaminaMax / S.SwimCost + S.HPMax / S.DrownDamage;
+  ok(bunAt > 0 && Math.abs(bunAt - lasts(T.bunny)) < 1, `a bunny in deep water drowns once its Stamina and then HP run out (${bunAt.toFixed(1)} s)`);
+  ok(wolfAt > bunAt && Math.abs(wolfAt - lasts(T.wolf)) < 1, `a wolf lasts far longer (${wolfAt.toFixed(1)} s)`);
+  ok(W.cCount === 0, 'drowned animals leave no body');
+  ok(T.bunny.SwimAt == null, 'a bunny never takes to deep water by choice (no SwimAt): only to flee');
 }
 
 // ---- Drinking takes real water: WaterLiters a meter, from the tile it drinks ----

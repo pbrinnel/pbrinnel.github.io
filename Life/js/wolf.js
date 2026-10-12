@@ -73,7 +73,8 @@
   // Matchers, goals and costs are created once and read these instead of closing over a call.
   // mSkip: the serial of the target this animal is ignoring (0 = none; see forget).
   // mWade: how deep this animal wades (animals.js wadeOf).
-  let mInvWade = 0;   // seconds a step into water it wades takes
+  let mInvWade = 0, mInvSwim = 0;   // seconds a step into water it wades, or swims, takes
+  let mSwim = false;                // it would swim now (animals.js swimsNow)
   let mSim = null, mW = null, mSelf = 0, mGoal = 0, mFrom = 0, mInvSpeed = 0, mSkip = 0, mWade = 0;
   // The species this animal hunts and the carcasses it eats, as AS.relations bitmasks.
   let mPrey = 0, mEats = 0;
@@ -106,29 +107,29 @@
 
   // Where a hunter can step: open ground, water it wades, or a blade it chews away first;
   // never a hole.
-  const canWalk = t => (AS.canStand(mW, t, mWade) || mW.kind[t] === K.GRASS) && !mW.hole[t];
+  const canWalk = t => (AS.canStand(mW, t, mWade) || mW.kind[t] === K.GRASS || (mSwim && mW.kind[t] === K.WATER)) && !mW.hole[t];
   // One step toward a goal the path search can't reach, going around what's in the way
   // (AS.edgeStep). Returns false once it gives up.
   function goAround(sim, s, goal, key) {
-    mW = sim.W; mWade = AS.wadeOf(sim, s);
+    mW = sim.W; mWade = AS.wadeOf(sim, s); mSwim = AS.swimsNow(sim, s);
     const next = AS.edgeStep(sim, s, goal, key, canWalk);
     if (next < 0) return false;
     AS.chewOrStep(sim, s, next);
     return true;
   }
-  // Grass costs its bites on top of the step, and water it wades its slower steps; anything
-  // else that occupies a tile can't be entered.
+  // Grass costs its bites on top of the step, and water its slower steps (wading, or swimming
+  // when it would swim now); anything else that occupies a tile can't be entered.
   const cost = t => {
     const k = mW.kind[t];
     if (k === K.EMPTY) return mW.hole[t] ? Infinity : mInvSpeed;   // a hole is a wall to wolves
     if (k === K.GRASS) return mInvSpeed + AS.chewSeconds(mSim, mSelf, t);
-    if (k === K.WATER && mW.wDepth[t] <= mWade) return mInvWade;
+    if (k === K.WATER) return mW.wDepth[t] <= mWade ? mInvWade : mSwim ? mInvSwim : Infinity;
     return Infinity;
   };
   // A tile the wolf can bite its goal from: touching the goal tile, and either where it
   // stands or one it can occupy once any blade on it is chewed away.
   const touchesGoal = t => {
-    if (t !== mFrom && (!(AS.canStand(mW, t, mWade) || mW.kind[t] === K.GRASS) || mW.hole[t])) return false;
+    if (t !== mFrom && !canWalk(t)) return false;
     const w = mW.w, dx = (t % w) - (mGoal % w), dy = ((t / w) | 0) - ((mGoal / w) | 0);
     return dx * dx + dy * dy === 1;
   };
@@ -167,9 +168,10 @@
     const W = sim.W;
     mSim = sim; mW = W; mSelf = s; mGoal = goalTile; mFrom = W.aTile[s];
     mInvSpeed = 1 / AS.speedOf(sim, s);
-    mWade = AS.wadeOf(sim, s);
-    const ws = AS.speciesStats(sim, s).WadeSpeed;
-    mInvWade = ws > 0 ? mInvSpeed / ws : mInvSpeed;
+    mWade = AS.wadeOf(sim, s); mSwim = AS.swimsNow(sim, s);
+    const S = AS.speciesStats(sim, s);
+    mInvWade = S.WadeSpeed > 0 ? mInvSpeed / S.WadeSpeed : mInvSpeed;
+    mInvSwim = S.SwimSpeed > 0 ? mInvSpeed / S.SwimSpeed : mInvSpeed;
     const next = AS.pathNextWeighted(sim, mFrom, exact ? isGoalTile : touchesGoal, AS.speciesStats(sim, s).VisionRange, cost);
     if (next < 0) return false;
     AS.edgeReset(W, s);   // a path again: any going-around is over

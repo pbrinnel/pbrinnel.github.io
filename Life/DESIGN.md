@@ -88,9 +88,14 @@ watching the sim run. Everything else in this doc is decided.
   so day 0 is already at rest. Depth is the
   truth: any water makes a tile water. Rising water drowns grass, floods warren holes, puts
   out scorched ground and washes corpses away (an animal that dies in water leaves no body);
-  animals **wade** water up to their `WadeDepth`, at `WadeSpeed`, and deeper water is a wall
-  (Paul: no fords; land cut off by deep water stays cut off); an animal the water rises over
-  walks out before doing anything else. **Drinking takes real water**: `WaterLiters` fill a
+  animals **wade** water up to their `WadeDepth`, at `WadeSpeed` (Paul: no fords). Deeper
+  water they **swim** (Paul, 12 Oct 2026: wolves swim well and rabbits badly, as they do):
+  it costs `SwimCost` Stamina a second (no sprinting, no refill) at `SwimSpeed`, and with
+  none left `DrownDamage` HP a second. A species with `SwimAt` (wolves, humans) goes in by
+  choice with at least that share of its Stamina, so a rested wolf crosses a river after a
+  bunny or to a carcass; one without (rabbits) goes in only to flee, and lasts seconds.
+  Once in, an animal carries on while its Stamina is above `RestBelow`, then makes for the
+  nearest land; one the water rises over, or with nowhere to go, walks out first. **Drinking takes real water**: `WaterLiters` fill a
   meter, taken from the tile drunk from (tiny against a lake; a puddle can be drunk dry), and
   a wading animal drinks where it stands. The bare beach moves with the shore. WATER MODE
   (PAINT) pours 1 m onto every tile of the brush, into the same rules, and it flows from

@@ -14,8 +14,12 @@ ThirstRate,per s,1.1,0.567,0.833,,Water lost per second walking; bunny empty in 
 ThirstyAt,% of WaterMax,50,50,50,,Below this an animal looks for water, but only if it knows where some is (WaterSense)
 DrinkRate,per s,25,25,25,,Water gained per second while drinking at the shore; it drinks until the meter is full
 WaterLiters,L,0.5,5,4,,Liters of water that fill an empty meter: drinking takes this much (in proportion) out of the tile it drinks from; blank = drinking takes nothing
-WadeDepth,m,0.1,0.5,0.8,,Deepest water an animal walks into; deeper water is a wall to it and one caught in deeper water walks out first; blank = never wades
+WadeDepth,m,0.1,0.5,0.8,,Deepest water an animal walks into; deeper it must swim (SwimCost); blank = never wades
 WadeSpeed,% of speed,50%,60%,60%,,How fast an animal moves in water it wades as a share of its speed on land; blank = no slower
+SwimCost,per s,20,2,4,,Stamina spent each second in water deeper than WadeDepth (no sprinting and no refill there); wolves swim well and rabbits badly; blank = never swims (deep water is a wall)
+SwimSpeed,% of speed,30%,40%,40%,,How fast it swims as a share of its speed on land
+SwimAt,% of StaminaMax,,50,50,,Takes to deep water by choice only with at least this much Stamina; blank = only to flee; any swimmer makes for land once its Stamina falls to RestBelow
+DrownDamage,HP per s,10,10,10,,HP lost each second in deep water with no Stamina left
 ThirstDamage,HP per s,1,0.4,0.4,,HP lost while Water = 0 (on top of any starving)
 WaterSense,tiles,200,200,200,,How far, walking, an animal knows its way to water without seeing it: its knowledge of its land (big enough to always know the nearest)
 HPMax,points,20,60,80,,
