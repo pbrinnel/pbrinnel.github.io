@@ -25,6 +25,9 @@ direction is clear.
 - **Swimming looks** (12 Oct 2026): picked from a mockup of four options (low in the water,
   head and back, each with or without a ring): head and back, with a short wake, sinking
   to the eyes when drowning, wading feet hidden.
+- **Wolf color** (12 Oct 2026): the blue-gray wolves were hard to see near water. Paul
+  picked a neutral gray from a mockup (gray, charcoal, timber, arctic, red wolf, and the
+  blue-gray outlined), judged on the fully zoomed-out view.
 - **Locate rings**: a first try was a one-off fade, which Paul swapped for a steady toggle.
 
 ### Controls

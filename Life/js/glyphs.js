@@ -3,7 +3,7 @@
 // far view (render.js) now draw everything, keyed by these ids and colors.
 //
 // Palette: black ground, a few calm muted hues. Grass is the three greens (a sprout is the
-// darkest so a young meadow recedes), bunnies a warm tan, wolves a gray-blue, humans a tunic brown (male) or green (female), a corpse
+// darkest so a young meadow recedes), bunnies a warm tan, wolves a neutral gray, humans a tunic brown (male) or green (female), a corpse
 // bone. Sex is two shades of the species color; elders are the same hue dimmed. No pure
 // saturated primaries.
 (function (AS) {
@@ -12,7 +12,8 @@
   const BACKGROUND = '#0a0c0a';
   const GRASS_COLORS = ['#2f5a33', '#4a8a4a', '#7fc06a'];   // sprout, middle, full
   const BUNNY_MALE = '#b98f58', BUNNY_FEMALE = '#dcb888';
-  const WOLF_MALE = '#6f86a3', WOLF_FEMALE = '#98adc8';
+  // Gray, as most wolves are, with no blue in it: water is the map's blue (Paul, 12 Oct 2026).
+  const WOLF_MALE = '#8b8a85', WOLF_FEMALE = '#b9b7b0';
   // Hunters: skin and tunic in one color a tile can carry, a warm ochre-brown (the sprite adds its own skin).
   const HUMAN_MALE = '#8c6a40', HUMAN_FEMALE = '#6f8f56';
   const CORPSE_COLOR = '#cfc6ac';

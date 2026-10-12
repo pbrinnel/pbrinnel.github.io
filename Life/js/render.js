@@ -40,7 +40,7 @@
     return abgr('#' + c.map(v => Math.round(f <= 1 ? v * f : v + (255 - v) * (f - 1))).map(v => Math.min(255, v).toString(16).padStart(2, '0')).join(''));
   });
   // Humans are a bright pink-violet no other species or ground uses, so a hunter stands out from far away.
-  const FAR_ANIMAL = [['#e0a868', '#f2cc96'], ['#8fb2e0', '#c0d6f2'], ['#e08fd8', '#f0b8ea']].map(r => r.map(abgr));   // [species][sex]
+  const FAR_ANIMAL = [['#e0a868', '#f2cc96'], ['#b4b2ab', '#dcdad2'], ['#e08fd8', '#f0b8ea']].map(r => r.map(abgr));   // [species][sex]
 
   // Scorched ground (a nuke's crater, W.scorch): a charcoal brown over the normal ground,
   // fading back to nothing as the tile's timer runs out. The far view mixes the same two

@@ -302,6 +302,8 @@ last only as long as their lives.
   way they last stepped sideways.
 - **Life stage and sex on the map:** babies are drawn smaller and elders in a dimmer
   color; males and females are two shades of their species color.
+- **Wolves are gray** (12 Oct 2026), up close and in the far view, so they never share a hue
+  with water. The graph and the map's location rings keep the wolves' blue.
 - **Animals move like animals.** Bunnies stretch and hop a pixel mid-step; wolves stride
   and bob a pixel. Standing animals now and then flick an ear or wag the tail, each on
   its own timer so they never move in unison. Frames change with movement, at walking

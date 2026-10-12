@@ -415,7 +415,7 @@ never flash: see DESIGN.md, Photosensitivity.
 ## Colors
 
 - **Map:** glyphs.js palette (black ground, greens for grass by size, tan bunnies,
-  gray-blue wolves, bone corpses; sexes two shades, elders dimmer) is the base for the
+  gray wolves, bone corpses; sexes two shades, elders dimmer) is the base for the
   sprites (sprites.js). The zoomed-out far view has its own brighter colors in render.js.
 - **Charts** (graph panel, lab): grass `#199e70`, bunnies `#d95926`, wolves `#3987e5`, humans `#c763b3`.
   Validated as a set for color-blind readers on the `#0a0c0a` background (the map's own
