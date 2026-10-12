@@ -5,9 +5,11 @@ const { stage, tally, quiet, editCSV, at, tick, secs, stateName } = require('./k
 const { ok, done } = tally();
 const near = (a, b, tol) => Math.abs(a - b) <= tol;
 
-// Blades stay as placed: no seeding muddying a short test.
+// Blades stay as placed and bunnies don't dig unless a test asks: a blade sprouting beside a
+// test's bunny would block it, and a bunny stopping to dig would stand still, by the luck of
+// the draw.
 function make(size, seed = 1, edit) {
-  const r = stage({ size, seed, species: [quiet.seeding], events: true, edit });
+  const r = stage({ size, seed, species: [quiet.seeding, [['SproutChance', 'Grass', '0%']], quiet.digging], events: true, edit });
   return { ...r, B: r.T.bunny };
 }
 
@@ -351,6 +353,9 @@ function wolf(AS, sim, x, y) {
     tx.species = editCSV(tx.species, 'StaminaRefill', 'Bunny', '0');
     tx.species = editCSV(tx.species, 'DigChance', 'Bunny', '0%');
     tx.species = editCSV(tx.species, 'LeaveChance', 'Bunny', '100%');
+    // It rolls to leave at the end of each wander run: one-tile runs keep it in the crowd
+    // for those rolls, rather than a long first run carrying it out by the luck of the draw.
+    tx.species = editCSV(tx.species, 'WanderRun', 'Bunny', '1-1');
   });
   // Young (no mating), and the crowd is out of Stamina, so it rests where it is.
   for (let y = 40; y < 60; y++) for (let x = 5; x < 13; x++) bunny(AS, sim, x, y, { stamina: 0, age: 1 });
