@@ -120,6 +120,11 @@
 
       // How deep the water on a tile is, in meters (0 on land). Any depth makes the tile water.
       wDepth: new Float32Array(n),
+      // Water in the soil, in meters of water (room for it: SoilDepth × AS.SOIL_POROSITY), as the water
+      // rules left it before day 0 (water.js). Still during play, for now.
+      wSoil: new Float32Array(n),
+      // River mouths: 1 where water leaves the map (terrain.js), or null in a world without water.
+      outlet: null,
 
       // Height of the ground in meters (0 to settings.csv Relief), laid once at world build
       // by terrain.js. Lakes and rivers are where it holds and drains water.

@@ -1,7 +1,7 @@
 // The minimap (Paul, 11 Oct 2026): the whole world, always fully zoomed out, in a small window
 // with a box on what the screen shows. Click or drag on it to move the view there. Animals of
-// the kinds whose rings are on (the Show/Hide tab's counts) show as dots in their ring color,
-// so a few last wolves are easy to find. The Show/Hide tab's Minimap button opens and closes
+// the kinds whose rings are on (the Info tab's counts) show as dots in their ring color,
+// so a few last wolves are easy to find. The Info tab's Minimap button opens and closes
 // it; +/− switches small (MINI_SMALL tiles per pixel) and big (one tile per pixel). Both
 // choices are kept per viewer.
 //
@@ -45,6 +45,7 @@
     const canvas = el('canvas', 'mini-canvas');
     panel.append(head, canvas);
     const ctx = canvas.getContext('2d');
+    if (AS.Draggable) { AS.Draggable(panel, head, 'life-minimap-pos'); head.title = 'Drag to move; double-click to put it back'; }
     // Gestures on the panel are the panel's; the map under it never sees them.
     for (const t of ['pointerdown', 'pointerup', 'wheel']) panel.addEventListener(t, e => e.stopPropagation());
 

@@ -47,23 +47,24 @@ const btns = (ids) => ids.hud.all(e => e.className === 'hud-speeds')[0].children
 let n = 0; const ok = m => console.log('ok', ++n, m);
 const input = { speedIndex: 1, achieved: 1, day: 3.24, seed: 1234567, counts: { bunnies: 0, wolves: 0, humans: 0, total: 0, blades: 23999, corpses: 1234567 } };
 
-{ const { ui, ids } = build(false);
+{ const { ui, ids } = build(true);   // with ?debug, so the seed (Debug tab) is on the page
   ui.hud(input); const w = writes; ui.hud(input);
   assert.strictEqual(writes, w); ok('second identical hud() writes nothing');
   const txt = ids.hud.textContent;
   assert(txt.includes('23,999') && txt.includes('1,234,567')); ok('thousands separators');
   assert(txt.includes('Day 3.2') && txt.includes('Seed 1234567')); ok('day and seed');
   const b = btns(ids); assert.strictEqual(b.length, 6);
-  assert.deepStrictEqual(b.map(x => x.textContent), ['Pause', '1×', '2×', '5×', '20×', 'Max']); ok('speed labels');
+  assert.deepStrictEqual(b.map(x => x._title || x.title), ['Pause', '1×', '2×', '5×', '20×', 'Max']); ok('speed labels (icons, named in their titles)');
   assert(b[1].classList.contains('on') && !b[0].classList.contains('on')); ok('active highlighted');
-  assert(!ids.hud.textContent.includes('running')); ok('no "running" at full speed');
   ui.hud({ ...input, speedIndex: 4, achieved: 14.2 });
-  assert(ids.hud.textContent.includes('running 14×')); ok('running 14×');
-  ui.hud({ ...input, speedIndex: 4, achieved: 19 });
-  assert(!ids.hud.textContent.includes('running')); ok('within 90% hides running');
+  assert(ids.hud.textContent.includes('20× (14×)')); ok('a speed shows what it is keeping');
+  ui.hud({ ...input, speedIndex: 2, achieved: 1.96 });
+  assert(ids.hud.textContent.includes('2× (2×)')); ok('one decimal under ten');
+  ui.hud({ ...input, speedIndex: 0, achieved: 0 });
+  assert(ids.hud.textContent.includes('Pause') && !ids.hud.textContent.includes('Pause (')); ok('paused shows no figure');
   ui.hud({ ...input, speedIndex: 5, achieved: 312.4 });
   assert(ids.hud.textContent.includes('Max (312×)')); ok('Max shows achieved multiple');
-  assert(!btns(ids).length || ids.hud.all(e => e.className.split(' ').includes('hud-tool')).length === 0); ok('no debug tools when debug false');
+  { const plain = build(false).ids; assert(plain.hud.all(e => e.className.split(' ').includes('hud-tool')).length === 0); } ok('no debug tools when debug false');
 }
 { const { ui, ids, doc, calls } = build(false);
   const b = btns(ids); b[3].fire('click'); b[0].fire('click');
@@ -146,7 +147,7 @@ const input = { speedIndex: 1, achieved: 1, day: 3.24, seed: 1234567, counts: { 
   assert.deepStrictEqual(calls, [2, 'bench', 3]); assert.deepStrictEqual(tools, ['corpse-bunny']); assert(!bench.disabled && btns(ids).every(b => !b.disabled)); ok('lock(false) restores everything');
 }
 { const { ids } = build(false);
-  assert.strictEqual(ids.hud.all(e => e.className === 'hud-bench').length, 1); ok('Benchmark button also shown without ?debug');
+  assert.strictEqual(ids.hud.all(e => e.className === 'hud-bench').length, 0); ok('Benchmark button hidden without ?debug (Paul, 12 Oct 2026)');
 }
 { const { ui, ids, calls } = build(false);
   const g = ids.hud.all(e => e.className.split(' ').includes('hud-graph'))[0];
@@ -160,7 +161,7 @@ const input = { speedIndex: 1, achieved: 1, day: 3.24, seed: 1234567, counts: { 
 }
 { const { ids, calls } = build(false, { onLines: on => calls.push('lines:' + on) });
   const l = ids.hud.all(e => e.className.split(' ').includes('hud-lines'))[0];
-  assert(l && l.textContent === 'Lines'); assert(!l.classList.contains('on')); ok('Lines button starts off when lines is not set');
+  assert(l && l.textContent === 'Intent lines'); assert(!l.classList.contains('on')); ok('Intent lines button starts off when lines is not set');
   l.fire('click'); assert(l.classList.contains('on')); l.fire('click'); assert(!l.classList.contains('on'));
   assert.deepStrictEqual(calls, ['lines:true', 'lines:false']); ok('Lines button toggles and reports its state');
 }
@@ -168,7 +169,7 @@ const input = { speedIndex: 1, achieved: 1, day: 3.24, seed: 1234567, counts: { 
   const l = ids.hud.all(e => e.className.split(' ').includes('hud-lines'))[0];
   assert(l.classList.contains('on')); ok('Lines button starts on when the saved choice is on');
 }
-{ const calls = []; const { ids, ui } = build(false, { onWater: on => calls.push('water:' + on) });
+{ const calls = []; const { ids, ui } = build(true, { onWater: on => calls.push('water:' + on) });
   const w = ids.hud.all(e => e.className.split(' ').includes('hud-water'))[0];
   assert(w && w.textContent === 'Water'); assert(!w.classList.contains('on')); ok('Water button starts off when water is not set');
   assert(/new world/i.test(w._title)); ok('Water button says it starts a new world');
@@ -176,7 +177,7 @@ const input = { speedIndex: 1, achieved: 1, day: 3.24, seed: 1234567, counts: { 
   assert.deepStrictEqual(calls, ['water:true', 'water:false']); ok('Water button toggles and reports its state (main.js starts the new world and remembers it)');
   ui.lock(true); w.fire('click'); assert(calls.length === 2); ui.lock(false); ok('Water button does nothing while locked');
 }
-{ const { ids } = build(false, { onWater() {}, water: true });
+{ const { ids } = build(true, { onWater() {}, water: true });
   const w = ids.hud.all(e => e.className.split(' ').includes('hud-water'))[0];
   assert(w.classList.contains('on')); ok('Water button starts on when the saved choice is on');
 }
@@ -188,26 +189,28 @@ const stripOf = ids => ids.hud.all(e => e.className === 'hud-tabstrip')[0];
 { const { ids } = build(false);
   const bar = ids.hud.all(e => e.className === 'hud-strip')[0];
   const barText = bar.children.map(c => c.className).join('|');
-  for (const c of ['hud-speeds', 'hud-status', 'hud-day', 'hud-tabs', 'hud-hide']) assert(barText.includes(c), c);
+  for (const c of ['hud-speeds', 'hud-speedname', 'hud-day', 'hud-tabs', 'hud-hide']) assert(barText.includes(c), c);
   assert(!bar.all(e => e.className.includes('hud-count') || e.className.includes('hud-lines') || e.className.includes('hud-nuke')).length); ok('the bar holds speeds, day, tabs and Hide UI, none of the tab contents');
-  assert.deepStrictEqual(ids.hud.all(e => e.className.split(' ').includes('hud-tab')).map(b => b.textContent), ['Show/Hide', 'Create/Destroy', 'Debug']); ok('three tabs: Show/Hide, Create/Destroy, Debug');
+  assert.deepStrictEqual(ids.hud.all(e => e.className.split(' ').includes('hud-tab')).map(b => b.textContent), ['Info', 'PAINT']); ok('two tabs: Info, PAINT (Debug only with ?debug)');
+  assert.deepStrictEqual(build(true).ids.hud.all(e => e.className.split(' ').includes('hud-tab')).map(b => b.textContent), ['Info', 'PAINT', 'Debug']); ok('with ?debug a third: Debug');
+  assert(!ids.hud.all(e => e.className.split(' ').includes('hud-water')).length && !ids.hud.textContent.includes('Benchmark')); ok('without ?debug, no Water or Benchmark on the page');
   assert.strictEqual(ids.hud.all(e => e.className.includes('hud-hide'))[0].textContent, 'Hide UI'); ok('a Hide UI button');
 }
-{ const { ui, ids } = build(false, { onLines() {} });
+{ const { ui, ids } = build(true, { onLines() {} });
   assert.strictEqual(ui.tab, 'info'); assert(!stripOf(ids).hidden && !panelOf(ids, 'info').hidden && panelOf(ids, 'debug').hidden && panelOf(ids, 'god').hidden); ok('Info is open by default');
   assert(panelOf(ids, 'info').textContent.includes('Graph') && panelOf(ids, 'info').all(e => e.className === "hud-glyph").length === 6); ok('Info holds the six counts (humans and the Total included) and the Graph button');
-  assert(panelOf(ids, 'debug').all(e => e.className.includes('hud-lines')).length === 1 && panelOf(ids, 'debug').textContent.includes('Benchmark') && panelOf(ids, 'debug').textContent.includes('Seed')); ok('Debug holds Lines, Benchmark and the Seed');
-  assert(panelOf(ids, 'god').textContent.includes('NUKE MODE')); ok('God holds NUKE MODE');
+  assert(panelOf(ids, 'info').all(e => e.className.includes('hud-lines')).length === 1 && panelOf(ids, 'debug').textContent.includes('Benchmark') && panelOf(ids, 'debug').textContent.includes('Seed')); ok('Info holds Intent lines; Debug holds Benchmark and the Seed');
+  assert(panelOf(ids, 'god').textContent.includes('NUKE MODE')); ok('PAINT holds NUKE MODE');
 }
 { const tabs = [];
-  const { ui, ids } = build(false, { tab: null, onTab: n => tabs.push(n) });
+  const { ui, ids } = build(true, { tab: null, onTab: n => tabs.push(n) });
   assert(stripOf(ids).hidden && ui.tab === null && tabs.length === 0); ok('tab: null starts closed, and the starting tab is not reported');
   tabBtn(ids, 'Debug').fire('click');
   assert(!stripOf(ids).hidden && !panelOf(ids, 'debug').hidden && panelOf(ids, 'info').hidden && tabBtn(ids, 'Debug').classList.contains('on')); ok('clicking a tab opens its strip');
-  tabBtn(ids, 'Create/Destroy').fire('click');
-  assert(panelOf(ids, 'debug').hidden && !panelOf(ids, 'god').hidden && !tabBtn(ids, 'Debug').classList.contains('on') && tabBtn(ids, 'Create/Destroy').classList.contains('on')); ok('only one tab is open at a time');
-  tabBtn(ids, 'Create/Destroy').fire('click');
-  assert(stripOf(ids).hidden && ui.tab === null && !tabBtn(ids, 'Create/Destroy').classList.contains('on')); ok('clicking the open tab closes the strip');
+  tabBtn(ids, 'PAINT').fire('click');
+  assert(panelOf(ids, 'debug').hidden && !panelOf(ids, 'god').hidden && !tabBtn(ids, 'Debug').classList.contains('on') && tabBtn(ids, 'PAINT').classList.contains('on')); ok('only one tab is open at a time');
+  tabBtn(ids, 'PAINT').fire('click');
+  assert(stripOf(ids).hidden && ui.tab === null && !tabBtn(ids, 'PAINT').classList.contains('on')); ok('clicking the open tab closes the strip');
   assert.deepStrictEqual(tabs, ['debug', 'god', null]); ok('onTab reports each change (for remembering it)');
 }
 { const { ui, ids } = build(false, { tab: 'god' });

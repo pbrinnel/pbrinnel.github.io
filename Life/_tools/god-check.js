@@ -1,5 +1,5 @@
 'use strict';
-// The Create/Destroy tab's nuke (js/god.js): everything within NukeRadius goes (animals with no corpse
+// The PAINT tab's nuke (js/god.js): everything within NukeRadius goes (animals with no corpse
 // and no event, blades, corpses, holes) and nothing outside it; the grid and stores still
 // audit; the ground is scorched, longest at the center; nothing grows or is dug on it until
 // it cools, and then grass can return.
@@ -10,7 +10,7 @@ function ok(c, m) { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) bad++; }
 const RADIUS = 20, DAYS = 8;
 const { AS, texts } = load();
 let s = texts.settings;
-for (const [k, v] of [['WorldWidth', '150'], ['WorldHeight', '100'], ['NukeRadius', String(RADIUS)], ['ScorchDays', String(DAYS)], ['Rain', '0%'], ['RiverDrain', '0']]) s = editCSV(s, k, 'Value', v);
+for (const [k, v] of [['WorldWidth', '150'], ['WorldHeight', '100'], ['NukeRadius', String(RADIUS)], ['ScorchDays', String(DAYS)], ['Rain', '0']]) s = editCSV(s, k, 'Value', v);
 texts.settings = s;
 texts.species = editCSV(texts.species, 'DigChance', 'Bunny', '100%');   // bunnies dig whenever they may
 const { T, errors } = AS.parseTables(texts);
@@ -198,7 +198,7 @@ W.scorch[t0] = 0;
 {
   const { AS: A6, texts: t6 } = load();
   let s6 = t6.settings;
-  for (const [k, v] of [['WorldWidth', '80'], ['WorldHeight', '60'], ['StartGrass', '0%'], ['StartBunnies', '0'], ['StartWolves', '0'], ['Rain', '0%'], ['RiverDrain', '0']]) s6 = editCSV(s6, k, 'Value', v);
+  for (const [k, v] of [['WorldWidth', '80'], ['WorldHeight', '60'], ['StartGrass', '0%'], ['StartBunnies', '0'], ['StartWolves', '0'], ['Rain', '0']]) s6 = editCSV(s6, k, 'Value', v);
   t6.settings = s6;
   const { T: T6 } = A6.parseTables(t6);
   const sim6 = A6.Sim(T6, 3), W6 = sim6.W, K6 = A6.KIND;

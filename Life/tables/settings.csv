@@ -7,22 +7,30 @@ StartGrass,30%,Meadows: share of the world that is meadow (most of it starts as 
 StartGrassAge,0,Scatter only: every starting blade is a sprout at this Age in days (0 = a new sprout at SproutSize); Meadows ages blades by how deep in the meadow they are
 StartLayout,Meadows,Meadows = meadows with open ground between, bunnies in colonies at meadow edges, wolves in packs in the open; Scatter = everything at random
 Water,on,Meadows only: on = lakes and rivers settle on the ground (and beaches and thirst); off = no water anywhere and no thirst. The Debug tab's Water button overrides this for the page and starts a new world
-Relief,60-140,Meters from the lowest ground to the highest (the topo lines are drawn every few meters of it) (a range: each world draws its own value from it)
-Hilliness,70-160,Tiles; roughly how wide hills and valleys are (a range: each world draws its own value from it)
-Roughness,0.4-0.6,0-1; how much small bumps ride on the big hills (0.3 = smooth and rolling; 0.7 = rugged) (a range: each world draws its own value from it)
-Bowls,5-13,Broad dips pressed into the ground; with Water on most hold a lake (a range: each world draws its own value from it)
-LakeDepth,2-5,Meters; a hollow shallower than this (floor to brim) stays dry (a range: each world draws its own value from it)
-Rain,25%-45%,"Water on only: how full each hollow gets, from its floor (0%) to the brim where it would spill (100%); 0% = no lakes (a range: each world draws its own value from it)"
-RiverDrain,150-500,Water on only: tiles of ground that must drain through a spot before it runs as a river (twice as wide past four times this); 0 = no rivers (a range: each world draws its own value from it)
-BridgeEvery,25,Tiles; a river is crossed by a land bridge (a ford) about this often along its length
+Relief,60-140,Meters from the lowest ground to the highest (a range: each world draws its own value from it)
+Hilliness,70-160,Tiles; how broad the ranges are that rise fastest while the ground grows (a range: each world draws its own)
+Roughness,0.4-0.6,0-1; how much smaller bumps ride on those ranges (a range: each world draws its own)
+Bowls,5-13,Lake basins pressed into the grown ground (as glaciers scoop them); water settles in them by the water rules (a range: each world draws its own)
+Rain,1-2,"Water on: mm of rain a day, on every tile (a range: each world draws its own); 0 = no water at all"
+Evaporation,6,mm a day from standing water
+Transpiration,3,"mm a day plants draw from full soil, less as it dries"
+SoilDepth,2,Meters of soil over the bedrock; 30% of it is room for water
+Infiltration,100,mm a day the soil can soak up
+SoilFlow,20,"m a day water seeps through full soil (Darcy), toward a lower water table"
+SurfaceFlow,30,"How easily surface water runs (1 / Manning's n): speed = this × depth^(2/3) × √slope, m/s"
+PreRunDays,120,Days the water rules run before day 0 so a world starts settled
+GrowRounds,800,Rounds of lifting and river cutting that grow the ground before day 0 (more: deeper-cut valleys; slower to make)
+RiverCut,0.04,How hard rivers cut while the ground grows (stream power)
+HillSoften,0.02,How much slopes soften each round while the ground grows (0-0.25)
+RiverMouths,3-6,Places on the map's edge where water leaves; valleys gather into rivers that run to them (a range: each world draws its own)
 MeadowSize,48,Tiles; roughly how wide the largest meadows are
 BunnyColonies,13,Meadows only: how many colonies the starting bunnies live in
 WolfPacks,7,Meadows only: how many packs the starting wolves run in
 HolesPerColony,6,Meadows only: warren holes dug at each colony before its bunnies settle; Scatter has none
 WarrenRadius,4,A new hole is dug only within this many tiles of an existing hole (unless no hole is within HoleRange)
 CollapseDays,10,A hole no bunny has stood on for this long collapses into bare ground
-NukeRadius,75,Create/Destroy tab: the default radius of the nuke (the Radius slider overrides it; 0-100); a nuke destroys everything within this many tiles (a circle) of where it lands
-ScorchDays,8,Create/Destroy tab: days the ground at a nuke's center stays scorched (bare: nothing grows or is dug there); it shortens toward the rim so the crater greens from its edges
-BrushRadius,0,Create/Destroy tab: the default radius in tiles of the grass/rabbit/wolf/human/water brush (0 = one tile; the Radius slider overrides it per mode)
+NukeRadius,75,PAINT tab: the default radius of the nuke (the Radius slider overrides it; 0-100); a nuke destroys everything within this many tiles (a circle) of where it lands
+ScorchDays,8,PAINT tab: days the ground at a nuke's center stays scorched (bare: nothing grows or is dug there); it shortens toward the rim so the crater greens from its edges
+BrushRadius,0,PAINT tab: the default radius in tiles of the grass/rabbit/wolf/human/water brush (0 = one tile; the Radius slider overrides it per mode)
 Seed,,Blank = new random seed each run; the seed used is shown on screen so you can paste it here to replay that start
-AnimalWarnAt,20000,Create/Destroy tab: painting past this many animals in total asks first since big crowds slow the sim down on many devices (the benchmark shows smooth to about 32000 animals on a Mac; phones vary)
+AnimalWarnAt,20000,PAINT tab: painting past this many animals in total asks first since big crowds slow the sim down on many devices (the benchmark shows smooth to about 32000 animals on a Mac; phones vary)

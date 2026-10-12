@@ -69,7 +69,7 @@
   const BLAST_GLOW_STOPS = [1, 0.5, 0];
   const MAX_BLASTS = 8;   // a hammered tap can't pile up work
 
-  // A count in the Show/Hide tab, tapped, toggles rings around every one of that kind on the map,
+  // A count in the Info tab, tapped, toggles rings around every one of that kind on the map,
   // steady (no pulsing: DESIGN.md Photosensitivity), drawn every frame so they follow the
   // animals and show paused. A ring is at least LOCATE_MIN_CSS_PX across, so it shows zoomed
   // far out where a tile is a dot. An animal off the screen gets a pip on the map's edge in
@@ -96,6 +96,13 @@
   const CONTOUR_CSS_PX = [1, 1.6];        // thin, bold: zoomed out
   const CONTOUR_NEAR_CSS_PX = [1.5, 2.5]; // thin, bold: at play zoom (sprites)
   const CONTOUR_CHUNK = 32;
+
+  // The Radius slider's preview (Paul, 12 Oct 2026): a circle the size the armed mode will
+  // cover, in the middle of the map, held RADIUS_HOLD_MS then faded out over RADIUS_FADE_MS
+  // of real time, so it shows the size without staying in the way. One slow fade, no blink.
+  const RADIUS_HOLD_MS = 500, RADIUS_FADE_MS = 1400;
+  const RADIUS_RGB = '232,217,160', RADIUS_NUKE_RGB = '255,150,70';
+  const RADIUS_FILL = 0.14, RADIUS_LINE = 0.9;
 
   // Real time an event holds a pose, whatever the speed, so nothing flickers (DESIGN.md,
   // Photosensitivity): a meatless death's fallen sprite, a bite's flinch, a mouthful or bite, a birth's hop.
@@ -402,6 +409,23 @@
       }
     }
 
+    // ---- the Radius slider's preview ----
+    let preview = null;   // { r (tiles), nuke, t0 (real ms) }
+    function drawRadiusPreview(cam, dpr, nowMs) {
+      const age = nowMs - preview.t0;
+      if (age >= RADIUS_HOLD_MS + RADIUS_FADE_MS) { preview = null; return; }
+      const a = age <= RADIUS_HOLD_MS ? 1 : 1 - (age - RADIUS_HOLD_MS) / RADIUS_FADE_MS;
+      const s = cam.scale * dpr, r = Math.max(0.5, preview.r + 0.5) * s;
+      const cx = canvas.width / 2, cy = canvas.height / 2, rgb = preview.nuke ? RADIUS_NUKE_RGB : RADIUS_RGB;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${rgb},${RADIUS_FILL * a})`;
+      ctx.fill();
+      ctx.lineWidth = 2 * dpr;
+      ctx.strokeStyle = `rgba(${rgb},${RADIUS_LINE * a})`;
+      ctx.stroke();
+    }
+
     // ---- topo lines ----
     let contoursOn = false, contourStep = CONTOUR_M;
     const contourCache = new WeakMap();   // world → Map(spacing → { cw, ch, thin, bold })
@@ -613,7 +637,10 @@
         if (blasts.length) drawBlasts(cam, dpr, nowMs);
         if (located) for (const key of located) if (LOCATE_COLORS[key]) drawLocate(sim, cam, dpr, key);
         if (sel) drawSelection(sim, cam, sel, dpr);
+        if (preview) drawRadiusPreview(cam, dpr, nowMs);
       },
+      // Show the size a radius covers (tiles; a nuke's in its own color), fading from nowMs.
+      radiusPreview(r, nuke, nowMs) { preview = { r, nuke: !!nuke, t0: nowMs }; },
       // The kinds to ring ('bunnies', 'wolves', 'humans', 'blades', 'corpses'): a Set, read
       // every frame; top is how many CSS px of the canvas's top the HUD covers, so pips stay below it.
       locate(kinds, top) { located = kinds && kinds.size ? kinds : null; locTop = top || 0; },

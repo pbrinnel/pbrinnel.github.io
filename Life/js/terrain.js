@@ -1,44 +1,51 @@
-// The ground's height, and the water that comes from it (Paul, 11 Oct 2026). Every tile gets
-// an elevation in meters (W.elev, 0 to Relief): rolling hills from noise, with a few broad
-// bowls pressed in. Water isn't placed: it settles where the ground holds it and runs
-// downhill. A priority flood from the world's edges (water leaves the map there) finds the
-// level water would stand at on every tile; each bowl that level makes fills Rain of the way
-// from its floor to its brim, and is a lake where it is at least LakeDepth deep. Summing one
-// unit of rain per tile down the way water drains gives how much ground drains through each
-// tile: RiverDrain or more is a river, wider where it drains much more. The first frame is the settled world; nothing
-// flows in from random spots.
+// The ground, and the water on it, made before day 0 (Paul, 11 Oct 2026: realistic river beds,
+// and no settling to watch on day 1). In order:
 //
-// Rivers get fords every BridgeEvery tiles along their length, and the land is then made one
-// piece, as the hand-laid lakes and rivers were: a cut-off piece is bridged across the
-// shortest run of river (or, failing that, of lake), or filled in if it is small.
+//   1. The ground is grown, not drawn: it starts almost flat and is lifted, round after round
+//      (GrowRounds), faster where the world's noise is high (its ranges) and near the edge (a
+//      rim, the region's watershed), while rivers cut it (stream power: ground wears down in
+//      proportion to how much ground drains through it × its slope, RiverCut) and slopes
+//      soften (HillSoften). Water leaves the map only at a few river mouths (RiverMouths),
+//      so the valleys gather into branching systems that run to them. Small dips fill with
+//      what the water carries in. Coarse to fine: most rounds on a half-size grid, the last
+//      FINE_ROUNDS at full size. Then it is stretched to 0..Relief meters.
+//   2. Lake basins (Bowls) are pressed in, as glaciers scoop them.
+//   3. With Water on, the water rules (water.js) run for PreRunDays from a rough first guess
+//      (each hollow half full, the soil half full), so day 0 is already at rest. Water stays
+//      as it is during play for now. Land pieces water cut off are joined across the
+//      shortest run of water (a ford), or filled in if tiny, so no animal is stranded.
 //
-// Uses its own generator, seeded from the world's seed, so the ground doesn't shift when
-// anything that draws on sim.rng changes. sim.js calls AS.layTerrain for every world.
+// Uses its own generator from the world's seed, so the ground doesn't shift when anything
+// that draws on sim.rng changes. sim.js and start.js call AS.layTerrain for every world.
 (function (AS) {
   'use strict';
+  // Math's functions looked up once: hot loops (and the Node sandbox the checks run in, where
+  // each global lookup is slow) don't pay for it on every call.
+  const { sqrt, min, max, abs, floor, ceil, round, exp, pow, SQRT1_2, SQRT2 } = Math;
 
   // ---- the shape of the ground (look, not tuning: these only make it look natural) ----
-  const OCTAVES = 5;              // hills with smaller hills on them
-  const WARP_SCALE = 90;          // tiles: how broad the bends in ridges and valleys are
+  const OCTAVES = 5;              // the uplift pattern: hills with smaller hills on them
+  const WARP_SCALE = 90;          // tiles: how broad the bends in the pattern are
   const WARP = 18;                // tiles: how far they bend
-  const WARP_STEP = 4;            // tiles between the points the warp is worked out at
-  const BOWL_RADIUS = [14, 46];   // tiles: how wide a bowl is (its dip fades out past that)
-  const BOWL_DEPTH = [0.18, 0.40]; // a bowl's depth as a share of the noise's range
-  const BOWL_MARGIN = 30;         // tiles a bowl's center keeps from the wall (less in a small world)
-  const BOWL_FALLOFF = 1.6;       // how quickly a bowl's dip fades with distance
-  const FLOOD_EPS = 1e-4;         // m: the slope the flood gives a flat, so every tile drains somewhere
-  const WIDE_RIVER = 4;           // a river draining this many times RiverDrain is two tiles wide
-  const FORD_LEN = 3;             // tiles of clear land a ford leaves along the river
-  const POCKET_MAX = 40;          // a cut-off land piece this small is filled in rather than bridged
-  const SPILL_PASSES = 8;         // rounds of hollows filling and spilling into the next ones down
-  const MIN_DEPTH = 0.05;         // m: the shallowest a lake's edge is
-  const RIVER_DEPTH = [0.3, 2];   // m: a river at RiverDrain, and the deepest any river runs
-  const POCKET_DEPTH = 0.3;       // m: a small land pocket filled in to keep the land one piece
-  const BRIDGE_TRIES = 40;        // land pieces mended before giving up
+  const UPLIFT = 0.01;            // how far the fastest-rising ground lifts a round (units of the pattern)
+  const UPLIFT_FLOOR = 0.2;       // the lowest ground still rises this share as fast as the highest
+  const RIM = 1.5, RIM_BAND = 0.08; // the edge rises up to RIM more, fading in over RIM_BAND of the shorter side
+  const MOUTH_W = 3;              // tiles wide, each river mouth
+  const STREAM_M = 0.5;           // stream power: erosion ∝ (drainage area)^STREAM_M × slope
+  const FINE_ROUNDS = 60;         // the last rounds, at full size
+  const FILL_MAX = 3000;          // dips filled one basin at a time before routing by the full flood
+  const FILL_REGION_MAX = 5000;   // a basin bigger than this is left to the full flood
+  const BOWL_RADIUS = [10, 40];   // tiles: a lake basin's size (its dip fades out past that)
+  const BOWL_DEPTH = [0.05, 0.17]; // a basin's depth as a share of Relief
+  const BOWL_MARGIN = 30;         // tiles a basin's center keeps from the wall (less in a small world)
+  const BOWL_FALLOFF = 1.6;       // how quickly a basin's dip fades with distance
+  const GUESS_FULL = 0.5;         // the water's first guess: each hollow this full
+  const PRE_STEP = 0.25;          // days per water step before day 0
+  const POCKET_MAX = 40;          // a cut-off land piece this small is filled in rather than joined
+  const POCKET_DEPTH = 0.3;       // m: such a filled-in pocket's water
+  const BRIDGE_TRIES = 40;        // land pieces joined before giving up
   const SEED_SALT = 0x5eed7e44;   // keeps the ground's generator apart from sim.rng
-
-  const K = AS.KIND;
-  const LAKE = 1, RIVER = 2;      // wet[] values
+  const D8X = [-1, 1, 0, 0, -1, 1, -1, 1], D8Y = [0, 0, -1, 1, -1, -1, 1, 1];
 
   // Octaves of lattice noise, each half the scale and `gain` times the weight of the last,
   // evaluated with plain loops over typed arrays: it runs once per tile.
@@ -46,7 +53,7 @@
     const lat = [], gws = [], inv = [], amps = [];
     let amp = 1, sum = 0;
     for (let o = 0; o < octaves; o++) {
-      const sc = Math.max(1, scale / (1 << o)), gw = Math.ceil(w / sc) + 2, gh = Math.ceil(h / sc) + 2;
+      const sc = max(1, scale / (1 << o)), gw = ceil(w / sc) + 2, gh = ceil(h / sc) + 2;
       const g = new Float32Array(gw * gh);
       for (let i = 0; i < g.length; i++) g[i] = rng.next();
       lat.push(g); gws.push(gw); inv.push(1 / sc); amps.push(amp); sum += amp; amp *= gain;
@@ -68,189 +75,230 @@
     };
   }
 
-  // W.elev: hills, bowls pressed in, then stretched to 0..Relief meters.
-  function elevation(W, S, rng) {
-    const pad = WARP + 2;   // the warp can look up to WARP tiles outside the world
-    const hills = fbm(rng, W.w + 2 * pad, W.h + 2 * pad, S.Hilliness, OCTAVES, S.Roughness);
-    const wx = fbm(rng, W.w + 2 * pad, W.h + 2 * pad, WARP_SCALE, 2, 0.5);
-    const wy = fbm(rng, W.w + 2 * pad, W.h + 2 * pad, WARP_SCALE, 2, 0.5);
-    const margin = Math.min(BOWL_MARGIN, Math.min(W.w, W.h) / 10), bowls = [];
-    for (let i = 0; i < S.Bowls; i++) {
-      bowls.push({
-        x: margin + rng.next() * Math.max(0, W.w - 2 * margin), y: margin + rng.next() * Math.max(0, W.h - 2 * margin),
-        r: BOWL_RADIUS[0] + rng.next() * (BOWL_RADIUS[1] - BOWL_RADIUS[0]), d: BOWL_DEPTH[0] + rng.next() * (BOWL_DEPTH[1] - BOWL_DEPTH[0]),
-      });
+  // The uplift pattern, 0..1: warped noise (Hilliness wide, Roughness rugged).
+  function pattern(w, h, S, rng) {
+    const pad = WARP + 2, out = new Float64Array(w * h);
+    const hills = fbm(rng, w + 2 * pad, h + 2 * pad, S.Hilliness, OCTAVES, S.Roughness);
+    const wx = fbm(rng, w + 2 * pad, h + 2 * pad, WARP_SCALE, 2, 0.5);
+    const wy = fbm(rng, w + 2 * pad, h + 2 * pad, WARP_SCALE, 2, 0.5);
+    let lo = Infinity, hi = -Infinity;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const px = x + pad, py = y + pad;
+      const v = hills(px + WARP * (2 * wx(px, py) - 1), py + WARP * (2 * wy(px, py) - 1));
+      out[y * w + x] = v;
+      if (v < lo) lo = v;
+      if (v > hi) hi = v;
     }
-    const E = W.elev;
-    // The warp bends slowly (WARP_SCALE), so it is worked out every WARP_STEP tiles and
-    // blended between: the same ground for a fraction of the work.
-    const gw = Math.ceil((W.w - 1) / WARP_STEP) + 2, gh = Math.ceil((W.h - 1) / WARP_STEP) + 2;
-    const gx = new Float32Array(gw * gh), gy = new Float32Array(gw * gh);
-    for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) {
-      const px = i * WARP_STEP + pad, py = j * WARP_STEP + pad;
-      gx[j * gw + i] = WARP * (2 * wx(px, py) - 1);
-      gy[j * gw + i] = WARP * (2 * wy(px, py) - 1);
-    }
-    for (let y = 0; y < W.h; y++) {
-      const fj = y / WARP_STEP, j = Math.floor(fj), v = fj - j;
-      for (let x = 0; x < W.w; x++) {
-        const fi = x / WARP_STEP, i = Math.floor(fi), u = fi - i, g = j * gw + i;
-        const dx = (gx[g] * (1 - u) + gx[g + 1] * u) * (1 - v) + (gx[g + gw] * (1 - u) + gx[g + gw + 1] * u) * v;
-        const dy = (gy[g] * (1 - u) + gy[g + 1] * u) * (1 - v) + (gy[g + gw] * (1 - u) + gy[g + gw + 1] * u) * v;
-        E[y * W.w + x] = hills(x + pad + dx, y + pad + dy);
+    for (let t = 0; t < out.length; t++) out[t] = (out[t] - lo) / (hi - lo || 1);
+    return out;
+  }
+
+  // River mouths on a w × h grid: spots are shares of the way round the edge (clockwise from
+  // the top-left corner), each MOUTH_W tiles wide.
+  function mouths(w, h, spots) {
+    const out = new Uint8Array(w * h), per = 2 * (w - 1) + 2 * (h - 1);
+    if (per <= 0) { out[0] = 1; return out; }
+    const at = p => {
+      p = ((p % per) + per) % per;
+      if (p < w - 1) return p;
+      p -= w - 1; if (p < h - 1) return p * w + (w - 1);
+      p -= h - 1; if (p < w - 1) return (h - 1) * w + (w - 1 - p);
+      p -= w - 1; return (h - 1 - p) * w;
+    };
+    for (const f of spots) for (let k = 0; k < MOUTH_W; k++) out[at(round(f * per) + k)] = 1;
+    return out;
+  }
+
+  // ---- growing the ground on one grid -----------------------------------------------------
+
+  function Grower(w, h) {
+    const n = w * h;
+    const recv = new Int32Array(n), order = new Int32Array(n), cnt = new Int32Array(n + 1), start = new Int32Array(n + 1), donor = new Int32Array(n);
+    const pits = new Int32Array(n);
+    let pitN = 0;
+    // Priority flood buffers (the fallback router).
+    const F = new Float64Array(n), seen = new Uint8Array(n), hi = new Int32Array(n), hv = new Float64Array(n);
+    // Dip-filling buffers.
+    const mark = new Uint32Array(n), fHi = new Int32Array(n), fHv = new Float64Array(n), reg = new Int32Array(n), q = new Int32Array(n), dist = new Int32Array(n), inReg = new Uint32Array(n);
+    let gen = 0;
+
+    // Each tile drains to its steepest lower neighbor (8 ways); mouths drain off the map. The
+    // order (mouths first) comes from walking up through donors. False if any tile is a dip.
+    const OFF = D8X.map((dx, d) => D8Y[d] * w + dx);
+    // One tile's steepest lower neighbor, or -1; `edge` checks each neighbor is on the map.
+    function lowest(E, t, x, y, edge) {
+      const e = E[t];
+      let best = -1, bestS = 0;
+      for (let d = 0; d < 8; d++) {
+        if (edge) { const xx = x + D8X[d], yy = y + D8Y[d]; if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue; }
+        const u = t + OFF[d], drop = e - E[u];
+        if (drop <= 0) continue;
+        const sl = d < 4 ? drop : drop * SQRT1_2;
+        if (sl > bestS) { bestS = sl; best = u; }
       }
+      return best;
     }
-    // Each bowl only touches the ground within twice its radius, where its dip is still felt.
-    for (const b of bowls) {
-      const reach = 2 * b.r;
-      for (let y = Math.max(0, Math.floor(b.y - reach)); y <= Math.min(W.h - 1, Math.ceil(b.y + reach)); y++) {
-        for (let x = Math.max(0, Math.floor(b.x - reach)); x <= Math.min(W.w - 1, Math.ceil(b.x + reach)); x++) {
-          const q = ((x - b.x) ** 2 + (y - b.y) ** 2) / (b.r * b.r);
-          if (q < 4) E[y * W.w + x] -= b.d * Math.exp(-q * BOWL_FALLOFF);
+    function steepest(E, outlet) {
+      cnt.fill(0); pitN = 0;
+      for (let y = 0; y < h; y++) {
+        const edgeRow = y === 0 || y === h - 1;
+        for (let x = 0, t = y * w; x < w; x++, t++) {
+          if (outlet[t]) { recv[t] = -1; continue; }
+          const best = lowest(E, t, x, y, edgeRow || x === 0 || x === w - 1);
+          if (best < 0) { pits[pitN++] = t; continue; }
+          recv[t] = best; cnt[best]++;
+        }
+      }
+      if (pitN) return false;
+      start[0] = 0; for (let t = 0; t < n; t++) start[t + 1] = start[t] + cnt[t];
+      cnt.fill(0);
+      for (let t = 0; t < n; t++) { const r = recv[t]; if (r >= 0) donor[start[r] + cnt[r]++] = t; }
+      let on = 0;
+      for (let t = 0; t < n; t++) if (recv[t] < 0) order[on++] = t;
+      for (let k = 0; k < on; k++) { const c = order[k]; for (let j = start[c]; j < start[c + 1]; j++) order[on++] = donor[j]; }
+      return true;
+    }
+
+    // The full flood from the mouths (8 ways), lowest first: every tile drains to the tile it
+    // was reached from, so water crosses dips to their spill.
+    function flood(E, outlet) {
+      recv.fill(-1); seen.fill(0);
+      let hn = 0, on = 0;
+      const push = (i, v) => { let k = hn++; while (k > 0) { const p = (k - 1) >> 1; if (hv[p] <= v) break; hi[k] = hi[p]; hv[k] = hv[p]; k = p; } hi[k] = i; hv[k] = v; };
+      for (let t = 0; t < n; t++) if (outlet[t]) { seen[t] = 1; F[t] = E[t]; push(t, F[t]); }
+      while (hn) {
+        const c = hi[0];
+        { const i = hi[--hn], v = hv[hn]; let k = 0; for (;;) { let c2 = 2 * k + 1; if (c2 >= hn) break; if (c2 + 1 < hn && hv[c2 + 1] < hv[c2]) c2++; if (hv[c2] >= v) break; hi[k] = hi[c2]; hv[k] = hv[c2]; k = c2; } hi[k] = i; hv[k] = v; }
+        order[on++] = c;
+        const cx = c % w, cy = (c / w) | 0;
+        for (let d = 0; d < 8; d++) {
+          const x = cx + D8X[d], y = cy + D8Y[d];
+          if (x < 0 || y < 0 || x >= w || y >= h) continue;
+          const u = y * w + x;
+          if (seen[u]) continue;
+          seen[u] = 1; const f = E[u] > F[c] + 1e-6 ? E[u] : F[c] + 1e-6; F[u] = f; recv[u] = c; push(u, f);
         }
       }
     }
-    let lo = Infinity, hi = -Infinity;
-    for (let t = 0; t < W.n; t++) { if (E[t] < lo) lo = E[t]; if (E[t] > hi) hi = E[t]; }
-    const k = hi > lo ? S.Relief / (hi - lo) : 0;
-    for (let t = 0; t < W.n; t++) E[t] = (E[t] - lo) * k;
+
+    // Fills the basin around dip t0 with what the water carries in, up to where it spills
+    // (lower ground or a mouth), with a hair of slope down to the spill so water runs out.
+    function fillDip(E, outlet, t0) {
+      const g = ++gen;
+      let hn = 0, rn = 0, level = E[t0], spill = -1;
+      const push = (i, v) => { let k = hn++; while (k > 0) { const p = (k - 1) >> 1; if (fHv[p] <= v) break; fHi[k] = fHi[p]; fHv[k] = fHv[p]; k = p; } fHi[k] = i; fHv[k] = v; };
+      const pop = () => { const top = fHi[0], i = fHi[--hn], v = fHv[hn]; let k = 0; for (;;) { let c = 2 * k + 1; if (c >= hn) break; if (c + 1 < hn && fHv[c + 1] < fHv[c]) c++; if (fHv[c] >= v) break; fHi[k] = fHi[c]; fHv[k] = fHv[c]; k = c; } fHi[k] = i; fHv[k] = v; return top; };
+      const addNbs = c => { const cx = c % w, cy = (c / w) | 0; for (let d = 0; d < 8; d++) { const x = cx + D8X[d], y = cy + D8Y[d]; if (x < 0 || y < 0 || x >= w || y >= h) continue; const u = y * w + x; if (mark[u] === g) continue; mark[u] = g; push(u, E[u]); } };
+      mark[t0] = g; reg[rn++] = t0; inReg[t0] = g; addNbs(t0);
+      while (hn) {
+        const u = pop();
+        if (E[u] < level || outlet[u]) { spill = u; break; }
+        level = E[u]; reg[rn++] = u; inReg[u] = g; addNbs(u);
+        if (rn > FILL_REGION_MAX) return;
+      }
+      if (spill < 0) return;
+      let qh = 0, qt = 0;
+      const sx = spill % w, sy = (spill / w) | 0;
+      for (let k = 0; k < rn; k++) {
+        const t = reg[k]; dist[t] = -1;
+        if (abs(t % w - sx) <= 1 && abs(((t / w) | 0) - sy) <= 1) { dist[t] = 1; q[qt++] = t; }
+      }
+      while (qh < qt) {
+        const c = q[qh++], cx = c % w, cy = (c / w) | 0;
+        for (let d = 0; d < 8; d++) {
+          const x = cx + D8X[d], y = cy + D8Y[d];
+          if (x < 0 || y < 0 || x >= w || y >= h) continue;
+          const u = y * w + x;
+          if (inReg[u] !== g || dist[u] >= 0) continue;
+          dist[u] = dist[c] + 1; q[qt++] = u;
+        }
+      }
+      for (let k = 0; k < rn; k++) { const t = reg[k], e = level + 1e-6 * max(1, dist[t]); if (E[t] < e) E[t] = e; }
+    }
+
+    // `rounds` rounds of lifting, cutting and creeping, from `startE` (or almost flat ground
+    // in the pattern's shape).
+    function run(pat, outlet, S, rounds, startE) {
+      const E = new Float64Array(n), up = new Float64Array(n), A = new Float64Array(n), lap = new Float64Array(n);
+      const band = max(1, RIM_BAND * min(w, h));
+      for (let t = 0; t < n; t++) {
+        const x = t % w, y = (t / w) | 0;
+        const e = max(0, 1 - min(x, y, w - 1 - x, h - 1 - y) / band);
+        up[t] = outlet[t] ? 0 : UPLIFT * (UPLIFT_FLOOR + (1 - UPLIFT_FLOOR) * pat[t]) * (1 + RIM * e * e);
+        E[t] = startE ? startE[t] : pat[t] * 0.01;
+      }
+      for (let r = 0; r < rounds; r++) {
+        for (let t = 0; t < n; t++) E[t] += up[t];
+        // Route: the steepest way down; a few dips filled; else the full flood.
+        let ok = steepest(E, outlet);
+        if (!ok && pitN <= FILL_MAX) { for (let k = 0; k < pitN; k++) fillDip(E, outlet, pits[k]); ok = steepest(E, outlet); }
+        if (!ok) flood(E, outlet);
+        A.fill(1);
+        for (let k = n - 1; k >= 0; k--) { const c = order[k]; if (recv[c] >= 0) A[recv[c]] += A[c]; }
+        // Stream power, implicit (so a tile never cuts below the one it drains to; a tile below
+        // its outlet is raised toward it: a dip filling).
+        for (let k = 0; k < n; k++) {
+          const c = order[k], rc = recv[c];
+          if (rc < 0) continue;
+          const diag = c % w !== rc % w && ((c / w) | 0) !== ((rc / w) | 0);
+          const f = S.RiverCut * (STREAM_M === 0.5 ? sqrt(A[c]) : pow(A[c], STREAM_M)) / (diag ? SQRT2 : 1);
+          E[c] = (E[c] + f * E[rc]) / (1 + f);
+        }
+        // Creep: each tile moves toward the neighbors it has; mouths stay at sea level.
+        if (S.HillSoften > 0) {
+          for (let t = 0; t < n; t++) {
+            if (outlet[t]) { lap[t] = 0; continue; }
+            const x = t % w, y = (t / w) | 0;
+            let sum = 0, k = 0;
+            if (x > 0) { sum += E[t - 1]; k++; } if (x < w - 1) { sum += E[t + 1]; k++; }
+            if (y > 0) { sum += E[t - w]; k++; } if (y < h - 1) { sum += E[t + w]; k++; }
+            lap[t] = sum - k * E[t];
+          }
+          for (let t = 0; t < n; t++) E[t] += S.HillSoften * lap[t];
+        }
+      }
+      return E;
+    }
+    return { run };
   }
 
-  // The priority flood from the edges. Returns the level water would stand at on each tile
-  // (F) and each tile's drain (recv: the tile it was reached from, -1 at the edge).
-  function flood(W) {
-    const E = W.elev, n = W.n, F = new Float32Array(n), recv = new Int32Array(n).fill(-1);
-    const seen = new Uint8Array(n), nb = new Int32Array(4);
-    const hi = new Int32Array(n), hv = new Float32Array(n);
-    let hn = 0;
-    const push = (i, v) => {
-      let k = hn++;
-      while (k > 0) { const p = (k - 1) >> 1; if (hv[p] <= v) break; hi[k] = hi[p]; hv[k] = hv[p]; k = p; }
-      hi[k] = i; hv[k] = v;
-    };
-    const pop = () => {
-      const top = hi[0], i = hi[--hn], v = hv[hn];
-      let k = 0;
-      for (;;) {
-        let c = 2 * k + 1;
-        if (c >= hn) break;
-        if (c + 1 < hn && hv[c + 1] < hv[c]) c++;
-        if (hv[c] >= v) break;
-        hi[k] = hi[c]; hv[k] = hv[c]; k = c;
+  // The ground for a w × h world, 0..1 before stretching; coarse then fine.
+  function growGround(w, h, pat, spots, S) {
+    const fine = min(S.GrowRounds, FINE_ROUNDS), coarse = S.GrowRounds - fine;
+    let startE = null;
+    if (coarse > 0 && w >= 8 && h >= 8) {
+      const cw = ceil(w / 2), ch = ceil(h / 2), small = new Float64Array(cw * ch);
+      for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) small[y * cw + x] = pat[min(h - 1, 2 * y) * w + min(w - 1, 2 * x)];
+      const Ec = Grower(cw, ch).run(small, mouths(cw, ch, spots), S, coarse, null);
+      startE = new Float64Array(w * h);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const fx = min(cw - 1.001, x / 2), fy = min(ch - 1.001, y / 2), ix = floor(fx), iy = floor(fy), u = fx - ix, v = fy - iy;
+        const a = Ec[iy * cw + ix], b = Ec[iy * cw + ix + 1], c = Ec[(iy + 1) * cw + ix], d = Ec[(iy + 1) * cw + ix + 1];
+        startE[y * w + x] = (a * (1 - u) + b * u) * (1 - v) + (c * (1 - u) + d * u) * v;
       }
-      hi[k] = i; hv[k] = v;
-      return top;
-    };
-    for (let t = 0; t < n; t++) {
-      const x = t % W.w, y = (t / W.w) | 0;
-      if (x === 0 || y === 0 || x === W.w - 1 || y === W.h - 1) { seen[t] = 1; F[t] = E[t]; push(t, F[t]); }
     }
+    return Grower(w, h).run(pat, mouths(w, h, spots), S, startE ? fine : S.GrowRounds, startE);
+  }
+
+  // ---- water ------------------------------------------------------------------------------
+
+  // The level water would rest at on every tile (4 ways, from the mouths): the first guess's
+  // hollows.
+  function restingLevel(W, outlet) {
+    const n = W.n, E = W.elev, F = new Float64Array(n), seen = new Uint8Array(n), hi = new Int32Array(n), hv = new Float64Array(n), nb = new Int32Array(4);
+    let hn = 0;
+    const push = (i, v) => { let k = hn++; while (k > 0) { const p = (k - 1) >> 1; if (hv[p] <= v) break; hi[k] = hi[p]; hv[k] = hv[p]; k = p; } hi[k] = i; hv[k] = v; };
+    for (let t = 0; t < n; t++) if (outlet[t]) { seen[t] = 1; F[t] = E[t]; push(t, F[t]); }
     while (hn) {
-      const c = pop();
+      const c = hi[0];
+      { const i = hi[--hn], v = hv[hn]; let k = 0; for (;;) { let c2 = 2 * k + 1; if (c2 >= hn) break; if (c2 + 1 < hn && hv[c2 + 1] < hv[c2]) c2++; if (hv[c2] >= v) break; hi[k] = hi[c2]; hv[k] = hv[c2]; k = c2; } hi[k] = i; hv[k] = v; }
       for (let i = 0, k = W.neighbors4(c, nb); i < k; i++) {
         const u = nb[i];
         if (seen[u]) continue;
-        seen[u] = 1; F[u] = Math.max(E[u], F[c] + FLOOD_EPS); recv[u] = c; push(u, F[u]);
+        seen[u] = 1; F[u] = max(E[u], F[c]); push(u, F[u]);
       }
     }
-    return { F, recv };
-  }
-
-  // Lakes and rivers into wet[]. A hollow (a connected patch the flood raised) fills from its
-  // floor toward its brim by how much rain reaches it: Rain times the square root of how many
-  // tiles drain into it per tile of its own, so a hollow fed by a big catchment fills more.
-  // One that fills spills over its rim, and its water runs on downhill, maybe into the next
-  // hollow; one that doesn't is where its water ends. Inside a hollow that isn't full water
-  // runs down the real slope to the floor; inside a full one it is under the lake on its way
-  // to the rim; elsewhere it follows the flood's drain. Each pass finds the hollows that are
-  // now full, until no more fill. A tile that RiverDrain tiles or more drain through, out of
-  // the water, is river, two wide past WIDE_RIVER times that, with a ford every BridgeEvery
-  // tiles along it. Returns the lakes' centers.
-  function settleWater(W, S, F, recv, wet, depth) {
-    const n = W.n, E = W.elev, nb = new Int32Array(4);
-    const raised = t => F[t] - E[t] > FLOOD_EPS * 10;
-    // The hollows: id per tile (-1 outside one), each one's floor, brim and size.
-    const bowl = new Int32Array(n).fill(-1), floor = [], brim = [], size = [], stack = [];
-    for (let t0 = 0; t0 < n; t0++) {
-      if (bowl[t0] >= 0 || !raised(t0)) continue;
-      const id = floor.length;
-      let lo = E[t0], hi = F[t0], c0 = 0;
-      bowl[t0] = id; stack.push(t0);
-      while (stack.length) {
-        const c = stack.pop();
-        c0++;
-        if (E[c] < lo) lo = E[c];
-        if (F[c] > hi) hi = F[c];
-        for (let i = 0, k = W.neighbors4(c, nb); i < k; i++) if (bowl[nb[i]] < 0 && raised(nb[i])) { bowl[nb[i]] = id; stack.push(nb[i]); }
-      }
-      floor.push(lo); brim.push(hi); size.push(c0);
-    }
-    const full = new Uint8Array(floor.length), fill = new Float64Array(floor.length);
-    const down = new Int32Array(n), key = new Float32Array(n), order = new Int32Array(n), drain = new Float32Array(n);
-    for (let pass = 0; ; pass++) {
-      for (let t = 0; t < n; t++) {
-        const b = bowl[t];
-        if (b < 0 || full[b]) { down[t] = recv[t]; key[t] = F[t]; continue; }
-        let best = -1, low = E[t];
-        for (let i = 0, k = W.neighbors4(t, nb); i < k; i++) if (E[nb[i]] < low) { low = E[nb[i]]; best = nb[i]; }
-        down[t] = best; key[t] = E[t];
-      }
-      // Every drain goes to a lower key, so highest first passes each tile's rain on in time.
-      for (let t = 0; t < n; t++) order[t] = t;
-      order.sort((a, b) => key[b] - key[a]);
-      drain.fill(1);
-      const into = new Float64Array(floor.length);
-      for (let k = 0; k < n; k++) {
-        const c = order[k], d = down[c];
-        if (d >= 0) drain[d] += drain[c];
-        else if (bowl[c] >= 0 && !full[bowl[c]]) into[bowl[c]] += drain[c];   // pools on the floor
-      }
-      let more = false;
-      for (let b = 0; b < floor.length; b++) {
-        if (full[b]) continue;
-        fill[b] = S.Rain * Math.sqrt(into[b] / size[b]);
-        if (fill[b] >= 1 && brim[b] - floor[b] >= S.LakeDepth) { full[b] = 1; more = true; }
-      }
-      if (!more || pass >= SPILL_PASSES) break;
-    }
-    // Lakes: each hollow at least LakeDepth deep, to its floor plus its fill of its depth.
-    const sx = new Float64Array(floor.length), sy = new Float64Array(floor.length), cnt = new Int32Array(floor.length);
-    for (let t = 0; t < n; t++) {
-      const b = bowl[t];
-      if (b < 0 || brim[b] - floor[b] < S.LakeDepth || !(S.Rain > 0)) continue;
-      const level = full[b] ? brim[b] : floor[b] + Math.min(1, fill[b]) * (brim[b] - floor[b]);
-      if (E[t] <= level || full[b]) {
-        wet[t] = LAKE; sx[b] += t % W.w; sy[b] += (t / W.w) | 0; cnt[b]++;
-        depth[t] = Math.max(MIN_DEPTH, level - E[t]);   // the water stands level across the lake
-      }
-    }
-    const lakes = [];
-    for (let b = 0; b < floor.length; b++) if (cnt[b]) lakes.push({ x: sx[b] / cnt[b], y: sy[b] / cnt[b] });
-    if (!(S.RiverDrain > 0)) return lakes;
-    // How far down its river each river tile is, from the river's source: a ford is where
-    // that comes round to a multiple of BridgeEvery.
-    const along = new Int32Array(n), river = new Uint8Array(n);
-    for (let t = 0; t < n; t++) if (!wet[t] && drain[t] >= S.RiverDrain) river[t] = 1;
-    for (let k = 0; k < n; k++) {
-      const c = order[k], r = down[c];
-      if (river[c] && r >= 0 && river[r]) along[r] = Math.max(along[r], along[c] + 1);
-    }
-    const every = Math.max(FORD_LEN + 1, Math.round(S.BridgeEvery));
-    for (let t = 0; t < n; t++) {
-      if (!river[t] || along[t] % every < FORD_LEN) continue;
-      wet[t] = RIVER;
-      // A river runs deeper the more ground drains through it.
-      depth[t] = Math.min(RIVER_DEPTH[1], RIVER_DEPTH[0] * Math.sqrt(drain[t] / S.RiverDrain));
-      // A big river is two tiles wide: across its flow, onto the lower side.
-      if (drain[t] >= S.RiverDrain * WIDE_RIVER && down[t] >= 0) {
-        const x = t % W.w, y = (t / W.w) | 0, across = down[t] % W.w !== x;   // flowing sideways: widen up or down
-        const a = across ? (y > 0 ? t - W.w : -1) : (x > 0 ? t - 1 : -1);
-        const b = across ? (y < W.h - 1 ? t + W.w : -1) : (x < W.w - 1 ? t + 1 : -1);
-        const side = a < 0 ? b : b < 0 ? a : (E[a] <= E[b] ? a : b);
-        if (side >= 0 && !wet[side]) { wet[side] = RIVER; depth[side] = depth[t]; }
-      }
-    }
-    return lakes;
+    return F;
   }
 
   // Labels the land (every tile wet[] leaves dry) by 4-connected piece, the way animals walk.
@@ -270,9 +318,9 @@
     return { label, sizes };
   }
 
-  // Joins land piece `from` to another by turning the shortest run of wet tiles between them
-  // (river only, or any water when `anyWet`) into land. Returns whether it found one.
-  function bridgePiece(W, wet, label, from, anyWet) {
+  // Joins land piece `from` to another across the shortest run of water (a ford). Returns
+  // whether it found one.
+  function bridgePiece(W, wet, label, from) {
     const prev = new Int32Array(W.n).fill(-2), queue = new Int32Array(W.n), nb = new Int32Array(4);
     let head = 0, tail = 0;
     for (let t = 0; t < W.n; t++) if (label[t] === from) { prev[t] = -1; queue[tail++] = t; }
@@ -285,62 +333,103 @@
           for (let v = t; v >= 0 && wet[v]; v = prev[v]) wet[v] = 0;
           return true;
         }
-        if (wet[u] === RIVER || (anyWet && wet[u])) { prev[u] = t; queue[tail++] = u; }
+        if (wet[u]) { prev[u] = t; queue[tail++] = u; }
       }
     }
     return false;
   }
 
-  // Makes the land one piece: the smallest piece is bridged to another across river, else
-  // across any water, else filled if it is small.
+  // Makes the land one piece: a tiny cut-off piece fills with water, any other is joined to
+  // the rest across the shortest run of water. Animals can't wade yet, so without this they
+  // would be stranded on islands.
   function keepLandWhole(W, wet) {
-    for (let n = 0; n < BRIDGE_TRIES; n++) {
+    for (let i = 0; i < BRIDGE_TRIES; i++) {
       const { label, sizes } = landPieces(W, wet);
       if (sizes.length <= 1) return;
       let small = 0;
-      for (let i = 1; i < sizes.length; i++) if (sizes[i] < sizes[small]) small = i;
-      if (bridgePiece(W, wet, label, small + 1, false)) continue;
-      if (sizes[small] <= POCKET_MAX) {
-        for (let t = 0; t < W.n; t++) if (label[t] === small + 1) wet[t] = LAKE;
-        continue;
-      }
-      if (!bridgePiece(W, wet, label, small + 1, true)) return;
+      for (let k = 1; k < sizes.length; k++) if (sizes[k] < sizes[small]) small = k;
+      if (sizes[small] <= POCKET_MAX) { for (let t = 0; t < W.n; t++) if (label[t] === small + 1) wet[t] = 2; continue; }
+      if (!bridgePiece(W, wet, label, small + 1)) return;
     }
   }
 
   // This world's own terrain values, each drawn from its settings.csv span (Paul: every world
   // feels different, under the same rules), plus the settings that are single values. Drawn
   // first, from the ground's own generator, so a seed always makes the same ground.
-  const SPANS = ['Relief', 'Hilliness', 'Roughness', 'Bowls', 'LakeDepth', 'Rain', 'RiverDrain'];
+  const SPANS = ['Relief', 'Hilliness', 'Roughness', 'Bowls', 'RiverMouths', 'Rain'];
+  const WHOLE = ['Bowls', 'RiverMouths'];
   AS.terrainOf = function (sim, rng) {
     const S = Object.assign({}, sim.T.world);
     for (const k of SPANS) {
       const r = S[k];
       S[k] = r.min + rng.next() * (r.max - r.min);
-      if (k === 'Bowls') S[k] = Math.round(S[k]);
+      if (WHOLE.includes(k)) S[k] = round(S[k]);
     }
     sim.terrain = S;
     return S;
   };
 
-  // Every world: the elevation; with `water`, the lakes and rivers it makes (world.js
-  // addWater) and the shore the grass is boosted along. Returns the lakes' centers.
+  // Every world: the ground; with `water`, the water the rules settle on it (world.js
+  // addWater, W.wDepth, W.wSoil) and the shore the grass is boosted along. Returns the
+  // centers of the lakes (bodies of water of LAKE_MIN tiles or more).
+  const LAKE_MIN = 40;
   AS.layTerrain = function (sim, water) {
     const { W, T } = sim, rng = AS.makeRng((sim.seed ^ SEED_SALT) >>> 0);
     const S = AS.terrainOf(sim, rng);
-    elevation(W, S, rng);
-    if (!water) return [];
-    const { F, recv } = flood(W);
+    const spots = [];
+    for (let i = 0; i < max(1, S.RiverMouths); i++) spots.push(rng.next());
+    const pat = pattern(W.w, W.h, S, rng);
+    const G0 = S.GrowRounds > 0 ? growGround(W.w, W.h, pat, spots, S) : pat;
+    // Stretched to 0..Relief, so basins press in to depths in meters; then stretched again below.
+    let lo = Infinity, hi = -Infinity;
+    for (let t = 0; t < W.n; t++) { if (G0[t] < lo) lo = G0[t]; if (G0[t] > hi) hi = G0[t]; }
+    const E = W.elev, k = hi > lo ? S.Relief / (hi - lo) : 0;
+    for (let t = 0; t < W.n; t++) E[t] = (G0[t] - lo) * k;
+    const margin = min(BOWL_MARGIN, min(W.w, W.h) / 10);
+    for (let i = 0; i < S.Bowls; i++) {
+      const bx = margin + rng.next() * max(0, W.w - 2 * margin), by = margin + rng.next() * max(0, W.h - 2 * margin);
+      const br = BOWL_RADIUS[0] + rng.next() * (BOWL_RADIUS[1] - BOWL_RADIUS[0]), bd = (BOWL_DEPTH[0] + rng.next() * (BOWL_DEPTH[1] - BOWL_DEPTH[0])) * S.Relief;
+      for (let y = max(0, floor(by - 2 * br)); y <= min(W.h - 1, ceil(by + 2 * br)); y++) {
+        for (let x = max(0, floor(bx - 2 * br)); x <= min(W.w - 1, ceil(bx + 2 * br)); x++) {
+          const q = ((x - bx) ** 2 + (y - by) ** 2) / (br * br);
+          if (q < 4) E[y * W.w + x] -= bd * exp(-q * BOWL_FALLOFF);
+        }
+      }
+    }
+    // Stretched again, so lowest to highest is exactly Relief with the basins in.
+    lo = Infinity; hi = -Infinity;
+    for (let t = 0; t < W.n; t++) { if (E[t] < lo) lo = E[t]; if (E[t] > hi) hi = E[t]; }
+    const k2 = hi > lo ? S.Relief / (hi - lo) : 0;
+    for (let t = 0; t < W.n; t++) E[t] = (E[t] - lo) * k2;
+    if (!water || !(S.Rain > 0)) return [];
+
+    // The water: a rough first guess, then the rules for PreRunDays.
+    const outlet = mouths(W.w, W.h, spots);
+    W.outlet = outlet;
+    const F = restingLevel(W, outlet), wat = AS.Water(W, S, outlet);
+    for (let t = 0; t < W.n; t++) {
+      const d = (F[t] - E[t]) * GUESS_FULL;
+      wat.H[t] = d > AS.WATER_TINY ? d : 0;
+      wat.G[t] = wat.H[t] > 0 ? wat.room : wat.room * 0.5;
+    }
+    wat.listWet();
+    for (let d = 0; d < S.PreRunDays; d += PRE_STEP) wat.step(PRE_STEP);
     const wet = new Uint8Array(W.n);
-    const depth = new Float32Array(W.n);
-    const lakes = settleWater(W, S, F, recv, wet, depth);
+    for (let t = 0; t < W.n; t++) if (wat.H[t] > 0) wet[t] = 1;
     keepLandWhole(W, wet);
     for (let t = 0; t < W.n; t++) {
+      W.wSoil[t] = wat.G[t];
       if (!wet[t]) continue;
       W.addWater(t);
-      W.wDepth[t] = depth[t] > 0 ? depth[t] : POCKET_DEPTH;   // a filled-in pocket has no depth of its own
+      W.wDepth[t] = wat.H[t] > 0 ? wat.H[t] : POCKET_DEPTH;
     }
     W.setShore(T.grass.WaterRadius, T.grass.WaterBoost);
+    // The lakes' centers: bodies of water LAKE_MIN tiles or more.
+    const { label, sizes } = landPieces(W, wet.map(v => (v ? 0 : 1)));
+    const sx = new Float64Array(sizes.length), sy = new Float64Array(sizes.length);
+    for (let t = 0; t < W.n; t++) if (label[t]) { sx[label[t] - 1] += t % W.w; sy[label[t] - 1] += (t / W.w) | 0; }
+    const lakes = [];
+    for (let i = 0; i < sizes.length; i++) if (sizes[i] >= LAKE_MIN) lakes.push({ x: sx[i] / sizes[i], y: sy[i] / sizes[i] });
     return lakes;
   };
 

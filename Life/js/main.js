@@ -45,6 +45,7 @@
   // Intent lines are the viewer's choice, kept per browser; off when storage is unavailable.
   // Water (lakes, rivers, thirst) is the viewer's choice too: on unless they turned it off.
   // The HUD is built before the tables load, so this default can't read settings.csv's Water.
+  let radiusReq = null;   // the Radius slider moved since the last frame: preview its size
   const located = new Set();   // kinds whose rings are on (ui onLocate)
   let waterOn = true;
   try { waterOn = localStorage.getItem(WATER_KEY) !== '0'; } catch (e) { /* stays on */ }
@@ -80,6 +81,7 @@
     onBench: () => AS.runBench(AS.app),
     onGraph: () => { if (graph) graph.toggle(); },
     onMinimap: () => { if (minimap) minimap.toggle(); },
+    onRadius: (mode, r) => { radiusReq = { r, nuke: mode === 'nuke' }; },
     tab: savedTab,
     onTab: name => { try { localStorage.setItem(TAB_KEY, name || ''); } catch (e) { /* not kept */ } },
     onNuke: on => { nukeOn = on; },
@@ -91,7 +93,7 @@
       waterOn = on;
       try { localStorage.setItem(WATER_KEY, on ? '1' : '0'); } catch (e) { /* the choice just isn't kept */ }
       // Water is laid when a world is built, so the switch starts a new world.
-      if (sim) { ui.ended(null); app.load(AS.Sim(T, T.world.Seed ?? AS.newSeed(), { water: waterOn })); setSpeed(runSpeed); }
+      if (sim) { ui.ended(null); makeWorld(T.world.Seed ?? AS.newSeed()).then(w => { app.load(w); setSpeed(runSpeed); }); }
     },
     inspect: inspectMode,
     onInspect: m => {
@@ -139,6 +141,15 @@
     return;
   }
 
+  // Making a world takes seconds (terrain.js grows the ground, the water settles), so the
+  // loading card shows first and gets two frames to paint before the work starts.
+  const loadingEl = document.getElementById('loading');
+  const nextFrame = () => new Promise(r => requestAnimationFrame(() => r()));
+  async function makeWorld(seed) {
+    if (loadingEl) { loadingEl.hidden = false; await nextFrame(); await nextFrame(); }
+    try { return AS.Sim(T, seed, { water: waterOn }); } finally { if (loadingEl) loadingEl.hidden = true; }
+  }
+
   const { T, errors, warnings } = await AS.loadTables(AS.V);
   if (!T) { ui.errors(errors, warnings); return; }
   const states = AS.checkStates(T);
@@ -148,11 +159,11 @@
 
   const seed = T.world.Seed ?? AS.newSeed();
   ui.setRadiusDefaults(T.world.NukeRadius, T.world.BrushRadius);
-  sim = AS.Sim(T, seed, { water: waterOn });
+  sim = await makeWorld(seed);
   const canvas = document.getElementById('map');
   const cam = AS.Camera(canvas, sim.W);
   const sheet = AS.SpriteSheet(T);
-  // The Show/Hide tab's counts show the world's own sprites: a bunny, a wolf, a human, a full tuft, a skull.
+  // The Info tab's counts show the world's own sprites: a bunny, a wolf, a human, a full tuft, a skull.
   const ICON_CSS_PX = 16;
   const ICON_SPRITE = {
     bunnies: AS.spriteIndex(AS.SPECIES.BUNNY, AS.SEX.MALE, AS.STAGE.ADULT, 0, AS.SPRITE_FRAME.STAND),
@@ -311,6 +322,7 @@
     let top = 0;
     if (located.size && !document.body.classList.contains('ui-off')) { const hud = document.getElementById('hud'); if (hud) top = hud.getBoundingClientRect().bottom; }
     renderer.locate(located, top);
+    if (radiusReq) { renderer.radiusPreview(radiusReq.r, radiusReq.nuke, now); radiusReq = null; }
     renderer.draw(sim, cam, sheet, live, alpha, now, speed);
     const shown = live ? live.serial : 0;
     if (shown !== inspected || now - inspectedAt >= INSPECT_EVERY_MS) {
@@ -363,7 +375,7 @@
     ui.ended({
       titles: EXTINCT.filter(([k]) => gone.has(k)).map(([, t]) => t),
       day: sim.day,
-      onNew() { ui.ended(null); app.load(AS.Sim(T, T.world.Seed ?? AS.newSeed(), { water: waterOn })); setSpeed(runSpeed); },
+      onNew() { ui.ended(null); makeWorld(T.world.Seed ?? AS.newSeed()).then(w => { app.load(w); setSpeed(runSpeed); }); },
       onContinue() { ui.ended(null); setSpeed(runSpeed); },
     });
   }

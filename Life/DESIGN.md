@@ -63,19 +63,33 @@ watching the sim run. Everything else in this doc is decided.
   partly filled with blades of every age, as a meadow that has been growing a while is,
   with a few lone seedlings in the open, so the start doesn't die back as one wave.
   **Water** (Paul, 4–5 Oct 2026), on by default since 5 Oct (`Water` in settings.csv; the Debug tab's
-  Water button switches it and starts a new world). **Water comes from the ground** (Paul,
-  11 Oct 2026): every tile has an elevation (`Relief` meters of rolling `Hilliness`-wide
-  hills with `Roughness`, and `Bowls` broad hollows pressed in), and water settles where the
-  ground holds it instead of being placed. Each hollow fills from its floor by how much rain
-  reaches it (`Rain` times the square root of its catchment per tile of its own); a full one
-  spills over its rim and its water runs on, so rivers chain lake to lake; one too shallow
-  (`LakeDepth`) stays dry. Ground that `RiverDrain` tiles or more drain through is river, with
-  a land-bridge ford every `BridgeEvery` tiles. The first frame is the settled world. The
-  seven terrain settings are ranges, and each world draws its own values from them by its
-  seed (Paul: every world feels different under the same rules; the ranges get dialed in
-  later). Tuned so water covers about 4-10% of the map, as the hand-laid lakes did. Topo
+  Water button switches it and starts a new world). **The ground is grown, and water settles on it by physics**
+  (Paul, 11-12 Oct 2026: realistic river beds, consistent water rules, nothing faked, and
+  nothing settling to watch on day 1). Before day 0: the ground starts almost flat and is
+  lifted for `GrowRounds` rounds, faster where the world's noise is high (`Hilliness`,
+  `Roughness`: its ranges) and near the edge (a rim, the region's watershed), while rivers
+  cut it (stream power: wear ∝ how much ground drains through × slope, `RiverCut`) and slopes
+  soften (`HillSoften`). Water leaves the map only at `RiverMouths` places on the edge (Paul:
+  with every edge tile an outlet, parallel streams combed in from every side), so valleys
+  gather into branching systems running to them. `Bowls` lake basins are pressed in after,
+  as glaciers scoop them, and the ground is stretched to `Relief` meters. Then the water rules
+  (water.js) run for `PreRunDays` from a rough first guess, so day 0 is already at rest.
+  **The water rules**, the same on every tile every step: `Rain` falls on every tile (mm a
+  day); surface water flows toward lower water surfaces, faster the deeper and steeper
+  (Manning, `SurfaceFlow`); it soaks into the soil (`Infiltration`, up to the soil's room,
+  30% of `SoilDepth`) and evaporates (`Evaporation`); soil water flows toward a lower water
+  table (Darcy, `SoilFlow`) and plants draw it out (`Transpiration`, less as the soil dries);
+  full soil pushes its extra up as springs and seeps. A tile is 10 m across. For now water
+  stays as the pre-run left it during play (Phase 1), and land pieces it cut off are joined
+  across the shortest run of water so no animal is stranded. **Coming (Phase 2), decided by
+  Paul:** the rules run live; water becomes a layer rather than a tile kind, animals wade
+  shallow water (deep water blocks; no fords needed); rising water drowns grass and warren
+  holes and animals step out; drinking takes real amounts (tiny against a lake); the bare
+  beach moves with the shore. The terrain settings Relief, Hilliness, Roughness, Bowls,
+  RiverMouths and Rain are ranges: each world draws its own values by its seed (Paul: every
+  world feels different under the same rules). Rain 0 makes a dry world. Topo
   lines show the height (Paul chose them over shaded ground in a mockup): a thin line every
-  5 m (the viewer's slider picks 0.5-20 m), every fifth bolder, under grass and animals, off water; the Elevation toggle (Show/Hide tab,
+  5 m (the viewer's slider picks 0.5-20 m), every fifth bolder, under grass and animals, off water; the Elevation toggle (Info tab,
   kept per viewer, on at first) shows or hides them. **Water has a depth** (Paul, 11 Oct
   2026), in meters: a lake's is its level minus the ground (it stands level across the
   lake), a river's grows with the ground draining through it. Any depth makes a tile water.
@@ -315,18 +329,24 @@ watching the sim run. Everything else in this doc is decided.
   side panel down the left, under the bar (Paul: across the top it hid too much of the
   world); the graph and minimap sit to its right unless dragged. On a phone it is a sheet
   under the bar, at most 40% of the screen, scrolling inside itself:
-  - **Show/Hide:** everything in it toggles what you see. **Counts** of bunnies, wolves,
-    humans, the total, blades and corpses (each count also rings its kind on the map).
-    **Windows:** Graph, Minimap. **Elevation:** Topo lines, and a slider for their spacing,
-    from a line every 0.5 m (every little rise) to every 20 m. **Properties: Off, Click or Hover**: no
-    properties window; click or tap something to see it (as before); or the window shows
+  - **Info** (was Show/Hide): everything in it toggles what you see. **Counts** of bunnies,
+    wolves, humans, the total, blades and corpses (each count also rings its kind on the
+    map). **Windows:** Graph, Minimap. **Map:** Topo lines and their spacing (0.5 to 20 m),
+    and Intent lines (moved from Debug, Paul, 12 Oct 2026). **Properties: Off, Click or
+    Hover**: no properties window; click or tap something to see it; or the window shows
     whatever the mouse is over (a tap still picks, so a phone works as with Click). Kept per
     viewer. Every selection's properties end with a **Tile** section: the ground under it
     (Position, Elevation, Ground: ground, beach, water or warren hole). **Inspect Empty
     Tiles**, also kept per viewer, lets a click or hover on bare ground pick the tile itself,
-    which shows only those rows.
-  - **Create/Destroy:** **Modes** (the tools for interfering with the sim) and **Size** (Radius).
-  - **Debug:** **Overlays** (Lines), **World** (Water, the seed), **Tools** (Benchmark).
+    which shows only those rows. **Tables:** the table-warnings button, when there are any.
+  - **PAINT** (was Create/Destroy): **Modes** (the brushes and the nuke) and **Size**
+    (Radius). Moving the Radius slider shows a circle that size in the middle of the map,
+    held half a second and then faded out over 1.4 s (Paul, 12 Oct 2026).
+  - **Debug**, only with `?debug` in the address (Paul, 12 Oct 2026: not needed for now):
+    **World** (Water, the seed), **Tools** (Benchmark, the debug tools).
+  - On a computer the side panel, the properties window and the minimap drag by their title
+    bars like the graph (drag.js), their places kept per viewer; a double-click on a title bar
+    puts the window back. A phone keeps its sheets.
 - **Minimap** (Paul, 11 Oct 2026): the whole world, always zoomed all the way out, in a small
   window with a box on what the screen shows; click or drag on it to go there. Animals of
   the kinds whose rings are on show as dots. Small (2 tiles a pixel) or big (1), by its +/−
@@ -341,26 +361,26 @@ watching the sim run. Everything else in this doc is decided.
   left it, plotting grass, bunnies and wolves over the whole run on one chart with a
   logarithmic scale. Scroll and zoom along it to see any part of the run's history; hover
   or tap for the exact counts.
-- **NUKE MODE** (Create/Destroy tab; Paul's first "god" feature): while armed, a tap on the world
+- **NUKE MODE** (PAINT tab; Paul's first "god" feature): while armed, a tap on the world
   drops a nuke there. Everything within `NukeRadius` tiles is destroyed outright: animals
   (no corpses), grass, corpses, warren holes. The ground stays scorched, with nothing
   growing or dug, for up to `ScorchDays` at the center and less toward the rim, so the
   crater greens from its edges. The blast shows as an expanding ring and a fading orange
   glow within its circle, never a flash.
-- **GRASS MODE, RABBIT MODE, WOLF MODE** (Create/Destroy tab, Paul: keeping the balance becomes the
+- **GRASS MODE, RABBIT MODE, WOLF MODE** (PAINT tab, Paul: keeping the balance becomes the
   game). Tap to fill a circle of `BrushRadius` tiles, or drag to paint a stroke; every
   empty tile that can hold it gets a blade or an animal of a random age (animals of
   random sex, from newborn to elder, full and rested). Grass skips warren holes and
   scorch; wolves skip holes. One God mode is on at a time; while a paint mode is on,
   dragging paints instead of panning (pan with the keys).
-- **WATER MODE** (Create/Destroy tab, Paul, 11 Oct 2026): tap or drag to pour water, 1 m
+- **WATER MODE** (PAINT tab, Paul, 11 Oct 2026): tap or drag to pour water, 1 m
   deep, on bare ground or grass (which drowns), never on an animal, a corpse, a warren hole
   or scorched ground; blades left on the new shore go too, as the beach stays bare. Sized by
   the Radius slider like the other brushes.
-- **Radius slider** (Create/Destroy tab): sets the size for whichever mode is on, 0 (a single tile,
+- **Radius slider** (PAINT tab): sets the size for whichever mode is on, 0 (a single tile,
   one agent per tap) to 75 tiles (Paul), a circle smaller than the crowd limit; each mode remembers its own (paint modes start at
   `BrushRadius`, the nuke at `NukeRadius`).
-- **Too many animals, asked first** (Paul): the Show/Hide tab shows the total of all animals.
+- **Too many animals, asked first** (Paul): the Info tab shows the total of all animals.
   Painting past `AnimalWarnAt` animals stops at the limit and asks, in plain words, whether
   to keep adding, since big crowds slow the sim down on many devices; Keep adding doubles
   the limit for that world. Births never ask.
@@ -425,7 +445,7 @@ mouthful, a flinch, a death) holds for at least a quarter of a second of real ti
 whatever the speed, and when the sim runs so fast that steps would flicker, animals
 glide in their standing pose instead of cycling their legs.
 
-**Finding things** (Paul, 5 Oct 2026). Each count in the Show/Hide tab (bunnies, wolves,
+**Finding things** (Paul, 5 Oct 2026). Each count in the Info tab (bunnies, wolves,
 humans, grass, corpses) is a toggle: on, every one of that kind on the map is ringed in its
 graph color, and the count wears a border of that color. Rings are steady (a first try was a
 one-off fade, which Paul swapped for a toggle) and follow the animals, paused or running. They

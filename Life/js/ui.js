@@ -10,6 +10,7 @@
 //         elevation (initial on/off), onElevation(on): the topo lines, contourStep (m), onContourStep(m),
 //         inspect ('off' | 'click' | 'hover'), onInspect(mode): the properties window,
 //         inspectEmpty (initial on/off), onInspectEmpty(on): bare tiles can be picked,
+//         onRadius(mode, tiles): the Radius slider moved (for the preview),
 //         tab (initial: 'info' | 'debug' | 'god' | null for closed; default 'info'), onTab(name | null),
 //         onNuke(on), onLocate(key, on): a count's ring toggle ('bunnies', 'wolves', 'humans', 'blades', 'corpses') }) → ui
 //   ui.hud({ speedIndex, achieved, day, seed, humansSeen, counts: { bunnies, wolves, humans, total, blades, corpses } })
@@ -17,7 +18,7 @@
 //   ui.tab, ui.setTab(name | null)   the open tab
 //   ui.hidden, ui.setHidden(on)      Hide UI (the H key toggles it; never remembered across loads)
 //   ui.nuke, ui.setNuke(on)          NUKE MODE armed (main.js reads it through onNuke)
-//   ui.mode, ui.setMode(name)        the Create/Destroy tab's one armed mode: 'nuke', 'grass', 'bunny', 'wolf', 'human', 'water' or ''
+//   ui.mode, ui.setMode(name)        the PAINT tab's one armed mode: 'nuke', 'grass', 'bunny', 'wolf', 'human', 'water' or ''
 //                                    (onMode(name) on every change; onNuke(on) when nuke flips)
 //   ui.setRadiusDefaults(nuke, brush)  the Radius slider's starting values (settings.csv); a radius the
 //                                    viewer chose earlier (kept per mode in localStorage) wins. Called once the tables load.
@@ -39,8 +40,6 @@
 (function (AS) {
   'use strict';
 
-  // "running 14×" is shown once the sim falls below this share of the chosen speed.
-  const BEHIND_SHARE = 0.9;
   // Figures below this get one decimal ("2.5×"); above it, whole numbers ("312×").
   const DECIMAL_BELOW = 10;
   const NUMBER_KEYS = '123456';
@@ -53,10 +52,22 @@
   // Counts in HUD order: a label (empty: the sprite icon replaces it once the sheet exists, see
   // setIcons; the total keeps its word), key in the counts object, tooltip.
   // The tabs, in bar order: key, label, tooltip.
-  const TABS = [
-    ['info', 'Show/Hide', 'Counts, rings on the map, the graph, the minimap, topo lines and the properties window'],
-    ['god', 'Create/Destroy', 'Powers over the world'],
-    ['debug', 'Debug', 'Lines, Water, Benchmark and the seed'],
+  // A speed's icon: two bars to pause, more play triangles for faster (one per step up to
+  // four), a triangle against a bar for Max.
+  function speedIcon(s) {
+    const tri = (x, w) => `<path d="M${x} 3 L${x + w} 8 L${x} 13 Z" fill="currentColor"/>`;
+    if (s === 0) return '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="4" y="3" width="3" height="10" rx="1" fill="currentColor"/><rect x="9" y="3" width="3" height="10" rx="1" fill="currentColor"/></svg>';
+    if (s === Infinity) return `<svg width="18" height="16" viewBox="0 0 18 16" aria-hidden="true">${tri(2, 9)}<rect x="12" y="3" width="3" height="10" rx="1" fill="currentColor"/></svg>`;
+    const k = s <= 1 ? 1 : s <= 2 ? 2 : s <= 5 ? 3 : 4, w = [8, 7, 6, 5][k - 1], step = w;
+    let paths = ''; for (let i = 0; i < k; i++) paths += tri(2 + i * step, w);
+    return `<svg width="${4 + k * step}" height="16" viewBox="0 0 ${4 + k * step} 16" aria-hidden="true">${paths}</svg>`;
+  }
+
+  // Debug is there only with ?debug (Paul, 12 Oct 2026: not needed for now).
+  const ALL_TABS = [
+    ['info', 'Info', 'Counts, rings on the map, the graph, the minimap, topo and intent lines, and the properties window'],
+    ['god', 'PAINT', 'Paint grass, animals and water, or drop a nuke'],
+    ['debug', 'Debug', 'Water, Benchmark, the seed and the debug tools'],
   ];
   const COUNTS = [
     ['', 'bunnies', 'bunnies'],
@@ -84,7 +95,7 @@
   }
 
   AS.UI = function (opts) {
-    const { debug, speeds, onSpeed, onDebugTool, onCloseInspector, onBench, onGraph, onLines, onWater, onTab, onNuke, onMode, onLocate, onElevation, onInspect, onInspectEmpty, onMinimap, onContourStep } = opts;
+    const { debug, speeds, onSpeed, onDebugTool, onCloseInspector, onBench, onGraph, onLines, onWater, onTab, onNuke, onMode, onLocate, onElevation, onInspect, onInspectEmpty, onMinimap, onContourStep, onRadius } = opts;
     const hudEl = document.getElementById('hud');
     const errorsEl = document.getElementById('errors');
     const inspEl = document.getElementById('inspector');
@@ -98,21 +109,35 @@
     // ---- bar ----
     const top = el('div', 'hud-top');
     const strip = el('div', 'hud-strip');
+    // Speeds as small icons (Paul, 12 Oct 2026, option A of five): pause bars, one to four
+    // play triangles, a triangle to a bar for Max; the lit one is the speed asked for. Beside
+    // them, its name and the speed the sim is really keeping, "5× (4.8×)", "Max (312×)".
     const speedBox = el('div', 'hud-speeds');
+    const speedName = el('span', 'hud-speedname', '');
+    const speedLabel = s => (s === 0 ? 'Pause' : s === Infinity ? 'Max' : s + '×');
     const buttons = speeds.map((s, i) => {
-      const label = s === 0 ? 'Pause' : s === Infinity ? 'Max' : s + '×';
-      const b = el('button', 'hud-btn', label);
+      const label = speedLabel(s);
+      const b = el('button', 'hud-btn hud-speed');
       b.type = 'button';
+      b.title = label;
+      b.setAttribute('aria-label', label);
+      b.innerHTML = speedIcon(s);
       b.addEventListener('click', () => { choose(i); b.blur(); });
       speedBox.appendChild(b);
       return b;
     });
-    const status = el('span', 'hud-status', '');
     const dayEl = el('span', 'hud-day', '');
     const tabBox = el('div', 'hud-tabs');
     const tabBtns = {}, tabPanels = {};
     const tabStrip = el('div', 'hud-tabstrip');
     tabStrip.hidden = true;
+    // On a computer the side panel has a title bar to drag it by (drag.js); a phone hides it.
+    const sideHead = el('div', 'hud-side-head');
+    const sideTitle = el('span', 'hud-side-title', '');
+    sideHead.appendChild(sideTitle);
+    sideHead.title = 'Drag to move; double-click to put it back';
+    tabStrip.appendChild(sideHead);
+    const TABS = ALL_TABS.filter(([key]) => key !== 'debug' || debug);
     for (const [key, label, tip] of TABS) {
       const b = el('button', 'hud-btn hud-tab', label);
       b.type = 'button';
@@ -130,7 +155,7 @@
     hideBtn.title = 'Hide everything but the world (H brings it back)';
     hideBtn.addEventListener('click', () => { setHidden(true); hideBtn.blur(); });
     // The behind-speed note comes after the tabs, so its coming and going moves nothing.
-    strip.append(speedBox, dayEl, tabBox, status, hideBtn);
+    strip.append(speedBox, speedName, dayEl, tabBox, hideBtn);
 
     // The small faint button that brings the UI back; CSS shows it only while hidden.
     const showBtn = el('button', 'hud-show', 'Show UI');
@@ -152,15 +177,17 @@
     }
     const showCounts = section('info', 'Counts', 'Tap a count to ring every one of that kind on the map');
     const showWindows = section('info', 'Windows');
-    const showElev = section('info', 'Elevation');
+    const showElev = section('info', 'Map', 'What is drawn over the world');
     const showProps = section('info', 'Properties', 'The properties window: what something is and how it is doing');
+    const showTables = section('info', 'Tables');
     const godModes = section('god', 'Modes');
     const godSize = section('god', 'Size');
-    const dbgOverlays = section('debug', 'Overlays');
-    const dbgWorld = section('debug', 'World');
-    const dbgTools = section('debug', 'Tools');
+    // Without ?debug there is no Debug tab: its controls are built but never shown.
+    const offPage = el('div');
+    const dbgWorld = tabPanels.debug ? section('debug', 'World') : offPage;
+    const dbgTools = tabPanels.debug ? section('debug', 'Tools') : offPage;
 
-    // ---- Show/Hide tab (key 'info') ----
+    // ---- Info tab (key 'info') ----
     const countsBox = el('span', 'hud-counts');
     const countEls = {}, glyphEls = {}, countBoxes = {};
     for (const [glyph, key, tip] of COUNTS) {
@@ -218,7 +245,7 @@
     let linesBtn = null;
     if (onLines) {
       let linesOn = !!opts.lines;
-      linesBtn = el('button', 'hud-bench hud-lines', 'Lines');
+      linesBtn = el('button', 'hud-bench hud-lines', 'Intent lines');
       linesBtn.type = 'button';
       linesBtn.title = 'Show every animal\'s line to what it is after (the selected animal\'s always shows)';
       linesBtn.classList.toggle('on', linesOn);
@@ -226,7 +253,7 @@
         if (!locked) { linesOn = !linesOn; linesBtn.classList.toggle('on', linesOn); onLines(linesOn); }
         linesBtn.blur();
       });
-      dbgOverlays.appendChild(linesBtn);
+      showElev.appendChild(linesBtn);
     }
     // Topo lines (render.js): every few meters of the ground's height. Kept per viewer.
     let elevBtn = null;
@@ -336,7 +363,7 @@
     const warnList = el('ul', 'hud-warnlist');
     warnList.hidden = true;
     warnBtn.addEventListener('click', () => { warnList.hidden = !warnList.hidden; warnBtn.blur(); });
-    dbgTools.appendChild(warnBtn);
+    showTables.appendChild(warnBtn);
 
     const toolButtons = [];
     if (debug) {
@@ -358,7 +385,7 @@
       dbgTools.appendChild(tools);
     }
 
-    // ---- Create/Destroy tab (key 'god') ----
+    // ---- PAINT tab (key 'god') ----
     // One mode at a time: 'nuke', or a brush ('grass', 'bunny', 'wolf', 'human'), or '' for none.
     // Armed until toggled off, so repeated nukes and strokes work; main.js turns a tap (or a
     // drag, for a brush) on the world into that mode's action while it is on.
@@ -417,7 +444,11 @@
       try { localStorage.setItem(RADIUS_KEY + name, String(r)); } catch (e) { /* the choice just isn't kept */ }
       if (name === mode) showRadius();
     }
-    radiusInput.addEventListener('input', () => { if (!locked && mode !== '') setRadius(mode, radiusInput.value); });
+    radiusInput.addEventListener('input', () => {
+      if (locked || mode === '') return;
+      setRadius(mode, radiusInput.value);
+      if (onRadius) onRadius(mode, radiusOf(mode));   // main.js shows a fading preview of the size
+    });
     function setRadiusDefaults(nuke, brush) {
       for (const [name] of MODES) radiusDefaults[name] = name === 'nuke' ? nuke : brush;
       for (const [name] of MODES) {
@@ -467,7 +498,9 @@
         tabBtns[key].classList.toggle('on', key === name);
       }
       tabStrip.hidden = name === null;
-      // On a computer the open tab is a side panel; the graph and minimap step aside (CSS).
+      if (name) sideTitle.textContent = TABS.find(t => t[0] === name)[1];
+      // On a computer the open tab is a side panel; the graph and minimap step aside (CSS)
+      // unless it has been dragged somewhere else.
       if (document.body) document.body.classList.toggle('side-open', name !== null);
       if (onTab && !quiet) onTab(name);
     }
@@ -518,7 +551,7 @@
     });
 
     // ---- hud ----
-    const setStatus = cachedText(status);
+    const setSpeedName = cachedText(speedName);
     const setDay = cachedText(dayEl);
     const setSeed = cachedText(seedNum);
     const setCount = {};
@@ -541,10 +574,7 @@
         if (speeds[current] !== 0) lastRunning = current;
       }
       const speed = speeds[s.speedIndex];
-      let st = '';
-      if (speed === Infinity) st = s.achieved > 0 ? `Max (${fmtMult(s.achieved)})` : '';
-      else if (speed > 0 && s.achieved < speed * BEHIND_SHARE) st = `running ${fmtMult(s.achieved)}`;
-      setStatus(st);
+      setSpeedName(speed > 0 && s.achieved > 0 ? `${speedLabel(speed)} (${fmtMult(s.achieved)})` : speedLabel(speed));
       setDay('Day ' + s.day.toFixed(1));
       for (const [, key] of COUNTS) setCount[key](fmtInt(s.counts[key]));
       // Humans are optional: their count shows only once this world has had one.
@@ -574,6 +604,12 @@
     const inspList = el('div', 'insp-list');
     inspEl.append(inspHead, inspList);
     for (const t of ['pointerdown', 'pointerup', 'wheel']) inspEl.addEventListener(t, e => e.stopPropagation());
+    // The side panel and the properties window drag by their title bars, like the graph.
+    if (AS.Draggable) {
+      AS.Draggable(tabStrip, sideHead, 'life-side-pos', moved => document.body && document.body.classList.toggle('side-moved', moved));
+      AS.Draggable(inspEl, inspHead, 'life-insp-pos');
+      inspHead.title = 'Drag to move; double-click to put it back';
+    }
 
     const setInspTitle = cachedText(inspTitle);
     let rowKey = '';
@@ -626,6 +662,8 @@
     // aren't about the CSVs' contents (e.g. the page opened from disk).
     function errors(errs, warns, opts) {
       const o = opts || {};
+      const loading = document.getElementById('loading');   // the error page replaces the loading card
+      if (loading) loading.hidden = true;
       hudEl.hidden = true;
       errorsEl.textContent = '';
       const page = el('div', 'err-page');
