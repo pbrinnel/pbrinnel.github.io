@@ -55,12 +55,13 @@ function audit(AS, sim, label) {
     // The layers agree: the flow layer holds water exactly where there is depth; a wet tile's
     // solid layer is empty or a wading animal, and it has no blade, corpse, hole or scorch.
     check((W.flow[t] === AS.FLOW.WATER) === (W.wDepth[t] > 0), `${label}: tile ${t} flow ${W.flow[t]}, depth ${W.wDepth[t]}`);
-    // Fire is a flow too: exactly the tiles in fList, each burning a blade or a corpse on dry
-    // ground that isn't a hole, with an age not past its burn time.
+    // Fire is a flow too: exactly the tiles in fList, each burning a blade, a corpse or nothing
+    // (a painted ember) on dry ground that isn't a hole, never an animal, with an age not past
+    // its burn time.
     if (W.flow[t] === AS.FLOW.FIRE) {
       fires++;
       check(W.fList[W.fSlot[t]] === t, `${label}: burning tile ${t} missing from fList`);
-      check(k === K.GRASS || k === K.CORPSE, `${label}: tile ${t} burns kind ${k}`);
+      check(k === K.GRASS || k === K.CORPSE || k === K.EMPTY, `${label}: tile ${t} burns kind ${k}`);
       check(W.wDepth[t] === 0 && !W.hole[t], `${label}: burning tile ${t} is wet or a hole`);
       check(W.fireTime[t] > 0 && W.fireAge[t] >= 0 && W.fireAge[t] <= W.fireTime[t] + 1e-3, `${label}: burning tile ${t} age ${W.fireAge[t]} of ${W.fireTime[t]}`);
     } else {
@@ -98,6 +99,7 @@ function audit(AS, sim, label) {
       const s = W.aSlot[t];
       check(s >= 0 && W.aAlive[s] && W.aTile[s] === t, `${label}: animal grid/slot mismatch at ${t}`);
       check(s >= 0 && AS.kindOf(W.aSpecies[s]) === k, `${label}: animal kind/species mismatch at ${t}`);
+      check(s >= 0 && W.aAlight[s] >= 0 && !Number.isNaN(W.aAlight[s]), `${label}: animal at ${t} has aAlight ${s >= 0 ? W.aAlight[s] : '?'}`);
     }
     if (W.hole[t]) {
       holes++;

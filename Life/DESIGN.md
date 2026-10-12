@@ -330,9 +330,16 @@ next. Fire comes first of the weather systems, and wind is real weather, not an 
   timer; nothing flashes or brightens all at once.
 - **Afterward**, a short scorch, then the ash makes grass regrow faster, as grassland comes
   back thicker after fire.
-- **Animals** sense fire and flee it; in or next to it they lose HP and can die (cause:
-  Burned). A bunny in its hole is safe as a fire passes over. A burning animal doesn't carry
+- **Animals catch fire** (Paul, 12 Oct 2026: anything but water can burn): from a burning
+  neighbor, as a chance per hour by how readily its species catches, or when painted. Alight,
+  it loses HP every second until its fire burns out or it reaches water, which puts it out;
+  if it dies, its body burns on as a corpse (cause: Burned). A burning animal doesn't spread
   fire, for now.
+- **Animals sense fire and flee it.** A bunny makes for its hole, which never burns, and is
+  safe in it as a fire passes over; a burning animal makes for water when there is some near.
+- **Painted fire on bare ground** (Paul, 12 Oct 2026: FIRE MODE should work anywhere but
+  water) burns briefly, like a dropped ember, and can light the fuel beside it. Fire never
+  spreads onto bare ground by itself, so bare ground is still a firebreak.
 - **Starting fires:** one way in, used by PAINT's FIRE MODE now and by lightning and humans
   later.
 - **Order:** mockups of the fire and the wind's look; wind; fire; animals and fire; after
@@ -438,8 +445,9 @@ and **Size** (the Radius slider).
   humans always adult). Grass skips warren holes, scorch and the beach; wolves and humans
   skip holes. While a paint mode is on, dragging paints instead of panning (pan with the
   keys).
-- **FIRE MODE** (12 Oct 2026): tap or drag to set grass and bodies alight in the brush's
-  circle; it spreads from there by itself. Bare ground, water, holes and animals don't catch.
+- **FIRE MODE** (12 Oct 2026): tap or drag to set everything in the brush's circle alight but
+  water and warren holes: grass, bodies and animals catch, and bare ground gets a brief fire
+  of its own; it spreads from there by itself.
   Info shows how many tiles are burning (with its ring toggle) once a world has had a fire,
   and the properties window says how far through its burn a blade or body is.
 - **WATER MODE** (11 Oct 2026): tap or drag to pour water, 1 m deep, on bare ground or

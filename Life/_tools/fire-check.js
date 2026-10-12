@@ -13,10 +13,14 @@ const FIRE = {           // the fire rows every scene starts from (a scene overr
 };
 const BURN = [['BurnHours', 'Grass', 4], ['BurnHours', 'Bunny', 3], ['BurnHours', 'Wolf', 5], ['BurnHours', 'Human', 5],
   ['CorpseDecay', 'Bunny', 10], ['CorpseDecay', 'Wolf', 10]];
+// What an animal does in a fire, set per scene: catches always, burns 4 hours at 2 HP a second.
+const ANIMAL = [['CatchFire', 'Bunny', '100%'], ['CatchFire', 'Wolf', '100%'], ['CatchFire', 'Human', '100%'],
+  ['AlightHours', 'Bunny', 4], ['AlightHours', 'Wolf', 4], ['AlightHours', 'Human', 4],
+  ['BurnDamage', 'Bunny', 2], ['BurnDamage', 'Wolf', 2], ['BurnDamage', 'Human', 2]];
 
 // A world filled with full blades, calm, no water rules, nothing growing or dying.
-function meadow({ size = 41, seed = 1, settings = {}, fill = true } = {}) {
-  const s = stage({ size, seed, settings: Object.assign({}, FIRE, settings), species: [quiet.grass, BURN] });
+function meadow({ size = 41, seed = 1, settings = {}, fill = true, animals = [] } = {}) {
+  const s = stage({ size, seed, settings: Object.assign({}, FIRE, settings), species: [quiet.grass, BURN, ANIMAL, animals] });
   s.AS.weatherTick = () => {};   // this scene's wind is the one it sets
   setWind(s.sim, 0, 1, 0);
   if (fill) for (let t = 0; t < s.W.n; t++) s.W.addGrass(t, 1, 0);
@@ -40,7 +44,7 @@ const audited = (s, label) => audit(s.AS, s.sim, label);
 
 // ---- ignite: what can catch
 {
-  const s = stage({ size: 12, settings: FIRE, species: [quiet.grass, BURN] });
+  const s = stage({ size: 12, settings: FIRE, species: [quiet.grass, BURN, ANIMAL] });
   const { AS, sim, W } = s;
   const at = (x, y) => W.tile(x, y);
   W.addGrass(at(1, 1), 1, 0);
@@ -57,17 +61,16 @@ const audited = (s, label) => audit(s.AS, s.sim, label);
   ok(AS.ignite(sim, at(3, 1)) && Math.abs(W.fireTime[at(3, 1)] - 0.5 * sim.T.grass.BurnHours) < 1e-6, 'a half blade burns half as long');
   ok(AS.ignite(sim, at(5, 1)) && W.fireTime[at(5, 1)] === sim.T.bunny.BurnHours, 'a corpse burns its species\' BurnHours');
   ok(!AS.ignite(sim, at(1, 1)), 'a tile already burning refuses');
-  ok(!AS.ignite(sim, at(0, 8)), 'bare ground refuses');
-  ok(!AS.ignite(sim, at(7, 1)) && W.flow[at(7, 1)] === AS.FLOW.NONE, 'a tile with an animal on it refuses (for now)');
   ok(!AS.ignite(sim, at(9, 1)) && W.flow[at(9, 1)] === AS.FLOW.WATER, 'water refuses');
   ok(!AS.ignite(sim, at(1, 4)), 'a hole with nothing on it refuses');
   ok(!AS.ignite(sim, at(3, 4)), 'a hole with a corpse on it refuses');
   ok(W.fCount === 3, 'three fires burn');
   let threw = 0;
-  for (const t of [at(0, 8), at(9, 1), at(1, 1), at(1, 4)]) { try { W.addFire(t, 1); } catch (e) { threw++; } }
-  ok(threw === 4, 'W.addFire itself refuses bare ground, water, a burning tile and a hole');
+  for (const t of [at(9, 1), at(1, 1), at(1, 4), at(7, 1)]) { try { W.addFire(t, 1); } catch (e) { threw++; } }
+  ok(threw === 4, 'W.addFire itself refuses water, a burning tile, a hole and an animal');
+  ok(AS.ignite(sim, at(7, 1)) && W.flow[at(7, 1)] === AS.FLOW.NONE && W.aAlight[W.aSlot[at(7, 1)]] > 0, 'an animal can be set alight, and its tile does not burn');
   ok(sim.rng.state() === before, 'lighting a fire draws no dice');
-  ok(audited(s, 'ignite') && failures.length === 0, 'the layers audit with three fires');
+  ok(audited(s, 'ignite') && failures.length === 0, 'the layers audit with three fires and a burning animal');
   ok(AS.fireStage(W, at(1, 1)) === 0 && AS.fireStage(W, at(0, 8)) === 0, 'fireStage starts at 0, and is 0 off fire');
   hours(sim, 2);
   const f = AS.fireStage(W, at(1, 1));
@@ -306,6 +309,235 @@ for (const [label, width, water] of [['a bare strip 1 wide', 1, false], ['a bare
   const full = mean(every), half = mean(every / 2), fine = mean(every / 5);
   ok(Math.abs(full - half) < 0.15 * half, `the burnt area barely depends on the step: ${full.toFixed(0)} tiles at ${every.toFixed(2)} h, ${half.toFixed(0)} at half, ${fine.toFixed(0)} at a fifth`);
   void base;
+}
+
+// ---- an animal beside a fire catches it, by its species' CatchFire
+{
+  // Six animals (two of each species) in a ring round a meadow's fire, the fire stepped
+  // directly (nothing else ticks, so nobody wanders off), until all are alight or `maxHours`.
+  const ring = (catchFire, { maxHours = 80, hole = false } = {}) => {
+    const rows = ['Bunny', 'Wolf', 'Human'].map(sp => ['CatchFire', sp, catchFire]);
+    const s = meadow({ size: 31, settings: { FireSpread: 1 }, animals: rows });
+    const { AS, sim, W } = s;
+    const spots = [[10, 10], [20, 10], [10, 20], [20, 20], [15, 8], [15, 22]];
+    const slots = spots.map(([x, y], i) => {
+      const t = W.tile(x, y);
+      W.removeGrass(t);
+      if (hole) W.addHole(t);
+      return AS.spawnStarting(sim, hole ? 0 : i % 3, t);   // only bunnies may stand on a hole
+    });
+    AS.ignite(sim, W.tile(15, 15));
+    const step = AS.FIRE.EVERY / AS.TICKS_PER_HOUR;
+    let h = 0, caughtAt = slots.map(() => -1);
+    for (; h < maxHours && W.fCount > 0; h += step) {
+      AS.fireStep(sim, step);
+      slots.forEach((a, i) => { if (caughtAt[i] < 0 && W.aAlight[a] > 0) caughtAt[i] = h; });
+    }
+    return { s, slots, caughtAt, W, AS, sim };
+  };
+  const hot = ring('100%');
+  ok(hot.caughtAt.every(h => h >= 0), `with CatchFire 100% every animal beside the fire catches (after ${hot.caughtAt.map(h => h.toFixed(1)).join(', ')} h)`);
+  ok(hot.slots.every((a, i) => hot.W.aAlight[a] === hot.sim.T[hot.AS.SPECIES_KEY[i % 3]].AlightHours), 'a fresh catch has its species\' AlightHours left');
+  ok(hot.slots.every(a => hot.W.flow[hot.W.aTile[a]] === hot.AS.FLOW.NONE), 'the animals\' own tiles never burn');
+  const cold = ring('0%');
+  ok(cold.caughtAt.every(h => h < 0) && cold.W.fCount === 0, 'with CatchFire 0 none catches, though the meadow all burns');
+  const holed = ring('100%', { hole: true });
+  ok(holed.caughtAt.every(h => h < 0), 'a bunny in its warren hole beside the fire never catches (a hole is safe)');
+  // Less readily takes longer, on average over a few worlds.
+  const mean = cf => {
+    let sum = 0, n = 0;
+    for (let k = 1; k <= 6; k++) {
+      const rows = ['Bunny', 'Wolf', 'Human'].map(sp => ['CatchFire', sp, cf]);
+      const s = meadow({ size: 31, seed: k, settings: { FireSpread: 1 }, animals: rows });
+      const { AS, sim, W } = s;
+      const t = W.tile(20, 15); W.removeGrass(t);
+      const a = AS.spawnStarting(sim, 0, t);
+      AS.ignite(sim, W.tile(15, 15));
+      const step = AS.FIRE.EVERY / AS.TICKS_PER_HOUR;
+      let h = 0;
+      for (; h < 200 && W.aAlight[a] === 0 && W.fCount > 0; h += step) AS.fireStep(sim, step);
+      if (W.aAlight[a] > 0) { sum += h; n++; }
+    }
+    return n ? sum / n : Infinity;
+  };
+  const quick = mean('100%'), slow = mean('15%');
+  ok(slow > quick, `a less flammable animal catches later (${quick.toFixed(1)} h at 100%, ${slow.toFixed(1)} h at 15%)`);
+  // The same dice: an animal beside a fire is one roll per step, like a blade.
+  ok(audited(hot.s, 'animals in fire') && failures.length === 0, 'audit');
+}
+
+// ---- alight: damage over time, no healing, water douses, it burns out, or kills
+{
+  const mk = (extra = [], settings = {}) => {
+    const s = stage({ size: 15, settings: Object.assign({}, FIRE, settings), species: [quiet.grass, BURN, ANIMAL, quiet.hunger, extra] });
+    s.AS.weatherTick = () => {};
+    return s;
+  };
+  // Loses BurnDamage x time, then it is out and the HP stays.
+  {
+    const s = mk(); const { AS, sim, W } = s;
+    const t = W.tile(7, 7), a = AS.spawnStarting(sim, 0, t);
+    const S = sim.T.bunny;
+    ok(AS.ignite(sim, t) && W.aAlight[a] === S.AlightHours, 'ignite sets an animal alight for AlightHours');
+    ok(!AS.ignite(sim, t), 'a burning animal refuses a second ignite');
+    const ticks = Math.round(S.AlightHours * AS.TICKS_PER_HOUR);
+    tick(sim, Math.round(AS.TICKS_PER_HOUR));   // one hour
+    const lost1 = S.HPMax - W.aHP[a];
+    ok(Math.abs(lost1 - S.BurnDamage * AS.TICKS_PER_HOUR * AS.DT) < 1e-3, `an hour alight costs BurnDamage x time (${lost1.toFixed(2)} HP)`);
+    tick(sim, ticks - Math.round(AS.TICKS_PER_HOUR));
+    ok(W.aAlight[a] === 0 && W.aAlive[a], 'AlightHours later it is out, and alive');
+    const lost = S.HPMax - W.aHP[a];
+    ok(Math.abs(lost - S.BurnDamage * ticks * AS.DT) < 1e-3, `the whole burn cost ${lost.toFixed(2)} HP = BurnDamage x AlightHours x clock`);
+    tick(sim, 30);
+    ok(W.aHP[a] > S.HPMax - lost, 'once out it heals again');
+    ok(audited(s, 'alight') && failures.length === 0, 'audit');
+  }
+  // It does not heal while alight: hurt first, then watch HP only fall.
+  {
+    const s = mk(); const { AS, sim, W } = s;
+    const t = W.tile(7, 7), a = AS.spawnStarting(sim, 1, t);
+    W.aHP[a] = 30;
+    AS.ignite(sim, t);
+    let rose = 0, last = W.aHP[a];
+    for (let i = 0; i < 60; i++) { sim.tick(); if (W.aHP[a] > last + 1e-6) rose++; last = W.aHP[a]; }
+    ok(rose === 0 && last < 30, 'a burning animal never heals');
+  }
+  // Water puts it out at once.
+  {
+    const s = mk(); const { AS, sim, W } = s;
+    const t = W.tile(7, 7), a = AS.spawnStarting(sim, 2, t);
+    AS.ignite(sim, t);
+    tick(sim, 10);
+    const hp = W.aHP[a], here = W.aTile[a];   // (it has walked on since)
+    W.setDepth(here, 0.1);   // the water comes to it
+    sim.tick();
+    ok(W.aAlight[a] === 0, 'standing in water puts it out at once');
+    ok(W.aHP[a] >= hp - 1e-4, 'and the tick it is put out costs no fire damage');
+    ok(!AS.ignite(sim, W.aTile[a]) && W.aAlight[a] === 0, 'a wading animal cannot be set alight');
+  }
+  // It dies of it: a burning corpse, cause Burned; in water, no body.
+  {
+    const s = mk([['BurnDamage', 'Bunny', 600]]); const { AS, sim, W } = s;
+    const t = W.tile(7, 7), a = AS.spawnStarting(sim, 0, t);
+    AS.ignite(sim, t);
+    tick(sim, 3);
+    ok(!W.aAlive[a] && W.cCount === 1, 'an animal burnt to 0 HP dies and leaves a corpse');
+    const c = W.cList[0];
+    ok(W.cCause[c] === AS.CAUSE.BURNED, 'its cause is Burned');
+    ok(W.flow[c] === AS.FLOW.FIRE && W.fireTime[c] === sim.T.bunny.BurnHours, 'the corpse is burning, for its species\' BurnHours');
+    burnOut(sim);
+    ok(W.cCount === 0 && W.scorch[c] > 0, 'the body burns away like any corpse and scorches the ground');
+    ok(audited(s, 'burnt') && failures.length === 0, 'audit');
+  }
+  {
+    const s = mk([['BurnDamage', 'Wolf', 600]]); const { AS, sim, W } = s;
+    // Hole: the body of a bunny that dies alight in a hole does not burn (a hole never burns).
+    const s2 = mk([['BurnDamage', 'Bunny', 600]]);
+    const th = s2.W.tile(3, 3); s2.W.addHole(th);
+    const b = s2.AS.spawnStarting(s2.sim, 0, th);
+    s2.AS.ignite(s2.sim, th);   // refused: it is in its hole
+    ok(s2.W.aAlight[b] === 0, 'an animal in a hole refuses to catch');
+    s2.W.aAlight[b] = 5;        // (it ran in while burning)
+    tick(s2.sim, 3);
+    ok(s2.W.cCount === 1 && s2.W.fCount === 0, 'one that dies alight in a hole leaves a body that does not burn');
+    // In water: no corpse, as ever.
+    const t = W.tile(7, 7), a = AS.spawnStarting(sim, 1, t);
+    W.setDepth(t, 0.1);
+    AS.killAnimal(sim, a, AS.CAUSE.BURNED);
+    ok(W.cCount === 0 && W.fCount === 0, 'a death in water leaves no corpse, burning or not');
+  }
+  // Fire catches from a burning neighbor while it lives its ordinary life: the whole thing, ticking.
+  {
+    const s = mk([['CatchFire', 'Bunny', '100%']], { FireSpread: 20 });
+    const { AS, sim, W } = s;
+    for (let t = 0; t < W.n; t++) if (W.tile(7, 7) !== t) W.addGrass(t, 1, 0);
+    const a = AS.spawnStarting(sim, 0, W.tile(7, 7));
+    AS.ignite(sim, W.tile(7, 8));
+    tick(sim, 60);
+    ok(W.aAlight[a] > 0 || !W.aAlive[a], 'ticking the whole sim, an animal beside a fire is set alight');
+  }
+}
+
+// ---- painted fire on bare ground: a brief ember that lights the fuel beside it and burns out
+{
+  const s = stage({ size: 12, settings: Object.assign({}, FIRE, { FireSpread: 10, EmberHours: 1 }), species: [quiet.grass, BURN, ANIMAL] });
+  const { AS, sim, W } = s;
+  s.AS.weatherTick = () => {};
+  setWind(sim, 0, 1, 0);
+  const t = W.tile(5, 5), blade = W.tile(6, 5), far = W.tile(10, 10);
+  W.addGrass(blade, 1, 0); W.addGrass(far, 1, 0);
+  ok(W.isBare(t), 'the ground is bare');
+  ok(AS.ignite(sim, t) && W.flow[t] === AS.FLOW.FIRE && W.kind[t] === AS.KIND.EMPTY, 'bare ground can be set alight');
+  ok(W.fireTime[t] === sim.T.world.EmberHours, 'an ember burns EmberHours');
+  ok(!W.isBare(t), 'a burning ember is not bare (nothing is placed on it)');
+  burnOut(sim);
+  ok(W.kind[blade] === AS.KIND.EMPTY && W.scorch[blade] > 0, 'the ember lit the blade beside it (and it burnt)');
+  ok(W.kind[far] === AS.KIND.GRASS && W.scorch[far] === 0, 'a blade out of reach is untouched');
+  ok(W.fCount === 0 && W.flow[t] === AS.FLOW.NONE && W.kind[t] === AS.KIND.EMPTY, 'the ember goes out and leaves nothing');
+  ok(W.scorch[t] > 0 && W.scorch[t] <= sim.T.world.FireScorchDays, 'it scorches the ground');
+  ok(!AS.ignite(sim, t), 'scorched ground refuses (nothing left to burn)');
+  ok(audited(s, 'ember') && failures.length === 0, 'audit');
+  // A painted brush over a mixed patch: everything but water and holes catches.
+  const q = stage({ size: 12, settings: FIRE, species: [quiet.grass, BURN, ANIMAL] });
+  const w = q.W;
+  w.addGrass(w.tile(5, 5), 1, 0); q.AS.spawnStarting(q.sim, 0, w.tile(6, 5)); w.addWater(w.tile(7, 5)); w.addHole(w.tile(5, 6));
+  const lit = q.AS.paintCircle(q.sim, 'fire', 6, 5, 1.5);
+  const a = w.aSlot[w.tile(6, 5)];
+  ok(w.flow[w.tile(7, 5)] === q.AS.FLOW.WATER && w.flow[w.tile(5, 6)] === q.AS.FLOW.NONE, 'the brush leaves water and the hole alone');
+  ok(w.aAlight[a] > 0 && w.flow[w.tile(5, 5)] === q.AS.FLOW.FIRE && w.flow[w.tile(6, 4)] === q.AS.FLOW.FIRE, 'the brush lights the animal, the blade and the bare ground');
+  ok(lit > 0 && audited(q, 'brush') && failures.length === 0, `FIRE MODE counts what caught (${lit}) and the layers audit`);
+}
+
+// ---- fire never spreads onto bare ground, and nothing walks into a painted ember
+{
+  const s = meadow({ size: [41, 21], settings: { FireSpread: 4 } });
+  const { AS, sim, W } = s;
+  const bare = [];
+  for (let y = 0; y < W.h; y++) for (let x = 20; x < 24; x++) { const t = W.tile(x, y); W.removeGrass(t); bare.push(t); }
+  const painted = W.tile(21, 10);
+  AS.ignite(sim, painted);   // the only way onto bare ground
+  AS.ignite(sim, W.tile(5, 10));
+  let onBare = 0;
+  for (let i = 0; i < 400 * HOUR_TICKS && W.fCount > 0; i++) {
+    sim.tick();
+    for (const t of bare) if (t !== painted && W.flow[t] === AS.FLOW.FIRE) onBare++;
+  }
+  ok(onBare === 0, 'fire never spreads onto bare ground');
+  ok(bare.every(t => (t === painted) === (W.scorch[t] > 0)), 'only the painted tile of the bare strip was scorched');
+}
+{
+  // A living world, embers and animals together, asserted every tick.
+  const s = stage({ seed: 3, size: [60, 45], bare: false, settings: Object.assign({ StartLayout: 'Meadows' }, FIRE, { FireSpread: 1 }), species: [ANIMAL] });
+  const { AS, sim, W } = s;
+  const K = AS.KIND;
+  let stood = 0, burnedAnimals = 0, ticks = 0, painted = 0;
+  const pick = (() => { let x = 12345; return n => { x = (Math.imul(x, 1103515245) + 12345) >>> 0; return x % n; }; })();
+  for (let i = 0; i < 4000; i++) {
+    if (i % 25 === 0) painted += AS.paintCircle(sim, 'fire', pick(W.w), pick(W.h), 2 + pick(3));
+    sim.tick(); ticks++;
+    for (let k = 0; k < W.fCount; k++) { const t = W.fList[k]; if (W.kind[t] >= K.BUNNY) stood++; }
+    for (let a = 0; a < W.aHigh; a++) {
+      if (!W.aAlive[a]) continue;
+      if (W.flow[W.aTile[a]] === AS.FLOW.FIRE) stood++;
+      if (W.aAlight[a] > 0) burnedAnimals++;
+    }
+  }
+  ok(stood === 0, `no animal ever stood on a burning tile (${ticks} ticks, ${painted} tiles painted, ${burnedAnimals} animal-ticks alight)`);
+  ok(burnedAnimals > 0, 'the run did burn animals');
+  ok(audited(s, 'embers and animals') && failures.length === 0, 'the layers audit after');
+}
+
+// ---- the properties window names the cause
+{
+  const s = stage({ size: 9, settings: FIRE, species: [quiet.grass, BURN, ANIMAL, [['BurnDamage', 'Bunny', 600]]], files: ['inspect'] });
+  const { AS, sim, W } = s;
+  const t = W.tile(4, 4);
+  AS.spawnStarting(sim, 0, t);
+  AS.ignite(sim, t);
+  tick(sim, 3);
+  const d = AS.describe(sim, { tile: W.cList[0], serial: W.serial[W.cList[0]], slot: -1 });
+  const row = d && d.rows.find(r => r.name === 'Cause');
+  ok(row && row.value === 'Burned', `the Cause row reads Burned (${row && row.value})`);
 }
 
 // ---- the same worlds with no fire in them (the rest of the suite, plus the full-world replay in harness.js, run through the new tick)

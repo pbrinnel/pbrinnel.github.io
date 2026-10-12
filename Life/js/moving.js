@@ -11,9 +11,12 @@
   // blank = none), slowed to WadeSpeed of its speed there; deeper water is a wall to it.
   AS.wadeOf = (sim, s) => AS.speciesStats(sim, s).WadeDepth || 0;
   // Whether an animal wading `wade` m deep can step onto t: open ground, or water with
-  // nothing in it no deeper than that. Holes are the caller's rule.
+  // nothing in it no deeper than that. Never a burning tile (a painted ember is fire on empty
+  // ground), so this tests the flow, not just the depth. Holes are the caller's rule.
   AS.canStand = (W, t, wade) => {
-    return W.kind[t] === KIND.EMPTY && (W.flow[t] === FLOW.NONE || W.wDepth[t] <= wade);
+    if (W.kind[t] !== KIND.EMPTY) return false;
+    const f = W.flow[t];
+    return f === FLOW.NONE || (f === FLOW.WATER && W.wDepth[t] <= wade);
   };
 
   // Swimming (Paul, 12 Oct 2026: wolves swim well and rabbits badly, as they do). Water
@@ -205,7 +208,7 @@
   const OUT_RANGE = 40;
   let oW = null, oWade = 0, oHoles = false;
   const outCost = t => {
-    return oW.kind[t] === KIND.EMPTY && (oHoles || !oW.hole[t]) ? 1 : Infinity;
+    return oW.kind[t] === KIND.EMPTY && oW.flow[t] !== FLOW.FIRE && (oHoles || !oW.hole[t]) ? 1 : Infinity;
   };
   const isStandable = t => AS.canStand(oW, t, oWade) && (oHoles || !oW.hole[t]);
   const onb = new Int32Array(4);

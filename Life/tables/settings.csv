@@ -38,6 +38,7 @@ FireSpread,0.3,"Fire: how fast it leaps, per in-world hour, to a full blade of b
 FireWind,0.8,"Fire: how much a strong wind tilts it (1 = a gale doubles its pace downwind and stops it upwind; 0 = wind makes no difference); a typical breeze is a third of a gale"
 FireDryness,70%,Fire: how dry the ground is (0-100%) in a world without water; where there is water the soil's own wetness decides
 FireScorchDays,2,Fire: days the burnt ground stays scorched (bare: nothing grows or is dug there) before grass can return
+EmberHours,1,"Fire: in-world hours a fire painted on bare ground burns (it has no fuel, so it is brief: about a second at 1×); long enough to be seen and to have a fair chance of lighting a blade beside it"
 BrushRadius,0,PAINT tab: the default radius in tiles of the grass/rabbit/wolf/human/water brush (0 = one tile; the Radius slider overrides it per mode)
 Seed,,Blank = new random seed each run; the seed used is shown on screen so you can paste it here to replay that start
 AnimalWarnAt,20000,PAINT tab: painting past this many animals in total asks first since big crowds slow the sim down on many devices (the benchmark shows smooth to about 32000 animals on a Mac; phones vary)

@@ -31,6 +31,7 @@
   const drinkCost = t => {
     const k = dW.kind[t];
     if (k === KIND.EMPTY) {
+      if (dW.flow[t] === AS.FLOW.FIRE) return Infinity;   // a painted ember
       if (dW.flow[t] !== AS.FLOW.NONE) return dW.wDepth[t] <= dWade ? dInvSpeed : Infinity;
       return dW.hole[t] && !dHoles ? Infinity : dInvSpeed;
     }

@@ -20,8 +20,8 @@
 //   was left empty for want of room (main.js's soft limit on the animal total).
 //   'water' pours water instead (placed = tiles poured on), and 'fire' sets alight every tile
 //   in the circle that will burn (placed = tiles that caught), through AS.ignite alone, so
-//   fire's own rules decide: grass and corpses with no water and no hole; bare ground, water
-//   and animals are skipped. Neither takes a cap.
+//   fire's own rules decide: grass, corpses and animals (not in a hole), and bare ground (a
+//   brief ember, unless scorched); water and warren holes are skipped. Neither takes a cap.
 (function (AS) {
   'use strict';
 
@@ -44,6 +44,7 @@
         const k = W.kind[t];
         if (k >= AS.KIND.BUNNY) { W.removeAnimal(W.aSlot[t]); out.animals++; }
         if (W.wDepth[t] > 0) continue;   // water is not the nuke's to touch, and it can't scorch
+        if (W.flow[t] === AS.FLOW.FIRE && k === AS.KIND.EMPTY) W.removeFire(t);   // an ember has nothing left to burn on
         else if (k === AS.KIND.GRASS) { W.removeGrass(t); out.blades++; }
         else if (k === AS.KIND.CORPSE) { AS.corpseRemove(sim, t); out.corpses++; }
         if (W.hole[t]) { W.removeHole(t); out.holes++; }

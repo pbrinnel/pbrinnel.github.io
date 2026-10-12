@@ -2,7 +2,9 @@
 //
 // A tile has layers. `kind` is the solid layer: at most one blade, corpse or animal, and EMPTY
 // when none. `flow` is the flow layer: at most one flowing thing (water or fire). A wading
-// animal is a solid in water's flow; a burning blade or corpse is a solid in fire's. `kind`
+// animal is a solid in water's flow; a burning blade or corpse is a solid in fire's, and a
+// painted ember is fire on bare ground with no solid at all. An animal's own fire is not in
+// the flow layer: it moves with the animal (aAlight). `kind`
 // is the truth about who is where. Only the add/remove/move
 // functions in this file write `kind`, `aSlot` or the dense lists; everything else writes
 // its own fields and calls these to change occupancy, so the grid can't drift from the
@@ -36,7 +38,7 @@
 
   // Why a corpse is a corpse (W.cCause, shown by the inspector's Cause row). A kill is ATTACKED
   // plus the biter's species code, so a new species needs no new cause.
-  AS.CAUSE = Object.freeze({ UNKNOWN: 0, OLD_AGE: 1, STARVED: 2, THIRST: 3, STARVED_THIRSTY: 4, DEBUG: 5, ATTACKED: 16 });
+  AS.CAUSE = Object.freeze({ UNKNOWN: 0, OLD_AGE: 1, STARVED: 2, THIRST: 3, STARVED_THIRSTY: 4, DEBUG: 5, BURNED: 6, ATTACKED: 16 });
 
   const ANIMAL_START_CAPACITY = 1024;
   // wDist for a tile no water can be reached from.
@@ -64,6 +66,7 @@
     aWater: Float32Array,  // the water meter, like Fullness; drained and refilled by animals.js and DRINK
     aStamina: Float32Array,
     aHP: Float32Array,
+    aAlight: Float64Array, // in-world hours of fire left on it (0 = not burning); fire.js sets it, animals.js counts it down
     aState: Uint8Array,    // index into T.states[species]
     aSprint: Uint8Array,
     aWinded: Uint8Array,       // ran Stamina to 0; no sprinting until it's full again
@@ -129,7 +132,8 @@
       hCount: 0,
 
       // Fire, by tile, same pattern: fList holds the burning tiles densely, so only they do
-      // work. A burning tile holds a blade or a corpse (its fuel; fire.js decides what burns).
+      // work. A burning tile holds a blade, a corpse (its fuel) or nothing (a painted ember on bare
+      // ground), never an animal, water or a hole; fire.js decides what burns.
       // fireAge is hours burning, fireTime hours this tile's fuel burns, set when it caught.
       fireAge: new Float32Array(n),
       fireTime: new Float32Array(n),
@@ -340,12 +344,13 @@
       if (beach && W.kind[u] === KIND.GRASS) W.removeGrass(u);
     }
 
-    // Sets the blade or corpse on tile t burning for `burnHours` in-world hours (fire.js works
-    // out how long: ignite is the one way a fire starts). Needs fuel and an empty flow layer,
-    // so it never starts on water; a warren hole never burns (a bunny in it is safe).
+    // Sets the blade or corpse on tile t, or bare ground (a painted ember), burning for
+    // `burnHours` in-world hours (fire.js works out how long: ignite is the one way a fire
+    // starts). Needs an empty flow layer, so it never starts on water; a warren hole never
+    // burns (a bunny in it is safe) and neither does an animal's tile (its fire is aAlight).
     W.addFire = function (t, burnHours) {
       const k = W.kind[t];
-      if (k !== KIND.GRASS && k !== KIND.CORPSE) throw new Error(`tile ${t} has nothing to burn (kind ${k})`);
+      if (k !== KIND.GRASS && k !== KIND.CORPSE && k !== KIND.EMPTY) throw new Error(`tile ${t} can't burn (kind ${k})`);
       if (W.flow[t] !== FLOW.NONE) throw new Error(`tile ${t} is taken (flow ${W.flow[t]})`);
       if (W.hole[t]) throw new Error(`tile ${t} is a warren hole; it doesn't burn`);
       W.flow[t] = FLOW.FIRE;
@@ -356,7 +361,7 @@
     };
 
     // The fire on tile t is out: burnt through (fire.js scorches the ground), put out by water,
-    // or its fuel taken. The solid stays as it is.
+    // or its fuel taken. The solid, if any, stays as it is.
     W.removeFire = function (t) {
       if (W.flow[t] !== FLOW.FIRE) throw new Error(`no fire on tile ${t}`);
       const i = W.fSlot[t], last = W.fList[--W.fCount];
@@ -477,6 +482,7 @@
     // Returns the new slot. The caller fills in the rest of the animal's fields.
     W.addAnimal = function (t, species, sex) {
       if (W.hole[t] && !AS.canEnterHole(species)) throw new Error(`tile ${t} is a warren hole; only bunnies can enter`);
+      if (W.flow[t] === FLOW.FIRE) throw new Error(`tile ${t} is burning; no animal is placed on fire`);
       claim(t, AS.kindOf(species), true);   // painted into water: it wades, or moving.js walks it out
       let s = W.aFree.length ? W.aFree.pop() : W.aHigh++;
       if (s >= W.aCap) growAnimals(W.aCap * 2);
@@ -511,6 +517,7 @@
     W.moveAnimal = function (s, t2) {
       const t = W.aTile[s];
       if (W.hole[t2] && !AS.canEnterHole(W.aSpecies[s])) throw new Error(`tile ${t2} is a warren hole; only bunnies can enter`);
+      if (W.flow[t2] === FLOW.FIRE) throw new Error(`tile ${t2} is burning; no animal steps onto fire`);
       claim(t2, W.kind[t], true);
       free(t);
       const b1 = blockOf(t), b2 = blockOf(t2);

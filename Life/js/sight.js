@@ -9,7 +9,7 @@
   'use strict';
 
   const K = AS.KIND;
-  const GRASS = K.GRASS, EMPTY = K.EMPTY, ANIMAL = K.BUNNY;
+  const GRASS = K.GRASS, EMPTY = K.EMPTY, ANIMAL = K.BUNNY, FIRE = AS.FLOW.FIRE;
 
   // ---- Line of sight ----
 
@@ -145,7 +145,7 @@
   }
 
   // The first step of a shortest path from `from` to the nearest tile where goal(t) is true,
-  // walking 4-directionally through tiles the walker can stand on (empty ones, and water no
+  // walking 4-directionally through tiles the walker can stand on (empty ones that aren't burning, and water no
   // deeper than the animal on `from` wades: moving.js canStand) and never leaving the circle
   // of `range` around `from`. Returns `from` if goal(from) already holds, or -1 if no goal is
   // reachable. goal is tested only on tiles the walker could stand on (and `from`).
@@ -183,7 +183,7 @@
         const nt = ny * w + nx;
         if (stamp[nt] === gen) continue;
         const kn = kind[nt];
-        if (kn !== EMPTY || depth[nt] > wade) continue;
+        if (kn !== EMPTY || depth[nt] > wade || W.flow[nt] === FIRE) continue;   // (a painted ember is fire on empty ground)
         const ddx = nx - fx, ddy = ny - fy;
         if (ddx * ddx + ddy * ddy > r2) continue;
         stamp[nt] = gen;

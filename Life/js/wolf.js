@@ -123,6 +123,7 @@
   const cost = t => {
     const k = mW.kind[t];
     if (k === K.EMPTY) {
+      if (mW.flow[t] === AS.FLOW.FIRE) return Infinity;   // a painted ember
       if (mW.flow[t] === AS.FLOW.WATER) return mW.wDepth[t] <= mWade ? mInvWade : mSwim ? mInvSwim : Infinity;
       return mW.hole[t] ? Infinity : mInvSpeed;   // a hole is a wall to wolves
     }

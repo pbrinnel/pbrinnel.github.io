@@ -1,9 +1,14 @@
 // Fire: a flow a tile can be in (world.js owns the layer), burning the solid under it. A
-// blade or a corpse is the fuel; bare ground, holes and water never burn, so they are
-// firebreaks. Animals don't burn yet, and fire doesn't spread onto a tile with one.
+// blade or a corpse is the fuel; bare ground, holes and water never catch from a neighbor, so
+// they are firebreaks. Only ignite puts fire on bare ground (a brief ember, EmberHours) and
+// that ember lights fuel beside it by the normal rules. An animal burns too, but its fire is
+// on the animal (W.aAlight, in-world hours left; animals.js counts it down and does the
+// damage), not in the tile's flow layer: a burning tile never holds an animal.
 //
 //   AS.ignite(sim, t) → bool      the one way a fire starts: PAINT's FIRE MODE now, lightning
-//                                 and humans later. False unless t has fuel, no flow and no hole.
+//                                 and humans later. True when something caught: a blade or
+//                                 corpse (no flow, no hole), an animal not already alight (not
+//                                 in a hole or water), or bare ground (no hole, not scorched).
 //   AS.fireTick(sim)              every FIRE_EVERY ticks: ages each burning tile, lets it light
 //                                 its neighbors, and ends the ones that have burnt through.
 //   AS.fireStep(sim, hours)       the same pass for `hours` of in-world time (the checks call it
@@ -13,12 +18,15 @@
 //
 // A burning tile has an age (hours) and a burn time (how long its fuel lasts, set when it
 // catches: a blade's is Grass BurnHours times its Size, a corpse's its species' BurnHours).
-// While it burns, each of its 8 neighbors that has fuel and no flow may catch, as a chance per
-// in-world hour with this rate (per hour):
+// While it burns, each of its 8 neighbors that has fuel (or an animal) and no flow may catch, as
+// a chance per in-world hour with this rate (per hour):
 //
 //   FireSpread × fuel × dryness × wind × (1 / distance)
 //
-//   fuel      the neighbor's: a blade's Size (0..1), a corpse counts as full
+//   fuel      the neighbor's: a blade's Size (0..1), a corpse counts as full; an animal's is its
+//             species' CatchFire, and dryness doesn't apply to it (1). A bunny in a warren hole
+//             is safe, as a hole's corpse is. An ember (bare ground) has no fuel of its own, so
+//             its spread uses the neighbor's, like any other fire's
 //   dryness   0..1, 1 - soil water / the soil's room under the neighbor, so a drought burns
 //             readily and wet ground hardly at all; FireDryness where the world has no water rules
 //   wind      max(0, 1 + FireWind × s × cos), s = wind strength / FULL_WIND_KMH (at most 1),
@@ -33,7 +41,7 @@
 // tile is burning with a neighbor that could catch: a world without fire draws nothing.
 //
 // Burning out: the solid is gone (a blade removed; a corpse through corpse.js so the grass it
-// was boosting is released), the tile's flow is NONE, and the ground is scorched for
+// was boosting is released; an ember has none), the tile's flow is NONE, and the ground is scorched for
 // FireScorchDays (the larger of that and any scorch it already had). The ash that makes grass
 // regrow faster comes in a later step.
 (function (AS) {
@@ -52,8 +60,6 @@
   const LEN = DX.map((x, i) => Math.hypot(x, DY[i]));
   const dirRate = new Float64Array(8);   // per direction: the wind factor / distance, for this pass
 
-  const hasFuel = (W, t) => (W.kind[t] === KIND.GRASS || W.kind[t] === KIND.CORPSE) && !W.hole[t];
-
   // How long the fuel on tile t burns, in in-world hours.
   function burnHours(sim, t) {
     const W = sim.W;
@@ -61,10 +67,26 @@
     return sim.T[AS.SPECIES_KEY[W.cSpecies[t]]].BurnHours;
   }
 
+  // Sets animal s alight for its species' AlightHours.
+  function setAlight(sim, s) {
+    sim.W.aAlight[s] = sim.T[AS.SPECIES_KEY[sim.W.aSpecies[s]]].AlightHours;
+  }
+
   AS.ignite = function (sim, t) {
-    const W = sim.W;
-    if (!hasFuel(W, t) || W.flow[t] !== FLOW.NONE) return false;
-    W.addFire(t, burnHours(sim, t));
+    const W = sim.W, k = W.kind[t];
+    if (W.flow[t] !== FLOW.NONE || W.hole[t]) return false;   // water, a fire already, or a hole (never burns)
+    if (k >= KIND.BUNNY) {
+      const s = W.aSlot[t];
+      if (W.aAlight[s] > 0) return false;
+      setAlight(sim, s);
+      return true;
+    }
+    if (k === KIND.EMPTY) {
+      if (W.scorch[t] > 0) return false;   // already burnt: nothing left to light
+      W.addFire(t, sim.T.world.EmberHours);
+      return true;
+    }
+    W.addFire(t, burnHours(sim, t));   // a blade or a corpse
     return true;
   };
 
@@ -78,7 +100,7 @@
     const W = sim.W;
     W.removeFire(t);
     if (W.kind[t] === KIND.GRASS) W.removeGrass(t);
-    else AS.corpseRemove(sim, t);
+    else if (W.kind[t] === KIND.CORPSE) AS.corpseRemove(sim, t);   // (an ember has no solid to remove)
     const days = sim.T.world.FireScorchDays;
     if (days > W.scorch[t]) W.scorch[t] = days;
   }
@@ -113,7 +135,16 @@
           if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
           const u = ny * w + nx;
           if (flow[u] !== FLOW.NONE || hole[u]) continue;
-          const fuel = kind[u] === KIND.GRASS ? gSize[u] : kind[u] === KIND.CORPSE ? 1 : 0;
+          const ku = kind[u];
+          if (ku >= KIND.BUNNY) {
+            // An animal catches by its species' CatchFire; soil dryness is a blade's business.
+            const a = W.aSlot[u];
+            if (W.aAlight[a] > 0) continue;
+            const rate = spread * T[AS.SPECIES_KEY[W.aSpecies[a]]].CatchFire * dirRate[d];
+            if (rate > 0 && rng.chance(1 - Math.exp(-rate * live))) setAlight(sim, a);
+            continue;
+          }
+          const fuel = ku === KIND.GRASS ? gSize[u] : ku === KIND.CORPSE ? 1 : 0;
           if (fuel <= 0) continue;
           const dry = G ? 1 - G[u] / room : drySet;
           const rate = spread * fuel * (dry < 0 ? 0 : dry > 1 ? 1 : dry) * dirRate[d];

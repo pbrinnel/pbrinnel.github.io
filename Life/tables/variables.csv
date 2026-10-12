@@ -19,7 +19,7 @@ Children,Dynamic,Bunny Wolf,count,Each birth,—,
 Kills,Dynamic,Wolf Human,count,Each kill,—,
 Nutrient,Dynamic,Corpse,0 – CorpseNutrient,—,Drunk by boosted grass (one per unit of extra growth),0 or CorpseDecay days → corpse gone
 Burning,Dynamic,Grass Corpse,No / 0 – 100%,Burning: the fire eats into it (age / burn time),Burns out at 100%,"100% → burnt away, leaving scorched ground (FireScorchDays)"
-Cause,Static,Corpse,a cause,—,—,Set when the animal dies: attacked by a species that hunts it (a wolf or human); starved; died of thirst; starved and thirsty; old age; dropped (debug). A nuke leaves no corpse
+Cause,Static,Corpse,a cause,—,—,Set when the animal dies: attacked by a species that hunts it (a wolf or human); starved; died of thirst; starved and thirsty; burned; old age; dropped (debug). A nuke leaves no corpse
 Meat,Dynamic,Corpse,0 – MeatOnBody,—,Eaten by a wolf or human (BiteFood per mouthful),0 or CorpseDecay days → nothing left to eat; the corpse is bones
 InHole,Dynamic,Bunny,yes / no,Walks onto a warren hole,Walks off it,A bunny in a hole can't be bitten or hunted
 LastUsed,Dynamic,Hole,0 – CollapseDays (days),Every tick no bunny stands on it,A bunny stands on it,CollapseDays → the hole collapses into bare ground

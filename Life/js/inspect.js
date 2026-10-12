@@ -144,7 +144,7 @@
     Cause: (sim, c) => {
       const v = sim.W.cCause[c.t], C = AS.CAUSE;
       if (v >= C.ATTACKED) return 'Attacked by a ' + AS.SPECIES_KEY[v - C.ATTACKED];
-      return { [C.OLD_AGE]: 'Old age', [C.STARVED]: 'Starved', [C.THIRST]: 'Died of thirst', [C.STARVED_THIRSTY]: 'Starved and thirsty', [C.DEBUG]: 'Dropped (debug)' }[v] || 'Unknown';
+      return { [C.OLD_AGE]: 'Old age', [C.STARVED]: 'Starved', [C.THIRST]: 'Died of thirst', [C.STARVED_THIRSTY]: 'Starved and thirsty', [C.BURNED]: 'Burned', [C.DEBUG]: 'Dropped (debug)' }[v] || 'Unknown';
     },
     Meat: (sim, c) => outOf(sim.W.cMeat[c.t], sim.T[AS.SPECIES_KEY[sim.W.cSpecies[c.t]]].MeatOnBody),
     Nutrient: (sim, c) => outOf(sim.W.cNut[c.t], sim.T[AS.SPECIES_KEY[sim.W.cSpecies[c.t]]].CorpseNutrient),

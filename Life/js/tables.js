@@ -111,6 +111,9 @@
     ['CorpseRadius', 'num', ANIMALS],
     ['CorpseBoost', 'num', ANIMALS],
     ['BurnHours', 'pos', ALL],
+    ['CatchFire', 'frac', ANIMALS],
+    ['AlightHours', 'pos', ANIMALS],
+    ['BurnDamage', 'num', ANIMALS],
   ];
 
   // Kept small enough that one grid's typed arrays stay well inside a phone's memory.
@@ -160,6 +163,7 @@
     ['FireWind', 'num'],
     ['FireDryness', 'frac'],
     ['FireScorchDays', 'pos'],
+    ['EmberHours', 'pos'],
     ['BrushRadius', 'num'],
     ['AnimalWarnAt', 'pos'],
     ['Seed', 'seed'],

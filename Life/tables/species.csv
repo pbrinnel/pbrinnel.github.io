@@ -89,3 +89,6 @@ MeatOnBody,Fullness,60,60,60,,Food on a body for whoever eats it (EatsCarcass); 
 CorpseRadius,tiles,3,3,3,,Grass inside grows and seeds faster
 CorpseBoost,× multiplier,3,3,3,,Applied to GrowthRate and SeedChance in radius
 BurnHours,hours,6,10,10,6,"In-world hours it burns once alight: a full blade of grass (a smaller blade burns less, down to a fifth of this) or a body (a corpse burns this long whatever is left of it)"
+CatchFire,% of FireSpread,100%,70%,50%,,"How readily it catches from a burning tile beside it: FireSpread times this, with the wind and the distance as for a blade (soil dryness does not apply). One in a warren hole or in water never catches"
+AlightHours,hours,6,8,8,,In-world hours it stays alight unless water puts it out first
+BurnDamage,HP per s,5,6,5,,"HP lost each second it is alight; it stops when the fire burns out (AlightHours) or water puts it out. Set so a bunny dies of a full burn and a healthy wolf or human lives"

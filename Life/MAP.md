@@ -85,7 +85,13 @@ load time: every file reads other files' `AS.*` inside functions, at call time.
 - **Flow:** `W.flow[t]` (`AS.FLOW`: NONE, WATER, FIRE), at most one per tile; water's
   amount is `wDepth`; fire's state is `fireAge`/`fireTime` (hours) with a dense list
   `fList`/`fSlot`/`fCount`, written only by `addFire`/`removeFire` (taking the blade or
-  corpse, or water arriving, puts the fire out). A burning blade neither grows nor seeds. `W.isBare(t)`: no solid and no flow (where a blade sprouts, a
+  corpse, or water arriving, puts the fire out). A burning blade neither grows nor seeds. A
+  burning tile holds a blade, a corpse, or nothing (a painted ember, `EmberHours`); fire never
+  spreads onto bare ground by itself. A burning *animal* carries its fire as `aAlight` (hours
+  left), not in the flow layer: it catches from a burning neighbor (`FireSpread` ×
+  `CatchFire` × wind ÷ distance) or from `ignite`, loses `BurnDamage` HP/s, doesn't heal, is
+  put out by water, and if it dies alight its corpse is lit (cause BURNED for a death by
+  fire). `canStand` allows only no flow or shallow water, so nothing walks into fire. `W.isBare(t)`: no solid and no flow (where a blade sprouts, a
   hole is dug, a baby is born, a brush paints); `W.isOpenWater(t)`: water with nothing in it.
 - **Ground:** height (`elev`), holes, scorch, beach, and the soil water (`W.water.G`).
 - **Air:** the world's wind (`sim.wind`, weather.js).

@@ -151,22 +151,27 @@
 
   // `cause` is an AS.CAUSE for the corpse; the body's own deaths work theirs out (bodyCause).
   // What killed an animal whose HP ran out or whose Lifespan ended in its own body tick: old age
-  // first, else whichever meter is empty (both: starved and thirsty).
-  function bodyCause(sim, s) {
+  // first, then fire if it was alight (it is what finished it), else whichever meter is empty
+  // (both: starved and thirsty).
+  function bodyCause(sim, s, burning) {
     const W = sim.W, S = AS.speciesStats(sim, s), C = AS.CAUSE;
     if (W.aAge[s] >= S.Lifespan) return C.OLD_AGE;
+    if (burning) return C.BURNED;
     const hungry = W.aFullness[s] === 0, dry = W.waterCount > 0 && W.aWater[s] === 0;
     return hungry && dry ? C.STARVED_THIRSTY : hungry ? C.STARVED : dry ? C.THIRST : C.UNKNOWN;
   }
 
   AS.killAnimal = function (sim, s, cause) {
-    const W = sim.W, t = W.aTile[s], sp = W.aSpecies[s];
+    const W = sim.W, t = W.aTile[s], sp = W.aSpecies[s], alight = W.aAlight[s] > 0;
     W.removeAnimal(s);
     // One that dies in water leaves no body: the water carries it off, as it washes away a
     // corpse it reaches (water.js).
     if (!(W.wDepth[t] > 0)) {
       W.addCorpse(t, sp, cause);
       AS.corpseAdded(sim, t);
+      // One that was alight when it died, whatever killed it, burns on as a corpse by fire's
+      // normal rules (a hole's corpse never burns).
+      if (alight) AS.ignite(sim, t);
     }
     sim.emit(EV.DEATH, t);
   };
@@ -246,15 +251,23 @@
         W.aWater[s] = wat;
         thirsty = wat === 0;
       }
+      // Fire on the animal: water puts it out at once; else it burns for AlightHours of
+      // in-world time and takes BurnDamage a second. Burning animals don't heal.
+      let burning = W.aAlight[s] > 0;
+      if (burning) {
+        if (W.wDepth[W.aTile[s]] > 0) { W.aAlight[s] = 0; burning = false; }
+        else W.aAlight[s] = Math.max(0, W.aAlight[s] - 1 / AS.TICKS_PER_HOUR);
+      }
       let hp = W.aHP[s];
+      if (burning) hp -= S.BurnDamage * dt;
       if (full === 0) hp -= S.StarveDamage * dt;
       // A dry animal doesn't heal, or a wolf's HealRate would outweigh its small ThirstDamage forever.
-      else if (full > S.HealAbove * S.FullnessMax && hp < S.HPMax && !thirsty) hp = Math.min(S.HPMax, hp + S.HealRate * dt);
+      else if (full > S.HealAbove * S.FullnessMax && hp < S.HPMax && !thirsty && !burning) hp = Math.min(S.HPMax, hp + S.HealRate * dt);
       if (thirsty) hp -= S.ThirstDamage * dt;
       const deep = W.wDepth[W.aTile[s]] > (S.WadeDepth || 0) && S.SwimCost != null;
       if (deep && W.aStamina[s] === 0) hp -= S.DrownDamage * dt;
       W.aHP[s] = hp;
-      if (hp <= 0 || W.aAge[s] >= S.Lifespan) { AS.killAnimal(sim, s, bodyCause(sim, s)); continue; }
+      if (hp <= 0 || W.aAge[s] >= S.Lifespan) { AS.killAnimal(sim, s, bodyCause(sim, s, burning)); continue; }
 
       if (deep) {
         W.aSprint[s] = 0;
