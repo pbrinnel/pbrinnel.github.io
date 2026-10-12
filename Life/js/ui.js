@@ -1,9 +1,12 @@
-// The HUD over the map, and the page that replaces the sim when the tables are bad.
+// The HUD over the map: the bar, the tab windows and their controls, the keys, and hud(),
+// which shows the speed, day and counts every frame. Some parts are their own files, handed
+// on through ui: the PAINT tab's controls (paint-tab.js), the properties window
+// (properties.js), and the cards and error page (cards.js).
 //
-// The bar is always visible: speed buttons, the day, three tab buttons (Info, Debug, God)
-// and Hide UI. A tab opens a strip under the bar with its controls; the open tab's button
-// closes it again, and one tab is open at a time. Hide UI hides the bar, strip, graph window
-// and inspector (CSS, `ui-off` on <body>) and leaves a faint button in the corner.
+// The bar is always visible: speed buttons, the day, the tab buttons (Info, PAINT, and Debug
+// with ?debug) and Hide UI. Each tab button opens and closes its own window, any of them at
+// once. Hide UI hides the bar, the windows, the graph and the properties window (CSS,
+// `ui-off` on <body>) and leaves a faint button in the corner.
 //
 // AS.UI({ debug, speeds, onSpeed(i), onDebugTool(mode), onBench(), onGraph(), onMinimap(),
 //         lines (initial on/off), onLines(on), water (initial on/off), onWater(on),
@@ -50,9 +53,6 @@
     ['select', 'Select', 'Click to inspect'],
     ...AS.SPECIES_KEY.map(k => ['corpse-' + k, `Drop ${k} body`, `Click a tile to drop a ${k} corpse`]),
   ];
-  // Counts in HUD order: a label (empty: the sprite icon replaces it once the sheet exists, see
-  // setIcons; the total keeps its word), key in the counts object, tooltip.
-  // The tabs, in bar order: key, label, tooltip.
   // A speed's icon: two bars to pause, more play triangles for faster (one per step up to
   // four), a triangle against a bar for Max.
   function speedIcon(s) {
@@ -64,12 +64,15 @@
     return `<svg width="${4 + k * step}" height="16" viewBox="0 0 ${4 + k * step} 16" aria-hidden="true">${paths}</svg>`;
   }
 
-  // Debug is there only with ?debug (Paul, 12 Oct 2026: not needed for now).
+  // The tabs, in bar order: key, label, tooltip. Debug is there only with ?debug (Paul,
+  // 12 Oct 2026: not needed for now).
   const ALL_TABS = [
     ['info', 'Info', 'Counts, rings on the map, the graph, the minimap, topo and intent lines, and the properties window'],
     ['god', 'PAINT', 'Paint grass, animals and water, or drop a nuke'],
     ['debug', 'Debug', 'Water, Benchmark, the seed and the debug tools'],
   ];
+  // Counts in HUD order: a label (empty: the sprite icon replaces it once the sheet exists, see
+  // setIcons; the total keeps its word), key in the counts object, tooltip.
   const COUNTS = [
     ['', 'bunnies', 'bunnies'],
     ['', 'wolves', 'wolves'],
@@ -79,28 +82,14 @@
     ['', 'corpses', 'corpses'],
   ];
 
-  const fmtInt = n => Math.round(n).toLocaleString('en-US');
-  const fmtMult = x => (x < DECIMAL_BELOW ? String(Math.round(x * 10) / 10) : fmtInt(x)) + '×';
-
-  function el(tag, cls, text) {
-    const e = document.createElement(tag);
-    if (cls) e.className = cls;
-    if (text !== undefined) e.textContent = text;
-    return e;
-  }
-
-  // A text node whose content is only rewritten when it changes.
-  function cachedText(node) {
-    let last = node.textContent;
-    return s => { if (s !== last) { last = s; node.textContent = s; } };
-  }
-
   AS.UI = function (opts) {
     const { debug, speeds, onSpeed, onDebugTool, onCloseInspector, onBench, onGraph, onLines, onWater, onWindows, onNuke, onMode, onLocate, onElevation, onInspect, onInspectEmpty, onMinimap, onContourStep, onRadius } = opts;
     const hudEl = document.getElementById('hud');
     const errorsEl = document.getElementById('errors');
     const inspEl = document.getElementById('inspector');
     const graphEl = document.getElementById('graph');
+    const { el, cachedText, fmtInt } = AS.uiParts;
+    const fmtMult = x => (x < DECIMAL_BELOW ? String(Math.round(x * 10) / 10) : fmtInt(x)) + '×';
 
     let current = -1;     // the speed index last chosen here or reported by hud(); Space toggles from it
     let shown = -1;       // the speed index whose button is highlighted; only hud() moves it
@@ -240,7 +229,6 @@
       showWindows.appendChild(miniBtn);
     }
 
-    // ---- Debug tab ----
     // Unlike Graph, the Lines button owns its state: nothing else changes it.
     let linesBtn = null;
     if (onLines) {
@@ -329,6 +317,7 @@
       });
       showProps.appendChild(emptyBtn);
     }
+    // ---- Debug tab ----
     // Water is laid when a world is built, so a flip starts a new world (main.js's onWater).
     let waterBtn = null;
     if (onWater) {
@@ -386,99 +375,7 @@
     }
 
     // ---- PAINT tab (key 'god') ----
-    // One mode at a time: 'nuke', or a brush ('grass', 'bunny', 'wolf', 'human', 'water'), or ''
-    // for none. Armed until toggled off, so repeated nukes and strokes work; main.js turns a tap
-    // (or a drag, for a brush) on the world into that mode's action while it is on. Each button
-    // shows its name until setIcons gives it its icon (Paul, 12 Oct 2026); the name stays its
-    // label for screen readers and leads its tooltip.
-    let mode = '';
-    const MODES = [
-      ['nuke', 'NUKE MODE', 'hud-nuke', 'nuke', 'Tapping the world drops a nuke there'],
-      ['grass', 'GRASS MODE', 'hud-brush', 'blades', 'Tap or drag to plant grass of random ages on empty ground'],
-      ['bunny', 'RABBIT MODE', 'hud-brush', 'bunnies', 'Tap or drag to add rabbits of random ages on empty ground'],
-      ['wolf', 'WOLF MODE', 'hud-brush', 'wolves', 'Tap or drag to add wolves of random ages on empty ground'],
-      ['human', 'HUMAN MODE', 'hud-brush', 'humans', 'Tap or drag to add adult humans on empty ground'],
-      ['water', 'WATER MODE', 'hud-brush', 'water', 'Tap or drag to pour water (1 m deep); it flows from there'],
-    ];
-    const modeBtns = {};
-    for (const [name, label, cls, , tip] of MODES) {
-      const b = el('button', 'hud-bench ' + cls, label);
-      b.type = 'button';
-      b.title = label + ': ' + tip.charAt(0).toLowerCase() + tip.slice(1);
-      b.setAttribute('aria-label', label);
-      b.addEventListener('click', () => { if (!locked) setMode(mode === name ? '' : name); b.blur(); });
-      godModes.appendChild(b);
-      modeBtns[name] = b;
-    }
-    const nukeBtn = modeBtns.nuke;
-
-    // The Radius slider sets the size of whichever mode is on (0 = one tile). Each mode keeps
-    // its own value, remembered in localStorage; the defaults come from settings.csv once the
-    // tables load (setRadiusDefaults), so until then a mode reads 0.
-    // Paul's cap: a round 75, whose circle (~17,700 tiles) stays under the crowd limit.
-    const RADIUS_MAX = 75;
-    const RADIUS_KEY = 'life-radius-';
-    const radii = {}, radiusDefaults = {};
-    const radiusBox = el('span', 'hud-radius');
-    radiusBox.title = 'Size of the armed mode, in tiles (0 = one tile)';
-    const radiusLabel = el('span', 'hud-radius-label', 'Radius –');
-    const radiusInput = el('input', 'hud-radius-input');
-    radiusInput.type = 'range';
-    radiusInput.min = '0';
-    radiusInput.max = String(RADIUS_MAX);
-    radiusInput.step = '1';
-    radiusInput.value = '0';
-    radiusInput.disabled = true;
-    radiusInput.setAttribute('aria-label', 'Radius in tiles');
-    radiusBox.append(radiusLabel, radiusInput);
-    godSize.appendChild(radiusBox);
-    const clampRadius = v => Math.max(0, Math.min(RADIUS_MAX, Math.round(Number(v) || 0)));
-    const radiusOf = name => name in radii ? radii[name] : clampRadius(radiusDefaults[name]);
-    function showRadius() {
-      radiusInput.disabled = locked || mode === '';
-      if (mode === '') { radiusLabel.textContent = 'Radius –'; return; }
-      const r = radiusOf(mode);
-      radiusLabel.textContent = 'Radius ' + r;
-      if (radiusInput.value !== String(r)) radiusInput.value = String(r);
-    }
-    function setRadius(name, r) {
-      r = clampRadius(r);
-      radii[name] = r;
-      try { localStorage.setItem(RADIUS_KEY + name, String(r)); } catch (e) { /* the choice just isn't kept */ }
-      if (name === mode) showRadius();
-    }
-    radiusInput.addEventListener('input', () => {
-      if (locked || mode === '') return;
-      setRadius(mode, radiusInput.value);
-      if (onRadius) onRadius(mode, radiusOf(mode));   // main.js shows a fading preview of the size
-    });
-    function setRadiusDefaults(nuke, brush) {
-      for (const [name] of MODES) radiusDefaults[name] = name === 'nuke' ? nuke : brush;
-      for (const [name] of MODES) {
-        delete radii[name];
-        try {
-          const v = localStorage.getItem(RADIUS_KEY + name);
-          if (v !== null && v !== '' && Number.isFinite(Number(v))) radii[name] = clampRadius(v);
-        } catch (e) { /* default */ }
-      }
-      showRadius();
-    }
-
-    function setMode(next) {
-      next = modeBtns[next] ? next : '';
-      if (next === mode) return;
-      const prev = mode;
-      mode = next;
-      for (const [name, b] of Object.entries(modeBtns)) b.classList.toggle('on', name === mode);
-      if (document.body) {
-        document.body.classList.toggle('nuke-armed', mode === 'nuke');
-        document.body.classList.toggle('paint-armed', mode !== '' && mode !== 'nuke');
-      }
-      showRadius();
-      if (onNuke && (prev === 'nuke' || mode === 'nuke')) onNuke(mode === 'nuke');
-      if (onMode) onMode(mode);
-    }
-    const setNuke = on => setMode(on ? 'nuke' : (mode === 'nuke' ? '' : mode));
+    const paint = AS.PaintTab(godModes, godSize, { onNuke, onMode, onRadius, isLocked: () => locked });
 
     top.append(strip, ...Object.values(tabWins));
     // The side panel starts just under the bar, whose height can change (it wraps when narrow).
@@ -592,107 +489,23 @@
       if (!list.length) warnList.hidden = true;
     }
 
-    // ---- inspector ----
-    // Built once; live calls only rewrite the values that changed. The rows are rebuilt
-    // only when the set of names changes (a different kind of thing was selected).
-    const inspHead = el('div', 'insp-head');
-    const inspTitle = el('span', 'insp-title', '');
-    const inspClose = el('button', 'hud-btn insp-close', '×');
-    inspClose.type = 'button';
-    inspClose.title = 'Close';
-    inspClose.addEventListener('click', () => { inspector(null); if (onCloseInspector) onCloseInspector(); });
-    inspHead.append(inspTitle, inspClose);
-    const inspList = el('div', 'insp-list');
-    inspEl.append(inspHead, inspList);
-    for (const t of ['pointerdown', 'pointerup', 'wheel']) inspEl.addEventListener(t, e => e.stopPropagation());
-    // The side panel and the properties window drag by their title bars, like the graph.
+    // ---- dragging, the properties window, the cards ----
+    // The tab windows drag by their title bars, like the graph.
     if (AS.Draggable) {
       for (const key of Object.keys(tabWins)) {
         AS.Draggable(tabWins[key], tabHeads[key], key === 'info' ? 'life-side-pos' : 'life-' + key + '-pos', key === 'info' ? (moved => document.body && document.body.classList.toggle('side-moved', moved)) : undefined);
       }
-      AS.Draggable(inspEl, inspHead, 'life-insp-pos');
-      inspHead.title = 'Drag to move; double-click to put it back';
     }
-
-    const setInspTitle = cachedText(inspTitle);
-    let rowKey = '';
-    let rowEls = [];   // { row, value, range, setValue, setRange, tip }
-    let panelTop = -1;
-
-    // The panel starts under the bar and tab strip, whose height changes as contents wrap.
-    function placeInspector() {
-      const h = top.offsetHeight;
-      if (h !== undefined && h !== panelTop) { panelTop = h; inspEl.style.setProperty('--hud-bottom', h + 'px'); }
-    }
-    if (typeof ResizeObserver === 'function') new ResizeObserver(placeInspector).observe(top);
-
-    function inspector(desc) {
-      if (!desc) { if (!inspEl.hidden) inspEl.hidden = true; return; }
-      if (inspEl.hidden) inspEl.hidden = false;
-      placeInspector();
-      setInspTitle(desc.title);
-      const rows = desc.rows;
-      const key = rows.map(r => r.name).join('\n');
-      if (key !== rowKey) {
-        rowKey = key;
-        inspList.textContent = '';
-        rowEls = rows.map(r => {
-          // A heading starts a section (the Tile under the selection): its name, no value.
-          if (r.heading) {
-            const head = el('div', 'insp-sub', r.name);
-            inspList.appendChild(head);
-            return { row: head, setValue() {}, setRange() {}, tip: '' };
-          }
-          const row = el('div', 'insp-row');
-          const val = el('span', 'insp-value', '');
-          const range = el('span', 'insp-range', '');
-          const cell = el('span', 'insp-cell');
-          cell.append(val, range);
-          row.append(el('span', 'insp-name', r.name), cell);
-          inspList.appendChild(row);
-          return { row, setValue: cachedText(val), setRange: cachedText(range), tip: row.title };
-        });
-      }
-      for (let i = 0; i < rows.length; i++) {
-        const r = rows[i], e = rowEls[i], tip = r.tip || '';
-        e.setValue(String(r.value));
-        e.setRange(r.range ? String(r.range) : '');
-        if (tip !== e.tip) { e.tip = tip; e.row.title = tip; }
-      }
-    }
-
-    // opts { title, intro, foot } replace the table-problem wording, for failures that
-    // aren't about the CSVs' contents (e.g. the page opened from disk).
-    function errors(errs, warns, opts) {
-      const o = opts || {};
-      const loading = document.getElementById('loading');   // the error page replaces the loading card
-      if (loading) loading.hidden = true;
-      hudEl.hidden = true;
-      errorsEl.textContent = '';
-      const page = el('div', 'err-page');
-      page.appendChild(el('h1', '', o.title || 'The tables have problems'));
-      page.appendChild(el('p', '', o.intro || 'The sim did not start. Each line names the file, row and column.'));
-      const ul = el('ul', 'err-list');
-      for (const m of errs) ul.appendChild(el('li', '', m));
-      page.appendChild(ul);
-      if (warns && warns.length) {
-        page.appendChild(el('h2', '', 'Warnings'));
-        const wl = el('ul', 'err-list err-warns');
-        for (const m of warns) wl.appendChild(el('li', '', m));
-        page.appendChild(wl);
-      }
-      page.appendChild(el('p', 'err-foot', o.foot || 'Fix the CSVs in tables/ and reload the page.'));
-      errorsEl.appendChild(page);
-      errorsEl.hidden = false;
-    }
+    const props = AS.PropertiesWindow(inspEl, { below: top, onClose: onCloseInspector });
+    const cards = AS.Cards({ hudEl, errorsEl });
 
     // Disabling the buttons also dims them; the handlers check `locked` as well.
     function lock(on) {
       locked = !!on;
-      for (const b of [...buttons, benchBtn, graphBtn, miniBtn, linesBtn, elevBtn, contourInput, ...inspBtns, emptyBtn, waterBtn, ...Object.values(modeBtns), ...toolButtons]) {
+      for (const b of [...buttons, benchBtn, graphBtn, miniBtn, linesBtn, elevBtn, contourInput, ...inspBtns, emptyBtn, waterBtn, ...toolButtons]) {
         if (b) b.disabled = locked;
       }
-      showRadius();
+      paint.lock(locked);
     }
 
     // The letters and mode names stand in until the sprite sheet exists (it needs the tables);
@@ -711,67 +524,19 @@
         glyphEls[key].replaceWith(cv);
         glyphEls[key] = cv;
       }
-      for (const [name, , , key] of MODES) {
-        const b = modeBtns[name];
-        b.textContent = '';
-        b.appendChild(icon(key));
-        b.classList.toggle('hud-mode-icon', true);
-      }
-    }
-
-    // End of a run: a card over the world naming what died out, with a way to start a new
-    // world or keep watching what's left.
-    let endEl = null;
-    function ended(info) {
-      if (endEl) { endEl.remove(); endEl = null; }
-      if (!info) return;
-      endEl = el('div', 'end-card');
-      endEl.setAttribute('role', 'dialog');
-      for (const t of info.titles) endEl.appendChild(el('div', 'end-title', t));
-      endEl.appendChild(el('div', 'end-day', `Day ${info.day.toFixed(1)}`));
-      const row = el('div', 'end-buttons');
-      const again = el('button', 'hud-bench', 'New world');
-      again.type = 'button';
-      again.addEventListener('click', () => info.onNew());
-      const watch = el('button', 'hud-bench', 'Keep watching');
-      watch.type = 'button';
-      watch.addEventListener('click', () => info.onContinue());
-      row.appendChild(again);
-      row.appendChild(watch);
-      endEl.appendChild(row);
-      document.body.appendChild(endEl);
-    }
-
-    // The painting limit's card (an end-card, since the same kind of question): the sim keeps
-    // running behind it. Keep adding and Stop here both close it; main.js decides what they mean.
-    let crowdEl = null;
-    function crowd(info) {
-      if (crowdEl) { crowdEl.remove(); crowdEl = null; }
-      if (!info) return;
-      crowdEl = el('div', 'end-card crowd-card');
-      crowdEl.setAttribute('role', 'dialog');
-      crowdEl.appendChild(el('div', 'end-title', 'That\'s a crowd'));
-      crowdEl.appendChild(el('div', 'crowd-text',
-        `Over ${fmtInt(info.limit)} animals can make the sim slow down or stutter, especially on phones. Add more anyway?`));
-      const row = el('div', 'end-buttons');
-      const keep = el('button', 'hud-bench crowd-keep', 'Keep adding');
-      keep.type = 'button';
-      keep.addEventListener('click', () => info.onKeep());
-      const stop = el('button', 'hud-bench crowd-stop', 'Stop here');
-      stop.type = 'button';
-      stop.addEventListener('click', () => info.onStop());
-      row.append(keep, stop);
-      crowdEl.appendChild(row);
-      document.body.appendChild(crowdEl);
+      paint.setIcons(icon);
     }
 
     return {
-      hud, errors, warnings, inspector, lock, setWindow, setHidden, setNuke, setMode, ended, setIcons,
-      setRadiusDefaults, setRadius, radiusOf, crowd,
+      hud, warnings, lock, setWindow, setHidden, setIcons,
+      errors: cards.errors, ended: cards.ended, crowd: cards.crowd,
+      inspector: props.show,
+      setNuke: paint.setNuke, setMode: paint.setMode,
+      setRadiusDefaults: paint.setRadiusDefaults, setRadius: paint.setRadius, radiusOf: paint.radiusOf,
       get windows() { return [...openWins]; },
       get hidden() { return uiHidden; },
-      get nuke() { return mode === 'nuke'; },
-      get mode() { return mode; },
+      get nuke() { return paint.mode === 'nuke'; },
+      get mode() { return paint.mode; },
     };
   };
 })(globalThis.AS);

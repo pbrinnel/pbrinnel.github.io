@@ -1,4 +1,4 @@
-// Runs Life/js/ui.js against a minimal fake DOM. Counts every write.
+// Runs Life/js/ui.js (and the parts it is built from) against a minimal fake DOM. Counts every write.
 const vm = require('vm'), fs = require('fs'), assert = require('assert');
 let writes = 0;
 class ClassList {
@@ -37,7 +37,7 @@ function build(debug, extra = {}) {
   vm.createContext(ctx);
   // ui.js builds its debug tools from the species list, which world.js owns.
   vm.runInContext(fs.readFileSync(require('path').join(__dirname, '../js/world.js'), 'utf8'), ctx);
-  vm.runInContext(fs.readFileSync(require('path').join(__dirname, '../js/ui.js'), 'utf8'), ctx);
+  for (const f of ['ui-parts', 'cards', 'properties', 'paint-tab', 'ui']) vm.runInContext(fs.readFileSync(require('path').join(__dirname, '../js/' + f + '.js'), 'utf8'), ctx);
   const calls = [], tools = [];
   const speeds = [0, 1, 2, 5, 20, Infinity];
   const ui = ctx.AS.UI({ debug, speeds, onSpeed: i => calls.push(i), onDebugTool: m => tools.push(m), onCloseInspector: () => calls.push('closed'), onBench: () => calls.push('bench'), onGraph: () => calls.push('graph'), ...extra });

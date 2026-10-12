@@ -67,7 +67,11 @@ load time: every file reads other files' `AS.*` inside functions, at call time.
 | `graph.js` | the population graph window, from `sim.history` | `Graph`, `graphMath` |
 | `minimap.js` | the minimap window | `Minimap` |
 | `bench.js` | benchmark mode (grass series, animal series) | `runBench`, `benchMath` |
-| `ui.js` | the bar, the tab windows (Info, PAINT, Debug), the properties window, the cards ([The page](#the-page)) | `UI` |
+| `ui-parts.js` | the small DOM helpers the windows share (`el`, `cachedText`, `fmtInt`) | `uiParts` |
+| `cards.js` | the end-of-run card, the "That's a crowd" card, the error page | `Cards` |
+| `properties.js` | the properties window (`#inspector`) | `PropertiesWindow` |
+| `paint-tab.js` | the PAINT tab's modes and Radius slider | `PaintTab` |
+| `ui.js` | the bar, the tab windows and their Info and Debug controls, the keys, `hud()`; builds the parts above and hands them on through `ui` ([The page](#the-page)) | `UI` |
 | `main.js` | boot, the frame loop, selection, wiring, the brush and the soft limit on painted animals ([The page](#the-page)) | `app`, `TICK_BUDGET_MS` |
 
 ## Data: struct of arrays (`world.js`)
@@ -351,15 +355,17 @@ never flash: see DESIGN.md, Photosensitivity.
     buttons; Topo lines (`onElevation`) and their spacing (`onContourStep`); Intent lines
     (`onLines`); Properties Off/Click/Hover through `onInspect`; Inspect Empty Tiles through
     `onInspectEmpty`.
-  - **PAINT:** the modes (NUKE, GRASS, RABBIT, WOLF, HUMAN, WATER: one at a time, `ui.mode`;
+  - **PAINT** (paint-tab.js, in the window ui.js makes): the modes (NUKE, GRASS, RABBIT,
+    WOLF, HUMAN, WATER: one at a time, `ui.mode`;
     icons once `setIcons` runs (main.js `ICON_SPRITE`), the name kept as `aria-label` and in
     the tooltip; the nuke icon is sprites.js `spriteNuke`) with a Radius slider (0–100; each
     mode keeps its own value in localStorage, defaults from `NukeRadius`/`BrushRadius`) and
-    the "That's a crowd" card (`ui.crowd`).
+    the "That's a crowd" card (`ui.crowd`, cards.js).
   - **Debug:** the Water button (kept per viewer in localStorage `life-water`; starts a new
     world with `opts.water`), the seed, Benchmark and the debug tools.
-  - Also ui.js: the properties window (a heading row renders as a section title), the
-    errors page, keys for speed.
+  - The properties window (properties.js, `ui.inspector`): a heading row renders as a
+    section title. The cards and the error page (cards.js: `ui.ended`, `ui.crowd`,
+    `ui.errors`). Keys for speed and Hide UI are ui.js's.
 - **PAINT's powers** (god.js): `paintCircle(sim, 'grass'|'bunny'|'wolf'|'human'|'water',
   cx, cy, r, cap?)` is the brush (empty eligible tiles only; random ages, but a species
   with no `LitterSize` (humans) stays adult; radius 0 = one tile; `cap = { room, hit }`
