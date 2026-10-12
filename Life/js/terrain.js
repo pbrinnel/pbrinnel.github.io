@@ -11,9 +11,9 @@
 //      FINE_ROUNDS at full size. Then it is stretched to 0..Relief meters.
 //   2. Lake basins (Bowls) are pressed in, as glaciers scoop them.
 //   3. With Water on, the water rules (water.js) run for PreRunDays from a rough first guess
-//      (each hollow half full, the soil half full), so day 0 is already at rest. Water stays
-//      as it is during play for now. Land pieces water cut off are joined across the
-//      shortest run of water (a ford), or filled in if tiny, so no animal is stranded.
+//      (each hollow half full, the soil half full), so day 0 is already at rest, and keep
+//      running during play (W.water). Nothing joins land across water: animals wade the
+//      shallows, and deep water is a wall, as it is.
 //
 // Uses its own generator from the world's seed, so the ground doesn't shift when anything
 // that draws on sim.rng changes. sim.js and start.js call AS.layTerrain for every world.
@@ -40,10 +40,6 @@
   const BOWL_MARGIN = 30;         // tiles a basin's center keeps from the wall (less in a small world)
   const BOWL_FALLOFF = 1.6;       // how quickly a basin's dip fades with distance
   const GUESS_FULL = 0.5;         // the water's first guess: each hollow this full
-  const PRE_STEP = 0.25;          // days per water step before day 0
-  const POCKET_MAX = 40;          // a cut-off land piece this small is filled in rather than joined
-  const POCKET_DEPTH = 0.3;       // m: such a filled-in pocket's water
-  const BRIDGE_TRIES = 40;        // land pieces joined before giving up
   const SEED_SALT = 0x5eed7e44;   // keeps the ground's generator apart from sim.rng
   const D8X = [-1, 1, 0, 0, -1, 1, -1, 1], D8Y = [0, 0, -1, 1, -1, -1, 1, 1];
 
@@ -318,41 +314,6 @@
     return { label, sizes };
   }
 
-  // Joins land piece `from` to another across the shortest run of water (a ford). Returns
-  // whether it found one.
-  function bridgePiece(W, wet, label, from) {
-    const prev = new Int32Array(W.n).fill(-2), queue = new Int32Array(W.n), nb = new Int32Array(4);
-    let head = 0, tail = 0;
-    for (let t = 0; t < W.n; t++) if (label[t] === from) { prev[t] = -1; queue[tail++] = t; }
-    while (head < tail) {
-      const t = queue[head++], k = W.neighbors4(t, nb);
-      for (let i = 0; i < k; i++) {
-        const u = nb[i];
-        if (prev[u] !== -2) continue;
-        if (label[u] && label[u] !== from) {
-          for (let v = t; v >= 0 && wet[v]; v = prev[v]) wet[v] = 0;
-          return true;
-        }
-        if (wet[u]) { prev[u] = t; queue[tail++] = u; }
-      }
-    }
-    return false;
-  }
-
-  // Makes the land one piece: a tiny cut-off piece fills with water, any other is joined to
-  // the rest across the shortest run of water. Animals can't wade yet, so without this they
-  // would be stranded on islands.
-  function keepLandWhole(W, wet) {
-    for (let i = 0; i < BRIDGE_TRIES; i++) {
-      const { label, sizes } = landPieces(W, wet);
-      if (sizes.length <= 1) return;
-      let small = 0;
-      for (let k = 1; k < sizes.length; k++) if (sizes[k] < sizes[small]) small = k;
-      if (sizes[small] <= POCKET_MAX) { for (let t = 0; t < W.n; t++) if (label[t] === small + 1) wet[t] = 2; continue; }
-      if (!bridgePiece(W, wet, label, small + 1)) return;
-    }
-  }
-
   // This world's own terrain values, each drawn from its settings.csv span (Paul: every world
   // feels different, under the same rules), plus the settings that are single values. Drawn
   // first, from the ground's own generator, so a seed always makes the same ground.
@@ -370,7 +331,7 @@
   };
 
   // Every world: the ground; with `water`, the water the rules settle on it (world.js
-  // addWater, W.wDepth, W.wSoil) and the shore the grass is boosted along. Returns the
+  // addWater, W.wDepth) and the shore the grass is boosted along. Returns the
   // centers of the lakes (bodies of water of LAKE_MIN tiles or more).
   const LAKE_MIN = 40;
   AS.layTerrain = function (sim, water) {
@@ -401,28 +362,29 @@
     for (let t = 0; t < W.n; t++) { if (E[t] < lo) lo = E[t]; if (E[t] > hi) hi = E[t]; }
     const k2 = hi > lo ? S.Relief / (hi - lo) : 0;
     for (let t = 0; t < W.n; t++) E[t] = (E[t] - lo) * k2;
-    if (!water || !(S.Rain > 0)) return [];
+    if (!water) return [];
 
-    // The water: a rough first guess, then the rules for PreRunDays.
+    // The water: a rough first guess, then the rules for PreRunDays. A world with no rain
+    // still gets the rules (dry), so water poured into it flows.
     const outlet = mouths(W.w, W.h, spots);
     W.outlet = outlet;
-    const F = restingLevel(W, outlet), wat = AS.Water(W, S, outlet);
+    const wat = AS.Water(W, S, outlet);
+    if (!(S.Rain > 0)) { W.water = wat; return []; }
+    const F = restingLevel(W, outlet);
     for (let t = 0; t < W.n; t++) {
       const d = (F[t] - E[t]) * GUESS_FULL;
       wat.H[t] = d > AS.WATER_TINY ? d : 0;
       wat.G[t] = wat.H[t] > 0 ? wat.room : wat.room * 0.5;
     }
     wat.listWet();
-    for (let d = 0; d < S.PreRunDays; d += PRE_STEP) wat.step(PRE_STEP);
+    wat.preRun(S.PreRunDays);
     const wet = new Uint8Array(W.n);
-    for (let t = 0; t < W.n; t++) if (wat.H[t] > 0) wet[t] = 1;
-    keepLandWhole(W, wet);
     for (let t = 0; t < W.n; t++) {
-      W.wSoil[t] = wat.G[t];
-      if (!wet[t]) continue;
-      W.addWater(t);
-      W.wDepth[t] = wat.H[t] > 0 ? wat.H[t] : POCKET_DEPTH;
+      if (!(wat.H[t] > 0)) continue;
+      wet[t] = 1;
+      W.addWater(t, wat.H[t]);
     }
+    W.water = wat;   // after laying it, which would otherwise copy each tile back into it
     W.setShore(T.grass.WaterRadius, T.grass.WaterBoost);
     // The lakes' centers: bodies of water LAKE_MIN tiles or more.
     const { label, sizes } = landPieces(W, wet.map(v => (v ? 0 : 1)));

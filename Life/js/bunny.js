@@ -352,27 +352,20 @@
     }
     // Path, within sight, to a tile AWAY_GAIN nearer the destination: bunnies can't cross
     // grass, and a straight-line step stalls at every meadow. None within sight (walled in
-    // by water or grass that way): try another destination after a plain run.
+    // by water or grass that way): it goes around on its own side (AS.edgeStep), and once
+    // that gives up, tries another destination after a plain run.
     mW = W; mGoalTile = g; mAwayNeed = (left - AWAY_GAIN) * (left - AWAY_GAIN);
-    const best = AS.pathNext(sim, t, isNearerAway, S.VisionRange);
-    if (best < 0 || best === t) { m.awayTo[s] = farGoal(sim, t, m.natal[s] ? natalRun(W, m, s, t) : S.RoamRun, m.awayFrom[s], m.natal[s] ? m.tripMin[s] : travelMin(W, S)); return false; }
+    let best = AS.pathNext(sim, t, isNearerAway, S.VisionRange);
+    if (best >= 0 && best !== t) AS.edgeReset(W, s);
+    else { mWade = AS.wadeOf(sim, s); best = AS.edgeStep(sim, s, g, g, isOpen); }
+    if (best < 0) { m.awayTo[s] = farGoal(sim, t, m.natal[s] ? natalRun(W, m, s, t) : S.RoamRun, m.awayFrom[s], m.natal[s] ? m.tripMin[s] : travelMin(W, S)); return false; }
     AS.stepTo(sim, s, best);
     return true;
   }
 
-  // The open neighbor of t that most shortens the straight line to g, or -1 if none does.
-  function closerStep(W, t, g) {
-    const gx = g % W.w, gy = (g / W.w) | 0;
-    const d2 = u => (u % W.w - gx) ** 2 + (((u / W.w) | 0) - gy) ** 2;
-    let best = -1, bestD = d2(t);
-    for (let i = 0, k = W.neighbors4(t, nb); i < k; i++) {
-      const u = nb[i];
-      if (W.kind[u] !== K.EMPTY) continue;
-      const d = d2(u);
-      if (d < bestD) { best = u; bestD = d; }
-    }
-    return best;
-  }
+  // Where a bunny can step on its own (stepTo's rule, wading mWade deep; bunnies may enter holes).
+  let mWade = 0;
+  const isOpen = t => AS.canStand(mW, t, mWade);
 
   // The nearest visible bunny of the other sex not already away comes along: a lone settler
   // never finds a mate, and a pair can found a colony.
@@ -401,7 +394,8 @@
     if (dx * dx + dy * dy <= FOLLOW_NEAR * FOLLOW_NEAR) return true;
     mW = W; mGoalTile = lt;
     let next = AS.pathNext(sim, t, touchesGoal, AS.speciesStats(sim, s).VisionRange);
-    if (next < 0 || next === t) next = closerStep(W, t, lt);
+    if (next >= 0 && next !== t) AS.edgeReset(W, s);
+    else { mWade = AS.wadeOf(sim, s); next = AS.edgeStep(sim, s, lt, -W.aSerial[L], isOpen); }
     if (next < 0) return false;
     AS.stepTo(sim, s, next);
     return true;
@@ -416,9 +410,10 @@
     if (W.aStepLeft[s] > 0) return;
     const t = W.aTile[s], S = AS.speciesStats(sim, s);
     if ((S.LeaveCrowd > 0 && S.LeaveChance > 0 || S.LeaveStress > 0 || S.DisperseRun || S.DisperseFar > 0) && emigrateStep(sim, s, S, t)) return;
+    const wade = AS.wadeOf(sim, s);
     if (W.aRunLeft[s] > 0) {
       const ahead = dirTile(W, t, W.aRunDir[s]);
-      if (ahead >= 0 && W.kind[ahead] === K.EMPTY) {
+      if (ahead >= 0 && AS.canStand(W, ahead, wade)) {
         if (AS.stepTo(sim, s, ahead)) W.aRunLeft[s]--;
         return;
       }
@@ -427,7 +422,7 @@
     let n = 0;
     for (let d = 0; d < 4; d++) {
       const nt = dirTile(W, t, d);
-      if (nt >= 0 && W.kind[nt] === K.EMPTY) open[n++] = d;
+      if (nt >= 0 && AS.canStand(W, nt, wade)) open[n++] = d;
     }
     if (n === 0) return;
     const d = pickRoomDir(sim, s, K.BUNNY, open, n);
@@ -520,7 +515,7 @@
           ey = ey < 0 ? 0 : ey >= W.h ? W.h - 1 : ey;
           if (c > 0) {
             const fx = Math.round(tx + cx), fy = Math.round(ty + cy);
-            if (!W.inside(fx, fy) || W.kind[fy * w + fx] !== K.EMPTY) continue;
+            if (!W.inside(fx, fy) || !AS.canStand(W, fy * w + fx, AS.wadeOf(sim, s))) continue;
           }
           const score = Math.sqrt((ex - wx) * (ex - wx) + (ey - wy) * (ey - wy)) - FLEE_WALL_COST * near;
           if (score > bestScore) { bestScore = score; bestC = c; bex = ex; bey = ey; }
@@ -537,9 +532,10 @@
         const k = W.neighbors4(t, nb);
         const d0 = (tx - wx) * (tx - wx) + (ty - wy) * (ty - wy);
         let best = -1, bestD = bestC === 0 ? d0 : Infinity;
+        const wade = AS.wadeOf(sim, s);
         for (let i = 0; i < k; i++) {
           const n = nb[i];
-          if (W.kind[n] !== K.EMPTY) continue;
+          if (!AS.canStand(W, n, wade)) continue;
           const dx = (n % w) - wx, dy = ((n / w) | 0) - wy, d2 = dx * dx + dy * dy;
           if (bestC === 0) {
             if (d2 > bestD) { bestD = d2; best = n; }

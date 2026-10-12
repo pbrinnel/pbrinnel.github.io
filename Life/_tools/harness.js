@@ -47,12 +47,23 @@ function check(cond, msg) { if (!cond) failures.push(msg); return cond; }
 function audit(AS, sim, label) {
   const W = sim.W, K = AS.KIND;
   let grass = 0, corpses = 0, animals = 0, holes = 0;
+  let wet = 0;
+  const nb = new Int32Array(4);
   for (let t = 0; t < W.n; t++) {
     const k = W.kind[t];
-    if (k === K.WATER) {
-      // Water holds nothing else: no animal, blade, corpse, hole or scorch.
-      check(W.aSlot[t] === -1 && W.gSlot[t] === -1 && W.cSlot[t] === -1 && W.hSlot[t] === -1, `${label}: water tile ${t} is in a store`);
-      check(!W.hole[t] && W.scorch[t] === 0 && W.serial[t] === 0, `${label}: water tile ${t} has a hole, scorch or serial`);
+    // Depth is the truth about water: a tile is WATER exactly when it is wet with nothing
+    // on it; a wet tile holds at most a wading animal, and no blade, corpse, hole or scorch.
+    if (W.wDepth[t] > 0) {
+      wet++;
+      check(k === K.WATER || k >= K.BUNNY, `${label}: wet tile ${t} holds kind ${k}`);
+      check(W.gSlot[t] === -1 && W.cSlot[t] === -1 && W.hSlot[t] === -1, `${label}: wet tile ${t} is in a store`);
+      check(!W.hole[t] && W.scorch[t] === 0 && (k >= K.BUNNY || W.serial[t] === 0), `${label}: wet tile ${t} has a hole, scorch or serial`);
+      check(!W.beach[t], `${label}: wet tile ${t} is marked beach`);
+    } else {
+      check(k !== K.WATER, `${label}: dry tile ${t} is WATER`);
+      let touches = 0;
+      for (let i = 0, m = W.neighbors4(t, nb); i < m; i++) if (W.wDepth[nb[i]] > 0) touches = 1;
+      check(W.beach[t] === touches, `${label}: tile ${t} beach ${W.beach[t]}, touches water ${touches}`);
     }
     if (k === K.GRASS) {
       grass++;
@@ -99,6 +110,7 @@ function audit(AS, sim, label) {
   }
   check(grass === W.gCount, `${label}: ${grass} blades on grid, gCount ${W.gCount}`);
   check(holes === W.hCount, `${label}: ${holes} holes on grid, hCount ${W.hCount}`);
+  check(wet === W.waterCount, `${label}: ${wet} wet tiles, waterCount ${W.waterCount}`);
   check(corpses === W.cCount, `${label}: ${corpses} corpses on grid, cCount ${W.cCount}`);
   check(animals === W.bunnies + W.wolves + W.humans, `${label}: animal counts`);
   let h = 2166136261;

@@ -9,7 +9,7 @@
   'use strict';
 
   const K = AS.KIND;
-  const GRASS = K.GRASS, EMPTY = K.EMPTY;
+  const GRASS = K.GRASS, EMPTY = K.EMPTY, WATER = K.WATER, ANIMAL = K.BUNNY;
 
   // ---- Line of sight ----
 
@@ -97,15 +97,18 @@
   }
 
   // The first step of a shortest path from `from` to the nearest tile where goal(t) is true,
-  // walking 4-directionally through EMPTY tiles and never leaving the circle of `range`
-  // around `from`. Returns `from` if goal(from) already holds, or -1 if no goal is reachable.
-  // goal is tested only on tiles the walker could stand on (empty ones, and `from`).
+  // walking 4-directionally through tiles the walker can stand on (empty ones, and water no
+  // deeper than the animal on `from` wades: animals.js canStand) and never leaving the circle
+  // of `range` around `from`. Returns `from` if goal(from) already holds, or -1 if no goal is
+  // reachable. goal is tested only on tiles the walker could stand on (and `from`).
   //
   // Wolves, which chew through grass when that is quicker, use pathNextWeighted below.
   AS.pathNext = function (sim, from, goal, range) {
     if (goal(from)) return from;
-    const W = sim.W, w = W.w, h = W.h, kind = W.kind, c = circle(range);
+    const W = sim.W, w = W.w, h = W.h, kind = W.kind, depth = W.wDepth, c = circle(range);
     const s = scratch(W, c.n + 1);
+    const walker = kind[from] >= ANIMAL ? W.aSlot[from] : -1;
+    const wade = walker >= 0 ? AS.wadeOf(sim, walker) : 0;
     const stamp = s.stamp, queue = s.queue, first = s.first;
     if (++s.gen === 0xFFFFFFFF) { stamp.fill(0); s.gen = 1; }
     const gen = s.gen, r2 = c.r2;
@@ -130,7 +133,9 @@
         }
         if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
         const nt = ny * w + nx;
-        if (stamp[nt] === gen || kind[nt] !== EMPTY) continue;
+        if (stamp[nt] === gen) continue;
+        const kn = kind[nt];
+        if (kn !== EMPTY && (kn !== WATER || depth[nt] > wade)) continue;
         const ddx = nx - fx, ddy = ny - fy;
         if (ddx * ddx + ddy * ddy > r2) continue;
         stamp[nt] = gen;

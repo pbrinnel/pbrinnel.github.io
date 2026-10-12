@@ -34,6 +34,8 @@
   const ANIMAL_START_CAPACITY = 1024;
   // wDist for a tile no water can be reached from.
   const WATER_NONE = AS.WATER_NONE = 0xFFFF;
+  // Meters of water addWater lays when not told a depth.
+  const LAID_DEPTH = 1;
 
   // Fields of one animal, by array type. A new field is one line here. Countdown timers are
   // Float64: counted down by 1/30 s a tick, Float32 rounding lands a whole tick late.
@@ -120,17 +122,19 @@
 
       // How deep the water on a tile is, in meters (0 on land). Any depth makes the tile water.
       wDepth: new Float32Array(n),
-      // Water in the soil, in meters of water (room for it: SoilDepth × AS.SOIL_POROSITY), as the water
-      // rules left it before day 0 (water.js). Still during play, for now.
-      wSoil: new Float32Array(n),
       // River mouths: 1 where water leaves the map (terrain.js), or null in a world without water.
       outlet: null,
+      // The water rules running this world's water (AS.Water, water.js), or null: a world made
+      // with Water off, whose water (laid by hand, in the checks) stays as laid.
+      water: null,
+      wetFlips: 0,      // tiles that have turned wet or dry (setDepth)
+      wetMoved: false,  // a shore moved since water.js last rebuilt the way-to-water field
 
       // Height of the ground in meters (0 to settings.csv Relief), laid once at world build
       // by terrain.js. Lakes and rivers are where it holds and drains water.
       elev: new Float32Array(n),
 
-      // The beach: land tiles 4-adjacent to water (1 = beach), kept up to date by addWater. An
+      // The beach: land tiles 4-adjacent to water (1 = beach), kept by addWater and setDepth. An
       // animal drinks from one, so no blade may stand on one (addGrass refuses; grass.js, god.js
       // and start.js skip them), or a lakeshore of grass would wall the animals off the water.
       beach: new Uint8Array(n),
@@ -185,10 +189,15 @@
       return k;
     };
 
-    function claim(t, kind) {
-      if (W.kind[t] !== KIND.EMPTY) throw new Error(`tile ${t} is taken (kind ${W.kind[t]})`);
+    // A tile can be claimed when nothing is on it. `wet` also allows unoccupied water (an
+    // animal wading in).
+    function claim(t, kind, wet) {
+      const k = W.kind[t];
+      if (k !== KIND.EMPTY && !(wet && k === KIND.WATER)) throw new Error(`tile ${t} is taken (kind ${W.kind[t]})`);
       W.kind[t] = kind;
     }
+    // What a tile shows when whatever was on it leaves: water if it has any, else bare ground.
+    function free(t) { W.kind[t] = W.wDepth[t] > 0 ? KIND.WATER : KIND.EMPTY; }
 
     W.addGrass = function (t, size, age) {
       if (W.hole[t]) throw new Error(`tile ${t} is a warren hole; no grass grows there`);
@@ -214,45 +223,85 @@
       W.gAge[t] = 0;
     };
 
-    // Lakes and rivers, laid at world build only (terrain.js). Water is a tile kind of its own: nothing
-    // enters, stands on, is born on, grows on or is dug into it, and it never changes.
-    W.addWater = function (t) {
+    // Water's depth on a tile, as the water rules (water.js) move it during play. Getting
+    // wet drowns a blade, floods a warren hole and puts out scorched ground; a corpse must
+    // already be gone (corpse.js lets its grass boost go first); an animal stays (it wades, or
+    // animals.js walks it out if the water is too deep for it). A tile with nothing on it
+    // shows as water while it has any. The bare beach follows the shore: a blade on land that
+    // comes to touch water dies. wetFlips counts shores moved, for whatever caches a picture
+    // of them (render.js's topo lines); wetMoved tells water.js to rebuild the way-to-water
+    // field.
+    const nbs4 = new Int32Array(4), nbs4b = new Int32Array(4);
+    W.setDepth = function (t, d) {
+      const was = W.wDepth[t] > 0, now = d > 0;
+      W.wDepth[t] = now ? d : 0;
+      if (was === now) return;
+      if (now) {
+        if (W.kind[t] === KIND.CORPSE) throw new Error(`tile ${t}: remove the corpse before the water comes`);
+        W.waterCount++;
+        if (W.kind[t] === KIND.GRASS) W.removeGrass(t);
+        if (W.hole[t]) W.removeHole(t);
+        W.scorch[t] = 0;   // ground under water isn't burning
+        if (W.kind[t] === KIND.EMPTY) W.kind[t] = KIND.WATER;
+      } else {
+        W.waterCount--;
+        if (W.kind[t] === KIND.WATER) W.kind[t] = KIND.EMPTY;
+      }
+      W.wetFlips++;
+      W.wetMoved = true;
+      refreshBeach(t);
+      for (let i = 0, k = W.neighbors4(t, nbs4); i < k; i++) refreshBeach(nbs4[i]);
+    };
+    function refreshBeach(u) {
+      let beach = 0;
+      if (!(W.wDepth[u] > 0)) for (let i = 0, k = W.neighbors4(u, nbs4b); i < k; i++) if (W.wDepth[nbs4b[i]] > 0) { beach = 1; break; }
+      W.beach[u] = beach;
+      if (beach && W.kind[u] === KIND.GRASS) W.removeGrass(u);
+    }
+
+    // Water laid on an empty tile, `depth` meters deep (LAID_DEPTH when not given: the
+    // checks' hand-built worlds): at world build (terrain.js), before anything else is placed.
+    W.addWater = function (t, depth) {
       if (W.hole[t] || W.scorch[t] > 0) throw new Error(`tile ${t} can't take water`);
       claim(t, KIND.WATER);
+      W.wDepth[t] = depth > 0 ? depth : LAID_DEPTH;
+      if (W.water) { W.water.H[t] = W.wDepth[t]; W.water.listWet(); }   // the rules move it from here
       W.waterCount++;
       W.waterStale = true;
-      const nbw = new Int32Array(4), k = W.neighbors4(t, nbw);
-      for (let i = 0; i < k; i++) W.beach[nbw[i]] = 1;
+      refreshBeach(t);
+      for (let i = 0, k = W.neighbors4(t, nbs4); i < k; i++) refreshBeach(nbs4[i]);
     };
 
     // Multi-source breadth-first search over land from every shore tile, so a thirsty animal
-    // anywhere knows which way the water is in O(1). Water never changes after the world is
-    // built, so this runs once, on first need after the lakes are in (animals.js calls it
-    // before any thirst work); a later addWater marks it stale and it runs again.
+    // anywhere knows which way the water is in O(1). It runs on first need after the lakes
+    // are in (animals.js calls it before any thirst work), and again when marked stale: by
+    // addWater, and by water.js once a step when shores have moved. A tile with an animal
+    // wading on it is water here too.
     W.buildWaterField = function () {
       W.waterStale = false;
       if (!W.wDist) { W.wDist = new Uint16Array(n); W.wNext = new Int32Array(n); W.wShore = new Int32Array(n); }
       const dist = W.wDist, next = W.wNext, shore = W.wShore, queue = new Int32Array(n), nb = new Int32Array(4);
       dist.fill(WATER_NONE); next.fill(-1); shore.fill(-1);
       let head = 0, tail = 0;
+      const D = W.wDepth;
       for (let t = 0; t < n; t++) {
-        if (W.kind[t] === KIND.WATER) continue;
+        if (D[t] > 0) continue;
         const k = W.neighbors4(t, nb);
         for (let i = 0; i < k; i++) {
-          if (W.kind[nb[i]] === KIND.WATER) { dist[t] = 0; shore[t] = t; queue[tail++] = t; break; }
+          if (D[nb[i]] > 0) { dist[t] = 0; shore[t] = t; queue[tail++] = t; break; }
         }
       }
       while (head < tail) {
         const t = queue[head++], k = W.neighbors4(t, nb);
         for (let i = 0; i < k; i++) {
           const u = nb[i];
-          if (dist[u] !== WATER_NONE || W.kind[u] === KIND.WATER) continue;
+          if (dist[u] !== WATER_NONE || D[u] > 0) continue;
           dist[u] = dist[t] + 1; next[u] = t; shore[u] = shore[t];
           queue[tail++] = u;
         }
       }
     };
-    W.ensureWaterField = () => { if (W.waterStale) W.buildWaterField(); };
+    W.ensureWaterField = () => { if (W.waterStale || !W.wDist) W.buildWaterField(); };
 
     // Land within `radius` tiles (a circle) of any water tile grows grass `boost` times faster.
     // Done once after the lakes are in, so no tick does distance work.
@@ -314,7 +363,7 @@
       W.cList[i] = last;
       W.cSlot[last] = i;
       W.cSlot[t] = -1;
-      W.kind[t] = KIND.EMPTY;
+      free(t);
       W.serial[t] = 0;
       W.cNut[t] = 0;
       W.cMeat[t] = 0;
@@ -325,7 +374,7 @@
     // Returns the new slot. The caller fills in the rest of the animal's fields.
     W.addAnimal = function (t, species, sex) {
       if (W.hole[t] && !AS.canEnterHole(species)) throw new Error(`tile ${t} is a warren hole; only bunnies can enter`);
-      claim(t, AS.kindOf(species));
+      claim(t, AS.kindOf(species), true);   // painted into water: it wades, or animals.js walks it out
       let s = W.aFree.length ? W.aFree.pop() : W.aHigh++;
       if (s >= W.aCap) growAnimals(W.aCap * 2);
       for (const f of Object.keys(ANIMAL_FIELDS)) W[f][s] = 0;
@@ -347,17 +396,18 @@
       const t = W.aTile[s];
       W.aAlive[s] = 0;
       W.aSlot[t] = -1;
-      W.kind[t] = KIND.EMPTY;
+      free(t);
       W[POP_KEY[W.aSpecies[s]]]--;
       W.aFree.push(s);
     };
 
-    // Steps an animal to an empty tile. The caller times the step (aStepLeft, aStepDur).
+    // Steps an animal to an empty tile, or into water (how deep is the caller's rule:
+    // animals.js canStand). The caller times the step (aStepLeft, aStepDur).
     W.moveAnimal = function (s, t2) {
       const t = W.aTile[s];
       if (W.hole[t2] && !AS.canEnterHole(W.aSpecies[s])) throw new Error(`tile ${t2} is a warren hole; only bunnies can enter`);
-      claim(t2, W.kind[t]);
-      W.kind[t] = KIND.EMPTY;
+      claim(t2, W.kind[t], true);
+      free(t);
       W.aSlot[t] = -1;
       W.aSlot[t2] = s;
       W.aFrom[s] = t;

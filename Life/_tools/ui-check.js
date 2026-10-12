@@ -185,7 +185,7 @@ const input = { speedIndex: 1, achieved: 1, day: 3.24, seed: 1234567, counts: { 
 // ---- tabs, Hide UI, NUKE MODE ----
 const tabBtn = (ids, label) => ids.hud.all(e => e.className.split(' ').includes('hud-tab') && e.textContent === label)[0];
 const panelOf = (ids, key) => ids.hud.all(e => e.className === 'hud-panel hud-panel-' + key)[0];
-const stripOf = ids => ids.hud.all(e => e.className === 'hud-tabstrip')[0];
+const winOf = (ids, key) => ids.hud.all(e => e.className === 'hud-tabstrip hud-win-' + key)[0];
 { const { ids } = build(false);
   const bar = ids.hud.all(e => e.className === 'hud-strip')[0];
   const barText = bar.children.map(c => c.className).join('|');
@@ -197,25 +197,25 @@ const stripOf = ids => ids.hud.all(e => e.className === 'hud-tabstrip')[0];
   assert.strictEqual(ids.hud.all(e => e.className.includes('hud-hide'))[0].textContent, 'Hide UI'); ok('a Hide UI button');
 }
 { const { ui, ids } = build(true, { onLines() {} });
-  assert.strictEqual(ui.tab, 'info'); assert(!stripOf(ids).hidden && !panelOf(ids, 'info').hidden && panelOf(ids, 'debug').hidden && panelOf(ids, 'god').hidden); ok('Info is open by default');
+  assert.strictEqual(ui.windows.join(','), 'info'); assert(!winOf(ids, 'info').hidden && winOf(ids, 'debug').hidden && winOf(ids, 'god').hidden); ok('Info is open by default, alone');
   assert(panelOf(ids, 'info').textContent.includes('Graph') && panelOf(ids, 'info').all(e => e.className === "hud-glyph").length === 6); ok('Info holds the six counts (humans and the Total included) and the Graph button');
   assert(panelOf(ids, 'info').all(e => e.className.includes('hud-lines')).length === 1 && panelOf(ids, 'debug').textContent.includes('Benchmark') && panelOf(ids, 'debug').textContent.includes('Seed')); ok('Info holds Intent lines; Debug holds Benchmark and the Seed');
   assert(panelOf(ids, 'god').textContent.includes('NUKE MODE')); ok('PAINT holds NUKE MODE');
 }
-{ const tabs = [];
-  const { ui, ids } = build(true, { tab: null, onTab: n => tabs.push(n) });
-  assert(stripOf(ids).hidden && ui.tab === null && tabs.length === 0); ok('tab: null starts closed, and the starting tab is not reported');
+{ const seen = [];
+  const { ui, ids } = build(true, { windows: [], onWindows: k => seen.push(k.join(',')) });
+  assert(winOf(ids, 'info').hidden && ui.windows.length === 0 && seen.length === 0); ok('windows: [] starts with none open, and that is not reported');
   tabBtn(ids, 'Debug').fire('click');
-  assert(!stripOf(ids).hidden && !panelOf(ids, 'debug').hidden && panelOf(ids, 'info').hidden && tabBtn(ids, 'Debug').classList.contains('on')); ok('clicking a tab opens its strip');
+  assert(!winOf(ids, 'debug').hidden && winOf(ids, 'info').hidden && tabBtn(ids, 'Debug').classList.contains('on')); ok('a tab button opens its own window');
   tabBtn(ids, 'PAINT').fire('click');
-  assert(panelOf(ids, 'debug').hidden && !panelOf(ids, 'god').hidden && !tabBtn(ids, 'Debug').classList.contains('on') && tabBtn(ids, 'PAINT').classList.contains('on')); ok('only one tab is open at a time');
+  assert(!winOf(ids, 'debug').hidden && !winOf(ids, 'god').hidden && tabBtn(ids, 'Debug').classList.contains('on') && tabBtn(ids, 'PAINT').classList.contains('on')); ok('another opens beside it: both stay open');
   tabBtn(ids, 'PAINT').fire('click');
-  assert(stripOf(ids).hidden && ui.tab === null && !tabBtn(ids, 'PAINT').classList.contains('on')); ok('clicking the open tab closes the strip');
-  assert.deepStrictEqual(tabs, ['debug', 'god', null]); ok('onTab reports each change (for remembering it)');
+  assert(winOf(ids, 'god').hidden && !winOf(ids, 'debug').hidden && !tabBtn(ids, 'PAINT').classList.contains('on')); ok('clicking an open one closes just that window');
+  assert.deepStrictEqual(seen, ['debug', 'debug,god', 'debug']); ok('onWindows reports the open ones after each change (for remembering them)');
 }
-{ const { ui, ids } = build(false, { tab: 'god' });
-  assert(ui.tab === 'god' && !panelOf(ids, 'god').hidden); ok('a remembered tab opens at load');
-  const { ui: u2 } = build(false, { tab: 'nonsense' }); assert.strictEqual(u2.tab, null); ok('an unknown remembered tab means closed');
+{ const { ui, ids } = build(false, { windows: ['god', 'info'] });
+  assert(!winOf(ids, 'god').hidden && !winOf(ids, 'info').hidden && ui.windows.length === 2); ok('remembered windows open at load');
+  const { ui: u2 } = build(false, { windows: ['nonsense', 'debug'] }); assert.strictEqual(u2.windows.length, 0); ok('an unknown remembered window (or Debug without ?debug) stays shut');
 }
 { const { ui, ids, doc, body } = build(false);
   assert(!body.classList.contains('ui-off') && !ui.hidden);

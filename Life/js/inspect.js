@@ -122,7 +122,7 @@
     Depth: (sim, c) => num(sim.W.wDepth[c.t], DEPTH_DECIMALS) + ' m',
     Ground: (sim, c) => {
       const W = sim.W, t = c.t;
-      return W.kind[t] === KIND.WATER ? 'Water' : W.hole[t] ? 'Warren hole' : W.beach[t] ? 'Beach' : 'Ground';
+      return W.wDepth[t] > 0 ? 'Water' : W.hole[t] ? 'Warren hole' : W.beach[t] ? 'Beach' : 'Ground';
     },
     Sex: (sim, c) => sim.W.aSex[c.s] === SEX.FEMALE ? 'Female' : 'Male',
     // A due litter with no room yet is still a pregnancy (DESIGN.md: the birth waits).

@@ -74,6 +74,7 @@
       AS.corpseTick(sim);
       AS.grassTick(sim);
       AS.warrenTick(sim);
+      AS.waterTick(sim);
       AS.animalsTick(sim);
       sim.tickCount++;
     };

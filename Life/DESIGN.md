@@ -79,13 +79,23 @@ watching the sim run. Everything else in this doc is decided.
   (Manning, `SurfaceFlow`); it soaks into the soil (`Infiltration`, up to the soil's room,
   30% of `SoilDepth`) and evaporates (`Evaporation`); soil water flows toward a lower water
   table (Darcy, `SoilFlow`) and plants draw it out (`Transpiration`, less as the soil dries);
-  full soil pushes its extra up as springs and seeps. A tile is 10 m across. For now water
-  stays as the pre-run left it during play (Phase 1), and land pieces it cut off are joined
-  across the shortest run of water so no animal is stranded. **Coming (Phase 2), decided by
-  Paul:** the rules run live; water becomes a layer rather than a tile kind, animals wade
-  shallow water (deep water blocks; no fords needed); rising water drowns grass and warren
-  holes and animals step out; drinking takes real amounts (tiny against a lake); the bare
-  beach moves with the shore. The terrain settings Relief, Hilliness, Roughness, Bowls,
+  full soil pushes its extra up as springs and seeps. A tile is 10 m across. **The rules keep
+  running during play** (Paul, 12 Oct 2026), a short step (36 minutes of the world's time)
+  every half second at 1×, each step the same: the exchange, a surface move, a soil move.
+  Longer steps let rain and springs arrive in lumps that drained away between looks, and
+  thousands of tiles blinked wet and dry; even steps see a steady trickle as steady. Before
+  day 0 the rules run in coarse steps to settle quickly, then 10 days of play's own steps,
+  so day 0 is already at rest. Depth is the
+  truth: any water makes a tile water. Rising water drowns grass, floods warren holes, puts
+  out scorched ground and washes corpses away (an animal that dies in water leaves no body);
+  animals **wade** water up to their `WadeDepth`, at `WadeSpeed`, and deeper water is a wall
+  (Paul: no fords; land cut off by deep water stays cut off); an animal the water rises over
+  walks out before doing anything else. **Drinking takes real water**: `WaterLiters` fill a
+  meter, taken from the tile drunk from (tiny against a lake; a puddle can be drunk dry), and
+  a wading animal drinks where it stands. The bare beach moves with the shore. WATER MODE
+  (PAINT) pours 1 m onto every tile of the brush, into the same rules, and it flows from
+  there (Paul: it should flow); a world made without water gets the rules when first poured
+  on. The grass-shore boost (`WaterBoost`) stays where the world was built. The terrain settings Relief, Hilliness, Roughness, Bowls,
   RiverMouths and Rain are ranges: each world draws its own values by its seed (Paul: every
   world feels different under the same rules). Rain 0 makes a dry world. Topo
   lines show the height (Paul chose them over shaded ground in a mockup): a thin line every
@@ -94,11 +104,9 @@ watching the sim run. Everything else in this doc is decided.
   2026), in meters: a lake's is its level minus the ground (it stands level across the
   lake), a river's grows with the ground draining through it. Any depth makes a tile water.
   It shows like grass's size: shallow water lighter, mid, deep darker (bands at 1 m and
-  4 m), in the sprites and the far view, and the properties window gives it (Depth). For
-  now depths are set at world build; flowing, drinking and refilling come next. Water is impassable to everything (but animals see
-  across it), nothing is ever placed on it, and nukes leave it. All land always stays one
-  connected piece: a lake or river that would cut off land is bridged or dropped, a tiny
-  cut-off pocket becomes water. A one-tile bare beach rings all water: grass never grows
+  4 m), in the sprites and the far view (under a wading animal too), and the properties window
+  gives it (Depth). Animals see across water; nothing but a wading animal is ever on it, and
+  nukes leave it. A one-tile bare beach rings all water: grass never grows
   there, so animals can always reach it to drink (Paul: shore grass blocked drinking).
   `WaterBoost` (faster grass near water) is kept as a setting, set to 1 (off).
   Bunnies live in `BunnyColonies` colonies just outside meadow edges; wolves run in
@@ -145,7 +153,8 @@ watching the sim run. Everything else in this doc is decided.
   that drains at `ThirstRate` (scaled by activity like hunger). Below `ThirstyAt` it goes
   to drink, ranked just under fleeing and hiding and above food and mating: it heads for
   the nearest water it knows of (within `WaterSense`, its knowledge of its land), stands
-  on the beach and drinks `DrinkRate` until full; water never runs out. At an empty meter
+  on the beach (or in the shallows it wades) and drinks `DrinkRate` until full, taking
+  real water from the tile (`WaterLiters` a meter: a puddle can run dry). At an empty meter
   it loses `ThirstDamage` HP a second and can die; a dry animal doesn't heal.
 - **Cause of death** is kept on every corpse and shown in the inspector: Attacked by a
   wolf (or a human), Starved, Died of thirst, Starved and thirsty, Old age.
@@ -220,7 +229,7 @@ watching the sim run. Everything else in this doc is decided.
   `StressHalfLife` days, so one bad chase fades and scares coming faster than that build up.
   At `LeaveStress` the bunny emigrates exactly as a crowded one does, and starts fresh where
   it settles. It is a value and a timestamp, faded only when read or added to, so it costs
-  nothing per tick. Thirst adds none: water doesn't move, so leaving can't fix it. Two
+  nothing per tick. Thirst adds none: water moves only slowly, so leaving can't fix it. Two
   30-day runs: 128 and 303 stress departures, peak stress about 9. Gross test, 3 seeds x 60
   days: every species alive; bunnies 134-924 at day 60 against 318-1,548 without it, and
   wolves 57-80 against 74-91.
@@ -262,6 +271,17 @@ watching the sim run. Everything else in this doc is decided.
   last saw it, picks the chase back up if the bunny reappears, and gives up when it
   reaches the spot and sees nothing or after `TrackSeconds`. Out of sight, it knows only
   what it last saw.
+- **Going around, and giving up** (Paul, 12 Oct 2026: wolves stood staring at bunnies
+  across a river). An animal's path search looks only as far as it can see. When it finds
+  no way to where it is going, the animal walks straight at it, and when something is in
+  the way (a lake, a river, a crowd) it follows that edge, keeping it on its own side:
+  every animal is born left- or right-handed, so two wolves meeting a lake split around
+  it. It leaves the edge once it is closer than where it met it, and gives up after
+  `EdgeFollow` steps along edges in one trip. Hunters (wolves, humans) then ignore that
+  bunny, carcass or mate for `ForgetSeconds` and get on with something else; a bunny's
+  trip picks a new destination. Used for every far trip (roaming, leaving home, a mate
+  heard beyond sight), for a chase or meal the path search can't reach, and by a bunny
+  following its trip's leader.
 
 **Grass**
 - Each tile of grass is one blade. Its sprite shows its Size in thirds.
@@ -322,13 +342,16 @@ watching the sim run. Everything else in this doc is decided.
   `variables.csv`, live, and the selection follows the agent as it moves. Clicking empty
   ground clears it. Live values only, no life history.
 - **Controls in tabs** (Paul, 4 Oct 2026): the top bar always shows Pause, the speeds and
-  the day, then three tabs and Hide UI. One tab's strip is open at a time. Named by what
+  the day, then three tabs and Hide UI. Each tab button opens and closes its own window,
+  and any of them may be open at once (Paul, 12 Oct 2026: like the graph and minimap, left
+  open to the side; they were one shared strip, one tab at a time). Named by what
   they hold, in this order (Paul, 11 Oct 2026; they were Info, Debug, God). Each tab is a
   stack of labeled rows (a row's name, its controls under or after it), so new controls
-  join a row or start one (Paul: the tabs keep growing). On a computer the open tab is a
-  side panel down the left, under the bar (Paul: across the top it hid too much of the
-  world); the graph and minimap sit to its right unless dragged. On a phone it is a sheet
-  under the bar, at most 40% of the screen, scrolling inside itself:
+  join a row or start one (Paul: the tabs keep growing). On a computer the windows float
+  (Paul: across the top they hid too much of the world): Info down the left under the bar,
+  with the graph and minimap to its right unless dragged; PAINT in the bottom right corner;
+  Debug on the right. Which are open is kept per viewer. On a phone each open one is a
+  sheet under the bar, at most 40% of the screen, scrolling inside itself, stacked:
   - **Info** (was Show/Hide): everything in it toggles what you see. **Counts** of bunnies,
     wolves, humans, the total, blades and corpses (each count also rings its kind on the
     map). **Windows:** Graph, Minimap. **Map:** Topo lines and their spacing (0.5 to 20 m),
@@ -344,7 +367,7 @@ watching the sim run. Everything else in this doc is decided.
     held half a second and then faded out over 1.4 s (Paul, 12 Oct 2026).
   - **Debug**, only with `?debug` in the address (Paul, 12 Oct 2026: not needed for now):
     **World** (Water, the seed), **Tools** (Benchmark, the debug tools).
-  - On a computer the side panel, the properties window and the minimap drag by their title
+  - On a computer the tab windows, the properties window and the minimap drag by their title
     bars like the graph (drag.js), their places kept per viewer; a double-click on a title bar
     puts the window back. A phone keeps its sheets.
 - **Minimap** (Paul, 11 Oct 2026): the whole world, always zoomed all the way out, in a small

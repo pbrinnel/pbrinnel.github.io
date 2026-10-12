@@ -13,13 +13,26 @@
 // one neighbor than a fifth of the difference in their levels (it trades with four at once).
 // Depths under TINY are float rounding and count as none.
 //
-// terrain.js runs these before day 0 so a world starts settled.
+// Time moves in steps, each the same three moves in order: the exchange, a surface move, a
+// soil move. During play one step runs every STEP_TICKS ticks (STEP_DAYS of the world's time),
+// so every look at the water sees it at the same point of a step: rain and springs arrive a
+// little each step, as they would, rather than in lumps that come and drain away (which made
+// thousands of tiles blink wet and dry). terrain.js runs them before day 0 (preRun): coarse
+// steps to settle the world quickly, then SETTLE_DAYS of play's own steps, so day 0 is
+// already at rest under the rules it will run by.
 //
 //   AS.Water(grid, S, outlet) → water
 //     grid: { w, h, n, elev }; S: the world's settings (sim.terrain); outlet: Uint8Array, 1 at a river mouth
 //     water.H, water.G      surface water depth and soil water (m of water), Float64Array
-//     water.step(days)       one step: exchange, SUBSTEPS surface moves, a soil move
+//     water.step(days)       one step of `days`
+//     water.preRun(days)     `days` before day 0, ending at rest under play's steps
+//     water.listWet()        after H is changed from outside (pouring, drinking)
 //     water.totals           m of water since made: { rain, evap, et, out } (per tile area)
+//
+//   AS.waterTick(sim)        the sim's tick: a step when one is due, then the world told (syncWater)
+//   AS.syncWater(sim)        W.wDepth and the tiles' kinds made to match water.H
+//   The world's water is W.water (terrain.js makes it; god.js makes one to pour into a world
+//   without).
 (function (AS) {
   'use strict';
   // Math's functions looked up once: hot loops (and the Node sandbox the checks run in, where
@@ -28,15 +41,20 @@
 
   const TILE_M = AS.TILE_M = 10;   // m across a tile: the map is 4.5 × 3 km
   const POROSITY = 0.3;            // share of the soil that is room for water
-  const SUBSTEPS = 8;              // surface moves per step (surface water is quick, soil slow)
   const SEC_PER_DAY = 86400;
   const TINY = 1e-6;               // m: below this a depth is float rounding, counted as none
+  const STEP_TICKS = 15;           // ticks between steps during play
+  const STEP_DAYS = STEP_TICKS / (AS.DAY_SECONDS * AS.TICK_HZ);   // sim.js sets the clock first
+  const SPINUP_STEP_DAYS = 1 / 8;  // the pre-run's coarse steps
+  const SETTLE_DAYS = 10;          // the pre-run's last days, in play's own steps
+  const FIELD_STEPS = 10;          // the way-to-water field is rebuilt at most this often (steps)
   AS.WATER_TINY = TINY;
   AS.SOIL_POROSITY = POROSITY;
+  AS.WATER_STEP_DAYS = STEP_DAYS;
 
   AS.Water = function (grid, S, outlet) {
     const { w, h, n } = grid, E = grid.elev;
-    const H = new Float64Array(n), G = new Float64Array(n), dH = new Float64Array(n), dG = new Float64Array(n);
+    const H = new Float64Array(n), G = new Float64Array(n), dH = new Float64Array(n), dG = new Float64Array(n), L = new Float64Array(n);
     const wet = new Int32Array(n), touched = new Int32Array(n), mark = new Uint8Array(n);
     let wetN = 0;
     const room = S.SoilDepth * POROSITY;
@@ -52,6 +70,7 @@
 
     // Rain, soaking in, springs, evaporation and transpiration on every tile, for dt days.
     function exchange(dt) {
+      wetN = 0;
       for (let i = 0; i < n; i++) {
         let d = H[i] + rain * dt, g = G[i];
         totals.rain += rain * dt;
@@ -61,8 +80,8 @@
         if (d > 0) { const e = min(d, evap * dt); d -= e; totals.evap += e; }
         if (g > 0) { const e = min(g, et * dt * g / room); g -= e; totals.et += e; }
         H[i] = d < TINY ? 0 : d; G[i] = g;
+        if (H[i] > 0) wet[wetN++] = i;
       }
-      listWet();
     }
 
     // Surface water, one move of dt days. Only tiles holding water do any work, and only the
@@ -112,40 +131,68 @@
 
     // Soil water, one move of dt days: toward a lower water table (the soil's floor, the ground
     // minus SoilDepth, plus the water's height in it); out of the map only at a river mouth.
+    // Darcy: SoilFlow × thickness × (drop / TILE_M) × dt over a tile's width, as water (× POROSITY).
     function soil(dt) {
-      dG.fill(0);
-      for (let i = 0; i < n; i++) {
-        const g = G[i];
-        if (g <= 0) continue;
-        const thick = g / POROSITY, top = E[i] - S.SoilDepth + thick;
-        nbs(i);
-        let total = 0, scale = 1, off = 0;
-        for (let k = 0; k < 4; k++) {
-          const u = nb[k]; want[k] = 0;
-          if (u < 0) continue;
-          const drop = top - (E[u] - S.SoilDepth + G[u] / POROSITY);
-          if (drop <= 0) continue;
-          want[k] = S.SoilFlow * thick * (drop / TILE_M) * dt / TILE_M * POROSITY;
-          const c = drop * POROSITY / 5;
-          if (want[k] > c) scale = min(scale, c / want[k]);
-          total += want[k];
+      const k = S.SoilFlow * dt * POROSITY / (TILE_M * TILE_M), floor = S.SoilDepth;
+      for (let i = 0; i < n; i++) { L[i] = E[i] - floor + G[i] / POROSITY; dG[i] = 0; }
+      for (let y = 0, i = 0; y < h; y++) {
+        for (let x = 0; x < w; x++, i++) {
+          const g = G[i];
+          if (g <= 0) continue;
+          const thick = g / POROSITY, top = L[i], kt = k * thick;
+          let total = 0, scale = 1, a = 0, b = 0, c = 0, d = 0;
+          if (x > 0) { const dr = top - L[i - 1]; if (dr > 0) { a = kt * dr; const cap = dr * POROSITY / 5; if (a > cap) scale = min(scale, cap / a); total += a; } }
+          if (x < w - 1) { const dr = top - L[i + 1]; if (dr > 0) { b = kt * dr; const cap = dr * POROSITY / 5; if (b > cap) scale = min(scale, cap / b); total += b; } }
+          if (y > 0) { const dr = top - L[i - w]; if (dr > 0) { c = kt * dr; const cap = dr * POROSITY / 5; if (c > cap) scale = min(scale, cap / c); total += c; } }
+          if (y < h - 1) { const dr = top - L[i + w]; if (dr > 0) { d = kt * dr; const cap = dr * POROSITY / 5; if (d > cap) scale = min(scale, cap / d); total += d; } }
+          const off = outlet[i] ? kt * thick : 0;
+          total += off;
+          if (total <= 0) continue;
+          if (total * scale > g) scale = g / total;
+          if (a > 0) dG[i - 1] += a * scale;
+          if (b > 0) dG[i + 1] += b * scale;
+          if (c > 0) dG[i - w] += c * scale;
+          if (d > 0) dG[i + w] += d * scale;
+          totals.out += off * scale;
+          dG[i] -= total * scale;
         }
-        if (outlet[i]) { off = S.SoilFlow * thick * (thick / TILE_M) * dt / TILE_M * POROSITY; total += off; }
-        if (total <= 0) continue;
-        if (total * scale > g) scale = g / total;
-        for (let k = 0; k < 4; k++) if (want[k] > 0) dG[nb[k]] += want[k] * scale;
-        totals.out += off * scale;
-        dG[i] -= total * scale;
       }
-      for (let i = 0; i < n; i++) G[i] = max(0, G[i] + dG[i]);
+      for (let i = 0; i < n; i++) { const v = G[i] + dG[i]; G[i] = v > 0 ? v : 0; }
     }
 
-    function step(dt) {
-      exchange(dt);
-      for (let k = 0; k < SUBSTEPS; k++) surface(dt / SUBSTEPS);
-      soil(dt);
+    function step(dt) { exchange(dt); surface(dt); soil(dt); }
+    function run(days, dt) { for (let t = 0; t < days - 1e-9; t += dt) step(dt); }
+    function preRun(days) {
+      const settle = min(days, SETTLE_DAYS);
+      run(days - settle, SPINUP_STEP_DAYS);
+      run(settle, STEP_DAYS);
     }
 
-    return { H, G, room, totals, step, listWet };
+    return { H, G, room, totals, step, preRun, listWet };
+  };
+
+  AS.waterTick = function (sim) {
+    const wat = sim.W.water;
+    if (!wat || sim.tickCount % STEP_TICKS !== 0) return;
+    wat.step(STEP_DAYS);
+    AS.syncWater(sim);
+    // The way-to-water field is a guide: rebuilt every FIELD_STEPS steps when shores have
+    // moved, not at every one.
+    if (sim.W.wetMoved && (sim.tickCount / STEP_TICKS) % FIELD_STEPS === 0) { sim.W.wetMoved = false; sim.W.waterStale = true; }
+  };
+
+  // Water reaching a tile drowns its blade, floods its hole and washes its corpse away
+  // (world.js setDepth, after corpse.js lets the corpse's grass boost go); an animal stays
+  // and wades or steps out (animals.js).
+  AS.syncWater = function (sim) {
+    const W = sim.W, H = W.water.H, D = W.wDepth, n = W.n;
+    for (let t = 0; t < n; t++) {
+      const h = H[t];
+      if (h > 0) {
+        if (D[t] > 0) { D[t] = h; continue; }
+        if (W.kind[t] === AS.KIND.CORPSE) AS.corpseRemove(sim, t);
+        W.setDepth(t, h);
+      } else if (D[t] > 0) W.setDepth(t, 0);
+    }
   };
 })(globalThis.AS);

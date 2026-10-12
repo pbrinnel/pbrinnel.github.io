@@ -194,31 +194,62 @@ W.scorch[t0] = 0;
   for (let i = 0; i < 4 * DAY; i++) sim5.tick();
   ok(W5.bunnies + W5.wolves + W5.humans !== live, 'a running world changes its animal count freely (births and deaths do not consult the limit)');
 }
-// ---- WATER MODE: water on bare ground and grass, never on animals, corpses, holes or scorch ----
+// ---- WATER MODE: water poured into the world's water rules, and it flows ----
 {
   const { AS: A6, texts: t6 } = load();
   let s6 = t6.settings;
+  // No rain, so every drop in the world is what was poured.
   for (const [k, v] of [['WorldWidth', '80'], ['WorldHeight', '60'], ['StartGrass', '0%'], ['StartBunnies', '0'], ['StartWolves', '0'], ['Rain', '0']]) s6 = editCSV(s6, k, 'Value', v);
   t6.settings = s6;
   const { T: T6 } = A6.parseTables(t6);
   const sim6 = A6.Sim(T6, 3), W6 = sim6.W, K6 = A6.KIND;
   const at = (x, y) => W6.tile(x, y);
+  ok(W6.water && W6.waterCount === 0, 'a world with Water on and no rain is dry, but has the water rules');
   W6.addGrass(at(40, 30), 1, 0);                         // drowned
   W6.addGrass(at(40, 26), 1, 0);                         // just outside radius 3: left on the new shore, so cleared
-  W6.addGrass(at(50, 30), 1, 0);                         // far away: untouched
+  W6.addGrass(at(50, 30), 1, 0);                         // far away: untouched (for now)
   const bun = A6.spawnStarting(sim6, A6.SPECIES.BUNNY, at(41, 30));
   A6.debugDropCorpse(sim6, at(39, 30), A6.SPECIES.BUNNY);
   W6.addHole(at(40, 31), 0);
   const placed = A6.paintCircle(sim6, 'water', 40, 30, 3);
-  const waterAt = (x, y) => W6.kind[at(x, y)] === K6.WATER;
-  ok(placed > 0 && W6.waterCount === placed && waterAt(40, 30) && W6.wDepth[at(40, 30)] > 0, `WATER MODE pours ${placed} tiles of water, with a depth, over grass too`);
-  ok(W6.aAlive[bun] && W6.aTile[bun] === at(41, 30) && W6.kind[at(39, 30)] === K6.CORPSE && W6.hole[at(40, 31)] && !waterAt(40, 31), 'it never covers an animal, a corpse or a warren hole');
+  const wetAt = (x, y) => W6.wDepth[at(x, y)] > 0;
+  ok(placed > 0 && W6.waterCount === placed && wetAt(40, 30) && W6.kind[at(40, 30)] === K6.WATER, `WATER MODE pours on all ${placed} tiles of the circle, over grass too`);
+  ok(W6.aAlive[bun] && wetAt(41, 30) && W6.kind[at(41, 30)] === K6.BUNNY, 'an animal it lands on stays, standing in it');
+  ok(W6.kind[at(39, 30)] === K6.WATER && !W6.hole[at(40, 31)], 'it washes a corpse away and floods a warren hole');
   let bladeOnBeach = 0; for (let t = 0; t < W6.n; t++) if (W6.beach[t] && W6.kind[t] === K6.GRASS) bladeOnBeach++;
   ok(bladeOnBeach === 0 && W6.kind[at(50, 30)] === K6.GRASS, 'the new shore is bare (the beach rule); grass away from it stays');
   const f0 = failures.length; audit(A6, sim6, 'after WATER MODE');
-  for (let i = 0; i < 2 * A6.TICK_HZ * A6.DAY_SECONDS; i++) sim6.tick();
+  // It flows: within a day it has left the circle, and it all adds up (surface + soil + what
+  // left by evaporation, plants and river mouths = what was poured).
+  const center0 = W6.wDepth[at(40, 30)];
+  let outside = false, bunnyOut = false;
+  for (let i = 0; i < A6.TICK_HZ * A6.DAY_SECONDS; i++) {
+    sim6.tick();
+    if (!outside) for (let t = 0; t < W6.n && !outside; t++) if (W6.wDepth[t] > 0 && (W6.tx(t) - 40) ** 2 + (W6.ty(t) - 30) ** 2 > 9) outside = true;
+    if (W6.aAlive[bun] && !(W6.wDepth[W6.aTile[bun]] > T6.bunny.WadeDepth)) bunnyOut = true;
+  }
+  ok(outside, 'the poured water flows out of the circle within a day');
+  ok(bunnyOut, 'the bunny walks out of water deeper than it wades');
+  ok(W6.wDepth[at(40, 30)] !== center0, `the water at the center moves (${center0.toFixed(2)} → ${W6.wDepth[at(40, 30)].toFixed(2)} m)`);
+  const wat = W6.water;
+  let held = 0; for (let t = 0; t < W6.n; t++) held += wat.H[t] + wat.G[t];
+  const gone = wat.totals.evap + wat.totals.et + wat.totals.out;
+  ok(Math.abs(held + gone - placed * 1) < 1e-6 * placed, `nothing is made or lost: ${held.toFixed(4)} held + ${gone.toFixed(4)} gone = ${placed} poured (m over a tile)`);
+  for (let i = 0; i < A6.TICK_HZ * A6.DAY_SECONDS; i++) sim6.tick();
   audit(A6, sim6, 'two days after WATER MODE');
   ok(failures.length === f0, 'the grid and stores audit after pouring water, and two days on' + (failures.length > f0 ? ': ' + failures[f0] : ''));
+}
+{
+  // A world made with Water off gets the rules when water is first poured, so it flows too.
+  const { AS: A7, texts: t7 } = load();
+  let s7 = t7.settings;
+  for (const [k, v] of [['WorldWidth', '60'], ['WorldHeight', '40'], ['StartGrass', '0%'], ['StartBunnies', '0'], ['StartWolves', '0'], ['Water', 'off']]) s7 = editCSV(s7, k, 'Value', v);
+  t7.settings = s7;
+  const sim7 = A7.Sim(A7.parseTables(t7).T, 4), W7 = sim7.W;
+  ok(!W7.water, 'Water off: no water rules');
+  const placed = A7.paintCircle(sim7, 'water', 30, 20, 2);
+  for (let i = 0; i < A7.TICK_HZ * A7.DAY_SECONDS; i++) sim7.tick();
+  ok(W7.water && W7.waterCount > 0 && W7.waterCount !== placed, `pouring gives it the rules, and the water spreads (${placed} → ${W7.waterCount} tiles)`);
 }
 console.log(bad ? `${bad} FAILED` : 'all passed');
 process.exit(bad ? 1 : 0);

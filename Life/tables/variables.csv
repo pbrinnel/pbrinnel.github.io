@@ -23,5 +23,5 @@ Meat,Dynamic,Corpse,0 – MeatOnBody,—,Eaten by a wolf or human (BiteFood per 
 InHole,Dynamic,Bunny,yes / no,Walks onto a warren hole,Walks off it,A bunny in a hole can't be bitten or hunted
 LastUsed,Dynamic,Hole,0 – CollapseDays (days),Every tick no bunny stands on it,A bunny stands on it,CollapseDays → the hole collapses into bare ground
 Elevation,Static,Tile,0 – Relief (m),—,—,"How high the ground is; water settles in the low places (the topo lines are every 5 m of it)"
-Ground,Static,Tile,Ground / Beach / Water / Warren hole,—,—,"Beach: land touching water, kept bare so animals can drink there"
-Depth,Dynamic,Water,0 – (m),—,—,"How deep the water stands: lakes level from their surface, rivers deeper the more ground drains through them. Shown by its shade: lighter shallow, darker deep"
+Ground,Dynamic,Tile,Ground / Beach / Water / Warren hole,—,—,"Beach: land touching water, kept bare so animals can drink there"
+Depth,Dynamic,Water,0 – (m),Rain; water flowing in from higher; springs; WATER MODE,Flowing away downhill; soaking into the soil; evaporation; drinking (WaterLiters),"How deep the water stands now: the water rules (water.js) move it all the time. Shown by its shade: lighter shallow, darker deep"

@@ -35,6 +35,9 @@
     ['ThirstRate', 'num', ANIMALS],
     ['ThirstyAt', 'frac', ANIMALS],
     ['DrinkRate', 'pos', ANIMALS],
+    ['WaterLiters', 'num', []],      // blank = drinking takes no water
+    ['WadeDepth', 'num', []],        // blank = never wades
+    ['WadeSpeed', 'ratio', []],      // blank = no slower in water
     ['ThirstDamage', 'num', ANIMALS],
     ['WaterSense', 'num', ANIMALS],
     ['HPMax', 'pos', ANIMALS],
@@ -45,6 +48,8 @@
     ['RestUntil', 'frac', ANIMALS],
     ['SprintRange', 'num', ['Wolf', 'Human']],
     ['TrackSeconds', 'num', ['Wolf', 'Human']],
+    ['EdgeFollow', 'num', []],       // blank = gives up as soon as it is blocked
+    ['ForgetSeconds', 'num', []],    // blank = never ignores a target
     ['HoleRange', 'num', ['Bunny']],
     ['DigChance', 'frac', ['Bunny']],
     ['LeaveCrowd', 'num', []],       // blank = never emigrates

@@ -25,7 +25,7 @@ function make(size, seed = 1, hunger = false, edit) {
   s = editCSV(s, 'WorldHeight', 'Value', String(size));
   s = editCSV(s, 'StartGrass', 'Value', '0%');
   s = editCSV(s, 'StartBunnies', 'Value', '0');
-  s = editCSV(s, 'Rain', 'Value', '0');   // these hand-place things on tiles; water is water-check.js's and thirst-check.js's
+  s = editCSV(s, 'Water', 'Value', 'off');   // these hand-place things on tiles, water included: no water rules to move it
   s = editCSV(s, 'StartWolves', 'Value', '0');
   texts.settings = s;
   if (!hunger) {
@@ -444,6 +444,64 @@ const d2 = (W, a, b) => (W.tx(a) - W.tx(b)) ** 2 + (W.ty(a) - W.ty(b)) ** 2;
   ok(kids.length === litter && kids.every(s => W.aSpecies[s] === AS.SPECIES.WOLF && W.aParentB[s] === mSer), `birth: ${litter} wolf cub(s) with both parents`);
   ok(events.filter(e => e[0] === AS.EV.BIRTH).length === litter && W.aChildren[f] === litter && W.aChildren[m] === litter, 'birth: BIRTH events and Children counts');
   ok(near(W.aMateCd[f], Wf.MateCooldown, 0.05), `birth: MateCooldown ${W.aMateCd[f].toFixed(2)} d starts at birth`);
+}
+
+// --- going around: a river between a wolf and what it wants (AS.edgeStep, EdgeFollow,
+// ForgetSeconds). Each wolf is born left- or right-handed (its serial's last bit). ---
+{
+  // A river down the map at x = RX, with one ford at y = FORD, farther than the wolf can see.
+  const RX = 22, FORD = 72, Y0 = 40;
+  function riverWorld(seed, ford, rightHanded) {
+    // The carcass must outlast the walk around.
+    const env = make(80, seed, false, tx => { tx.species = editCSV(tx.species, 'CorpseDecay', 'Bunny', '100'); });
+    const { AS, sim, W } = env;
+    for (let y = 0; y < W.h; y++) if (y !== ford) W.addWater(at(W, RX, y));
+    let w = wolf(AS, sim, RX - 2, Y0, { full: 10 });
+    while ((W.aSerial[w] & 1) !== (rightHanded ? 1 : 0)) { W.removeAnimal(w); w = wolf(AS, sim, RX - 2, Y0, { full: 10 }); }
+    return { ...env, w };
+  }
+  const sight = make(10).Wf.VisionRange;
+  ok(FORD - Y0 > sight, `around: the ford (${FORD - Y0} tiles off) is beyond the wolf's sight (${sight})`);
+  const feedScene = rightHanded => {
+    const env = riverWorld(31, FORD, rightHanded), { AS, sim, W, w } = env;
+    const ct = at(W, RX + 2, Y0);
+    W.addCorpse(ct, AS.SPECIES.BUNNY, 0);
+    // Hunger is off in these worlds, so only a bite of the carcass raises Fullness. The run
+    // ends when it eats or gives up (leaves FEED).
+    const full0 = W.aFullness[w];
+    let fed = false, moved = 0, last = W.aTile[w], feeding = false;
+    for (let i = 0; i < secs(AS, 300) && !fed; i++) {
+      tick(sim);
+      if (W.aTile[w] !== last) { moved++; last = W.aTile[w]; }
+      fed = W.aFullness[w] > full0;
+      const st = sname(sim, w, 'wolf');
+      if (st === 'FEED') feeding = true;
+      else if (feeding) break;
+    }
+    return { fed, moved, W, w, sim, env };
+  };
+  // Facing east at the river, a left-handed wolf keeps the water on its left: it goes south, to the ford.
+  const L = feedScene(false), R = feedScene(true);
+  ok(L.fed, `around: a left-handed wolf follows the bank south to the ford and eats across the river (${L.moved} steps)`);
+  ok(!R.fed && R.moved > 10, `around: a right-handed one heads north instead, along the bank (${R.moved} steps), and doesn't get there`);
+  ok(sname(R.sim, R.w, 'wolf') !== 'FEED', `around: having given up, it forgets that carcass (${sname(R.sim, R.w, 'wolf')})`);
+}
+{
+  // No ford at all, a bunny just across: the wolf may look, but it doesn't stand and stare.
+  const { AS, sim, W } = make(60, 32);
+  for (let y = 0; y < W.h; y++) W.addWater(at(W, 30, y));
+  const w = wolf(AS, sim, 28, 30, { full: 10 });
+  const b = bun(AS, sim, 33, 30);
+  let hunting = 0, still = 0, last = W.aTile[w];
+  const n = secs(AS, 90);
+  for (let i = 0; i < n; i++) {
+    tick(sim);
+    if (W.aAlive[b] && W.aTargetSlot[w] === b) hunting++;
+    if (W.aTile[w] === last && W.aStepLeft[w] <= 0) still++;
+    last = W.aTile[w];
+  }
+  ok(hunting < n / 2, `around: with no way across it stops hunting that bunny (${(100 * hunting / n).toFixed(0)}% of the time on it)`);
+  ok(still < n / 2, `around: and doesn't stand staring (${(100 * still / n).toFixed(0)}% of ticks standing)`);
 }
 
 // --- real world, 60 days ---

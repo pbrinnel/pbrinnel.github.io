@@ -1,9 +1,10 @@
 'use strict';
-// The ground and its water (terrain.js, water.js; world.js KIND.WATER): every world has an
-// elevation grown before day 0; the water rules settle water on it, lower than the land, more
-// with more Rain, leaving the map only at river mouths; water is impassable
-// ground that holds nothing, never blocks sight, survives a nuke, and grass grows and seeds
-// faster along it; the land is always one connected piece; Scatter has no water.
+// The ground and its water (terrain.js, water.js; world.js wDepth and KIND.WATER): every world
+// has an elevation grown before day 0; the water rules settle water on it, lower than the land,
+// more with more Rain, leaving the map only at river mouths, and keep running, so day 0 is
+// already at rest; animals wade water no deeper than WadeDepth and never stand in deeper;
+// drinking takes real water; water holds nothing else, never blocks sight, survives a nuke,
+// and grass grows and seeds faster along it; Scatter has no water.
 const { load, audit, editCSV, failures } = require('./harness.js');
 let bad = 0;
 function ok(c, m) { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) bad++; }
@@ -48,13 +49,12 @@ function landPieces(AS, W) {
   ok(AS.TICK_HZ * AS.DAY_SECONDS === DAY, 'a day is the length this check assumes');
 }
 
-// ---- Meadows: the ground has height, water sits low on it, the land is one piece ----
+// ---- Meadows: the ground has height, water sits low on it ----
 {
-  let withWater = 0, worst = 0, lowWater = 0, inRelief = 0, total = 8, someWater = 0;
+  let withWater = 0, lowWater = 0, inRelief = 0, total = 8, someWater = 0;
   for (let seed = 1; seed <= total; seed++) {
     const { AS, W, T, sim } = make(seed);
-    const { pieces, water } = landPieces(AS, W);
-    worst = Math.max(worst, pieces);
+    const { water } = landPieces(AS, W);
     if (water > 0) withWater++;
     someWater += water;
     let lo = Infinity, hi = -Infinity, wSum = 0, lSum = 0, lN = 0;
@@ -69,7 +69,6 @@ function landPieces(AS, W) {
     if (water > 0 && wSum / water < lSum / lN) lowWater++;
   }
   ok(inRelief === total, `${total} seeds: the ground runs from 0 to the world's own Relief, drawn from the setting's range`);
-  ok(worst === 1, `${total} seeds: every land tile is reachable from every other (most pieces seen: ${worst})`);
   ok(withWater === total, `${total} seeds: every one has water (${(someWater / total) | 0} water tiles on average)`);
   ok(lowWater === total, 'water sits on low ground: in every seed it is lower on average than the land');
 }
@@ -109,23 +108,25 @@ function landPieces(AS, W) {
   ok(strayEdge < worlds * 40, `water reaches the edge mostly at the mouths (${strayEdge} other wet edge tiles in ${worlds} worlds)`);
 }
 
-// ---- A stress world: lots of rain, many basins, a small map: the land stays connected ----
+// ---- A stress world: lots of rain, many basins, a small map: it builds, and holds together ----
 {
-  let worst = 0, filled = 0, runs = 0;
+  let filled = 0, runs = 0;
+  const f0 = failures.length;
   for (let seed = 1; seed <= 10; seed++) {
-    const { AS, W } = make(seed, [set('WorldWidth', 120), set('WorldHeight', 90), set('Bowls', 14), set('Rain', 8), set('StartBunnies', 20), set('StartWolves', 6)]);
-    const { pieces, water } = landPieces(AS, W);
-    worst = Math.max(worst, pieces); filled += water > 0 ? 1 : 0; runs++;
+    const { AS, W, sim } = make(seed, [set('WorldWidth', 120), set('WorldHeight', 90), set('Bowls', 14), set('Rain', 8), set('StartBunnies', 20), set('StartWolves', 6)]);
+    filled += landPieces(AS, W).water > 0 ? 1 : 0; runs++;
+    for (let i = 0; i < DAY; i++) sim.tick();
+    audit(AS, sim, `stress seed ${seed}`);
   }
-  ok(worst === 1 && filled > 0, `wet small worlds (${runs} seeds, heavy rain, many basins): land stays one piece`);
+  ok(filled > 0 && failures.length === f0, `wet small worlds (${runs} seeds, heavy rain, many basins) build and audit a day in${failures.length > f0 ? ': ' + failures[f0] : ''}`);
 }
 
 // ---- Rain 0, and Scatter, have no water (but still have ground) ----
 {
   const a = make(3, [set('Rain', 0)]);
-  ok(landPieces(a.AS, a.W).water === 0 && a.W.shore.every(v => v === 1), 'Rain 0: no water and no shore boost');
+  ok(landPieces(a.AS, a.W).water === 0 && a.W.shore.every(v => v === 1) && a.W.water, 'Rain 0: no water and no shore boost, but the water rules, for water poured in');
   const b = make(3, [set('StartLayout', 'Scatter')]);
-  ok(landPieces(b.AS, b.W).water === 0 && b.W.shore.every(v => v === 1) && b.W.elev.some(e => e > 0), 'Scatter: no water, but the ground has height');
+  ok(landPieces(b.AS, b.W).water === 0 && b.W.shore.every(v => v === 1) && b.W.elev.some(e => e > 0) && !b.W.water, 'Scatter: no water and no water rules, but the ground has height');
 }
 
 // ---- Same seed, same ground and water ----
@@ -139,36 +140,45 @@ function landPieces(AS, W) {
   ok(same && other, 'the same seed makes the same ground and water; another seed makes others');
 }
 
-// ---- Several days of a Meadows world: nothing ever stands on water, and the audit holds ----
+// ---- Several days of a Meadows world: the water keeps moving and settled, animals wade only
+// the shallows, and the audit holds ----
 {
-  let animalsSeen = 0, onWater = 0, births = 0, nearWater = 0;
+  let animalsSeen = 0, deep = 0, wading = 0, births = 0, nearWater = 0, drift = 0, blinking = 0, tiles = 0;
   for (const seed of [4, 5, 6]) {
-    const { AS, sim, W, K } = make(seed);
-    const water = []; for (let t = 0; t < W.n; t++) if (W.kind[t] === K.WATER) water.push(t);
-    const wet = new Uint8Array(W.n); for (const t of water) wet[t] = 1;
-    // Tiles touching water, to see that animals really do come to the lakes.
-    const shoreTile = new Uint8Array(W.n);
-    for (const t of water) for (const d of [1, -1, W.w, -W.w]) if (W.kind[t + d] !== K.WATER && t + d >= 0 && t + d < W.n) shoreTile[t + d] = 1;
+    const { AS, sim, W } = make(seed);
+    const wet0 = W.waterCount;
+    const was = new Uint8Array(W.n), flips = new Uint16Array(W.n);
+    for (let t = 0; t < W.n; t++) was[t] = W.wDepth[t] > 0 ? 1 : 0;
     let peak = 0;
     for (let tick = 0; tick < 4 * DAY; tick++) {
       sim.tick();
       peak = Math.max(peak, W.bunnies + W.wolves);
+      if (sim.tickCount % 15 === 1) for (let t = 0; t < W.n; t++) { const v = W.wDepth[t] > 0 ? 1 : 0; if (v !== was[t]) { flips[t]++; was[t] = v; } }
       if (tick % 12 !== 0) continue;
       for (let s = 0; s < W.aHigh; s++) {
         if (!W.aAlive[s]) continue;
         animalsSeen++;
-        if (wet[W.aTile[s]]) onWater++;
-        if (shoreTile[W.aTile[s]]) nearWater++;
+        const d = W.wDepth[W.aTile[s]];
+        if (d > 0) { wading++; if (d > AS.wadeOf(sim, s)) deep++; }
+        if (W.beach[W.aTile[s]]) nearWater++;
       }
     }
-    for (const t of water) if (W.kind[t] !== K.WATER || W.aSlot[t] !== -1) onWater++;
+    drift = Math.max(drift, Math.abs(W.waterCount - wet0) / wet0);
+    for (let t = 0; t < W.n; t++) if (flips[t] >= 16) blinking++;
+    tiles += W.n;
     births += peak;
     const f0 = failures.length;
     audit(AS, sim, `seed ${seed} after 4 days`);
-    ok(failures.length === f0, `seed ${seed}: the grid and stores audit with lakes in the world${failures.length > f0 ? ': ' + failures[f0] : ''}`);
+    ok(failures.length === f0, `seed ${seed}: the grid and stores audit with the water moving${failures.length > f0 ? ': ' + failures[f0] : ''}`);
   }
-  ok(animalsSeen > 1000 && births > 0, `the run had animals to watch (${animalsSeen} sightings)`);
-  ok(onWater === 0, `no animal ever stood on water (${nearWater} sightings were on a lakeshore)`);
+  ok(animalsSeen > 1000 && births > 0 && nearWater > 0, `the run had animals to watch (${animalsSeen} sightings, ${nearWater} on a shore, ${wading} wading)`);
+  // Water that rises over an animal leaves it in deep water until it has walked out.
+  ok(deep <= animalsSeen / 1000, `animals stand in water deeper than they wade almost never (${deep} sightings)`);
+  // Day 0 is at rest (Paul: nothing settling to watch on day 1), at the game's own PreRunDays;
+  // these worlds settle for QUICK_DAYS only, so this allows them more.
+  ok(drift < 0.25, `the water's extent moves little in the first 4 days (most: ${(100 * drift).toFixed(1)}%)`);
+  // Never strobe (CLAUDE.md): tiles don't blink wet and dry; a shore creeping is a flip or two.
+  ok(blinking <= tiles / 10000, `hardly any tile turns wet and dry over and over (${blinking} of ${tiles} flipped 16+ times in 4 days)`);
 }
 
 // ---- Rivers: running water is water; beach is exactly the land touching it ----
@@ -206,7 +216,7 @@ function landPieces(AS, W) {
   ok(beachTiles > 500 && onBeach === 0, `no blade on any of ${beachTiles} beach tiles over 3 seeds x 4 days, nor painted (${onBeach} seen)`);
 }
 
-// ---- Nothing can be put on water ----
+// ---- Nothing but an animal can be put in water ----
 {
   const { AS, sim, W, K } = make(2, [set('StartBunnies', 0), set('StartWolves', 0), set('StartGrass', 0)]);
   let w = -1; for (let t = 0; t < W.n && w < 0; t++) if (W.kind[t] === K.WATER && W.kind[t - 1] === K.WATER && W.kind[t + 1] === K.WATER) w = t;
@@ -216,7 +226,11 @@ function landPieces(AS, W) {
   ok(throws(() => W.addCorpse(w, AS.SPECIES.BUNNY)), 'no corpse on water');
   ok(throws(() => W.addHole(w, 0)), 'no warren hole on water');
   ok(throws(() => W.addWater(w)), 'water on water is refused (the tile is taken)');
-  for (const sp of AS.SPECIES_KEY.map((_, i) => i)) ok(throws(() => W.addAnimal(w, sp, 0)), `no ${AS.SPECIES_KEY[sp]} on water`);
+  for (const sp of AS.SPECIES_KEY.map((_, i) => i)) {
+    const a = W.addAnimal(w, sp, 0), standing = W.kind[w] === AS.kindOf(sp);
+    W.removeAnimal(a);
+    ok(standing && W.kind[w] === K.WATER, `a ${AS.SPECIES_KEY[sp]} can stand in water, and it is water again when it leaves`);
+  }
   ok(!AS.debugDropCorpse(sim, w, AS.SPECIES.BUNNY), 'the debug corpse drop leaves water alone');
   // The paint modes' brush, centered on the lake and wide enough to cover it.
   const before = W.kind.slice(), cx = W.tx(w), cy = W.ty(w);
@@ -249,9 +263,11 @@ function landPieces(AS, W) {
 
 // ---- Sight crosses water, and paths go around it ----
 {
-  // A bare 40 x 20 world with a wall of water at x = 20 except a gap at the bottom.
-  const { AS, sim, W, K } = make(1, [set('WorldWidth', 40), set('WorldHeight', 20), set('StartGrass', 0), set('StartBunnies', 0), set('StartWolves', 0), set('Rain', 0)]);
-  for (let y = 0; y < 15; y++) W.addWater(W.tile(20, y));
+  // A bare 40 x 20 world with a wall of water at x = 20 except a gap at the bottom, deeper
+  // than anything wades (Water off: no rules to move it).
+  const { AS, sim, W, K } = make(1, [set('WorldWidth', 40), set('WorldHeight', 20), set('StartGrass', 0), set('StartBunnies', 0), set('StartWolves', 0), set('Water', 'off')]);
+  const DEEP = 1 + Math.max(...AS.SPECIES_KEY.map(k => sim.T[k].WadeDepth || 0));
+  for (let y = 0; y < 15; y++) W.addWater(W.tile(20, y), DEEP);
   const a = W.tile(12, 5), b = W.tile(28, 5);
   ok(AS.lineOfSight(W, a, b) && AS.lineOfSight(W, b, a), 'line of sight crosses water, both ways');
   const bunny = AS.spawnStarting(sim, AS.SPECIES.BUNNY, b);
@@ -269,7 +285,7 @@ function landPieces(AS, W) {
     const dx = W.tx(step) - W.tx(from), dy = W.ty(step) - W.ty(from);
     if (step !== from && dx * dx + dy * dy !== 1) wet++;
   }
-  ok(found > 100 && wet === 0, `pathNext never steps onto water (${found} paths)`);
+  ok(found > 100 && wet === 0, `pathNext never steps onto water deeper than the walker wades (${found} paths)`);
   // The weighted pathfinder honors the caller's Infinity for water, as wolf.js's cost does.
   let wetW = 0, foundW = 0;
   for (let n = 0; n < 200; n++) {
@@ -288,18 +304,19 @@ function landPieces(AS, W) {
   for (let tick = 0; tick < 60 * AS.TICK_HZ; tick++) {
     sim.tick();
     if (!W.aAlive[wolf]) break;
-    if (W.kind[W.aTile[wolf]] === K.WATER) onWater++;
+    if (W.wDepth[W.aTile[wolf]] > 0) onWater++;
     if (W.aTargetTile[wolf] >= 0) hunted = true;
   }
-  ok(hunted && onWater === 0, 'a wolf that sees a bunny across a lake hunts it and never enters the water');
+  ok(hunted && onWater === 0, 'a wolf that sees a bunny across deep water hunts it and never enters the water');
 }
 
 // ---- Grass likes water ----
 {
-  // A bare 120 x 70 world: water in the top rows, so rows within WaterRadius of it are shore
-  // and rows far below are not. WaterRadius is raised to give both regions room.
+  // A bare 120 x 70 world: water in the top rows (Water off: no rules to move it), so rows
+  // within WaterRadius of it are shore and rows far below are not. WaterRadius is raised to
+  // give both regions room.
   const R = 25;
-  const edits = [set('WorldWidth', 120), set('WorldHeight', 70), set('StartGrass', 0), set('StartBunnies', 0), set('StartWolves', 0), set('Rain', 0),
+  const edits = [set('WorldWidth', 120), set('WorldHeight', 70), set('StartGrass', 0), set('StartBunnies', 0), set('StartWolves', 0), set('Water', 'off'),
     ['species', 'WaterBoost', 'Grass', '2'],   // pinned: the shipped value may be 1 (no boost), but the rule is tested at 2
     ['species', 'WaterRadius', 'Grass', String(R)], ['species', 'SproutChance', 'Grass', '0%'], ['species', 'SeedChance', 'Grass', '10%']];
   const build = extra => {
@@ -354,6 +371,50 @@ function landPieces(AS, W) {
     const ra = W.gSize[ga] - 0.1, rb = W.gSize[gb] - 0.1;
     ok(rb > 0 && Math.abs(ra / rb - boost) < 1e-3, `corpse and shore boosts multiply (ratio ${(ra / rb).toFixed(3)} = WaterBoost)`);
   }
+}
+
+// ---- Wading: water no deeper than an animal's WadeDepth is ground to it, slower ----
+{
+  // A bare world with a strip of water across it at x = 20, between the bunny's and the
+  // wolf's WadeDepth: the wolf wades it, the bunny can't (Water off: the strip stays as laid).
+  const { AS, sim, W, T } = make(1, [set('WorldWidth', 40), set('WorldHeight', 12), set('StartGrass', 0), set('StartBunnies', 0), set('StartWolves', 0), set('Water', 'off')]);
+  const mid = (T.bunny.WadeDepth + T.wolf.WadeDepth) / 2;
+  ok(T.wolf.WadeDepth > T.bunny.WadeDepth, `wolves wade deeper than bunnies (${T.wolf.WadeDepth} m, ${T.bunny.WadeDepth} m)`);
+  for (let y = 0; y < W.h; y++) W.addWater(W.tile(20, y), mid);
+  const wolf = AS.spawnStarting(sim, AS.SPECIES.WOLF, W.tile(19, 6)), bun = AS.spawnStarting(sim, AS.SPECIES.BUNNY, W.tile(19, 2));
+  const across = W.tile(21, 6), acrossB = W.tile(21, 2);
+  ok(AS.pathNext(sim, W.tile(19, 6), t => t === across, 10) === W.tile(20, 6), 'a wolf\'s path goes through water it wades');
+  ok(AS.pathNext(sim, W.tile(19, 2), t => t === acrossB, 10) === -1, 'a bunny\'s path can\'t cross water deeper than it wades');
+  ok(AS.stepTo(sim, wolf, W.tile(20, 6)) && W.wDepth[W.aTile[wolf]] > 0 && W.kind[W.aTile[wolf]] === AS.kindOf(AS.SPECIES.WOLF), 'a wolf steps into it and stands there');
+  ok(!AS.stepTo(sim, bun, W.tile(20, 2)), 'a bunny can\'t step into it');
+  const dryDur = 1 / AS.speedOf(sim, wolf);
+  ok(Math.abs(W.aStepDur[wolf] - dryDur / T.wolf.WadeSpeed) < 1e-9, `a step into water takes 1 / WadeSpeed as long (${W.aStepDur[wolf].toFixed(3)} s)`);
+  W.aStepLeft[wolf] = 0;
+  ok(AS.stepTo(sim, wolf, across) && W.kind[W.tile(20, 6)] === AS.KIND.WATER, 'and out the other side, leaving water behind it');
+}
+
+// ---- Drinking takes real water: WaterLiters a meter, from the tile it drinks ----
+{
+  const { AS, sim, W, T } = make(1, [set('WorldWidth', 40), set('WorldHeight', 20), set('StartGrass', 0), set('StartBunnies', 0), set('StartWolves', 0), set('Rain', 0)]);
+  // A small pond poured into the world's rules, and a thirsty wolf on its shore.
+  AS.paintCircle(sim, 'water', 20, 10, 1);
+  let shore = -1; for (let t = 0; t < W.n && shore < 0; t++) if (W.beach[t] && W.kind[t] === AS.KIND.EMPTY) shore = t;
+  const wolf = AS.spawnStarting(sim, AS.SPECIES.WOLF, shore);
+  W.aWater[wolf] = 0;
+  let drank = 0, took = 0, sips = 0;
+  for (let i = 0; i < 5 * AS.TICK_HZ && W.aAlive[wolf]; i++) {
+    const before = W.aWater[wolf], H = Float64Array.from(W.water.H);
+    sim.tick();
+    // Only ticks when no water step ran, so the rules' own moves don't mix in.
+    if (sim.tickCount % 15 === 1) continue;
+    const gained = W.aWater[wolf] - before;
+    if (!(gained > 0)) continue;
+    drank += gained; sips++;
+    for (let t = 0; t < W.n; t++) took += H[t] - W.water.H[t];
+  }
+  const expect = drank / T.wolf.WaterMax * T.wolf.WaterLiters / 1000 / (AS.TILE_M * AS.TILE_M);
+  // A sip that leaves less than WATER_TINY leaves none (the rules' own rounding).
+  ok(drank > 0 && Math.abs(took - expect) <= sips * AS.WATER_TINY, `a drink of ${drank.toFixed(1)} points took ${(took * 1e6).toFixed(2)} µm of water off a tile (${(expect * 1e6).toFixed(2)} expected)`);
 }
 
 // ---- The inspector names it ----

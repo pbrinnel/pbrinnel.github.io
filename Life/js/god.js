@@ -8,7 +8,7 @@
 //   vanish with no corpse and no DEATH event (nothing is left to act out), blades, corpses
 //   and warren holes go, and the ground is scorched (W.scorch, days left): ScorchDays at the
 //   center, shorter toward the rim, so the crater greens from its edges inward. Water is left
-//   alone: it stays and is not scorched.
+//   alone: it stays, and wet ground (an animal wading included) is not scorched.
 //
 // AS.paintCircle(sim, kind, cx, cy, r, cap) → number placed       kind: 'grass' | 'bunny' | 'wolf' | 'human'
 //   The paint modes' brush: one new thing of that kind on every eligible tile within r tiles
@@ -38,8 +38,8 @@
         const t = y * W.w + x;
         out.tiles++;
         const k = W.kind[t];
-        if (k === AS.KIND.WATER) continue;   // water is not the nuke's to touch, and it can't scorch
         if (k >= AS.KIND.BUNNY) { W.removeAnimal(W.aSlot[t]); out.animals++; }
+        if (W.wDepth[t] > 0) continue;   // water is not the nuke's to touch, and it can't scorch
         else if (k === AS.KIND.GRASS) { W.removeGrass(t); out.blades++; }
         else if (k === AS.KIND.CORPSE) { AS.corpseRemove(sim, t); out.corpses++; }
         if (W.hole[t]) { W.removeHole(t); out.holes++; }
@@ -86,27 +86,27 @@
     return placed;
   };
 
-  // WATER MODE (Paul, 11 Oct 2026): water POUR_DEPTH meters deep on bare ground and on grass
-  // (which drowns) within r of (cx, cy); never on an animal, a corpse, a warren hole or
-  // scorched ground. Blades left on the new shore go too, since the beach stays bare for
-  // drinking. The grass-shore boost (W.shore) stays as the world was built.
+  // WATER MODE (Paul, 11-12 Oct 2026: it should flow): POUR_DEPTH meters more water on every
+  // tile within r of (cx, cy), into the world's water rules (water.js), which take it from
+  // there: downhill, into the soil, out at the river mouths. What it reaches it treats as any
+  // water would (drowned grass and holes, corpses washed away, animals wading or stepping
+  // out). A world made without water gets the rules here, dry, with no river mouths. The
+  // grass-shore boost (W.shore) stays as the world was built.
   const POUR_DEPTH = 1;
   function pourWater(sim, cx, cy, r) {
-    const W = sim.W, K = AS.KIND, reach = Math.floor(r), r2 = r * r, nb = new Int32Array(4);
+    const W = sim.W, reach = Math.floor(r), r2 = r * r;
+    if (!W.water) W.water = AS.Water(W, sim.terrain, W.outlet || new Uint8Array(W.n));
+    const H = W.water.H;
     let placed = 0;
     for (let y = Math.max(0, cy - reach); y <= Math.min(W.h - 1, cy + reach); y++) {
       for (let x = Math.max(0, cx - reach); x <= Math.min(W.w - 1, cx + reach); x++) {
         if ((x - cx) ** 2 + (y - cy) ** 2 > r2) continue;
-        const t = y * W.w + x;
-        if (W.hole[t] || W.scorch[t] > 0) continue;
-        if (W.kind[t] === K.GRASS) W.removeGrass(t);
-        if (W.kind[t] !== K.EMPTY) continue;
-        W.addWater(t);
-        W.wDepth[t] = POUR_DEPTH;
+        H[y * W.w + x] += POUR_DEPTH;
         placed++;
-        for (let i = 0, k = W.neighbors4(t, nb); i < k; i++) if (W.kind[nb[i]] === K.GRASS) W.removeGrass(nb[i]);
       }
     }
+    W.water.listWet();
+    AS.syncWater(sim);
     return placed;
   }
 })(globalThis.AS);

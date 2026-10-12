@@ -13,6 +13,9 @@ WaterMax,points,100,100,100,,Size of the water meter (Water): an animal drinks i
 ThirstRate,per s,1.1,0.567,0.833,,Water lost per second walking; bunny empty in ~4.5 days; wolf in ~9; human in ~6. Standing still and sprinting scale it by RestHunger and SprintHunger. No water in the world = no thirst
 ThirstyAt,% of WaterMax,50,50,50,,Below this an animal looks for water, but only if it knows where some is (WaterSense)
 DrinkRate,per s,25,25,25,,Water gained per second while drinking at the shore; it drinks until the meter is full
+WaterLiters,L,0.5,5,4,,Liters of water that fill an empty meter: drinking takes this much (in proportion) out of the tile it drinks from; blank = drinking takes nothing
+WadeDepth,m,0.1,0.5,0.8,,Deepest water an animal walks into; deeper water is a wall to it and one caught in deeper water walks out first; blank = never wades
+WadeSpeed,% of speed,50%,60%,60%,,How fast an animal moves in water it wades as a share of its speed on land; blank = no slower
 ThirstDamage,HP per s,1,0.4,0.4,,HP lost while Water = 0 (on top of any starving)
 WaterSense,tiles,200,200,200,,How far, walking, an animal knows its way to water without seeing it: its knowledge of its land (big enough to always know the nearest)
 HPMax,points,20,60,80,,
@@ -23,6 +26,8 @@ RestBelow,% of StaminaMax,30,30,30,,Below this it stops to rest
 RestUntil,% of StaminaMax,100,100,100,,A resting animal gets up at this Stamina
 SprintRange,tiles,,3,14,,A hunting wolf or human sprints once its prey is this close
 TrackSeconds,s,,0,15,,How long a hunting wolf or human keeps heading for where it last saw its prey after losing sight of it; 0 = forgets at once
+EdgeFollow,steps,60,100,100,,Steps an animal walks along the edge of what's in its way (a lake or river or a crowd) in one trip toward somewhere it finds no path to; it keeps the obstacle on its own side (each animal is born left- or right-handed) and gives up after this many; blank = gives up as soon as it is blocked
+ForgetSeconds,s,,60,60,,How long a wolf or human ignores a bunny or carcass or mate it found no way to even going around; blank = never ignores one
 HoleRange,tiles,8,,,,A bunny that sees a wolf runs for a free warren hole this close; also how far from any hole it must be to found a new warren
 DigChance,per day,50%,,,,Chance per day that a fed adult with no wolf in sight digs a warren hole; 0% = never
 DigSeconds,s,8,,,,How long a digging bunny stands still before the hole opens

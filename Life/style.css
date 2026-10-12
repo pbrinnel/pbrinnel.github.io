@@ -74,7 +74,8 @@ html, body {
 .hud-btn.hud-speed svg { display: block; }
 .hud-speedname { color: var(--hud-on); font-size: 12px; min-width: 10ch; font-variant-numeric: tabular-nums; }
 .hud-hide { margin-left: auto; }
-/* The strip under the bar holds the open tab's controls; it scrolls inside itself, never the page. */
+/* A tab's window (each tab button toggles its own); on a phone a sheet under the bar, several
+   stacking. It scrolls inside itself, never the page. */
 .hud-tabstrip {
   border-top: 1px solid var(--hud-line);
   padding: 4px calc(env(safe-area-inset-right) + 8px) 4px calc(env(safe-area-inset-left) + 8px);
@@ -92,9 +93,10 @@ html, body {
 .hud-sec-title { color: var(--hud-dim); font-size: 12px; }
 .hud-sec-body { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-height: var(--hud-h); }
 .hud-sec-body:empty, .hud-sec:has(.hud-sec-body:empty) { display: none; }
-/* On a computer the open tab is a side panel down the left, under the bar (Paul: across the
-   top it hid too much of the world). Its rows put the name above the controls, and the graph
-   and minimap, unless dragged somewhere, sit to its right. A phone keeps the sheet under the bar. */
+/* On a computer each tab window floats (Paul: across the top it hid too much of the world):
+   Info down the left under the bar, PAINT in the bottom right corner, Debug on the right. Rows
+   put the name above the controls. The graph and minimap, unless dragged somewhere, sit to the
+   right of Info. A phone keeps the sheets under the bar. */
 :root { --side-w: 320px; }
 @media (min-width: 601px) {
   .hud-tabstrip {
@@ -110,11 +112,20 @@ html, body {
     border-bottom: 1px solid var(--hud-line);
     padding: 6px 10px 8px calc(env(safe-area-inset-left) + 10px);
   }
+  .hud-tabstrip.hud-win-god, .hud-tabstrip.hud-win-debug {
+    left: auto;
+    right: calc(env(safe-area-inset-right) + 8px);
+    border: 1px solid var(--hud-line);
+    padding-left: 10px;
+    max-height: calc(50vh - var(--hud-bar, 41px));
+  }
+  .hud-tabstrip.hud-win-god { top: auto; bottom: calc(env(safe-area-inset-bottom) + 8px); }
+  .hud-tabstrip.hud-win-debug { top: 50vh; }
   .hud-tabstrip .hud-sec { grid-template-columns: 1fr; gap: 2px 8px; }
   .hud-tabstrip .hud-sec-body { gap: 4px 8px; }
   body.side-open #graph:not([style*="left:"]), body.side-open #minimap:not(.dragged) { left: calc(var(--side-w) + 8px); }
 }
-/* The side panel's title bar: drags it on a computer (drag.js); a phone hides it. */
+/* A tab window's title bar: drags it on a computer (drag.js); a phone hides it. */
 .hud-side-head { display: none; }
 @media (min-width: 601px) {
   .hud-side-head { display: flex; align-items: center; color: var(--hud-on); padding: 0 0 6px; margin-bottom: 4px; border-bottom: 1px solid var(--hud-line); }

@@ -87,8 +87,9 @@
   // Topo lines (Paul, 11 Oct 2026, over shading): a thin line every few meters (CONTOUR_M until
   // the viewer's slider picks another spacing) of
   // W.elev, every CONTOUR_BOLD_EVERY-th one bolder, under the grass and animals and never
-  // over water. Worked out once per world by marching squares over tile centers, kept in
-  // CONTOUR_CHUNK-tile squares so a frame strokes only what is on screen.
+  // over water. Worked out by marching squares over tile centers, kept in CONTOUR_CHUNK-tile
+  // squares so a frame strokes only what is on screen; water moves, so a square on screen is
+  // worked out again when the water in it has changed since.
   const CONTOUR_M = 5;                    // the spacing until the viewer picks one (setContourStep)
   const CONTOUR_BOLD_EVERY = 5;
   const CONTOUR_RGB = '176,186,150';
@@ -264,7 +265,7 @@
         const k = kind[t];
         if (k === KIND.GRASS) { const z = size[t]; px[t] = z < lo ? g0 : z < hi ? g1 : g2; }
         else if (k === KIND.CORPSE) px[t] = corpse;
-        else if (k === KIND.WATER) px[t] = waters[AS.waterBand(depth[t])];
+        else if (depth[t] > 0) px[t] = waters[AS.waterBand(depth[t])];   // under a wading animal too
         else if (scorch[t] > 0) px[t] = mixAbgr(bg, FAR_SCORCH, scorch[t] / fullDays);
         else px[t] = holeAt[t] ? FAR_HOLE : bg;   // empty ground (or a hole), or an animal that the loop below paints
       }
@@ -309,8 +310,8 @@
             if (W.cMeat[row + tx] > 0) id = AS.spriteCarcass(W.cSpecies[row + tx]);
             else if (nowMs < deathUntil[row + tx]) id = AS.spriteCarcass(W.cSpecies[row + tx]);
             else id = AS.spriteSkull(W.cSpecies[row + tx]);
-          } else if (k === KIND.WATER) id = AS.spriteWater(tx, ty, AS.waterBand(W.wDepth[row + tx]));
-          else continue;   // empty, or an animal (own pass)
+          } else if (W.wDepth[row + tx] > 0) id = AS.spriteWater(tx, ty, AS.waterBand(W.wDepth[row + tx]));   // under a wading animal too
+          else continue;   // empty, or an animal on land (own pass)
           const dx = Math.round(tx * s - ox), dw = Math.round((tx + 1) * s - ox) - dx;
           ctx.drawImage(img, sh.sx(id), sh.sy(id), px, px, dx, dy, dw, dh);
         }
@@ -428,26 +429,46 @@
 
     // ---- topo lines ----
     let contoursOn = false, contourStep = CONTOUR_M;
-    const contourCache = new WeakMap();   // world → Map(spacing → { cw, ch, thin, bold })
+    const contourCache = new WeakMap();   // world → Map(spacing → contour set, below)
+    // Corners a, b, c, d: the centers of tiles (x, y), (x+1, y), (x+1, y+1), (x, y+1).
+    const P = [null, [3, 0], [0, 1], [3, 1], [1, 2], [3, 0, 1, 2], [0, 2], [3, 2], [2, 3], [0, 2], [0, 1, 2, 3], [1, 2], [1, 3], [0, 1], [3, 0], null];
+    const ex = new Float64Array(4), ey = new Float64Array(4), segThin = [], segBold = [];
+    // A set: { step, cw, ch, thin[], bold[] (segments by square), wetN, wetSum (the water
+    // each square was worked out with: how many wet tiles and the sum of their indices),
+    // flips (W.wetFlips when squares were last marked), check (squares to look at again) }.
     function contoursFor(W) {
       let byStep = contourCache.get(W);
       if (!byStep) { byStep = new Map(); contourCache.set(W, byStep); }
       let c = byStep.get(contourStep);
-      if (c) return c;
-      const step = contourStep;
-      const cw = Math.ceil(W.w / CONTOUR_CHUNK), ch = Math.ceil(W.h / CONTOUR_CHUNK);
-      const thin = [], bold = [];
-      for (let i = 0; i < cw * ch; i++) { thin.push([]); bold.push([]); }
-      const E = W.elev, kind = W.kind, w = W.w;
-      // Corners a, b, c, d: the centers of tiles (x, y), (x+1, y), (x+1, y+1), (x, y+1).
-      const P = [null, [3, 0], [0, 1], [3, 1], [1, 2], [3, 0, 1, 2], [0, 2], [3, 2], [2, 3], [0, 2], [0, 1, 2, 3], [1, 2], [1, 3], [0, 1], [3, 0], null];
-      const ex = new Float64Array(4), ey = new Float64Array(4);
-      for (let y = 0; y + 1 < W.h; y++) for (let x = 0; x + 1 < w; x++) {
+      if (!c) {
+        const cw = Math.ceil(W.w / CONTOUR_CHUNK), ch = Math.ceil(W.h / CONTOUR_CHUNK), m = cw * ch;
+        c = { step: contourStep, cw, ch, thin: new Array(m), bold: new Array(m), wetN: new Float64Array(m), wetSum: new Float64Array(m), flips: W.wetFlips, check: new Uint8Array(m) };
+        for (let i = 0; i < m; i++) buildSquare(W, c, i);
+        byStep.set(contourStep, c);
+      }
+      if (c.flips !== W.wetFlips) { c.flips = W.wetFlips; c.check.fill(1); }
+      return c;
+    }
+    // The tiles a square's lines read: its own and the row and column after.
+    function squareTiles(W, c, i) {
+      const cx = i % c.cw, cy = (i / c.cw) | 0;
+      return [cx * CONTOUR_CHUNK, cy * CONTOUR_CHUNK, Math.min(W.w - 1, (cx + 1) * CONTOUR_CHUNK), Math.min(W.h - 1, (cy + 1) * CONTOUR_CHUNK)];
+    }
+    function squareWet(W, c, i) {
+      const [x0, y0, x1, y1] = squareTiles(W, c, i), D = W.wDepth;
+      let n = 0, sum = 0;
+      for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const t = y * W.w + x; if (D[t] > 0) { n++; sum += t; } }
+      return [n, sum];
+    }
+    function buildSquare(W, c, i) {
+      const [x0, y0, x1, y1] = squareTiles(W, c, i), step = c.step;
+      const E = W.elev, D = W.wDepth, w = W.w;
+      segThin.length = 0; segBold.length = 0;
+      for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
         const i0 = y * w + x;
-        if (kind[i0] === KIND.WATER || kind[i0 + 1] === KIND.WATER || kind[i0 + w] === KIND.WATER || kind[i0 + w + 1] === KIND.WATER) continue;
+        if (D[i0] > 0 || D[i0 + 1] > 0 || D[i0 + w] > 0 || D[i0 + w + 1] > 0) continue;
         const a = E[i0], b = E[i0 + 1], c2 = E[i0 + w + 1], d = E[i0 + w];
         const lo = Math.min(a, b, c2, d), hi = Math.max(a, b, c2, d);
-        const chunk = ((y / CONTOUR_CHUNK) | 0) * cw + ((x / CONTOUR_CHUNK) | 0);
         for (let n = Math.max(1, Math.ceil(lo / step)); n * step < hi; n++) {
           const L = n * step;
           const k = (a > L) | (b > L) << 1 | (c2 > L) << 2 | (d > L) << 3, p = P[k];
@@ -457,19 +478,26 @@
           ex[1] = x + 1; ey[1] = y + (L - b) / (c2 - b);
           ex[2] = x + (L - d) / (c2 - d); ey[2] = y + 1;
           ex[3] = x; ey[3] = y + (L - a) / (d - a);
-          const out = n % CONTOUR_BOLD_EVERY === 0 ? bold[chunk] : thin[chunk];
+          const out = n % CONTOUR_BOLD_EVERY === 0 ? segBold : segThin;
           for (let j = 0; j < p.length; j += 2) out.push(ex[p[j]] + 0.5, ey[p[j]] + 0.5, ex[p[j + 1]] + 0.5, ey[p[j + 1]] + 0.5);
         }
       }
-      c = { cw, ch, thin: thin.map(a => Float32Array.from(a)), bold: bold.map(a => Float32Array.from(a)) };
-      byStep.set(step, c);
-      return c;
+      c.thin[i] = Float32Array.from(segThin);
+      c.bold[i] = Float32Array.from(segBold);
+      [c.wetN[i], c.wetSum[i]] = squareWet(W, c, i);
     }
     function drawContours(sim, cam, dpr, near) {
       const W = sim.W, c = contoursFor(W), s = cam.scale * dpr, ox = cam.x * s, oy = cam.y * s;
       const cx0 = Math.max(0, Math.floor(cam.x / CONTOUR_CHUNK)), cy0 = Math.max(0, Math.floor(cam.y / CONTOUR_CHUNK));
       const cx1 = Math.min(c.cw - 1, Math.floor((cam.x + canvas.width / s) / CONTOUR_CHUNK)), cy1 = Math.min(c.ch - 1, Math.floor((cam.y + canvas.height / s) / CONTOUR_CHUNK));
       const widths = near ? CONTOUR_NEAR_CSS_PX : CONTOUR_CSS_PX;
+      for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) {
+        const i = cy * c.cw + cx;
+        if (!c.check[i]) continue;
+        c.check[i] = 0;
+        const [n, sum] = squareWet(W, c, i);
+        if (n !== c.wetN[i] || sum !== c.wetSum[i]) buildSquare(W, c, i);
+      }
       for (const [list, alpha, width] of [[c.thin, CONTOUR_ALPHA, widths[0]], [c.bold, CONTOUR_BOLD_ALPHA, widths[1]]]) {
         ctx.beginPath();
         for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) {

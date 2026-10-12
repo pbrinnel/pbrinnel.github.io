@@ -28,8 +28,8 @@
   const INSPECT_EMPTY_KEY = 'life-inspect-empty';
   const CONTOUR_KEY = 'life-contour-m';
   const WATER_KEY = 'life-water';
-  // The open tab ('info', 'debug', 'god', or '' for closed), remembered per browser.
-  const TAB_KEY = 'life-ui-tab';
+  // The open tab windows (keys of 'info', 'god', 'debug', comma-separated), remembered per browser.
+  const WINDOWS_KEY = 'life-ui-windows';
 
   const debug = new URLSearchParams(location.search).has('debug');
   let speedIndex = START_SPEED;
@@ -63,9 +63,9 @@
   try { elevOn = localStorage.getItem(ELEV_KEY) !== '0'; } catch (e) { /* stays on */ }
   let linesOn = false;
   try { linesOn = localStorage.getItem(LINES_KEY) === '1'; } catch (e) { /* stays off */ }
-  // The open HUD tab is also the viewer's choice. Nothing stored (or storage blocked): Info.
-  let savedTab;
-  try { const v = localStorage.getItem(TAB_KEY); if (v !== null) savedTab = v === '' ? null : v; } catch (e) { /* default */ }
+  // Which tab windows are open is also the viewer's choice. Nothing stored (or storage blocked): Info.
+  let savedWindows;
+  try { const v = localStorage.getItem(WINDOWS_KEY); if (v !== null) savedWindows = v ? v.split(',') : []; } catch (e) { /* default */ }
   let nukeOn = false;   // NUKE MODE: a tap on the world drops a nuke instead of selecting
   let brush = '';   // GRASS / RABBIT / WOLF / HUMAN MODE: the kind a tap or drag paints, or ''
   let radiusOf = () => 0;   // the Radius slider's value for a mode; the real one exists once the UI does
@@ -82,8 +82,8 @@
     onGraph: () => { if (graph) graph.toggle(); },
     onMinimap: () => { if (minimap) minimap.toggle(); },
     onRadius: (mode, r) => { radiusReq = { r, nuke: mode === 'nuke' }; },
-    tab: savedTab,
-    onTab: name => { try { localStorage.setItem(TAB_KEY, name || ''); } catch (e) { /* not kept */ } },
+    windows: savedWindows,
+    onWindows: keys => { try { localStorage.setItem(WINDOWS_KEY, keys.join(',')); } catch (e) { /* not kept */ } },
     onNuke: on => { nukeOn = on; },
     // A count's toggle: the kinds to ring on the map, handed to the renderer every frame.
     onLocate: (key, on) => { if (on) located.add(key); else located.delete(key); },

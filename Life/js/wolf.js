@@ -38,6 +38,9 @@
       m.dispOn = grow(m.dispOn, Uint8Array);        // 1 while on that trip
       m.dispFor = grow(m.dispFor, Uint32Array);     // the serial whose dispersal was decided (once a life)
       m.roamingFor = grow(m.roamingFor, Uint32Array); // the serial `roaming` belongs to
+      m.skip = grow(m.skip, Uint32Array);           // serial of a target it found no way to (prey, carcass or mate)
+      m.skipUntil = grow(m.skipUntil, Float64Array); // sim.simSeconds it stops ignoring that one
+      m.skipFor = grow(m.skipFor, Uint32Array);     // the serial the skip belongs to
       m.cap = W.aCap;
     }
     return m;
@@ -68,32 +71,64 @@
   const DISPERSE_THERE = 2;
 
   // Matchers, goals and costs are created once and read these instead of closing over a call.
-  let mSim = null, mW = null, mSelf = 0, mGoal = 0, mFrom = 0, mInvSpeed = 0;
+  // mSkip: the serial of the target this animal is ignoring (0 = none; see forget).
+  // mWade: how deep this animal wades (animals.js wadeOf).
+  let mInvWade = 0;   // seconds a step into water it wades takes
+  let mSim = null, mW = null, mSelf = 0, mGoal = 0, mFrom = 0, mInvSpeed = 0, mSkip = 0, mWade = 0;
   // The species this animal hunts and the carcasses it eats, as AS.relations bitmasks.
   let mPrey = 0, mEats = 0;
   const isGoalTile = t => t === mGoal;
   // A bunny on a warren hole is safe, so it isn't prey.
   const isPrey = t => {
     const k = mW.kind[t];
-    return k >= K.BUNNY && ((mPrey >> (k - K.BUNNY)) & 1) === 1 && !mW.hole[t];
+    return k >= K.BUNNY && ((mPrey >> (k - K.BUNNY)) & 1) === 1 && !mW.hole[t] && mW.aSerial[mW.aSlot[t]] !== mSkip;
   };
-  const hasMeat = t => mW.kind[t] === K.CORPSE && mW.cMeat[t] > 0 && ((mEats >> mW.cSpecies[t]) & 1) === 1;
+  const hasMeat = t => mW.kind[t] === K.CORPSE && mW.cMeat[t] > 0 && ((mEats >> mW.cSpecies[t]) & 1) === 1 && mW.serial[t] !== mSkip;
   const isPartner = t => {
     if (mW.kind[t] !== AS.kindOf(mW.aSpecies[mSelf])) return false;
     const p = mW.aSlot[t];
-    return mW.aSex[p] !== mW.aSex[mSelf] && AS.canMate(mSim, p);
+    return mW.aSex[p] !== mW.aSex[mSelf] && AS.canMate(mSim, p) && mW.aSerial[p] !== mSkip;
   };
-  // Grass costs its bites on top of the step; anything else that occupies a tile can't be entered.
+
+  // A target it found no way to, even going around (Paul, 12 Oct 2026: wolves stood staring
+  // at bunnies across a river), is ignored for ForgetSeconds, so it hunts, feeds or prowls
+  // elsewhere instead of choosing the same one again at every decision. One at a time:
+  // prey, carcasses and mates share one run of serials.
+  function forget(sim, s, serial) {
+    const W = sim.W, m = mem(W), f = AS.speciesStats(sim, s).ForgetSeconds;
+    if (!(f > 0)) return;
+    m.skip[s] = serial; m.skipUntil[s] = sim.simSeconds + f; m.skipFor[s] = W.aSerial[s];
+  }
+  function skipOf(sim, s) {
+    const m = mem(sim.W);
+    return m.skipFor[s] === sim.W.aSerial[s] && sim.simSeconds < m.skipUntil[s] ? m.skip[s] : 0;
+  }
+
+  // Where a hunter can step: open ground, water it wades, or a blade it chews away first;
+  // never a hole.
+  const canWalk = t => (AS.canStand(mW, t, mWade) || mW.kind[t] === K.GRASS) && !mW.hole[t];
+  // One step toward a goal the path search can't reach, going around what's in the way
+  // (AS.edgeStep). Returns false once it gives up.
+  function goAround(sim, s, goal, key) {
+    mW = sim.W; mWade = AS.wadeOf(sim, s);
+    const next = AS.edgeStep(sim, s, goal, key, canWalk);
+    if (next < 0) return false;
+    AS.chewOrStep(sim, s, next);
+    return true;
+  }
+  // Grass costs its bites on top of the step, and water it wades its slower steps; anything
+  // else that occupies a tile can't be entered.
   const cost = t => {
     const k = mW.kind[t];
     if (k === K.EMPTY) return mW.hole[t] ? Infinity : mInvSpeed;   // a hole is a wall to wolves
     if (k === K.GRASS) return mInvSpeed + AS.chewSeconds(mSim, mSelf, t);
+    if (k === K.WATER && mW.wDepth[t] <= mWade) return mInvWade;
     return Infinity;
   };
   // A tile the wolf can bite its goal from: touching the goal tile, and either where it
   // stands or one it can occupy once any blade on it is chewed away.
   const touchesGoal = t => {
-    if (t !== mFrom && ((mW.kind[t] !== K.EMPTY && mW.kind[t] !== K.GRASS) || mW.hole[t])) return false;
+    if (t !== mFrom && (!(AS.canStand(mW, t, mWade) || mW.kind[t] === K.GRASS) || mW.hole[t])) return false;
     const w = mW.w, dx = (t % w) - (mGoal % w), dy = ((t / w) | 0) - ((mGoal / w) | 0);
     return dx * dx + dy * dy === 1;
   };
@@ -128,30 +163,16 @@
     return best;
   }
 
-  // One step toward a goal beyond the pathfinder's reach (it searches only VisionRange):
-  // to the open or chewable 4-neighbor that most shortens the straight-line distance.
-  const farNb = new Int32Array(4);
-  function headToward(sim, s, goal) {
-    const W = sim.W, t = W.aTile[s], gx = goal % W.w, gy = (goal / W.w) | 0;
-    const d2 = u => (u % W.w - gx) ** 2 + (((u / W.w) | 0) - gy) ** 2;
-    let best = -1, bestD = d2(t);
-    for (let i = 0, k = W.neighbors4(t, farNb); i < k; i++) {
-      const u = farNb[i];
-      if ((W.kind[u] !== K.EMPTY && W.kind[u] !== K.GRASS) || (W.hole && W.hole[u])) continue;
-      const d = d2(u);
-      if (d < bestD) { best = u; bestD = d; }
-    }
-    if (best < 0) return false;
-    AS.chewOrStep(sim, s, best);
-    return true;
-  }
-
   function walkToward(sim, s, goalTile, exact) {
     const W = sim.W;
     mSim = sim; mW = W; mSelf = s; mGoal = goalTile; mFrom = W.aTile[s];
     mInvSpeed = 1 / AS.speedOf(sim, s);
+    mWade = AS.wadeOf(sim, s);
+    const ws = AS.speciesStats(sim, s).WadeSpeed;
+    mInvWade = ws > 0 ? mInvSpeed / ws : mInvSpeed;
     const next = AS.pathNextWeighted(sim, mFrom, exact ? isGoalTile : touchesGoal, AS.speciesStats(sim, s).VisionRange, cost);
     if (next < 0) return false;
+    AS.edgeReset(W, s);   // a path again: any going-around is over
     if (next !== mFrom) AS.chewOrStep(sim, s, next);
     return true;
   }
@@ -194,17 +215,17 @@
   function prowlStep(sim, s) {
     const W = sim.W;
     if (W.aStepLeft[s] > 0) return;
-    const t = W.aTile[s];
+    const t = W.aTile[s], wade = AS.wadeOf(sim, s);
     let nOpen = 0, nGrass = 0;
     for (let d = 0; d < 4; d++) {
       const nt = dirTile(W, t, d);
       if (nt < 0) continue;
-      if (W.kind[nt] === K.EMPTY && !W.hole[nt]) open[nOpen++] = d;
+      if (AS.canStand(W, nt, wade) && !W.hole[nt]) open[nOpen++] = d;
       else if (W.kind[nt] === K.GRASS) grassDirs[nGrass++] = d;
     }
     if (W.aRunLeft[s] > 0) {
       const ahead = dirTile(W, t, W.aRunDir[s]);
-      if (ahead >= 0 && W.kind[ahead] === K.EMPTY && !W.hole[ahead]) {
+      if (ahead >= 0 && AS.canStand(W, ahead, wade) && !W.hole[ahead]) {
         if (AS.stepTo(sim, s, ahead)) W.aRunLeft[s]--;
         return;
       }
@@ -223,7 +244,7 @@
     // plain run follows, which also walks it out of a dead end before the next one.
     const S = AS.speciesStats(sim, s), m = mem(W), now = sim.simSeconds;
     if (m.preyFor[s] !== W.aSerial[s]) { m.preyFor[s] = W.aSerial[s]; m.preyAt[s] = now; }
-    mW = W;
+    mW = W; mSkip = skipOf(sim, s);
     mPrey = AS.relations(sim.T).prey[W.aSpecies[s]];
     if (AS.nearestVisible(sim, t, S.VisionRange, isPrey) >= 0) m.preyAt[s] = now;
     const roaming = S.RoamAfter > 0 && now - m.preyAt[s] > S.RoamAfter * AS.DAY_SECONDS;
@@ -240,12 +261,12 @@
     if (m.dispOn[s] && m.dispFor[s] === W.aSerial[s]) {
       const g = m.dispTo[s], dx = t % W.w - g % W.w, dy = ((t / W.w) | 0) - ((g / W.w) | 0);
       if (dx * dx + dy * dy <= DISPERSE_THERE * DISPERSE_THERE) { m.dispOn[s] = 0; W.aTargetTile[s] = -1; }
-      else if (headToward(sim, s, g)) { W.aTargetTile[s] = g; return; }
+      else if (goAround(sim, s, g, g)) { W.aTargetTile[s] = g; return; }
       else m.dispTo[s] = roamGoal(sim, t, S.DisperseRun);
     }
     if (roaming) {
       if (m.roamFor[s] !== W.aSerial[s]) { m.roamFor[s] = W.aSerial[s]; m.roamTo[s] = roamGoal(sim, t, S.RoamRun); }
-      if (headToward(sim, s, m.roamTo[s])) return;
+      if (goAround(sim, s, m.roamTo[s], m.roamTo[s])) return;
     }
     m.roamFor[s] = 0;
     let d;
@@ -288,7 +309,7 @@
         // wolf's nose and out of line of sight behind grass the wolf chewed to get there).
         const ft = m.feedTile[s];
         if (feeding && ft >= 0 && W.kind[ft] === K.CORPSE && W.serial[ft] === m.feedSerial[s] && W.cMeat[ft] > 0) return true;
-        mW = W;
+        mW = W; mSkip = skipOf(sim, s);
         mEats = AS.relations(sim.T).eats[W.aSpecies[s]];
         const t = AS.nearestVisible(sim, W.aTile[s], S.VisionRange, hasMeat);
         if (t < 0) return false;
@@ -320,7 +341,10 @@
           return;
         }
         if (W.aStepLeft[s] > 0) return;
-        if (!walkToward(sim, s, ft)) { W.aTargetTile[s] = -1; m.feedTile[s] = -1; }
+        if (!walkToward(sim, s, ft) && !goAround(sim, s, ft, -W.serial[ft])) {
+          forget(sim, s, W.serial[ft]);
+          W.aTargetTile[s] = -1; m.feedTile[s] = -1;
+        }
       },
     },
 
@@ -334,7 +358,7 @@
         // stays safe until the wolf has rested.
         if (cur === I.HUNT && W.aWinded[s]) return false;
         if (cur === I.GIVE_UP && W.aStamina[s] < S.RestUntil * S.StaminaMax) return false;
-        mW = W;
+        mW = W; mSkip = skipOf(sim, s);
         mPrey = AS.relations(sim.T).prey[W.aSpecies[s]];
         const t = AS.nearestVisible(sim, W.aTile[s], S.VisionRange, isPrey);
         const m = mem(W);
@@ -386,8 +410,11 @@
             W.aTargetSlot[s] = -1;
             AS.setSprint(sim, s, false);
             if (W.aStepLeft[s] > 0 || t === goal) return;
-            // No way there: let the next decision give up.
-            if (!walkToward(sim, s, goal, true)) { W.aTargetTile[s] = -1; m.seenAt[s] = -Infinity; }
+            // No way there, even around: it forgets this bunny.
+            if (!walkToward(sim, s, goal, true) && !goAround(sim, s, goal, -m.preySerial[s])) {
+              forget(sim, s, m.preySerial[s]);
+              W.aTargetTile[s] = -1; m.seenAt[s] = -Infinity;
+            }
             return;
           }
         }
@@ -402,7 +429,14 @@
         const dx = (pt % W.w) - (t % W.w), dy = ((pt / W.w) | 0) - ((t / W.w) | 0);
         AS.setSprint(sim, s, dx * dx + dy * dy <= S.SprintRange * S.SprintRange);
         if (W.aStepLeft[s] > 0) return;
-        if (!walkToward(sim, s, pt)) { W.aTargetTile[s] = -1; W.aTargetSlot[s] = -1; m.preySerial[s] = 0; }
+        if (walkToward(sim, s, pt)) return;
+        // No path within sight (across a river): no sprinting along the bank, it goes around
+        // or, if that fails, forgets this bunny.
+        AS.setSprint(sim, s, false);
+        if (!goAround(sim, s, pt, -W.aSerial[p])) {
+          forget(sim, s, W.aSerial[p]);
+          W.aTargetTile[s] = -1; W.aTargetSlot[s] = -1; m.preySerial[s] = 0;
+        }
       },
     },
 
@@ -422,7 +456,7 @@
       enter(sim, s) {
         if (!AS.canMate(sim, s)) return false;
         const W = sim.W;
-        mSim = sim; mW = W; mSelf = s;
+        mSim = sim; mW = W; mSelf = s; mSkip = skipOf(sim, s);
         const t = nearestPartner(sim, s);
         if (t < 0) return false;
         const m = mem(W), p = W.aSlot[t];
@@ -447,7 +481,8 @@
         const S = AS.speciesStats(sim, s), t = W.aTile[s];
         const dx = pt % W.w - t % W.w, dy = ((pt / W.w) | 0) - ((t / W.w) | 0);
         const far = dx * dx + dy * dy > S.VisionRange * S.VisionRange;
-        if (far ? !headToward(sim, s, pt) : !walkToward(sim, s, pt)) {
+        if ((far || !walkToward(sim, s, pt)) && !goAround(sim, s, pt, -W.aSerial[p])) {
+          forget(sim, s, W.aSerial[p]);
           W.aTargetTile[s] = -1; W.aTargetSlot[s] = -1;
           m.mateSerial[s] = 0;
           prowlStep(sim, s);

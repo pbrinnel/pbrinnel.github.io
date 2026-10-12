@@ -22,13 +22,14 @@ function loadAS() {
   return { AS: ctx.AS, texts };
 }
 const KEYS = ['bunny', 'wolf', 'human'];
-// A bare world, nobody hungry and nothing growing unless a test says so, Water on, no lakes or
-// rivers of its own: tests dig their own with W.addWater.
+// A bare world, nobody hungry and nothing growing unless a test says so, made with Water off:
+// no lakes or rivers of its own and no water rules, so the lakes tests dig with W.addWater
+// stay as dug.
 function make(w, h, o = {}) {
   const { AS, texts } = loadAS();
   let s = editCSV(texts.settings, 'WorldWidth', 'Value', String(w));
   s = editCSV(s, 'WorldHeight', 'Value', String(h));
-  for (const [k, v] of [['StartGrass', '0%'], ['StartBunnies', '0'], ['StartWolves', '0'], ['Rain', '0'], ['Water', o.water || 'on']]) s = editCSV(s, k, 'Value', v);
+  for (const [k, v] of [['StartGrass', '0%'], ['StartBunnies', '0'], ['StartWolves', '0'], ['Water', o.water || 'off']]) s = editCSV(s, k, 'Value', v);
   texts.settings = s;
   if (!o.hunger) for (const sp of ['Bunny', 'Wolf', 'Human']) texts.species = editCSV(texts.species, 'HungerRate', sp, '0');
   texts.species = editCSV(texts.species, 'SeedChance', 'Grass', '0%');

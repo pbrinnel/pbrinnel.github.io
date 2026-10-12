@@ -88,13 +88,28 @@
     sim.W.aSprint[s] = on && !sim.W.aWinded[s] && sim.W.aStamina[s] > 0 ? 1 : 0;
   };
 
-  // One step to an empty 4-neighbor, if the last step has finished. Returns whether it
-  // moved. The step's time comes from the speed at the moment it starts.
+  // Wading (Paul, 11 Oct 2026): an animal walks into water up to its WadeDepth (meters;
+  // blank = none), slowed to WadeSpeed of its speed there; deeper water is a wall to it.
+  AS.wadeOf = (sim, s) => AS.speciesStats(sim, s).WadeDepth || 0;
+  // Whether an animal wading `wade` m deep can step onto t: open ground, or water with
+  // nothing in it no deeper than that. Holes are the caller's rule.
+  AS.canStand = (W, t, wade) => {
+    const k = W.kind[t];
+    return k === KIND.EMPTY || (k === KIND.WATER && W.wDepth[t] <= wade);
+  };
+
+  // One step to a 4-neighbor it can stand on, if the last step has finished. Returns
+  // whether it moved. The step's time comes from the speed at the moment it starts.
   AS.stepTo = function (sim, s, t2) {
     const W = sim.W;
-    if (W.aStepLeft[s] > 0 || W.kind[t2] !== KIND.EMPTY) return false;
+    if (W.aStepLeft[s] > 0 || !AS.canStand(W, t2, AS.wadeOf(sim, s))) return false;
+    return move(sim, s, t2);
+  };
+  function move(sim, s, t2) {
+    const W = sim.W;
     if (W.hole[t2] && !AS.canEnterHole(W.aSpecies[s])) return false;   // a hole is a wall to all but bunnies
-    const v = AS.speedOf(sim, s);
+    let v = AS.speedOf(sim, s);
+    if (W.wDepth[t2] > 0) { const f = AS.speciesStats(sim, s).WadeSpeed; if (f != null) v *= f; }
     if (!(v > 0)) return false;
     const dur = 1 / v;
     W.moveAnimal(s, t2);
@@ -142,7 +157,7 @@
   // the step comes on a later tick once the blade is gone. Returns whether it moved.
   AS.chewOrStep = function (sim, s, t2) {
     const W = sim.W;
-    if (W.kind[t2] === KIND.EMPTY) return AS.stepTo(sim, s, t2);
+    if (W.kind[t2] === KIND.EMPTY || W.kind[t2] === KIND.WATER) return AS.stepTo(sim, s, t2);
     if (W.kind[t2] !== KIND.GRASS || W.aStepLeft[s] > 0 || W.aBiteLeft[s] > 0) return false;
     const S = AS.speciesStats(sim, s);
     if (!(S.BiteSize > 0)) return false;
@@ -150,6 +165,90 @@
     W.aBiteLeft[s] = S.BiteCooldown;
     sim.emit(EV.GRAZE, t2);
     return false;
+  };
+
+  // ---- going around what's in the way ------------------------------------------------------
+
+  // A step toward a goal the path search can't reach (it looks only VisionRange around), or
+  // too far away for it (Paul, 12 Oct 2026). Straight at the goal while some step gets
+  // closer; blocked, the animal follows the edge of what's in its way, keeping it on its own
+  // side: every animal is born left- or right-handed (its serial's last bit, so the draw costs
+  // the world's random numbers nothing), and two wolves meeting a lake split around it. It
+  // leaves the edge once it is closer than where it met it and a step gets closer still, and
+  // gives up after EdgeFollow steps along edges in one trip, so a cupped shore can't loop it
+  // forever (blank: it gives up as soon as it is blocked).
+  //
+  //   AS.edgeStep(sim, s, goal, key, canEnter) → the tile to step to, or -1 (gave up, walled in)
+  //     key        what the trip is for (a destination tile, or minus a target's serial): a new
+  //                key starts afresh, and a given-up key stays given up
+  //     canEnter   (tile) → whether this animal can step there
+  //   The caller makes the step; one it hasn't made yet (a blade still being chewed) is kept.
+  const DX4 = [0, 1, 0, -1], DY4 = [-1, 0, 1, 0];
+  const EDGE_OFF = 0, EDGE_ON = 1, EDGE_GAVE_UP = 2;
+  const edgeOf = new WeakMap();
+  function edgeMem(W) {
+    let e = edgeOf.get(W);
+    if (!e) { e = { cap: 0 }; edgeOf.set(W, e); }
+    if (e.cap < W.aCap) {
+      const grow = (old, Ctor) => { const a = new Ctor(W.aCap); if (old) a.set(old); return a; };
+      e.for = grow(e.for, Uint32Array);    // the serial this slot's trip belongs to
+      e.key = grow(e.key, Float64Array);   // the trip's key
+      e.mode = grow(e.mode, Uint8Array);   // EDGE_OFF, EDGE_ON or EDGE_GAVE_UP
+      e.dir = grow(e.dir, Uint8Array);     // heading along the edge (DX4/DY4 index)
+      e.hit = grow(e.hit, Float32Array);   // distance to the goal where it met the edge
+      e.left = grow(e.left, Int32Array);   // steps it may still take along edges this trip
+      e.at = grow(e.at, Int32Array);       // tile the last step was chosen from
+      e.next = grow(e.next, Int32Array);   // that step
+      e.cap = W.aCap;
+    }
+    return e;
+  }
+  // Forget any trip: the next edgeStep starts afresh (a found path, a new state).
+  AS.edgeReset = function (W, s) { const e = edgeMem(W); e.for[s] = 0; };
+
+  AS.edgeStep = function (sim, s, goal, key, canEnter) {
+    const W = sim.W, e = edgeMem(W), t = W.aTile[s], w = W.w;
+    if (e.for[s] !== W.aSerial[s] || e.key[s] !== key) {
+      e.for[s] = W.aSerial[s]; e.key[s] = key; e.mode[s] = EDGE_OFF; e.at[s] = -1;
+      const f = AS.speciesStats(sim, s).EdgeFollow;
+      e.left[s] = f > 0 ? Math.round(f) : 0;
+    }
+    if (e.mode[s] === EDGE_GAVE_UP) return -1;
+    if (e.at[s] === t && canEnter(e.next[s])) return e.next[s];
+    const tx = t % w, ty = (t / w) | 0, gx = goal % w, gy = (goal / w) | 0;
+    const here = Math.hypot(tx - gx, ty - gy);
+    let best = -1, bestD = here;
+    for (let d = 0; d < 4; d++) {
+      const x = tx + DX4[d], y = ty + DY4[d];
+      if (!W.inside(x, y)) continue;
+      const u = y * w + x, dd = Math.hypot(x - gx, y - gy);
+      if (dd < bestD && canEnter(u)) { best = u; bestD = dd; }
+    }
+    const take = u => { e.at[s] = t; e.next[s] = u; return u; };
+    if (e.mode[s] === EDGE_OFF) {
+      if (best >= 0) return take(best);
+      if (e.left[s] <= 0) { e.mode[s] = EDGE_GAVE_UP; return -1; }
+      e.mode[s] = EDGE_ON; e.hit[s] = here;
+      // Face along the edge with the goal on the animal's hand side.
+      const dx = gx - tx, dy = gy - ty;
+      const toGoal = Math.abs(dx) >= Math.abs(dy) ? (dx > 0 ? 1 : 3) : (dy > 0 ? 2 : 0);
+      e.dir[s] = (W.aSerial[s] & 1) ? (toGoal + 3) & 3 : (toGoal + 1) & 3;
+    } else if (best >= 0 && here < e.hit[s]) {
+      e.mode[s] = EDGE_OFF;
+      return take(best);
+    }
+    if (e.left[s] <= 0) { e.mode[s] = EDGE_GAVE_UP; return -1; }
+    e.left[s]--;
+    // Hand on the edge: turn toward it if it falls away, else ahead, else away, else back.
+    const hand = (W.aSerial[s] & 1) ? 1 : 3, h = e.dir[s];
+    for (let i = 0; i < 4; i++) {
+      const d = (h + (i === 0 ? hand : i === 1 ? 0 : i === 2 ? 4 - hand : 2)) & 3;
+      const x = tx + DX4[d], y = ty + DY4[d];
+      if (!W.inside(x, y)) continue;
+      const u = y * w + x;
+      if (canEnter(u)) { e.dir[s] = d; return take(u); }
+    }
+    return -1;
   };
 
   // One bite of an adjacent animal: BiteDamage, and no food. A hunter eats the carcass its
@@ -184,8 +283,12 @@
   AS.killAnimal = function (sim, s, cause) {
     const W = sim.W, t = W.aTile[s], sp = W.aSpecies[s];
     W.removeAnimal(s);
-    W.addCorpse(t, sp, cause);
-    AS.corpseAdded(sim, t);
+    // One that dies in water leaves no body: the water carries it off, as it washes away a
+    // corpse it reaches (water.js).
+    if (!(W.wDepth[t] > 0)) {
+      W.addCorpse(t, sp, cause);
+      AS.corpseAdded(sim, t);
+    }
     sim.emit(EV.DEATH, t);
   };
 
@@ -220,21 +323,24 @@
     return byKey[key];
   }
 
-  // The water tile touching t (first in neighbors4 order), or -1.
+  // The water an animal at t drinks: its own tile when it is wading, else the first wet
+  // tile touching it (neighbors4 order), or -1.
   const dnb = new Int32Array(4);
-  function adjacentWater(W, t) {
+  function waterAt(W, t) {
+    if (W.wDepth[t] > 0) return t;
     const k = W.neighbors4(t, dnb);
-    for (let i = 0; i < k; i++) if (W.kind[dnb[i]] === KIND.WATER) return dnb[i];
+    for (let i = 0; i < k; i++) if (W.wDepth[dnb[i]] > 0) return dnb[i];
     return -1;
   }
 
   // What the local path search reads; set before each call, as in wolf.js.
-  let dSim = null, dW = null, dSelf = 0, dInvSpeed = 0, dHoles = false;
+  let dSim = null, dW = null, dSelf = 0, dInvSpeed = 0, dHoles = false, dWade = 0;
   // A tile an animal can walk to, grass counting as the bites it costs to chew through.
   const drinkCost = t => {
     const k = dW.kind[t];
     if (k === KIND.EMPTY) return dW.hole[t] && !dHoles ? Infinity : dInvSpeed;
     if (k === KIND.GRASS) return dInvSpeed + AS.chewSeconds(dSim, dSelf, t);
+    if (k === KIND.WATER && dW.wDepth[t] <= dWade) return dInvSpeed;
     return Infinity;
   };
   // A shore tile an animal could drink from (a blade on it is chewed away on arrival).
@@ -244,10 +350,23 @@
   // grazer (hunts nothing) eats what it bites, as it would anyway; a hunter just chews through.
   function drinkMove(sim, s, u) {
     const W = sim.W;
-    if (W.kind[u] === KIND.EMPTY) return AS.stepTo(sim, s, u);
+    if (W.kind[u] === KIND.EMPTY || W.kind[u] === KIND.WATER) return AS.stepTo(sim, s, u);
     if (W.kind[u] !== KIND.GRASS || W.aBiteLeft[s] > 0) return false;
     if (AS.relations(sim.T).prey[W.aSpecies[s]] === 0) { AS.grazeBite(sim, s, u); return false; }
     return AS.chewOrStep(sim, s, u);
+  }
+
+  // Drinking takes real water (Paul, 11 Oct 2026): WaterLiters fill a whole meter, so a sip
+  // lowers the tile it comes from by that many liters spread over the tile (tiny against a
+  // lake, but a puddle can be drunk dry). Water laid by hand with no water rules (the checks)
+  // isn't touched.
+  const LITERS_PER_M3 = 1000;
+  function drinkFrom(sim, s, t, gained) {
+    const wat = sim.W.water, L = AS.speciesStats(sim, s).WaterLiters;
+    if (!wat || !(L > 0)) return;
+    const m = gained / AS.speciesStats(sim, s).WaterMax * L / LITERS_PER_M3 / (AS.TILE_M * AS.TILE_M);
+    const h = wat.H[t] - m;
+    wat.H[t] = h > AS.WATER_TINY ? h : 0;
   }
 
   // "Walk to a land tile touching water and drink until the meter is full." Enters only when
@@ -257,14 +376,15 @@
     enter(sim, s) {
       const W = sim.W;
       if (W.waterCount === 0) return false;
-      if (W.waterStale) W.buildWaterField();
+      W.ensureWaterField();
       const S = AS.speciesStats(sim, s);
       // Full means within one tick's burn of WaterMax: the body drains the meter before each
       // decision, so an animal that has just topped up is never quite at WaterMax when asked.
       // Judging it by WaterMax itself kept a full drinker in DRINK for good, on the shore tile.
       const full = S.WaterMax - S.ThirstRate * Math.max(1, S.SprintHunger) * AS.DT;
       if (W.aState[s] === drinkIdx(sim, s) && W.aWater[s] < full) return true;
-      return W.aWater[s] < S.ThirstyAt * S.WaterMax && W.wDist[W.aTile[s]] <= S.WaterSense;
+      const t = W.aTile[s];
+      return W.aWater[s] < S.ThirstyAt * S.WaterMax && (W.wDepth[t] > 0 || W.wDist[t] <= S.WaterSense);
     },
     start(sim, s) {
       AS.setSprint(sim, s, false);
@@ -273,13 +393,14 @@
     act(sim, s) {
       const W = sim.W, S = AS.speciesStats(sim, s), t = W.aTile[s];
       AS.setSprint(sim, s, false);
-      const water = adjacentWater(W, t);
+      const water = waterAt(W, t);
       if (water >= 0) {
         W.aTargetTile[s] = water;
         W.aTargetSlot[s] = -1;
         if (W.aStepLeft[s] > 0) return;
-        const wat = W.aWater[s] + S.DrinkRate * AS.DT;
+        const before = W.aWater[s], wat = before + S.DrinkRate * AS.DT;
         W.aWater[s] = wat < S.WaterMax ? wat : S.WaterMax;
+        drinkFrom(sim, s, water, W.aWater[s] - before);
         // A sip every BiteCooldown shows the head-down pose, as a bite of food does.
         if (W.aBiteLeft[s] <= 0) W.aBiteLeft[s] = S.BiteCooldown;
         if (W.aWater[s] >= S.WaterMax) W.aDecideLeft[s] = 0;   // full: the next tick picks what's next
@@ -294,13 +415,14 @@
       // search's reach, the field is the way: its next tile if free, else any neighbor nearer.
       const hole = AS.canEnterHole(W.aSpecies[s]);
       if (W.wDist[t] <= S.VisionRange) {
-        dSim = sim; dW = W; dSelf = s; dHoles = hole;
+        dSim = sim; dW = W; dSelf = s; dHoles = hole; dWade = AS.wadeOf(sim, s);
         dInvSpeed = 1 / AS.speedOf(sim, s);
         const step = AS.pathNextWeighted(sim, t, isShoreGoal, S.VisionRange, drinkCost);
         if (step >= 0 && step !== t) { drinkMove(sim, s, step); return; }
       }
       const nxt = W.wNext[t];
-      if (nxt >= 0 && W.kind[nxt] === KIND.EMPTY && (hole || !W.hole[nxt])) { AS.stepTo(sim, s, nxt); return; }
+      const wade = AS.wadeOf(sim, s);
+      if (nxt >= 0 && AS.canStand(W, nxt, wade) && (hole || !W.hole[nxt])) { AS.stepTo(sim, s, nxt); return; }
       const k = W.neighbors4(t, dnb);
       let best = -1, bestD = W.wDist[t];
       for (let i = 0; i < k; i++) {
@@ -310,6 +432,38 @@
       if (best >= 0) drinkMove(sim, s, best);
     },
   };
+
+  // ---- out of deep water --------------------------------------------------------------
+
+  // An animal in water deeper than it wades (the water rose, or was poured on it) does
+  // nothing else until it is out (Paul, 11 Oct 2026: animals step out): the nearest tile it
+  // can stand on within sight, through water of any depth, at its wading speed; none in
+  // sight, the shallowest neighbor that is shallower than here.
+  let oW = null, oWade = 0, oHoles = false;
+  const outCost = t => {
+    const k = oW.kind[t];
+    return (k === KIND.EMPTY || k === KIND.WATER) && (oHoles || !oW.hole[t]) ? 1 : Infinity;
+  };
+  const isStandable = t => AS.canStand(oW, t, oWade) && (oHoles || !oW.hole[t]);
+  const onb = new Int32Array(4);
+  function wadeOut(sim, s) {
+    const W = sim.W;
+    if (W.aStepLeft[s] > 0) return;
+    const t = W.aTile[s];
+    oW = W; oWade = AS.wadeOf(sim, s); oHoles = AS.canEnterHole(W.aSpecies[s]);
+    let next = AS.pathNextWeighted(sim, t, isStandable, AS.speciesStats(sim, s).VisionRange, outCost);
+    if (next === t) next = -1;
+    if (next < 0) {
+      let best = W.wDepth[t];
+      for (let i = 0, k = W.neighbors4(t, onb); i < k; i++) {
+        const u = onb[i];
+        if (outCost(u) !== Infinity && W.wDepth[u] < best) { next = u; best = W.wDepth[u]; }
+      }
+    }
+    W.aTargetTile[s] = next;
+    W.aTargetSlot[s] = -1;
+    if (next >= 0) move(sim, s, next);
+  }
 
   // ---- the tick -----------------------------------------------------------------------
 
@@ -322,6 +476,7 @@
           W.aState[s] = i;
           W.aTargetTile[s] = -1;
           W.aTargetSlot[s] = -1;
+          AS.edgeReset(W, s);
           if (st.start) st.start(sim, s);
         }
         return;
@@ -357,7 +512,7 @@
       // thirst at all, so the meter stays put and nothing about such a world changes.
       let thirsty = false;
       if (W.waterCount > 0) {
-        if (W.waterStale) W.buildWaterField();
+        W.ensureWaterField();
         let wat = W.aWater[s] - S.ThirstRate * burn * dt;
         if (wat < 0) wat = 0;
         W.aWater[s] = wat;
@@ -392,6 +547,8 @@
         decide(sim, s, key);
         W.aDecideLeft[s] += 1 / S.DecidePerSec;
       }
+      const d = W.wDepth[W.aTile[s]];
+      if (d > 0 && d > AS.wadeOf(sim, s)) { wadeOut(sim, s); continue; }
       if (W.aState[s] !== NO_STATE) IMPL[key][T.states[key][W.aState[s]].name].act(sim, s);
     }
   };

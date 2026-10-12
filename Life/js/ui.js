@@ -11,11 +11,12 @@
 //         inspect ('off' | 'click' | 'hover'), onInspect(mode): the properties window,
 //         inspectEmpty (initial on/off), onInspectEmpty(on): bare tiles can be picked,
 //         onRadius(mode, tiles): the Radius slider moved (for the preview),
-//         tab (initial: 'info' | 'debug' | 'god' | null for closed; default 'info'), onTab(name | null),
+//         windows (the tab windows open at first: keys of 'info', 'god', 'debug'; default ['info']),
+//         onWindows(keys): the open ones, after the viewer opens or closes one,
 //         onNuke(on), onLocate(key, on): a count's ring toggle ('bunnies', 'wolves', 'humans', 'blades', 'corpses') }) → ui
 //   ui.hud({ speedIndex, achieved, day, seed, humansSeen, counts: { bunnies, wolves, humans, total, blades, corpses } })
 //                                 (humansSeen: this world has had a human, so their count shows)
-//   ui.tab, ui.setTab(name | null)   the open tab
+//   ui.windows, ui.setWindow(key, on)  the tab windows open (each tab button toggles its own)
 //   ui.hidden, ui.setHidden(on)      Hide UI (the H key toggles it; never remembered across loads)
 //   ui.nuke, ui.setNuke(on)          NUKE MODE armed (main.js reads it through onNuke)
 //   ui.mode, ui.setMode(name)        the PAINT tab's one armed mode: 'nuke', 'grass', 'bunny', 'wolf', 'human', 'water' or ''
@@ -95,7 +96,7 @@
   }
 
   AS.UI = function (opts) {
-    const { debug, speeds, onSpeed, onDebugTool, onCloseInspector, onBench, onGraph, onLines, onWater, onTab, onNuke, onMode, onLocate, onElevation, onInspect, onInspectEmpty, onMinimap, onContourStep, onRadius } = opts;
+    const { debug, speeds, onSpeed, onDebugTool, onCloseInspector, onBench, onGraph, onLines, onWater, onWindows, onNuke, onMode, onLocate, onElevation, onInspect, onInspectEmpty, onMinimap, onContourStep, onRadius } = opts;
     const hudEl = document.getElementById('hud');
     const errorsEl = document.getElementById('errors');
     const inspEl = document.getElementById('inspector');
@@ -128,27 +129,26 @@
     });
     const dayEl = el('span', 'hud-day', '');
     const tabBox = el('div', 'hud-tabs');
-    const tabBtns = {}, tabPanels = {};
-    const tabStrip = el('div', 'hud-tabstrip');
-    tabStrip.hidden = true;
-    // On a computer the side panel has a title bar to drag it by (drag.js); a phone hides it.
-    const sideHead = el('div', 'hud-side-head');
-    const sideTitle = el('span', 'hud-side-title', '');
-    sideHead.appendChild(sideTitle);
-    sideHead.title = 'Drag to move; double-click to put it back';
-    tabStrip.appendChild(sideHead);
+    // Each tab is its own window (Paul, 12 Oct 2026: like the graph and the minimap, toggled
+    // on and left open), with a title bar to drag it by on a computer (drag.js); a phone hides
+    // the title bar and stacks the open ones under the bar.
+    const tabBtns = {}, tabPanels = {}, tabWins = {}, tabHeads = {};
     const TABS = ALL_TABS.filter(([key]) => key !== 'debug' || debug);
     for (const [key, label, tip] of TABS) {
       const b = el('button', 'hud-btn hud-tab', label);
       b.type = 'button';
       b.title = tip;
-      b.addEventListener('click', () => { setTab(openTab === key ? null : key); b.blur(); });
+      b.addEventListener('click', () => { setWindow(key, !openWins.has(key)); b.blur(); });
       tabBox.appendChild(b);
       tabBtns[key] = b;
+      const win = el('div', 'hud-tabstrip hud-win-' + key);
+      win.hidden = true;
+      const head = el('div', 'hud-side-head');
+      head.appendChild(el('span', 'hud-side-title', label));
+      head.title = 'Drag to move; double-click to put it back';
       const panel = el('div', 'hud-panel hud-panel-' + key);
-      panel.hidden = true;
-      tabPanels[key] = panel;
-      tabStrip.appendChild(panel);
+      win.append(head, panel);
+      tabWins[key] = win; tabHeads[key] = head; tabPanels[key] = panel;
     }
     const hideBtn = el('button', 'hud-btn hud-hide', 'Hide UI');
     hideBtn.type = 'button';
@@ -477,7 +477,7 @@
     }
     const setNuke = on => setMode(on ? 'nuke' : (mode === 'nuke' ? '' : mode));
 
-    top.append(strip, tabStrip);
+    top.append(strip, ...Object.values(tabWins));
     // The side panel starts just under the bar, whose height can change (it wraps when narrow).
     const placeSide = () => document.documentElement.style.setProperty('--hud-bar', strip.offsetHeight + 'px');
     if (typeof ResizeObserver === 'function') new ResizeObserver(placeSide).observe(strip);
@@ -488,25 +488,23 @@
       warnList.addEventListener(t, e => e.stopPropagation());
     }
 
-    let openTab = null, quiet = false;
-    function setTab(name) {
-      if (name !== null && !tabPanels[name]) name = null;
-      if (name === openTab) return;
-      openTab = name;
-      for (const [key] of TABS) {
-        tabPanels[key].hidden = key !== name;
-        tabBtns[key].classList.toggle('on', key === name);
-      }
-      tabStrip.hidden = name === null;
-      if (name) sideTitle.textContent = TABS.find(t => t[0] === name)[1];
-      // On a computer the open tab is a side panel; the graph and minimap step aside (CSS)
-      // unless it has been dragged somewhere else.
-      if (document.body) document.body.classList.toggle('side-open', name !== null);
-      if (onTab && !quiet) onTab(name);
+    const openWins = new Set();
+    let quiet = false;
+    function setWindow(key, on) {
+      if (!tabWins[key]) return;
+      on = !!on;
+      if (on === openWins.has(key)) return;
+      if (on) openWins.add(key); else openWins.delete(key);
+      tabWins[key].hidden = !on;
+      tabBtns[key].classList.toggle('on', on);
+      // On a computer Info sits down the left; the graph and minimap step aside (CSS) unless
+      // it has been dragged somewhere else.
+      if (key === 'info' && document.body) document.body.classList.toggle('side-open', on);
+      if (onWindows && !quiet) onWindows([...openWins]);
     }
-    // The first tab is set quietly: onTab is for the viewer's changes (main.js remembers them).
+    // The first windows open quietly: onWindows is for the viewer's changes (main.js keeps them).
     quiet = true;
-    setTab(opts.tab === undefined ? 'info' : opts.tab);
+    for (const key of opts.windows === undefined ? ['info'] : opts.windows) setWindow(key, true);
     quiet = false;
 
     let uiHidden = false;
@@ -606,7 +604,9 @@
     for (const t of ['pointerdown', 'pointerup', 'wheel']) inspEl.addEventListener(t, e => e.stopPropagation());
     // The side panel and the properties window drag by their title bars, like the graph.
     if (AS.Draggable) {
-      AS.Draggable(tabStrip, sideHead, 'life-side-pos', moved => document.body && document.body.classList.toggle('side-moved', moved));
+      for (const key of Object.keys(tabWins)) {
+        AS.Draggable(tabWins[key], tabHeads[key], key === 'info' ? 'life-side-pos' : 'life-' + key + '-pos', key === 'info' ? (moved => document.body && document.body.classList.toggle('side-moved', moved)) : undefined);
+      }
       AS.Draggable(inspEl, inspHead, 'life-insp-pos');
       inspHead.title = 'Drag to move; double-click to put it back';
     }
@@ -753,9 +753,9 @@
     }
 
     return {
-      hud, errors, warnings, inspector, lock, setTab, setHidden, setNuke, setMode, ended, setIcons,
+      hud, errors, warnings, inspector, lock, setWindow, setHidden, setNuke, setMode, ended, setIcons,
       setRadiusDefaults, setRadius, radiusOf, crowd,
-      get tab() { return openTab; },
+      get windows() { return [...openWins]; },
       get hidden() { return uiHidden; },
       get nuke() { return mode === 'nuke'; },
       get mode() { return mode; },
