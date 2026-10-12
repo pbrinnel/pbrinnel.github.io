@@ -53,7 +53,7 @@ load time: every file reads other files' `AS.*` inside functions, at call time.
 | `drink.js` | the DRINK state every species shares | `drinkState` |
 | `breed.js` | mating and births, shared by the species that breed (a species with no `LitterSize`, humans, never mates); the female's territory rule (`PackLimit`/`TerritoryRange`) in `canMate` | `canMate`, `mate`, `tryBirth` |
 | `bunny.js`, `wolf.js`, `human.js` | each species' states, by the names in `states.csv` ([Behavior](#behavior)). wolf.js's FEED, HUNT, GIVE_UP, REST and PROWL are the hunter states (`AS.hunterStates`), so human.js registers them too and adds FORAGE | (register via `AS.registerStates`) |
-| `glyphs.js` | ids, palette and life stage (`stageOf`) shared by the sprites and HUD; the old glyph sheet (no longer drawn) | `GLYPH`, `COLORS`, `CELL_COLOR`, `GlyphSheet`, `stageOf`, … |
+| `glyphs.js` | ids (named for the font glyphs the map was first drawn with), the palette, and life stage (`stageOf`), shared by the sprites, the far view and the HUD | `GLYPH`, `COLORS`, `animalGlyph`, `grassGlyph`, `STAGE`, `stageOf` |
 
 **The page:**
 
