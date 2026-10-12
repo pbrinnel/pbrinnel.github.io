@@ -72,19 +72,24 @@
     function listWet() { wetN = 0; for (let i = 0; i < n; i++) if (H[i] > 0) wet[wetN++] = i; }
 
     // Rain, soaking in, springs, evaporation and transpiration on every tile, for dt days.
+    // The surface move after it leaves the soil alone, so this pass also readies the soil
+    // move: each tile's water table (L) from its final soil water, and dG cleared.
     function exchange(dt) {
       wetN = 0;
+      const perM = 1 / POROSITY, r = rain * dt, soakMax = inf * dt, evMax = evap * dt, etDt = et * dt;
+      let evapSum = 0, etSum = 0;
       for (let i = 0; i < n; i++) {
-        let d = H[i] + rain * dt, g = G[i];
-        totals.rain += rain * dt;
-        const soak = min(d, inf * dt, max(0, room - g));
+        let d = H[i] + r, g = G[i];
+        const soak = min(d, soakMax, max(0, room - g));
         d -= soak; g += soak;
         if (g > room) { d += g - room; g = room; }
-        if (d > 0) { const e = min(d, evap * dt); d -= e; totals.evap += e; }
-        if (g > 0) { const e = min(g, et * dt * g / room); g -= e; totals.et += e; }
+        if (d > 0) { const e = min(d, evMax); d -= e; evapSum += e; }
+        if (g > 0) { const e = min(g, etDt * g / room); g -= e; etSum += e; }
         H[i] = d < TINY ? 0 : d; G[i] = g;
-        if (H[i] > 0) wet[wetN++] = i;
+        if (d >= TINY) wet[wetN++] = i;
+        L[i] = floor[i] + g * perM; dG[i] = 0;
       }
+      totals.rain += r * n; totals.evap += evapSum; totals.et += etSum;
     }
 
     // Surface water, one move of dt days. Only tiles holding water do any work, and only the
@@ -135,9 +140,9 @@
     // Soil water, one move of dt days: toward a lower water table (the soil's floor, the ground
     // minus SoilDepth, plus the water's height in it); out of the map only at a river mouth.
     // Darcy: SoilFlow × thickness × (drop / TILE_M) × dt over a tile's width, as water (× POROSITY).
+    // L (each tile's water table) and a cleared dG come from exchange, which runs just before.
     function soil(dt) {
       const k = S.SoilFlow * dt * POROSITY / (TILE_M * TILE_M), perM = 1 / POROSITY, capK = POROSITY / 5;
-      for (let i = 0; i < n; i++) { L[i] = floor[i] + G[i] * perM; dG[i] = 0; }
       for (let y = 0, i = 0; y < h; y++) {
         for (let x = 0; x < w; x++, i++) {
           const g = G[i];

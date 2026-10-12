@@ -47,7 +47,7 @@ load time: every file reads other files' `AS.*` inside functions, at call time.
 | `terrain.js` | every world's ground, grown before day 0, and its first water ([Water](#water)) | `growTerrain`, `layTerrain`, `terrainOf`, `terrainShape` |
 | `terrain-worker.js` | not a page script: main.js runs it as a Worker to grow a world off the main thread ([Water](#water)) | — |
 | `start.js` | the Meadows day-0 layout (`StartLayout`): the ground and water first (`AS.layTerrain`), then meadow grass (never on the beach) aged by depth, bunny colonies at meadow edges, wolf packs in the open (never humans); uses only `sim.rng` | `startMeadows` |
-| `sight.js` | line of sight through grass, nearest visible thing, local paths (plain and weighted for chewing) | `lineOfSight`, `nearestVisible`, `pathNext`, `pathNextWeighted` |
+| `sight.js` | line of sight through grass, nearest visible thing, local paths (plain and weighted for chewing) | `lineOfSight`, `nearestVisible`, `nearestVisibleAnimal`, `nearestVisibleIn`, `pathNext`, `pathNextWeighted` |
 | `animals.js` | every animal's body (hunger, thirst, healing, stamina, swimming's cost, age), the decide loop, bites, death, spawning; `relations(T)` (who hunts and eats whom); the shared grass bite `grazeBite` | `animalsTick`, `registerStates`, `checkStates`, `speciesStats`, `speedOf`, `setSprint`, `biteAnimal`, `killAnimal`, `spawnStarting`, `relations`, `grazeBite`, `bestAdjacentBlade`, … |
 | `moving.js` | how animals get from tile to tile: steps and their time, wading and swimming, chewing through grass, going around, walking out of deep water | `stepTo`, `chewOrStep`, `chewSeconds`, `canStand`, `canEnter`, `wadeOf`, `swimsNow`, `edgeStep`, `edgeReset`, `wadeOut` |
 | `drink.js` | the DRINK state every species shares | `drinkState` |
@@ -105,11 +105,15 @@ Animals tell their own kind by `kind >= BUNNY`. Tiles are `t = y * W.w + x`.
   slot index is valid for a whole life; `aSerial[s]` tells a reused slot from its old
   occupant. Every field is an `a*` array (see `ANIMAL_FIELDS` in world.js, one line per
   field). `W.aSlot[t]` maps a tile to its animal.
-- **Who's near:** `W.nearCount` counts each species per `NEAR_BLOCK`² block (kept by
-  `addAnimal`/`removeAnimal`/`moveAnimal`); `W.anyNear(t, range, speciesMask)` answers
-  whether any are within a square of `range`. bunny.js `threatSeen` and wolf.js's prey
-  scans ask it before `nearestVisible`, an exact shortcut (it only skips scans that would
-  find nothing).
+- **Who's near:** each species' animals in each `NEAR_BLOCK`² block, as a linked list
+  (`W.nearHead`, the slots' `aNearNext`/`aNearPrev`), kept by `addAnimal`/`removeAnimal`/
+  `moveAnimal`. `W.animalsNear(t, range, speciesMask)` puts the slots in the blocks around t
+  into `W.nearFound`; `W.anyNear` says whether there are any. sight.js
+  `nearestVisibleAnimal(sim, from, range, mask, match)` answers as `nearestVisible` would
+  from those few animals (sorted into the circle's own tie order), and `nearestVisibleIn`
+  does the same from a dense list (`cList` for carcasses, `hList` for holes). Every search
+  for hunters, prey, mates and companions uses them; sight-check proves they pick the tile
+  the sweep would.
 - **Identity:** anything that remembers another agent stores slot (or tile) **and** serial,
   and checks the serial before trusting it (selection, targets, fathers).
 

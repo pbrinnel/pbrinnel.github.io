@@ -78,6 +78,54 @@
     return -1;
   };
 
+  // The same answer as nearestVisible, from a list of the only tiles `match` can be true on
+  // rather than every tile in range: the list's tiles within the circle, nearest first in the
+  // circle's own tie order (distance, then dy, then dx), and the first that matches and can be
+  // seen. A few candidates instead of hundreds of tiles. `slots`: the list holds animal slots,
+  // whose tiles are W.aTile.
+  let order = new Float64Array(64), busy = false;
+  function nearestOfList(W, from, range, list, n, slots, match) {
+    const w = W.w, aTile = W.aTile, r2 = range * range, N = W.n;
+    const fx = from % w, fy = (from / w) | 0;
+    // Key: distance², then dy, then dx (each offset to be non-negative), then the tile itself,
+    // packed into one exact number (well under 2^53) so a plain numeric sort orders them and
+    // the tile comes back out without the list, which `match` may search again.
+    const R = Math.floor(range), S = 2 * R + 1;
+    const buf = busy || order.length < n ? new Float64Array(Math.max(n, 64)) : order;
+    if (!busy && buf !== order) order = buf;
+    let m = 0;
+    for (let i = 0; i < n; i++) {
+      const t = slots ? aTile[list[i]] : list[i], dx = t % w - fx, dy = ((t / w) | 0) - fy, d2 = dx * dx + dy * dy;
+      if (d2 === 0 || d2 > r2) continue;
+      buf[m++] = ((d2 * S + dy + R) * S + dx + R) * N + t;
+    }
+    const keys = buf.subarray(0, m).sort();
+    const outer = busy;
+    busy = true;
+    try {
+      for (let j = 0; j < m; j++) {
+        const t = keys[j] % N;
+        if (match(t) && AS.lineOfSight(W, from, t)) return t;
+      }
+      return -1;
+    } finally { busy = outer; }
+  }
+
+  // For a match only ever true on an animal of a species in `mask` (bit = species code): the
+  // candidates are the animals in the world's per-block lists near `from` (W.animalsNear).
+  AS.nearestVisibleAnimal = function (sim, from, range, mask, match) {
+    const W = sim.W, n = W.animalsNear(from, range, mask);
+    return n === 0 ? -1 : nearestOfList(W, from, range, W.nearFound, n, true, match);
+  };
+
+  // For a match only ever true on the first `count` tiles of `list` (a world's dense list:
+  // corpses, holes). A list longer than the circle is quicker to sweep tile by tile.
+  AS.nearestVisibleIn = function (sim, from, range, list, count, match) {
+    if (count === 0) return -1;
+    if (count > circle(range).n) return AS.nearestVisible(sim, from, range, match);
+    return nearestOfList(sim.W, from, range, list, count, false, match);
+  };
+
   // ---- Pathfinding ----
 
   // Per-world search buffers: a visited stamp per tile (a new generation per search, so

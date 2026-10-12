@@ -125,7 +125,7 @@
     mW = W;
     mThreat = AS.relations(sim.T).threat[AS.SPECIES.BUNNY];
     const range = AS.speciesStats(sim, s).VisionRange;
-    const t = W.anyNear(W.aTile[s], range, mThreat) ? AS.nearestVisible(sim, W.aTile[s], range, isThreat) : -1;
+    const t = AS.nearestVisibleAnimal(sim, W.aTile[s], range, mThreat, isThreat);
     if (t >= 0) m.threatAt[s] = sim.simSeconds;
     return t;
   }
@@ -411,7 +411,7 @@
   function takeCompanion(sim, s, S, t, m) {
     const W = sim.W;
     mW = W; mSelf = s; mMem = m;
-    const ct = AS.nearestVisible(sim, t, S.VisionRange, isCompanion);
+    const ct = AS.nearestVisibleAnimal(sim, t, S.VisionRange, 1 << AS.SPECIES.BUNNY, isCompanion);
     if (ct < 0) return;
     const c = W.aSlot[ct];
     m.awayFor[c] = W.aSerial[c]; m.lead[c] = s; m.leadSerial[c] = W.aSerial[s]; m.natal[c] = 0;
@@ -518,7 +518,7 @@
         if (wolf < 0) return false;
         const m = mem(W);
         m.wolf[s] = wolf;
-        m.hole[s] = S.HoleRange > 0 && W.hCount > 0 ? AS.nearestVisible(sim, W.aTile[s], S.HoleRange, isFreeHole) : -1;
+        m.hole[s] = S.HoleRange > 0 && W.hCount > 0 ? AS.nearestVisibleIn(sim, W.aTile[s], S.HoleRange, W.hList, W.hCount, isFreeHole) : -1;
         return true;
       },
       start(sim, s) { sim.W.aRunLeft[s] = 0; scared(sim, s); },
@@ -669,7 +669,7 @@
         if (!AS.canMate(sim, s)) return false;
         const W = sim.W;
         mSim = sim; mW = W; mSelf = s;
-        const t = AS.nearestVisible(sim, W.aTile[s], AS.speciesStats(sim, s).VisionRange, isPartner);
+        const t = AS.nearestVisibleAnimal(sim, W.aTile[s], AS.speciesStats(sim, s).VisionRange, 1 << AS.SPECIES.BUNNY, isPartner);
         if (t < 0) return false;
         const m = mem(W), p = W.aSlot[t];
         m.mate[s] = p;

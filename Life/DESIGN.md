@@ -438,8 +438,9 @@ Built this way so it never needs a rewrite:
   garbage collector quiet.
 - **Grass updates in bulk.** Growth, seeding and aging happen once per in-world hour per
   blade, spread over the hour's ticks, not every tick.
-- **Animals look only where something is.** The world keeps a count of each species per
-  8×8-tile block, so an animal looking for hunters or prey skips its scan when none are near.
+- **Animals look only at what is there.** The world keeps a list of each species' animals
+  per 8×8-tile block, so an animal looking for hunters, prey or a mate checks the few nearby
+  rather than every tile in sight, and a wolf looking for a carcass checks the carcasses.
 - **Worlds are made in the background.** Growing the ground and settling the water (about
   5 s) runs in a worker thread, so the page stays alive behind the loading card.
 - **Animal decisions are staggered.** Each animal re-decides its state a few times a

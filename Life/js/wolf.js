@@ -152,7 +152,7 @@
   // scattered few can still pair up. The nearest visible partner wins if there is one.
   function nearestPartner(sim, s) {
     const W = sim.W, S = AS.speciesStats(sim, s);
-    const near = AS.nearestVisible(sim, W.aTile[s], S.VisionRange, isPartner);
+    const near = AS.nearestVisibleAnimal(sim, W.aTile[s], S.VisionRange, 1 << W.aSpecies[s], isPartner);
     if (near >= 0 || !(S.MateRange > S.VisionRange)) return near;
     const t0 = W.aTile[s], x0 = t0 % W.w, y0 = (t0 / W.w) | 0, r2 = S.MateRange * S.MateRange;
     let best = -1, bestD = Infinity;
@@ -253,7 +253,7 @@
     if (m.preyFor[s] !== W.aSerial[s]) { m.preyFor[s] = W.aSerial[s]; m.preyAt[s] = now; }
     mW = W; mSkip = skipOf(sim, s);
     mPrey = AS.relations(sim.T).prey[W.aSpecies[s]];
-    if (W.anyNear(t, S.VisionRange, mPrey) && AS.nearestVisible(sim, t, S.VisionRange, isPrey) >= 0) m.preyAt[s] = now;
+    if (AS.nearestVisibleAnimal(sim, t, S.VisionRange, mPrey, isPrey) >= 0) m.preyAt[s] = now;
     const roaming = S.RoamAfter > 0 && now - m.preyAt[s] > S.RoamAfter * AS.DAY_SECONDS;
     m.roaming[s] = roaming ? 1 : 0; m.roamingFor[s] = W.aSerial[s];
     // Natal dispersal (Paul): grown up, a hunter born in this world leaves home once, with
@@ -318,7 +318,7 @@
         if (feeding && ft >= 0 && W.kind[ft] === K.CORPSE && W.serial[ft] === m.feedSerial[s] && W.cMeat[ft] > 0) return true;
         mW = W; mSkip = skipOf(sim, s);
         mEats = AS.relations(sim.T).eats[W.aSpecies[s]];
-        const t = AS.nearestVisible(sim, W.aTile[s], S.VisionRange, hasMeat);
+        const t = AS.nearestVisibleIn(sim, W.aTile[s], S.VisionRange, W.cList, W.cCount, hasMeat);
         if (t < 0) return false;
         m.feedTile[s] = t;
         m.feedSerial[s] = W.serial[t];
@@ -367,7 +367,7 @@
         if (cur === I.GIVE_UP && W.aStamina[s] < S.RestUntil * S.StaminaMax) return false;
         mW = W; mSkip = skipOf(sim, s);
         mPrey = AS.relations(sim.T).prey[W.aSpecies[s]];
-        const t = W.anyNear(W.aTile[s], S.VisionRange, mPrey) ? AS.nearestVisible(sim, W.aTile[s], S.VisionRange, isPrey) : -1;
+        const t = AS.nearestVisibleAnimal(sim, W.aTile[s], S.VisionRange, mPrey, isPrey);
         const m = mem(W);
         if (t >= 0) {
           // Any prey in view wins, so a second one appearing mid-search takes over.

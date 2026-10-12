@@ -63,7 +63,13 @@
     return r;
   };
 
-  AS.speciesStats = (sim, s) => sim.T[AS.SPECIES_KEY[sim.W.aSpecies[s]]];
+  // An animal's species column of the tables. Called on nearly every decision, so the columns
+  // are kept as an array by species code for whichever table set was asked last.
+  let statsT = null, statsBy = null;
+  AS.speciesStats = (sim, s) => {
+    if (sim.T !== statsT) { statsT = sim.T; statsBy = AS.SPECIES_KEY.map(k => statsT[k]); }
+    return statsBy[sim.W.aSpecies[s]];
+  };
 
   AS.stageOfSlot = (sim, s) => AS.stageOf(AS.speciesStats(sim, s), sim.W.aAge[s]);
 
@@ -200,6 +206,9 @@
 
   AS.animalsTick = function (sim) {
     const W = sim.W, T = sim.T, dt = AS.DT;
+    // Thirst reads the way-to-water field. Nothing in this loop makes it stale, so it is
+    // brought up to date once, here, when there is water and anyone to drink it.
+    if (W.waterCount > 0 && AS.POP_KEY.some(k => W[k] > 0)) W.ensureWaterField();
     for (let s = 0, hi = W.aHigh; s < hi; s++) {
       if (!W.aAlive[s]) continue;
       const key = AS.SPECIES_KEY[W.aSpecies[s]], S = T[key];
@@ -221,7 +230,6 @@
       // thirst at all, so the meter stays put and nothing about such a world changes.
       let thirsty = false;
       if (W.waterCount > 0) {
-        W.ensureWaterField();
         let wat = W.aWater[s] - S.ThirstRate * burn * dt;
         if (wat < 0) wat = 0;
         W.aWater[s] = wat;

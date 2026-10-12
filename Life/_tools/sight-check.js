@@ -104,6 +104,35 @@ function refDist(W, from, goal, range) {
   console.log(`nearestVisible vs brute force: ${bad} mismatches`);
 }
 
+{ // the list searches pick exactly the tile the tile-by-tile sweep picks, ties included
+  const { AS, sim, W } = mk(70, 50, '30%', 5);
+  let s = 7, bad = 0, found = 0;
+  const rnd = m => { s = (s * 1664525 + 1013904223) >>> 0; return s % m; };
+  const empty = () => { for (;;) { const t = rnd(W.n); if (W.kind[t] === AS.KIND.EMPTY && !W.hole[t]) return t; } };
+  // Crowds and clusters, so many candidates sit at equal distances.
+  for (let i = 0; i < 400; i++) AS.spawnStarting(sim, i % 3 === 0 ? AS.SPECIES.WOLF : AS.SPECIES.BUNNY, empty());
+  for (let i = 0; i < 60; i++) { const t = empty(); W.addCorpse(t, AS.SPECIES.BUNNY); AS.corpseAdded(sim, t); }
+  for (let i = 0; i < 40; i++) W.addHole(empty(), 0);
+  const K = AS.KIND, B = AS.SPECIES.BUNNY, Wf = AS.SPECIES.WOLF;
+  const cases = [
+    [1 << Wf, t => W.kind[t] === K.WOLF],
+    [1 << B, t => W.kind[t] === K.BUNNY && W.aSex[W.aSlot[t]] === 1],
+    [(1 << B) | (1 << Wf), t => W.kind[t] >= K.BUNNY && W.aSlot[t] % 5 !== 0],
+  ];
+  for (let i = 0; i < 3000; i++) {
+    const f = rnd(W.n), r = [2.5, 6, 9.5, 16][i % 4];
+    for (const [mask, match] of cases) {
+      const want = AS.nearestVisible(sim, f, r, match), got = AS.nearestVisibleAnimal(sim, f, r, mask, match);
+      if (got !== want) bad++; if (want >= 0) found++;
+    }
+    const meat = t => W.kind[t] === K.CORPSE && t % 3 !== 0, hole = t => W.hole[t] === 1;
+    if (AS.nearestVisibleIn(sim, f, r, W.cList, W.cCount, meat) !== AS.nearestVisible(sim, f, r, meat)) bad++;
+    if (AS.nearestVisibleIn(sim, f, r, W.hList, W.hCount, hole) !== AS.nearestVisible(sim, f, r, hole)) bad++;
+  }
+  ok(found > 1000 && bad === 0, `list searches vs the tile sweep: ${bad} different of ${3000 * 5}, ${found} animal finds`);
+  console.log(`list searches vs the tile sweep: ${bad} different, ${found} animal finds`);
+}
+
 // ---- pathNext ----
 {
   const { AS, sim, W } = mk(20, 20);

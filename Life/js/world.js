@@ -37,7 +37,7 @@
   const WATER_NONE = AS.WATER_NONE = 0xFFFF;
   // Meters of water addWater lays when not told a depth.
   const LAID_DEPTH = 1;
-  // Tiles across a block of the animal counts (W.anyNear).
+  // Tiles across a block of the per-block animal lists (W.animalsNear, W.anyNear).
   const NEAR_BLOCK = 8;
 
   // Fields of one animal, by array type. A new field is one line here. Countdown timers are
@@ -75,6 +75,8 @@
     aParentB: Uint32Array,
     aChildren: Uint16Array,
     aKills: Uint16Array,
+    aNearNext: Int32Array,     // the next animal of its species in its block's list (W.nearHead), -1 at the end
+    aNearPrev: Int32Array,     // the one before it, -1 at the head
   };
 
   AS.World = function (T) {
@@ -162,10 +164,11 @@
       wolves: 0,
       humans: 0,
 
-      // How many of each species are in each NEAR_BLOCK × NEAR_BLOCK block, kept by
-      // addAnimal, removeAnimal and moveAnimal: a search for hunters or prey can first ask
-      // anyNear whether any are about, and skip its scan when none are (most of the time).
-      nearCount: new Uint16Array(Math.ceil(w / NEAR_BLOCK) * Math.ceil(h / NEAR_BLOCK) * SP_COUNT),
+      // The animals of each species in each NEAR_BLOCK × NEAR_BLOCK block, as a linked list
+      // through aNearNext/aNearPrev (the first slot, or -1), kept by addAnimal, removeAnimal and
+      // moveAnimal: a search for hunters, prey or mates looks at the few animals near it
+      // (animalsNear) instead of every tile in sight.
+      nearHead: new Int32Array(Math.ceil(w / NEAR_BLOCK) * Math.ceil(h / NEAR_BLOCK) * SP_COUNT).fill(-1),
     };
     const nearCols = Math.ceil(w / NEAR_BLOCK);
     const blockOf = t => (((t / w) | 0) / NEAR_BLOCK | 0) * nearCols + ((t % w) / NEAR_BLOCK | 0);
@@ -175,13 +178,47 @@
       const x = t % w, y = (t / w) | 0, r = Math.ceil(range);
       const bx0 = Math.max(0, x - r) / NEAR_BLOCK | 0, bx1 = Math.min(w - 1, x + r) / NEAR_BLOCK | 0;
       const by0 = Math.max(0, y - r) / NEAR_BLOCK | 0, by1 = Math.min(h - 1, y + r) / NEAR_BLOCK | 0;
-      const C = W.nearCount;
+      const H = W.nearHead;
       for (let by = by0; by <= by1; by++) for (let bx = bx0; bx <= bx1; bx++) {
         const b = (by * nearCols + bx) * SP_COUNT;
-        for (let sp = 0; sp < SP_COUNT; sp++) if (((mask >> sp) & 1) && C[b + sp] > 0) return true;
+        for (let sp = 0; sp < SP_COUNT; sp++) if (((mask >> sp) & 1) && H[b + sp] >= 0) return true;
       }
       return false;
     };
+    // The slots of every animal of the species in `mask` in the blocks covering `range` tiles
+    // around tile t (a square, so it holds every one within a circle of that range), written
+    // into W.nearFound; returns how many. Not in any order: the caller sorts.
+    W.nearFound = new Int32Array(64);
+    W.animalsNear = function (t, range, mask) {
+      const x = t % w, y = (t / w) | 0, r = Math.ceil(range);
+      const bx0 = Math.max(0, x - r) / NEAR_BLOCK | 0, bx1 = Math.min(w - 1, x + r) / NEAR_BLOCK | 0;
+      const by0 = Math.max(0, y - r) / NEAR_BLOCK | 0, by1 = Math.min(h - 1, y + r) / NEAR_BLOCK | 0;
+      const H = W.nearHead, next = W.aNearNext;
+      let out = W.nearFound, n = 0;
+      for (let by = by0; by <= by1; by++) for (let bx = bx0; bx <= bx1; bx++) {
+        const b = (by * nearCols + bx) * SP_COUNT;
+        for (let sp = 0; sp < SP_COUNT; sp++) {
+          if (!((mask >> sp) & 1)) continue;
+          for (let s = H[b + sp]; s >= 0; s = next[s]) {
+            if (n === out.length) { const a = new Int32Array(n * 2); a.set(out); out = W.nearFound = a; }
+            out[n++] = s;
+          }
+        }
+      }
+      return n;
+    };
+    function nearLink(s, key) {
+      const H = W.nearHead, head = H[key];
+      W.aNearPrev[s] = -1;
+      W.aNearNext[s] = head;
+      if (head >= 0) W.aNearPrev[head] = s;
+      H[key] = s;
+    }
+    function nearUnlink(s, key) {
+      const prev = W.aNearPrev[s], next = W.aNearNext[s];
+      if (prev >= 0) W.aNearNext[prev] = next; else W.nearHead[key] = next;
+      if (next >= 0) W.aNearPrev[next] = prev;
+    }
 
     function growAnimals(cap) {
       for (const [f, Ctor] of Object.entries(ANIMAL_FIELDS)) {
@@ -403,7 +440,7 @@
       W.aTargetSlot[s] = -1;
       W.aSlot[t] = s;
       W[POP_KEY[species]]++;
-      W.nearCount[blockOf(t) * SP_COUNT + species]++;
+      nearLink(s, blockOf(t) * SP_COUNT + species);
       return s;
     };
 
@@ -413,7 +450,7 @@
       W.aSlot[t] = -1;
       free(t);
       W[POP_KEY[W.aSpecies[s]]]--;
-      W.nearCount[blockOf(t) * SP_COUNT + W.aSpecies[s]]--;
+      nearUnlink(s, blockOf(t) * SP_COUNT + W.aSpecies[s]);
       W.aFree.push(s);
     };
 
@@ -425,7 +462,7 @@
       claim(t2, W.kind[t], true);
       free(t);
       const b1 = blockOf(t), b2 = blockOf(t2);
-      if (b1 !== b2) { W.nearCount[b1 * SP_COUNT + W.aSpecies[s]]--; W.nearCount[b2 * SP_COUNT + W.aSpecies[s]]++; }
+      if (b1 !== b2) { nearUnlink(s, b1 * SP_COUNT + W.aSpecies[s]); nearLink(s, b2 * SP_COUNT + W.aSpecies[s]); }
       W.aSlot[t] = -1;
       W.aSlot[t2] = s;
       W.aFrom[s] = t;
