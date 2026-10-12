@@ -115,8 +115,37 @@
     return inDeep(sim, s) || st >= S.SwimAt;
   };
   // Whether animal s can step onto t now: ground or water it can stand on, or deeper water
-  // it would swim.
-  AS.canEnter = (sim, s, t) => AS.canStand(sim.W, t, AS.wadeOf(sim, s)) || (sim.W.kind[t] === KIND.WATER && AS.swimsNow(sim, s));
+  // it would swim and can get across.
+  AS.canEnter = (sim, s, t) => AS.canStand(sim.W, t, AS.wadeOf(sim, s)) ||
+    (sim.W.kind[t] === KIND.WATER && AS.swimsNow(sim, s) && (inDeep(sim, s) || crossable(sim, s, t)));
+
+  // Into deep water from land only toward land it can see within its swimming reach (Paul,
+  // 12 Oct 2026: a rabbit doesn't strike out across water with no far bank in view): the
+  // tiles its Stamina lasts at its swimming speed, and land at least two tiles ahead in the
+  // direction it would swim, so not the bank it is leaving. A breadth-first walk through the
+  // deep water.
+  const crossQ = [], crossSeen = new Map();
+  function crossable(sim, s, t) {
+    const W = sim.W, S = AS.speciesStats(sim, s), wade = AS.wadeOf(sim, s), from = W.aTile[s];
+    const sw = S.SwimSpeed != null ? S.SwimSpeed : 1;
+    const reach = Math.floor(W.aStamina[s] / S.SwimCost * S.WalkSpeed * sw);
+    if (reach < 1) return false;
+    const fx = from % W.w, fy = (from / W.w) | 0, dx = t % W.w - fx, dy = ((t / W.w) | 0) - fy;
+    crossQ.length = 0; crossSeen.clear();
+    crossQ.push(t); crossSeen.set(t, 1);
+    for (let i = 0; i < crossQ.length; i++) {
+      const u = crossQ[i], d = crossSeen.get(u);
+      for (let j = 0, k = W.neighbors4(u, crossNb); j < k; j++) {
+        const v = crossNb[j];
+        if (crossSeen.has(v) || v === from) continue;
+        crossSeen.set(v, d + 1);
+        if (AS.canStand(W, v, wade) && (v % W.w - fx) * dx + (((v / W.w) | 0) - fy) * dy >= 2) return true;
+        if (W.kind[v] === KIND.WATER && d < reach) crossQ.push(v);
+      }
+    }
+    return false;
+  }
+  const crossNb = new Int32Array(4);
 
   // One step to a 4-neighbor it can enter, if the last step has finished. Returns whether it
   // moved. The step's time comes from the speed at the moment it starts.

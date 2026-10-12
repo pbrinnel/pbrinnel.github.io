@@ -192,6 +192,16 @@ watching the sim run. Everything else in this doc is decided.
   sometimes digs a new one (`DigChance` per day, `DigSeconds` to dig) within
   `WarrenRadius` of its warren, or founds a new warren where no hole is near. A hole no
   bunny has used for `CollapseDays` falls in, so warrens grow and die with their colony.
+  **Bunnies keep to their warrens** (Paul, 12 Oct 2026, after a measurement: three in four
+  bunnies a wolf caught had no free hole within reach): a bunny grazes within `HomeRange` of
+  a hole while it isn't hungrier than `StrayAt` and isn't on a trip, and heads back when it
+  strays; it stays in its hole until no hunter has been in sight for `HideSeconds`; and one
+  about to die of hunger or thirst (below `DesperateAt`) eats or drinks with hunters about.
+  A bunny takes to deep water to flee only toward land it can see ahead within its
+  swimming reach, so it no longer drowns in rivers it can't cross (wolves too, crossing by
+  choice). Measured, 3 seeds × 20 days: drownings 47-72 → 14-31 a world, thirst and
+  starvation about halved, bunnies at day 20 587-1,296 → 888-1,486, wolves 94-150 → 126;
+  wolf kills about the same (145-179 → 166-183).
 - **Animals spread toward room** (Paul, 4 Oct 2026: they stayed clumped and got pinned in
   corners while empty land went unused). When a wandering animal picks a direction it
   leans toward the one with fewer of its own kind ahead (`RoomPreference`; 0 = random

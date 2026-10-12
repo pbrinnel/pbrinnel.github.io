@@ -35,6 +35,10 @@ ForgetSeconds,s,,60,60,,How long a wolf or human ignores a bunny or carcass or m
 HoleRange,tiles,8,,,,A bunny that sees a wolf runs for a free warren hole this close; also how far from any hole it must be to found a new warren
 DigChance,per day,50%,,,,Chance per day that a fed adult with no wolf in sight digs a warren hole; 0% = never
 DigSeconds,s,8,,,,How long a digging bunny stands still before the hole opens
+HomeRange,tiles,6,,,,A bunny keeps within this many tiles of a warren hole: it grazes there first and heads back when it strays (not on a trip); keep it inside HoleRange so a hole is in reach when a hunter comes; blank = no home
+StrayAt,% of FullnessMax,30,,,,Hungrier than this a bunny grazes away from home too
+HideSeconds,s,10,,,,A bunny in a hole stays in until no hunter has been in sight for this long; blank = comes out as soon as none is in sight
+DesperateAt,% of meter,10,,,,A bunny whose Fullness or Water is below this share eats or drinks with hunters about: it neither hides nor flees; blank = never
 LeaveCrowd,count,30,,,,A wandering bunny with this many bunnies within VisionRange (a square) may set off for open land; blank = never
 LeaveChance,per day,100%,,,,Chance per day that a bunny in such a crowd sets off (100% = at once); it heads for far destinations (RoamRun) until it reaches SettleCrowd
 SettleCrowd,count,3,,,,An emigrating bunny settles near water once no more than this many bunnies are within SettleRange, and is content with crowds again

@@ -107,11 +107,12 @@
 
   // Where a hunter can step: open ground, water it wades, or a blade it chews away first;
   // never a hole.
-  const canWalk = t => (AS.canStand(mW, t, mWade) || mW.kind[t] === K.GRASS || (mSwim && mW.kind[t] === K.WATER)) && !mW.hole[t];
+  // Deep water only where it would swim and get across (animals.js canEnter).
+  const canWalk = t => (AS.canStand(mW, t, mWade) || mW.kind[t] === K.GRASS || (mSwim && mW.kind[t] === K.WATER && AS.canEnter(mSim, mSelf, t))) && !mW.hole[t];
   // One step toward a goal the path search can't reach, going around what's in the way
   // (AS.edgeStep). Returns false once it gives up.
   function goAround(sim, s, goal, key) {
-    mW = sim.W; mWade = AS.wadeOf(sim, s); mSwim = AS.swimsNow(sim, s);
+    mSim = sim; mSelf = s; mW = sim.W; mWade = AS.wadeOf(sim, s); mSwim = AS.swimsNow(sim, s);
     const next = AS.edgeStep(sim, s, goal, key, canWalk);
     if (next < 0) return false;
     AS.chewOrStep(sim, s, next);
@@ -129,9 +130,8 @@
   // A tile the wolf can bite its goal from: touching the goal tile, and either where it
   // stands or one it can occupy once any blade on it is chewed away.
   const touchesGoal = t => {
-    if (t !== mFrom && !canWalk(t)) return false;
     const w = mW.w, dx = (t % w) - (mGoal % w), dy = ((t / w) | 0) - ((mGoal / w) | 0);
-    return dx * dx + dy * dy === 1;
+    return dx * dx + dy * dy === 1 && (t === mFrom || canWalk(t));
   };
   const adjacent = (W, a, b) => {
     const dx = (a % W.w) - (b % W.w), dy = ((a / W.w) | 0) - ((b / W.w) | 0);
@@ -172,7 +172,12 @@
     const S = AS.speciesStats(sim, s);
     mInvWade = S.WadeSpeed > 0 ? mInvSpeed / S.WadeSpeed : mInvSpeed;
     mInvSwim = S.SwimSpeed > 0 ? mInvSpeed / S.SwimSpeed : mInvSpeed;
-    const next = AS.pathNextWeighted(sim, mFrom, exact ? isGoalTile : touchesGoal, AS.speciesStats(sim, s).VisionRange, cost);
+    let next = AS.pathNextWeighted(sim, mFrom, exact ? isGoalTile : touchesGoal, S.VisionRange, cost);
+    // The way it found starts across water it can't see the far side of: plan on land.
+    if (next >= 0 && next !== mFrom && W.wDepth[next] > mWade && !AS.canEnter(sim, s, next)) {
+      mSwim = false;
+      next = AS.pathNextWeighted(sim, mFrom, exact ? isGoalTile : touchesGoal, S.VisionRange, cost);
+    }
     if (next < 0) return false;
     AS.edgeReset(W, s);   // a path again: any going-around is over
     if (next !== mFrom) AS.chewOrStep(sim, s, next);

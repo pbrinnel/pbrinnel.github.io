@@ -179,12 +179,65 @@ const still = tx => { tx.species = editCSV(editCSV(tx.species, 'WalkSpeed', 'Wol
   ok(sawFlee && hid >= 0, `flee: a bunny with a free hole in range runs to it and hides (tick ${hid})`);
   tick(sim, secs(AS, 20));
   ok(W.aTile[b] === hole && sname(sim, b, 'bunny') === 'HIDE', 'hide: it stays put for 20 s while the wolf is in sight');
-  // The wolf goes away; the bunny is hungry with a blade in view: it leaves.
+  // The wolf goes away; the bunny is hungry (not desperate) with a blade in view: it waits
+  // HideSeconds after its last sight of the wolf, then leaves.
+  const B = sim.T.bunny;
   W.removeAnimal(w);
-  W.aFullness[b] = 10;
+  W.aFullness[b] = (B.DesperateAt + B.HungryAt) / 2 * B.FullnessMax;
   W.addGrass(at(W, 13, 14), 1, 3);
-  tick(sim, secs(AS, 10));
-  ok(W.aTile[b] !== hole && sname(sim, b, 'bunny') !== 'HIDE', `hide: with no wolf in sight a hungry bunny leaves (${sname(sim, b, 'bunny')})`);
+  tick(sim, secs(AS, B.HideSeconds - 1));
+  ok(W.aTile[b] === hole && sname(sim, b, 'bunny') === 'HIDE', `hide: it stays in for HideSeconds (${B.HideSeconds} s) after the wolf is gone`);
+  tick(sim, secs(AS, 4));
+  ok(W.aTile[b] !== hole && sname(sim, b, 'bunny') !== 'HIDE', `hide: then, hungry, it comes out (${sname(sim, b, 'bunny')})`);
+}
+{
+  // Desperate (below DesperateAt): out of the hole to eat, the wolf in plain sight.
+  const { AS, sim, W } = make(30, tx => { still(tx); });
+  const B = sim.T.bunny, hole = at(W, 13, 10);
+  W.addHole(hole, 0);
+  wolf(AS, sim, 6, 10, { full: 10 });
+  const b = bun(AS, sim, 13, 10, { full: B.DesperateAt * B.FullnessMax / 2 });
+  W.addGrass(at(W, 13, 13), 1, 3);
+  const full0 = W.aFullness[b];
+  let left = false;
+  for (let i = 0; i < secs(AS, 5); i++) { tick(sim); if (W.aTile[b] !== hole) left = true; }
+  // A bite or two lifts it past DesperateAt, and with the wolf still there it goes back in.
+  ok(left && W.aFullness[b] > full0, `desperate: a starving bunny leaves its hole and eats with a wolf in sight (now ${sname(sim, b, 'bunny')})`);
+}
+// --- home: grazing within HomeRange of a hole, and heading back when strayed ---
+{
+  const { AS, sim, W } = make(40);
+  const B = sim.T.bunny, R = B.HomeRange;
+  const hole = at(W, 10, 20);
+  W.addHole(hole, 0);
+  // Hungry, not past StrayAt: a blade near home, and a nearer one outside HomeRange.
+  const b = bun(AS, sim, 10 + R, 20, { full: (B.StrayAt + B.HungryAt) / 2 * B.FullnessMax });
+  const homeBlade = at(W, 10 + R - 4, 20), farBlade = at(W, 10 + R + 3, 20);
+  W.addGrass(homeBlade, 1, 3); W.addGrass(farBlade, 1, 3);
+  ok(W.holeNear[at(W, 10 + R, 20)] > 0 && !W.holeNear[farBlade], 'holeNear marks the tiles within HomeRange of a hole');
+  tick(sim, 2);
+  ok(sname(sim, b, 'bunny') === 'SEEK_FOOD' && W.aTargetTile[b] === homeBlade, 'home: a hungry bunny picks grass near home over a nearer blade beyond it');
+  // Past StrayAt it takes the nearest blade wherever it is (back where it started, so the far
+  // blade is the nearer one).
+  const start = at(W, 10 + R, 20);
+  if (W.aTile[b] !== start) W.moveAnimal(b, start);
+  W.aStepLeft[b] = 0;
+  W.aFullness[b] = B.StrayAt / 2 * B.FullnessMax; W.aDecideLeft[b] = 0;
+  tick(sim, 2);
+  ok(W.aTargetTile[b] === farBlade, 'home: hungrier than StrayAt it takes the nearest blade, home or not');
+  // Fed and wandering, carried out of range: it heads back.
+  W.removeGrass(homeBlade); W.removeGrass(farBlade);
+  W.aFullness[b] = B.FullnessMax; W.aDecideLeft[b] = 0;
+  tick(sim, secs(AS, 2));
+  const out = at(W, 10 + R + 8, 20);
+  if (W.kind[out] === AS.KIND.EMPTY) W.moveAnimal(b, out);
+  W.aRunLeft[b] = 0;
+  let back = false;
+  for (let i = 0; i < secs(AS, 20) && !back; i++) { tick(sim); back = W.holeNear[W.aTile[b]] > 0; }
+  ok(back, 'home: a bunny that strays beyond HomeRange heads back');
+  // Its warren gone, it no longer pulls back.
+  W.removeHole(hole);
+  ok(!W.holeNear[at(W, 10, 20)], 'a collapsed hole takes its home tiles with it');
 }
 {
   // No hole in range: it flees away as before.

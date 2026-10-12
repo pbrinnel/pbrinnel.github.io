@@ -444,6 +444,28 @@ function landPieces(AS, W) {
   ok(W.cCount === 0, 'drowned animals leave no body');
   ok(T.bunny.SwimAt == null, 'a bunny never takes to deep water by choice (no SwimAt): only to flee');
 }
+{
+  // A fleeing bunny swims only toward a bank it can reach on its Stamina (Paul, 12 Oct 2026):
+  // a one-tile stream it crosses; a river wider than its reach it won't go into.
+  const run = width => {
+    const { AS, sim, W, T } = make(1, [set('WorldWidth', 50), set('WorldHeight', 15), set('StartGrass', 0), set('StartBunnies', 0), set('StartWolves', 0), set('Water', 'off'),
+      ['species', 'WalkSpeed', 'Wolf', '0'], ['species', 'SprintSpeed', 'Wolf', '0'], ['species', 'SwimCost', 'Wolf', ''], ['species', 'HoleRange', 'Bunny', '0']]);
+    const DEEP = 1 + T.bunny.WadeDepth;
+    for (let y = 0; y < W.h; y++) for (let x = 20; x < 20 + width; x++) W.addWater(W.tile(x, y), DEEP);
+    const bun = AS.spawnStarting(sim, AS.SPECIES.BUNNY, W.tile(19, 7)), ser = W.aSerial[bun];
+    AS.spawnStarting(sim, AS.SPECIES.WOLF, W.tile(14, 7));
+    let swam = false, across = false;
+    for (let i = 0; i < 8 * AS.TICK_HZ && W.aAlive[bun] && W.aSerial[bun] === ser; i++) {
+      sim.tick();
+      if (W.wDepth[W.aTile[bun]] > T.bunny.WadeDepth) swam = true;
+      if (W.tx(W.aTile[bun]) >= 20 + width) across = true;
+    }
+    return { swam, across, alive: W.aAlive[bun] && W.aSerial[bun] === ser };
+  };
+  const narrow = run(1), wide = run(8);
+  ok(narrow.swam && narrow.across && narrow.alive, 'a fleeing bunny swims a one-tile stream to get away');
+  ok(!wide.swam && wide.alive, 'it won\'t go into a river wider than it can swim; it runs along the bank instead');
+}
 
 // ---- Drinking takes real water: WaterLiters a meter, from the tile it drinks ----
 {

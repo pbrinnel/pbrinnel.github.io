@@ -69,6 +69,10 @@
     ['DisperseFar', 'frac', []],     // blank = DisperseRun tiles
     ['TravelMin', 'frac', []],       // blank = settles wherever the trip's rules allow
     ['DigSeconds', 'num', ['Bunny']],
+    ['HomeRange', 'num', []],        // blank = no home
+    ['StrayAt', 'frac', []],
+    ['HideSeconds', 'num', []],      // blank = out as soon as no hunter is in sight
+    ['DesperateAt', 'frac', []],     // blank = never
     ['WanderRun', 'range', ANIMALS],
     ['RoomPreference', 'num', ANIMALS],
     ['DecidePerSec', 'pos', ANIMALS],

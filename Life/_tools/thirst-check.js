@@ -144,17 +144,21 @@ for (const [sp, name] of [[0, 'bunny'], [1, 'wolf'], [2, 'human']]) {
   // a hungry wolf that sees a bunny, thirsty
   const wolf = put(AS, sim, AS.SPECIES.WOLF, 30, 30, { water: 10, full: 10 });
   const prey = put(AS, sim, AS.SPECIES.BUNNY, 36, 30, { water: 100, full: 100 });
-  // a thirsty bunny with a wolf in sight: FLEE wins
-  const flee = put(AS, sim, AS.SPECIES.BUNNY, 10, 5, { water: 10, full: 100 }), threat = put(AS, sim, AS.SPECIES.WOLF, 14, 5, { water: 100, full: 100 });
+  // a thirsty (not yet desperate: DesperateAt) bunny with a wolf in sight: FLEE wins
+  const B = T.bunny, thirsty = (B.DesperateAt + B.ThirstyAt) / 2 * B.WaterMax;
+  const flee = put(AS, sim, AS.SPECIES.BUNNY, 10, 5, { water: thirsty, full: 100 }), threat = put(AS, sim, AS.SPECIES.WOLF, 14, 5, { water: 100, full: 100 });
   // a thirsty bunny on a hole with a wolf in sight: HIDE wins
   W.addHole(at(W, 10, 35), 0);
-  const hide = put(AS, sim, AS.SPECIES.BUNNY, 10, 35, { water: 10, full: 100 }), threat2 = put(AS, sim, AS.SPECIES.WOLF, 14, 35, { water: 100, full: 100 });
-  for (const s of [eat, wolf, prey, flee, threat, hide, threat2]) W.aDecideLeft[s] = 0;
+  const hide = put(AS, sim, AS.SPECIES.BUNNY, 10, 35, { water: thirsty, full: 100 }), threat2 = put(AS, sim, AS.SPECIES.WOLF, 14, 35, { water: 100, full: 100 });
+  // one about to die of thirst (below DesperateAt) drinks, wolf or no wolf (Paul, 12 Oct 2026)
+  const dying = put(AS, sim, AS.SPECIES.BUNNY, 50, 15, { water: B.DesperateAt * B.WaterMax / 2, full: 100 }), threat3 = put(AS, sim, AS.SPECIES.WOLF, 47, 15, { water: 100, full: 100 });
+  for (const s of [eat, wolf, prey, flee, threat, hide, threat2, dying, threat3]) W.aDecideLeft[s] = 0;
   tick(sim, 2);
   ok(sname(sim, eat) === 'DRINK', 'a thirsty hungry bunny with grass beside it drinks first');
   ok(sname(sim, wolf) === 'DRINK', 'a thirsty hungry wolf with prey in sight drinks first');
   ok(sname(sim, flee) === 'FLEE', 'a thirsty bunny with a wolf in sight flees');
   ok(sname(sim, hide) === 'HIDE', 'a thirsty bunny in a hole with a wolf in sight hides');
+  ok(sname(sim, dying) === 'DRINK', 'one about to die of thirst drinks with a wolf in sight (DesperateAt)');
   const order = names => names.indexOf('DRINK');
   ok(order(T.states.bunny.map(s => s.name)) === 2 && order(T.states.wolf.map(s => s.name)) === 0 && order(T.states.human.map(s => s.name)) === 0, 'states.csv: DRINK after HIDE and FLEE for bunnies, first for wolves and humans');
 }

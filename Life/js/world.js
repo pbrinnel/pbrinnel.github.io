@@ -107,6 +107,9 @@
       // hList holds the holes densely, hSlot is each tile's place in it.
       hole: new Uint8Array(n),
       holeUsedAt: new Float64Array(n),
+      // How many holes are within the bunny's HomeRange of each tile (a circle), kept by
+      // addHole and removeHole: a tile with any is "home" (bunny.js); null with no HomeRange.
+      holeNear: T.bunny && T.bunny.HomeRange > 0 ? new Uint16Array(n) : null,
       hList: new Int32Array(n),
       hSlot: new Int32Array(n).fill(-1),
       hCount: 0,
@@ -331,7 +334,17 @@
       W.holeUsedAt[t] = usedAt || 0;
       W.hSlot[t] = W.hCount;
       W.hList[W.hCount++] = t;
+      markHome(t, 1);
     };
+    function markHome(t, d) {
+      if (!W.holeNear) return;
+      const R = T.bunny.HomeRange, r = Math.floor(R), R2 = R * R, cx = t % w, cy = (t / w) | 0;
+      for (let y = Math.max(0, cy - r); y <= Math.min(h - 1, cy + r); y++) {
+        for (let x = Math.max(0, cx - r); x <= Math.min(w - 1, cx + r); x++) {
+          if ((x - cx) ** 2 + (y - cy) ** 2 <= R2) W.holeNear[y * w + x] += d;
+        }
+      }
+    }
 
     // A collapsed hole is bare ground again. Whatever stands on it stays.
     W.removeHole = function (t) {
@@ -342,6 +355,7 @@
       W.hSlot[t] = -1;
       W.hole[t] = 0;
       W.holeUsedAt[t] = 0;
+      markHome(t, -1);
     };
 
     // species is AS.SPECIES.*; the corpse's Nutrient, decay and boost come from that species.

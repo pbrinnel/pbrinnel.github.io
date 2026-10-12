@@ -74,6 +74,9 @@
       m.dispFor = grow(m.dispFor, Uint32Array, 1); // the serial whose dispersal was decided (once a life)
       m.lead = grow(m.lead, Int32Array, 1);        // a companion's leader slot; -1 = it leads itself
       m.leadSerial = grow(m.leadSerial, Uint32Array, 1);
+      m.home = grow(m.home, Int32Array, 1);        // a tile near its warren it last stood on (holeNear > 0)
+      m.threatAt = grow(m.threatAt, Float64Array, 1); // sim.simSeconds it last saw a hunter
+      m.ownFor = grow(m.ownFor, Uint32Array, 1);   // the serial home and threatAt belong to
       m.cap = W.aCap;
     }
     return m;
@@ -101,6 +104,31 @@
     return sim.W.aState[s] === fleeIdx;
   };
 
+  // Home, danger and need (Paul, 12 Oct 2026: bunnies should hide better, as rabbits do; a
+  // measurement found three in four bunnies a wolf caught had no free hole within HoleRange).
+  // A bunny keeps within HomeRange of a warren hole while it isn't too hungry (StrayAt) and
+  // isn't on a trip; it stays in its hole until no hunter has been seen for HideSeconds; and
+  // one about to die of hunger or thirst (below DesperateAt) eats or drinks whatever is about.
+  function own(W, m, s) {
+    if (m.ownFor[s] !== W.aSerial[s]) { m.ownFor[s] = W.aSerial[s]; m.home[s] = -1; m.threatAt[s] = -Infinity; }
+  }
+  const atHome = (W, t) => !!W.holeNear && W.holeNear[t] > 0;
+  function desperate(sim, s) {
+    const W = sim.W, S = AS.speciesStats(sim, s);
+    if (!(S.DesperateAt > 0)) return false;
+    return W.aFullness[s] < S.DesperateAt * S.FullnessMax || (W.waterCount > 0 && W.aWater[s] < S.DesperateAt * S.WaterMax);
+  }
+  // A hunter in sight: the time is remembered, for HIDE.
+  function threatSeen(sim, s) {
+    const W = sim.W, m = mem(W);
+    own(W, m, s);
+    mW = W;
+    mThreat = AS.relations(sim.T).threat[AS.SPECIES.BUNNY];
+    const t = AS.nearestVisible(sim, W.aTile[s], AS.speciesStats(sim, s).VisionRange, isThreat);
+    if (t >= 0) m.threatAt[s] = sim.simSeconds;
+    return t;
+  }
+
   // ---- shared pieces ---------------------------------------------------------------------
 
   const nb = new Int32Array(4);
@@ -116,8 +144,10 @@
   const isHoleTile = t => t === mGoalTile;
   // Bare ground a bunny can dig: nothing on it, not already a hole, not scorched.
   const isBare = (W, t) => W.kind[t] === K.EMPTY && W.hole[t] === 0 && W.scorch[t] === 0;
+  // mHomeOnly: SEEK_FOOD is looking near home only (atHome).
+  let mHomeOnly = false;
   const isFreshBlade = t => {
-    if (mW.kind[t] !== K.GRASS) return false;
+    if (mW.kind[t] !== K.GRASS || (mHomeOnly && !atHome(mW, t))) return false;
     const base = mSelf * BAD_N, now = mSim.tickCount, owner = mW.aSerial[mSelf];
     for (let i = 0; i < BAD_N; i++) {
       if (mMem.badTile[base + i] === t && mMem.badOwner[base + i] === owner && mMem.badUntil[base + i] > now) return false;
@@ -418,6 +448,18 @@
     if (W.aStepLeft[s] > 0) return;
     const t = W.aTile[s], S = AS.speciesStats(sim, s);
     if ((S.LeaveCrowd > 0 && S.LeaveChance > 0 || S.LeaveStress > 0 || S.DisperseRun || S.DisperseFar > 0) && emigrateStep(sim, s, S, t)) return;
+    // Home: remember where it is while there; strayed beyond HomeRange, head back (going
+    // around what's in the way). A trip forgets the old home, so a settler finds a new one.
+    const m = mem(W);
+    own(W, m, s);
+    if (m.awayFor[s] === W.aSerial[s]) m.home[s] = -1;
+    else if (atHome(W, t)) m.home[s] = t;
+    else if (m.home[s] >= 0 && !atHome(W, m.home[s])) m.home[s] = -1;   // its warren is gone
+    else if (m.home[s] >= 0 && W.aRunLeft[s] === 0) {
+      mW = W; mWade = AS.wadeOf(sim, s);
+      const step = AS.edgeStep(sim, s, m.home[s], m.home[s], isOpen);
+      if (step >= 0) { W.aTargetTile[s] = m.home[s]; AS.stepTo(sim, s, step); return; }
+    }
     const wade = AS.wadeOf(sim, s);
     if (W.aRunLeft[s] > 0) {
       const ahead = dirTile(W, t, W.aRunDir[s]);
@@ -449,14 +491,14 @@
 
   AS.registerStates('bunny', {
     // "Stay still in the hole." Hunters can't bite a bunny on a hole or hunt it (wolf.js), so the
-    // bunny simply waits; once no hunter is in sight the next decision lets it get on with life.
+    // bunny simply waits, until no hunter has been in sight for HideSeconds (or it is desperate).
     HIDE: {
       enter(sim, s) {
         const W = sim.W;
-        if (!W.hole[W.aTile[s]]) return false;
-        mW = W;
-        mThreat = AS.relations(sim.T).threat[AS.SPECIES.BUNNY];
-        return AS.nearestVisible(sim, W.aTile[s], AS.speciesStats(sim, s).VisionRange, isThreat) >= 0;
+        if (!W.hole[W.aTile[s]] || desperate(sim, s)) return false;
+        if (threatSeen(sim, s) >= 0) return true;
+        const S = AS.speciesStats(sim, s);
+        return S.HideSeconds > 0 && sim.simSeconds - mem(W).threatAt[s] < S.HideSeconds;
       },
       start: calmStart,
       act(sim, s) {
@@ -470,9 +512,8 @@
     FLEE: {
       enter(sim, s) {
         const W = sim.W, S = AS.speciesStats(sim, s);
-        mW = W;
-        mThreat = AS.relations(sim.T).threat[AS.SPECIES.BUNNY];
-        const wolf = AS.nearestVisible(sim, W.aTile[s], S.VisionRange, isThreat);
+        if (desperate(sim, s)) return false;
+        const wolf = threatSeen(sim, s);
         if (wolf < 0) return false;
         const m = mem(W);
         m.wolf[s] = wolf;
@@ -580,7 +621,10 @@
         const W = sim.W, S = AS.speciesStats(sim, s);
         if (!AS.isHungry(sim, s) || bestAdjacentBlade(W, W.aTile[s]) >= 0) return false;
         mW = W; mSim = sim; mSelf = s; mMem = mem(W);
+        // At home, and not hungry past StrayAt nor travelling: grass near home only.
+        mHomeOnly = atHome(W, W.aTile[s]) && !(W.aFullness[s] < S.StrayAt * S.FullnessMax) && mMem.awayFor[s] !== W.aSerial[s];
         const blade = AS.nearestVisible(sim, W.aTile[s], S.VisionRange, isFreshBlade);
+        mHomeOnly = false;
         if (blade < 0) return false;
         mMem.food[s] = blade;
         return true;
