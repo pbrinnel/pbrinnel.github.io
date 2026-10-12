@@ -1,85 +1,117 @@
 # Life — code map
 
 How the code is put together, so you can find things without reading everything. The spec
-is DESIGN.md; the rules are CLAUDE.md. **Keep this file true**: when you add a file, a
-field, an event, a tool or a step in the tick, update the section it belongs in.
+is DESIGN.md (and why it is so, HISTORY.md); the rules are CLAUDE.md. **Keep this file
+true**: when you add a file, a field, an event, a tool or a step in the tick, update the
+section it belongs in.
+
+**Contents:** [Layout](#layout) · [Files](#files) · [Data](#data-struct-of-arrays-worldjs) ·
+[Time](#time) · [Water](#water) · [Behavior](#behavior) · [Sprite poses](#sprite-poses-renderjs--spritesjs) ·
+[The page](#the-page) · [Recipes](#recipes) · [Colors](#colors) · [Tools](#tools-_tools-run-from-the-repo-root) ·
+[The tuning lab](#the-tuning-lab-_lab)
 
 ## Layout
 
 ```
 life.html            the page (site root): elements, AS.V/BASE/FONT, every <script> in load order
 Life/
-  CLAUDE.md          rules            DESIGN.md   spec + milestone status      MAP.md  this
+  CLAUDE.md          rules     DESIGN.md  the spec     HISTORY.md  why: measurements, tuning     MAP.md  this
   style.css          all page styles (HUD, inspector, graph panel, benchmark overlay, errors)
-  fonts/             DejaVu Sans Mono subset (woff2) + its license; every glyph and all UI text
+  fonts/             DejaVu Sans Mono subset (woff2) + its license; all UI text
   tables/            species.csv, settings.csv, states.csv, variables.csv: every number
-  js/                the sim (below)
+  js/                the sim and the page (below)
   _tools/            headless checks, the benchmark and screenshot drivers (tracked, unpublished)
   _lab/              the tuning lab, a local page + server (tracked, unpublished)
   _original-notes.txt  Paul's first sketch, history only
 ```
 
-## How the scripts fit together
+## Files
 
 Plain scripts, no modules or bundler. Each file is an IIFE that adds to one global, `AS`.
 `life.html` loads them in this order, and the order matters only for code that runs at
 load time: every file reads other files' `AS.*` inside functions, at call time.
 
+**The sim** (never touches the DOM, so the Node checks and the lab's workers run it unchanged):
+
 | File | Role | Exports |
 |---|---|---|
 | `tables.js` | fetch + parse + validate the CSVs into frozen `T` | `loadTables`, `parseTables` |
 | `rng.js` | seeded randomness (mulberry32); the only source the sim may use | `makeRng`, `newSeed` |
-| `world.js` | the grid and every store (typed arrays) + the only code that changes occupancy; the species lists (`SPECIES`, `SPECIES_KEY`, `POP_KEY`, `kindOf`, `canEnterHole`): a species is one entry in each | `World`, `KIND`, `SPECIES`, `SPECIES_KEY`, `SPECIES_COUNT`, `POP_KEY`, `kindOf`, `canEnterHole`, `SEX` |
-| `grass.js` | growth (an hour's worth), age, seeding, sprouting on empty tiles, old age, all in hourly slices; bites | `grassTick`, `grassBite`, `grassStage` |
-| `warren.js` | warren holes' clocks: marks a hole used while a bunny stands on it, collapses holes unused for `CollapseDays` (hourly); `holeWithin` | `warrenTick`, `holeWithin` |
+| `world.js` | the grid and every store (typed arrays, [Data](#data-struct-of-arrays-worldjs)) and the only code that changes occupancy; the species lists (`SPECIES`, `SPECIES_KEY`, `POP_KEY`, `kindOf`, `canEnterHole`): a species is one entry in each | `World`, `KIND`, `SPECIES`, `SPECIES_KEY`, `SPECIES_COUNT`, `POP_KEY`, `kindOf`, `canEnterHole`, `SEX` |
+| `grass.js` | growth (an hour's worth), age, seeding, sprouting on empty tiles, old age, all in hourly slices; scorch cooling; bites | `grassTick`, `grassBite`, `grassStage` |
 | `corpse.js` | decay, and the boost field grass drinks from | `corpseTick`, `corpseAdded`, `corpseBoost` |
-| `god.js` | God powers: `paintCircle(sim, kind, …)` brushes (grass, a species, or `water`: `pourWater`), `nuke(sim, tile)` destroys everything within the radius (`NukeRadius` unless the slider says otherwise) (animals with no corpse and no event, blades, corpses, holes) and scorches the ground (`W.scorch`, days left, `ScorchDays` at the center, shorter to the rim); `grass.js` counts scorch down hourly and nothing grows or is dug on it; `paintCircle(sim, 'grass'\|'bunny'\|'wolf'\|'human', cx, cy, r, cap?)` is the GRASS/RABBIT/WOLF/HUMAN MODE brush (empty eligible tiles only; random ages, but a species with no `LitterSize` (humans) stays adult; radius 0 = one tile; `cap = { room, hit }` stops animals at the soft limit); `nuke(sim, tile, radius?)` takes the God tab's Radius slider value (default `NukeRadius`) | `nuke`, `paintCircle` |
+| `warren.js` | warren holes' clocks: marks a hole used while a bunny stands on it, collapses holes unused for `CollapseDays` (hourly) | `warrenTick`, `holeWithin` |
 | `sim.js` | the fixed tick, populate, events ring, population history | `Sim`, `TICK_HZ`, `DT`, `DAY_SECONDS`, `TICKS_PER_HOUR`, `EV`, `debugDropCorpse` |
-| `terrain-worker.js` | not a page script: main.js runs it as a Worker to grow a world's ground and water (`AS.growTerrain`) off the main thread; it imports rng, world, sim, water, terrain itself (with `?v=`); the page lays the result (`layTerrain(sim, water, grown)`, through `AS.Sim` `opts.terrain`); no Worker → the page grows it | — |
-| `water.js` | the water rules: `AS.Water(grid, S, outlet)` → `{ H, G, step(days), preRun(days), listWet }`: rain, soaking in, springs, evaporation, transpiration (`exchange`), surface flow (Manning, `surface`, only over wet tiles), soil flow (Darcy, `soil`); stability caps on every exchange; out only at river mouths. Every step is the exchange, one surface move and one soil move, so every look sees the water at the same point of a step (lumps of rain or spring water once per long step made thousands of tiles blink). Run by terrain.js before day 0 (`preRun`: `SPINUP_STEP_DAYS` steps, then `SETTLE_DAYS` of play's), then by the tick: `waterTick` runs a step every `STEP_TICKS` ticks (`WATER_STEP_DAYS`) and `syncWater` makes `W.wDepth` and the tiles match `H` (corpses through `corpseRemove`, the rest through world.js `setDepth`), and marks the way-to-water field stale every `FIELD_STEPS` steps when shores moved | `Water`, `waterTick`, `syncWater`, `TILE_M`, `WATER_TINY`, `WATER_STEP_DAYS` |
-| `terrain.js` | every world's ground (`W.elev`, meters) grown before day 0: `AS.terrainOf` draws the world's own values from the settings' ranges; `pattern` (warped noise: where the ground rises fastest); `growGround` (coarse then fine `Grower` rounds: uplift with a rim, routing by `steepest` descent with dips filled (`fillDip`) or the full `flood`, implicit stream power, creep; water leaves only at `mouths`); lake basins pressed in; stretched to `Relief`. With Water on: `W.outlet` and `W.water` (the rules, dry when Rain is 0), and with rain a `restingLevel` first guess and the rules for `PreRunDays`, then every wet tile laid with `addWater`. Sets `W.elev`, `W.wDepth`, `W.outlet`, `W.water` (whose `G` is the soil water). Own generator from the seed | `layTerrain`, `terrainOf`, `terrainShape` |
-| `start.js` | the Meadows day-0 layout (`StartLayout`): the ground and water first (`AS.layTerrain`, terrain.js), then meadow grass (never on the beach) aged by depth, bunny colonies at meadow edges, wolf packs in the open (never humans: they are only painted in); uses only `sim.rng` | `startMeadows` |
+| `god.js` | PAINT's powers: the brushes and the nuke ([The page](#the-page)) | `nuke`, `paintCircle` |
+| `water.js` | the water rules ([Water](#water)) | `Water`, `waterTick`, `syncWater`, `TILE_M`, `WATER_TINY`, `WATER_STEP_DAYS` |
+| `terrain.js` | every world's ground, grown before day 0, and its first water ([Water](#water)) | `growTerrain`, `layTerrain`, `terrainOf`, `terrainShape` |
+| `terrain-worker.js` | not a page script: main.js runs it as a Worker to grow a world off the main thread ([Water](#water)) | — |
+| `start.js` | the Meadows day-0 layout (`StartLayout`): the ground and water first (`AS.layTerrain`), then meadow grass (never on the beach) aged by depth, bunny colonies at meadow edges, wolf packs in the open (never humans); uses only `sim.rng` | `startMeadows` |
 | `sight.js` | line of sight through grass, nearest visible thing, local paths (plain and weighted for chewing) | `lineOfSight`, `nearestVisible`, `pathNext`, `pathNextWeighted` |
-| `animals.js` | every animal's body, steps, the decide loop, bites, death, spawning; `relations(T)` (who hunts and eats whom, as bitmasks over species codes, from species.csv's `Prey` and `EatsCarcass`; `threat` is the reverse of `prey`); the shared grass bite `grazeBite` (bunny EAT, human FORAGE) | `animalsTick`, `registerStates`, `checkStates`, `stepTo`, `chewOrStep`, `edgeStep`, `edgeReset`, `biteAnimal`, `killAnimal`, `spawnStarting`, `relations`, `grazeBite`, `bestAdjacentBlade`, … |
-| `breed.js` | mating and births, shared by the species that breed (a species with no `LitterSize`, humans, never mates; a female's `PackLimit`/`TerritoryRange` territory rule is in `canMate`; blank for bunnies = off) | `canMate`, `mate`, `tryBirth` |
-| `bunny.js`, `wolf.js`, `human.js` | each species' states, by the names in `states.csv`. wolf.js's FEED, HUNT, GIVE_UP, REST and PROWL are the hunter states (`AS.hunterStates`) and read `Prey`/`EatsCarcass`, so `human.js` registers them for humans too and adds FORAGE (grass when hungry with no meat or prey in sight; no MATE) | (register via `AS.registerStates`) |
-| `glyphs.js` | ids, palette and life stage shared by the sprites and HUD; the old glyph sheet (no longer drawn) | `GLYPH`, `COLORS`, `CELL_COLOR`, `GlyphSheet`, `stageOf`, … |
-| `sprites.js` | the 8×8 pixel-art sprites (bunny, wolf, human with a spear, corpse, grass, water: three still variants chosen by tile position, `spriteWater`) as bitmaps (ten frames per animal: stand, walk, idle, eat/bite, runA, runB, rest, winded, dead, pregnant; plus a dimmed dead-pose carcass per species, `spriteCarcass`), the pose-priority rule (`spritePose`, pure; a species' `winds` flag decides whether it has a winded frame), per-slot facing, and the pre-rendered sprite sheet | `SpriteSheet`, `spritePose`, `spriteIndex`, `SpriteFacing`, `SPRITE_FRAME`, `SPRITE_HOLD`, … |
-| `camera.js` | pan/zoom/pinch/wheel/keys, tap → tile; zoomed in, the view pans up to `OVERSCROLL` of itself past the world's edge (render.js shows the outside darker, `OUTSIDE`, with an `EDGE_LINE`); `cam.strokes` makes a one-pointer drag call `onStroke` (the brush) instead of panning | `Camera` |
-| `render.js` | draw (scorched ground, the Radius slider's fading preview (`radiusPreview`, `RADIUS_*`), topo lines from `W.elev` when on (`setContours`, spacing `setContourStep`, each spacing cached per world, `CONTOUR_*`: marching squares in `CONTOUR_CHUNK` squares, a square on screen worked out again when its wet tiles changed (`W.wetFlips` says when to look)), the locate rings for the kinds a count toggles on (`locate(kinds, top)`, `LOCATE_*`, `AS.LOCATE_COLORS`: steady rings, edge pips for animals off screen), and the nuke's ring and glow over real time, `blast()`): visible tiles from the sprite sheet, or cell mode zoomed out (its brighter far-view colors live at the top of render.js); animals glide and act out events (below); intent lines (off by default, the selected animal's always on); selection | `Renderer`, `CELL_PX`, `glideProgress` |
-| `inspect.js` | `variables.csv` → the inspector's rows for a selection | `describe`, `inspectWarnings` |
-| `drag.js` | `Draggable(panel, handle, key)`: drag a floating window by its title bar (computer only), kept on screen and remembered per viewer; double-click resets. Used by the tab windows, the properties window and the minimap | `Draggable` |
-| `graph.js` | the population graph as a draggable, see-through floating window (position and its +/− big or small size kept in localStorage, clamped to the viewport; day labels thin out to fit the width; from `sim.history`) | `Graph`, `graphMath` |
-| `minimap.js` | the minimap window (`#minimap`): the far view's picture (`renderer.farCanvas`, refreshed every `MINI_REFRESH_MS`), the view box and dots for the ringed kinds every frame; click or drag moves `cam`; +/− size and open state kept in localStorage | `Minimap` |
-| `bench.js` | benchmark mode (grass series, animal series) | `runBench`, `benchMath` |
-| `ui.js` | the bar (speeds, day, Info and PAINT tabs, plus Debug only with `?debug` (keys `info`, `god`, `debug`), each a stack of labeled rows made by `section(tab, title)`, to which a new control is appended; each tab its own window, toggled by its button (`setWindow(key, on)`, `ui.windows`, `onWindows` → main.js keeps them in localStorage `life-ui-windows`); on a computer they float (CSS, `--side-w`, `--hud-bar`: Info down the left, `body.side-open` moving the graph and minimap aside; PAINT bottom right; Debug right), dragged by their title bars; the Debug tab's Lines and Water buttons: Water, kept per viewer in localStorage `life-water`, starts a new world with `opts.water`, Hide UI, `H`), the tab windows (Info: per-species counts, each a toggle that rings that kind on the map through `onLocate(key, on)` and wears its color while on, a Total, the Graph and Minimap buttons, Elevation, Properties Off/Click/Hover through `onInspect`, Inspect Empty Tiles through `onInspectEmpty`; the properties window renders a heading row as a section title), PAINT window modes (NUKE, GRASS, RABBIT, WOLF, HUMAN, WATER: one at a time, `ui.mode`; icons once `setIcons` runs, the name kept as `aria-label` and in the tooltip; the nuke icon is sprites.js `spriteNuke`) with a Radius slider (0–100; each mode keeps its own value in localStorage, defaults from `NukeRadius`/`BrushRadius`) and the "That's a crowd" card (`ui.crowd`), inspector panel, errors page, keys for speed | `UI` |
-| `main.js` | boot, the frame loop, selection (`pickAt`, which with Inspect Empty Tiles returns bare ground as `{ empty: true }`, kept picked whatever comes onto it; the properties mode `inspectMode`: off, click, or hover, which re-picks under the mouse once per frame after it moves), wiring, the brush (`paintAt`/`paintLine`, sized by the Radius slider) and the soft limit on painted animals (`app.animalLimit`, `AnimalWarnAt`) | `app`, `TICK_BUDGET_MS` |
+| `animals.js` | every animal's body, steps, the decide loop, bites, death, spawning; wading, swimming and going around; thirst and DRINK; `relations(T)` (who hunts and eats whom); the shared grass bite `grazeBite` | `animalsTick`, `registerStates`, `checkStates`, `stepTo`, `chewOrStep`, `canStand`, `canEnter`, `edgeStep`, `edgeReset`, `biteAnimal`, `killAnimal`, `spawnStarting`, `relations`, `grazeBite`, `bestAdjacentBlade`, `drinkState`, … |
+| `breed.js` | mating and births, shared by the species that breed (a species with no `LitterSize`, humans, never mates); the female's territory rule (`PackLimit`/`TerritoryRange`) in `canMate` | `canMate`, `mate`, `tryBirth` |
+| `bunny.js`, `wolf.js`, `human.js` | each species' states, by the names in `states.csv` ([Behavior](#behavior)). wolf.js's FEED, HUNT, GIVE_UP, REST and PROWL are the hunter states (`AS.hunterStates`), so human.js registers them too and adds FORAGE | (register via `AS.registerStates`) |
+| `glyphs.js` | ids, palette and life stage (`stageOf`) shared by the sprites and HUD; the old glyph sheet (no longer drawn) | `GLYPH`, `COLORS`, `CELL_COLOR`, `GlyphSheet`, `stageOf`, … |
 
-Sim files (`tables` … `human`, plus `glyphs` for `stageOf`) never touch the DOM, so the
-Node harness and the lab's workers run them unchanged.
+**The page:**
+
+| File | Role | Exports |
+|---|---|---|
+| `sprites.js` | the 8×8 pixel-art sprites as bitmaps, the pose-priority rule, per-slot facing, the pre-rendered sprite sheet ([Sprite poses](#sprite-poses-renderjs--spritesjs)) | `SpriteSheet`, `spritePose`, `spriteIndex`, `SpriteFacing`, `SPRITE_FRAME`, `SPRITE_HOLD`, `spriteNuke`, … |
+| `camera.js` | pan/zoom/pinch/wheel/keys, tap → tile; zoomed in, the view pans up to `OVERSCROLL` of itself past the world's edge; `cam.strokes` makes a one-pointer drag call `onStroke` (the brush) instead of panning | `Camera` |
+| `render.js` | draws the world: tiles from the sprite sheet, or cell mode zoomed out (its brighter far-view colors at the top); scorch, topo lines, the outside past the edge (`OUTSIDE`, `EDGE_LINE`), locate rings, the nuke's blast, the Radius preview; animals glide and act out events; intent lines; selection | `Renderer`, `CELL_PX`, `glideProgress` |
+| `inspect.js` | `variables.csv` → the inspector's rows for a selection | `describe`, `inspectWarnings` |
+| `drag.js` | `Draggable(panel, handle, key)`: drag a floating window by its title bar (computer only), kept on screen and remembered per viewer; double-click resets | `Draggable` |
+| `graph.js` | the population graph window, from `sim.history` | `Graph`, `graphMath` |
+| `minimap.js` | the minimap window | `Minimap` |
+| `bench.js` | benchmark mode (grass series, animal series) | `runBench`, `benchMath` |
+| `ui.js` | the bar, the tab windows (Info, PAINT, Debug), the properties window, the cards ([The page](#the-page)) | `UI` |
+| `main.js` | boot, the frame loop, selection, wiring, the brush and the soft limit on painted animals ([The page](#the-page)) | `app`, `TICK_BUDGET_MS` |
 
 ## Data: struct of arrays (`world.js`)
 
 `W = sim.W`. One thing per tile; `W.kind[t]` (`AS.KIND`: EMPTY, GRASS, CORPSE, WATER, BUNNY,
-WOLF, HUMAN; an animal's kind is `AS.kindOf(species)`) is the truth about who is where. Tiles are `t = y * W.w + x`.
+WOLF, HUMAN; an animal's kind is `AS.kindOf(species)`) is the truth about who is where.
+Animals tell their own kind by `kind >= BUNNY`. Tiles are `t = y * W.w + x`.
 
 - **Blades** are indexed by tile (they never move): `gSize`, `gAge` (days), plus a dense
   list `gList[0..gCount)` with `gSlot[t]` for O(1) removal.
-- **Warren holes**, by tile: `hole` (1 = a hole), `holeUsedAt` (sim seconds a bunny last stood there), dense `hList`/`hSlot`/`hCount`. A hole is *ground*, not an occupant: the tile's `kind` stays EMPTY (or BUNNY, or a corpse that died there), so one-thing-per-tile is untouched. Only bunnies may enter one (`stepTo`, `tryBirth`, `moveAnimal` and `addAnimal` refuse any other species, via `AS.canEnterHole`; hunter pathing costs a hole `Infinity`), nothing grows on one (`addGrass` throws; grass.js skips holes), and a bunny on one can't be bitten (`biteAnimal`) or picked as prey (wolf.js `isPrey`). `addHole`/`removeHole` are world.js's; `holeUsedAt` is written by warren.js and by DIG/start. Bunnies HIDE on one while a wolf or human is in sight, FLEE runs to a free one within `HoleRange`, DIG makes new ones on bare ground.
-- **Water**, by tile: depth is the truth: `W.wDepth` in meters (0 on land; drawn by `AS.waterBand`: shallow, mid, deep), moved by the water rules (`W.water`, water.js) every `STEP_TICKS` ticks; with no rules (a world made with Water off, as the checks' hand-built ones are) water stays as laid. `kind` WATER means wet with nothing on it; a wet tile may instead hold a wading animal (its `kind`), and nothing else: `setDepth` (world.js) drowns a blade, removes a hole and scorch as a tile gets wet (a corpse is removed first, by `syncWater`), and `killAnimal` leaves no corpse in water. `addWater(t, depth)` lays water on an empty tile (and into `W.water` if there is one). `W.waterCount` counts wet tiles; with none there is no thirst at all. Animals tell their own kind by `kind >= BUNNY`, and stepping is one rule, animals.js `AS.canStand(W, t, wade)`: EMPTY, or WATER no deeper than `AS.wadeOf` (`WadeDepth`); stepTo, chewOrStep, `pathNext` (the walker is the animal on `from`), wolf.js's `cost`/`canWalk`/prowl and bunny.js's wander, flee and trips all use it. Births, grass, holes and painting (except WATER MODE) use EMPTY only. Deeper than it wades is swimming: `AS.canEnter(sim, s, t)` adds water it would swim now (`AS.swimsNow`: `SwimCost` set, not winded, Stamina above `RestBelow`, and either `SwimAt` reached (or already in) or fleeing, `AS.isFleeing` from bunny.js); the body tick drains `SwimCost` there and, at 0 Stamina, `DrownDamage` HP; `move` uses `SwimSpeed`. wolf.js `cost`/`canWalk` take swimmable water at `mInvSwim`; bunny.js FLEE steps use `canEnter`. An animal in deep water that isn't swimming now, or swims with no step under way and no target, runs `wadeOut` (the nearest standable tile within `OUT_RANGE`). `lineOfSight` ignores water (only GRASS blocks sight). A nuke kills animals in it but leaves the water (no scorch). **The beach**: `W.beach` (Uint8) marks dry land 4-adjacent to water, kept by `addWater` and `setDepth` (which also drops a blade the moving shore reaches); no blade is ever on one (`addGrass` throws, grass.js seeding/sprouting, god.js painting and start.js skip them) so animals can always reach the water. **The water field** (`buildWaterField`, on first need through `ensureWaterField`, again when `waterStale`): `wDist` (walking distance to the nearest beach tile, 0 on one, `AS.WATER_NONE` where unreachable), `wNext`, `wShore`; wet tiles (by depth) are its water; a guide that ignores animals and blades. The harness audit checks all of this by depth.
-- **Scorch**, by tile: `scorch` (Float32, days left); set by `nuke`, counted down by the hourly grass pass; `addGrass` and `addHole` refuse a scorched tile.
-- **Corpses**, by tile: `cCause` (`AS.CAUSE`: old age, starved, thirst, both, debug, or `ATTACKED` plus the biter's species code; set by `addCorpse`, shown as the inspector's Cause row), `cNut`, `cMeat` (Fullness left on the body, set from `MeatOnBody` by `addCorpse`, eaten down by wolf.js's FEED, zeroed with the corpse), `cAge`, `cSpecies`, dense `cList`/`cSlot`/`cCount`;
-  `boostSrc[t]` = the corpse tile boosting tile t, or −1.
+- **Warren holes**, by tile: `hole` (1 = a hole), `holeUsedAt` (sim seconds a bunny last
+  stood there), dense `hList`/`hSlot`/`hCount`. A hole is *ground*, not an occupant: the
+  tile's `kind` stays EMPTY (or BUNNY, or a corpse that died there), so one-thing-per-tile
+  is untouched. Only bunnies may enter one (`stepTo`, `tryBirth`, `moveAnimal` and
+  `addAnimal` refuse any other species, via `AS.canEnterHole`; hunter pathing costs a hole
+  `Infinity`), nothing grows on one (`addGrass` throws; grass.js skips holes), and a bunny
+  on one can't be bitten (`biteAnimal`) or picked as prey (wolf.js `isPrey`).
+  `addHole`/`removeHole` are world.js's; `holeUsedAt` is written by warren.js and by
+  DIG/start. `W.holeNear` counts holes within a bunny's `HomeRange` of each tile (kept by
+  `addHole`/`removeHole`).
+- **Water**, by tile: `wDepth` (meters, 0 on land), `beach`, and the water field (`wDist`,
+  `wNext`, `wShore`); see [Water](#water).
+- **Scorch**, by tile: `scorch` (Float32, days left); set by `nuke`, counted down by the
+  hourly grass pass; `addGrass` and `addHole` refuse a scorched tile.
+- **Corpses**, by tile: `cCause` (`AS.CAUSE`: old age, starved, thirst, both, debug, or
+  `ATTACKED` plus the biter's species code; set by `addCorpse`, shown as the inspector's
+  Cause row), `cNut`, `cMeat` (Fullness left on the body, set from `MeatOnBody` by
+  `addCorpse`, eaten down by wolf.js's FEED, zeroed with the corpse), `cAge`, `cSpecies`,
+  dense `cList`/`cSlot`/`cCount`; `boostSrc[t]` = the corpse tile boosting tile t, or −1.
 - **Animals** live in stable slots (`0..aHigh`, free list `aFree`, never compacted), so a
   slot index is valid for a whole life; `aSerial[s]` tells a reused slot from its old
   occupant. Every field is an `a*` array (see `ANIMAL_FIELDS` in world.js, one line per
   field). `W.aSlot[t]` maps a tile to its animal.
+- **Who's near:** `W.nearCount` counts each species per `NEAR_BLOCK`² block (kept by
+  `addAnimal`/`removeAnimal`/`moveAnimal`); `W.anyNear(t, range, speciesMask)` answers
+  whether any are within a square of `range`. bunny.js `threatSeen` and wolf.js's prey
+  scans ask it before `nearestVisible`, an exact shortcut (it only skips scans that would
+  find nothing).
 - **Identity:** anything that remembers another agent stores slot (or tile) **and** serial,
   and checks the serial before trusting it (selection, targets, fathers).
 
 **Who writes what.** Only `world.js`'s add/remove/move functions change `kind`, `aSlot` or
-the dense lists. Grass fields: grass.js. Hole fields: world.js (`addHole`/`removeHole`), `holeUsedAt` also warren.js. Corpse fields and `boostSrc`: corpse.js (`cMeat` also wolf.js, FEED). Animal
-fields: animals.js, breed.js, bunny.js, wolf.js, human.js. Everything else (render, inspect,
+the dense lists. Grass fields: grass.js. Hole fields: world.js (`addHole`/`removeHole`),
+`holeUsedAt` also warren.js. Corpse fields and `boostSrc`: corpse.js (`cMeat` also
+wolf.js, FEED). Water: water.js through world.js `setDepth`/`addWater`. Animal fields:
+animals.js, breed.js, bunny.js, wolf.js, human.js. Everything else (render, inspect,
 graph, ui, bench) only reads.
 
 ## Time
@@ -89,16 +121,88 @@ graph, ui, bench) only reads.
   `corpseTick` → `grassTick` → `warrenTick` → `waterTick` → `animalsTick`.
 - **Grass:** growth/age/seed/sprout/old-age once per in-world hour, spread over
   `TICKS_PER_HOUR` ticks by tile (`t % TICKS_PER_HOUR`).
-- **Animals:** body every tick (age, hunger, starve/heal, stamina + winded, timers), decide
-  every 1/`DecidePerSec` s (random phase per animal), then the current state's `act` every
-  tick. Timers are Float64 and snap to 0 within 1e-9 so cooldowns last exactly their CSV
-  value.
+- **Water:** a step every `STEP_TICKS` ticks ([Water](#water)).
+- **Animals:** body every tick (age, hunger, thirst, starve/heal, stamina + winded,
+  swimming, timers), decide every 1/`DecidePerSec` s (random phase per animal), then the
+  current state's `act` every tick. Timers are Float64 and snap to 0 within 1e-9 so
+  cooldowns last exactly their CSV value.
 - **Frame loop (main.js):** each frame runs as many ticks as speed × real time asks,
   within `TICK_BUDGET_MS` (12 ms); past that a fixed speed falls behind and the HUD shows
   the speed actually reached. Then one draw. Drawing never changes the sim, so a seed
   replays exactly at any speed.
-- **Determinism:** same tables + same seed → same run, in the page, the Node harness and
-  the lab's workers (checked). Only `sim.rng` may roll dice; never `Math.random` in sim code.
+- **Determinism:** same tables + same seed → same run, in the page, the Node harness, the
+  terrain worker and the lab's workers (checked). Only `sim.rng` may roll dice; never
+  `Math.random` in sim code.
+
+## Water
+
+- **The ground** (terrain.js): `W.elev`, meters, grown before day 0. `AS.terrainOf` draws the
+  world's own values from the settings' ranges; `pattern` (warped noise: where the ground
+  rises fastest); `growGround` (coarse then fine `Grower` rounds: uplift with a rim, routing
+  by `steepest` descent with dips filled (`fillDip`) or the full `flood`, implicit stream
+  power, creep; water leaves only at `mouths`); lake basins pressed in; stretched to
+  `Relief`. Own generator from the seed. `AS.growTerrain(sim, water)` returns
+  `{ S, water, elev, outlet, H, G }`; `AS.layTerrain(sim, water, grown)` lays it into the
+  world (growing it first if `grown` is missing or for the other water setting): `W.elev`,
+  `W.outlet`, `W.water` (the rules, whose `H` is surface water and `G` soil water; dry when
+  Rain is 0; with rain a `restingLevel` first guess and the rules for `PreRunDays` first),
+  and every wet tile through `addWater`.
+- **In the background** (terrain-worker.js): main.js `growInWorker` posts the tables, seed
+  and water setting; the worker imports rng, world, sim, water and terrain itself (with
+  `?v=`), runs `growTerrain` and transfers the arrays back; `AS.Sim`'s `opts.terrain` hands
+  them to `layTerrain`. No Worker (a page opened as a file) → the page grows it.
+- **The rules** (water.js): `AS.Water(grid, S, outlet)` → `{ H, G, step(days),
+  preRun(days), listWet }`: rain, soaking in, springs, evaporation, transpiration
+  (`exchange`), surface flow (Manning, `surface`, only over wet tiles), soil flow (Darcy,
+  `soil`, from the precomputed soil floor); stability caps on every exchange; out only at
+  river mouths. Every step is the exchange, one surface move and one soil move, so every
+  look sees the water at the same point of a step. Before day 0 (`preRun`):
+  `SPINUP_STEP_DAYS` steps, then `SETTLE_DAYS` of play's. In play, `waterTick` runs a step
+  every `STEP_TICKS` ticks (`WATER_STEP_DAYS`) and `syncWater` makes `W.wDepth` and the
+  tiles match `H` (corpses through `corpseRemove`, the rest through world.js `setDepth`),
+  and marks the way-to-water field stale every `FIELD_STEPS` steps when shores moved.
+- **Depth is the truth:** `W.wDepth` in meters (0 on land; drawn by `AS.waterBand`:
+  shallow, mid, deep). With no rules (a world made with Water off, as the checks'
+  hand-built ones are) water stays as laid. `kind` WATER means wet with nothing on it; a
+  wet tile may instead hold a wading animal (its `kind`), and nothing else: `setDepth`
+  drowns a blade, removes a hole and scorch as a tile gets wet (a corpse is removed first,
+  by `syncWater`), and `killAnimal` leaves no corpse in water. `addWater(t, depth)` lays
+  water on an empty tile (and into `W.water` if there is one). `W.waterCount` counts wet
+  tiles; with none there is no thirst at all. `W.wetFlips` tells render.js which topo
+  squares to work out again. `lineOfSight` ignores water. A nuke kills animals in it but
+  leaves the water (no scorch).
+- **The beach:** `W.beach` (Uint8) marks dry land 4-adjacent to water, kept by `addWater`
+  and `setDepth` (which also drops a blade the moving shore reaches); no blade is ever on
+  one (`addGrass` throws; grass.js seeding/sprouting, god.js painting and start.js skip
+  them), so animals can always reach the water.
+- **The water field** (`buildWaterField`, on first need through `ensureWaterField`, again
+  when `waterStale`): `wDist` (walking distance to the nearest beach tile, 0 on one,
+  `AS.WATER_NONE` where unreachable), `wNext`, `wShore`; wet tiles (by depth) are its
+  water; a guide that ignores animals and blades.
+- **Wading and swimming** (animals.js): stepping is one rule, `AS.canStand(W, t, wade)`:
+  EMPTY, or WATER no deeper than `AS.wadeOf` (`WadeDepth`); stepTo, chewOrStep, `pathNext`
+  (the walker is the animal on `from`), wolf.js's `cost`/`canWalk`/prowl and bunny.js's
+  wander, flee and trips all use it. Births, grass, holes and painting (except WATER MODE)
+  use EMPTY only. Deeper than it wades is swimming: `AS.canEnter(sim, s, t)` adds water it
+  would swim now (`AS.swimsNow`: `SwimCost` set, not winded, Stamina above `RestBelow`, and
+  either `SwimAt` reached (or already in) or fleeing, `AS.isFleeing` from bunny.js). A step
+  from land into deep water also needs land two tiles ahead within the swimming reach of
+  its Stamina (`crossable`); wolf.js re-plans on land when refused. The body tick drains
+  `SwimCost` there and, at 0 Stamina, `DrownDamage` HP; `move` uses `SwimSpeed`. wolf.js
+  `cost`/`canWalk` take swimmable water at `mInvSwim`; bunny.js FLEE steps use `canEnter`.
+  An animal in deep water that isn't swimming now, or swims with no step under way and no
+  target, runs `wadeOut` (the nearest standable tile within `OUT_RANGE`).
+- **Thirst** (animals.js): `aWater` (like Fullness: `WaterMax`, drained each tick by
+  `ThirstRate` times the same activity factor as hunger, only when the world has water; 0
+  loses `ThirstDamage` HP/s and stops healing). **DRINK** is `AS.drinkState`, shared by
+  every species' file: enters below `ThirstyAt` when wading or when `wDist` is within
+  `WaterSense` (and stays until the meter is within one tick's burn of full), walks by one
+  rule (the cheapest local walk to a free beach tile when one is within `VisionRange`,
+  else the water field's next tile), drinks `DrinkRate` per s from its own tile if wading,
+  else a wet neighbor (`waterAt`), takes the water from `W.water` (`drinkFrom`:
+  `WaterLiters` a meter) and sets `aBiteLeft` per sip for the head-down pose. Priority:
+  below HIDE and FLEE for bunnies, first for wolves and humans.
+- The harness audit checks all of this by depth.
 
 ## Behavior
 
@@ -110,35 +214,168 @@ graph, ui, bench) only reads.
 - Movement goes only through `AS.stepTo` (empty tiles) or `AS.chewOrStep` (wolves into
   grass): both respect speed and one-thing-per-tile. Paths: `pathNext` (empty tiles only)
   and `pathNextWeighted` (cost per tile; wolves pay chew time for grass).
-- **Who eats whom is data** (species.csv `Prey`, `EatsCarcass`; `AS.relations`): wolves hunt bunnies and humans, humans hunt bunnies and wolves, bunnies run from (FLEE/HIDE) every species that lists Bunny as prey. Wolves never eat wolf carcasses and humans never eat human ones. Humans are never placed at the start (only HUMAN MODE paints them), never breed (no `LitterSize`: `canMate` is false), forage grass when hungry with no meat or prey in sight (`GrassFood` per bite; blank = `BiteFood`, as bunnies), and can't enter holes or catch a bunny in one.
-- A hunter's bite kills prey whose HP its `BiteDamage` covers (a human's always does; a wolf needs several bites on a human) and feeds nothing (`biteAnimal`); the body holds `MeatOnBody`. **FEED** (wolf.js, above HUNT): a hungry hunter that sees a carcass of a species it eats with `cMeat > 0` walks to a tile touching it and eats `min(BiteFood, cMeat, room)` every `BiteCooldown`, raising `aBiteLeft` (the renderer reads that as a mouthful); once feeding it stays until Fullness is `FullnessMax` or the meat is gone, past `HungryAt`. Its carcass is kept per wolf in `mem(W)` (`feedTile`/`feedSerial`).
-- **Wandering leans toward room.** When a wander/prowl run starts, `pickRoomDir` (a copy in bunny.js and in wolf.js, which humans use) weights each open direction by `exp(-RoomPreference * c / (L/2))`, `c` = same-species animals in a box `L` = `VisionRange` tiles long reaching out that way; 0 = uniform random. Bunny FLEE's escape point is the best of straight-away and ±45°/±90° turns, scored by distance from the wolf minus a cost for path tiles at the world's edge (`FLEE_*` in bunny.js).
-- **Bunnies leave crowds** (bunny.js `emigrateStep`, inside `wanderStep`, so SEEK_FOOD with nothing to eat follows it too): per-bunny memory `awayTo`/`awayFor` (destination and the serial it belongs to), `lead`/`leadSerial` (a companion's leader; -1 leads itself). Starts at a run start, not elderly, with `LeaveCrowd`+ bunnies in the `VisionRange` square (`crowdAt`) at `LeaveChance` a day, and recruits the nearest visible bunny of the other sex not already away (`isCompanion`), which follows (`followStep`: waits within `FOLLOW_NEAR`, else `pathNext` to it, else `edgeStep`) and settles when its leader does or dies. The leader's destination (`farGoal`) is `RoamRun` away, near water if one of `GOAL_TRIES` is (`nearWater`: `wDist` ≤ `GOAL_WATER`); it paths within sight to a tile `AWAY_GAIN` nearer (`isNearerAway`), goes around (`edgeStep`) when no such tile is in sight, takes a new destination when there or when going around gives up, shows it as the target line, and every `SETTLE_EVERY` s settles if near water with ≤ `SettleCrowd` in the `SettleRange` square. LeaveChance 0 draws nothing.
-- **Bunny stress** (bunny.js `stressNow`/`addStress`/`scared`): `stress`/`stressAt`/`scareAt`/`stressFor` per bunny, faded by `StressHalfLife` only when read or added to. FLEE's start adds `ScareStress` (not again within `SCARE_GAP` s), WANDER's start adds `HungerStress` when hungry (SEEK_FOOD found no blade). `emigrateStep` leaves at `LeaveStress` without the crowd roll, and zeroes stress.
-- **Natal dispersal** (`DisperseChance`, `DisperseRun`): decided once a life (`dispFor`, by serial) at the first wander (bunny, in `emigrateStep`) or prowl (wolf, `prowlStep`) as an adult, only for animals with a parent (`aParentA` ≠ 0). Bunnies travel as an emigrant with `natal` set (with a companion, `takeCompanion`; settle on arrival, not by crowd); wolves go to `dispTo` with `goAround` and are home within `DISPERSE_THERE`. A bunny's trip (either kind) starts at `awayFrom`; `farGoal` keeps destinations at least `travelMin` (`TravelMin` × the world's longer side) from it, and neither kind settles nearer. A natal bunny's own length is `tripMin` (`TravelMin`..`DisperseFar` of that side; DisperseRun tiles if DisperseFar is blank); it is home on crossing it, and detours aim only as far as is left (`natalRun`).
-- **Who's near** (world.js): `W.nearCount` counts each species per `NEAR_BLOCK`² block (kept by `addAnimal`/`removeAnimal`/`moveAnimal`); `W.anyNear(t, range, speciesMask)` answers whether any are within a square of `range`. bunny.js `threatSeen` and wolf.js's prey scans ask it before `nearestVisible`, an exact shortcut (it only skips scans that would find nothing).
-- **Home and hiding** (bunny.js): `W.holeNear` (world.js, holes within the bunny's `HomeRange` per tile, kept by `addHole`/`removeHole`) says a tile is home (`atHome`); SEEK_FOOD looks at home only while at home, fed above `StrayAt` and not travelling (`mHomeOnly`); `wanderStep` remembers `home` and walks back (`edgeStep`) when strayed; a trip forgets it. HIDE holds `HideSeconds` after `threatAt` (set by `threatSeen`); HIDE and FLEE stand aside when `desperate` (`DesperateAt`). animals.js `crossable`: a step from land into deep water needs land two tiles ahead within the swimming reach of its Stamina; wolf.js re-plans on land when refused.
-- **Going around** (animals.js `AS.edgeStep(sim, s, goal, key, canEnter)`): a step toward a goal the path search can't reach; greedy while a 4-neighbor gets closer, else edge following with the animal's hand (`aSerial & 1`: 1 right, 0 left) on the obstacle, leaving the edge once closer than where it met it; `EdgeFollow` steps of edge per trip (`key`: a destination tile, or minus a target's serial), then it returns -1 and the key stays given up. Per-slot memory in a WeakMap by world; `AS.edgeReset` (the decide loop on a state change, and callers when a path is found again). wolf.js `goAround` (chew or step) for HUNT, FEED, MATE and the far trips (roam, dispersal); bunny.js for emigrant trips (`emigrateStep`) and `followStep`. wolf.js `forget`: when even that fails, the target's serial is ignored (`skip`/`skipUntil` in `mem`, read by the matchers through `mSkip`) for `ForgetSeconds`.
-- A hunting wolf remembers where it last saw its bunny: wolf.js keeps `seenTile`/`seenAt` per wolf in `mem(W)`, and while `TrackSeconds` (species.csv, 0 = off) allows it HUNT walks to that tile when the bunny is out of sight (`act` then uses `lineOfSight` instead of the bunny's true tile).
+- **Who eats whom is data** (species.csv `Prey`, `EatsCarcass`; `AS.relations(T)`, bitmasks
+  over species codes; `threat` is the reverse of `prey`): wolves hunt bunnies and humans,
+  humans hunt bunnies and wolves, bunnies run from (FLEE/HIDE) every species that lists
+  Bunny as prey. Wolves never eat wolf carcasses and humans never eat human ones. Humans are
+  never placed at the start (only HUMAN MODE paints them), never breed (no `LitterSize`:
+  `canMate` is false), forage grass when hungry with no meat or prey in sight (FORAGE,
+  `GrassFood` per bite; blank = `BiteFood`, as bunnies; `grazeBite` is shared with bunny
+  EAT), and can't enter holes or catch a bunny in one.
+- A hunter's bite kills prey whose HP its `BiteDamage` covers (a human's always does; a
+  wolf needs several bites on a human) and feeds nothing (`biteAnimal`); the body holds
+  `MeatOnBody`. **FEED** (wolf.js, above HUNT): a hungry hunter that sees a carcass of a
+  species it eats with `cMeat > 0` walks to a tile touching it and eats
+  `min(BiteFood, cMeat, room)` every `BiteCooldown`, raising `aBiteLeft` (the renderer
+  reads that as a mouthful); once feeding it stays until Fullness is `FullnessMax` or the
+  meat is gone, past `HungryAt`. Its carcass is kept per wolf in `mem(W)`
+  (`feedTile`/`feedSerial`).
+- A hunting wolf remembers where it last saw its bunny: wolf.js keeps `seenTile`/`seenAt`
+  per wolf in `mem(W)`, and while `TrackSeconds` (species.csv, 0 = off) allows it HUNT
+  walks to that tile when the bunny is out of sight (`act` then uses `lineOfSight` instead
+  of the bunny's true tile).
+- **Desperate hunters** (animals.js, wolf.js): a hunter in PROWL that has seen no prey for
+  `RoamAfter` days is roaming (`AS.isRoaming`, set by `prowlStep`); walking then burns
+  `RoamHunger` times `HungerRate`.
+- **Wandering leans toward room.** When a wander/prowl run starts, `pickRoomDir` (a copy in
+  bunny.js and in wolf.js, which humans use) weights each open direction by
+  `exp(-RoomPreference * c / (L/2))`, `c` = same-species animals in a box `L` =
+  `VisionRange` tiles long reaching out that way; 0 = uniform random. Bunny FLEE's escape
+  point is the best of straight-away and ±45°/±90° turns, scored by distance from the wolf
+  minus a cost for path tiles at the world's edge (`FLEE_*` in bunny.js).
+- **Home and hiding** (bunny.js): `W.holeNear` says a tile is home (`atHome`); SEEK_FOOD
+  looks at home only while at home, fed above `StrayAt` and not travelling (`mHomeOnly`);
+  `wanderStep` remembers `home` and walks back (`edgeStep`) when strayed; a trip forgets
+  it. HIDE holds `HideSeconds` after `threatAt` (set by `threatSeen`); HIDE and FLEE stand
+  aside when `desperate` (`DesperateAt`). FLEE runs to a free hole within `HoleRange`,
+  DIG makes new ones on bare ground.
+- **Bunnies leave crowds** (bunny.js `emigrateStep`, inside `wanderStep`, so SEEK_FOOD with
+  nothing to eat follows it too): per-bunny memory `awayTo`/`awayFor` (destination and the
+  serial it belongs to), `lead`/`leadSerial` (a companion's leader; -1 leads itself).
+  Starts at a run start, not elderly, with `LeaveCrowd`+ bunnies in the `VisionRange`
+  square (`crowdAt`) at `LeaveChance` a day, and recruits the nearest visible bunny of the
+  other sex not already away (`isCompanion`), which follows (`followStep`: waits within
+  `FOLLOW_NEAR`, else `pathNext` to it, else `edgeStep`) and settles when its leader does
+  or dies. The leader's destination (`farGoal`) is `RoamRun` away, near water if one of
+  `GOAL_TRIES` is (`nearWater`: `wDist` ≤ `GOAL_WATER`); it paths within sight to a tile
+  `AWAY_GAIN` nearer (`isNearerAway`), goes around (`edgeStep`) when no such tile is in
+  sight, takes a new destination when there or when going around gives up, shows it as the
+  target line, and every `SETTLE_EVERY` s settles if near water with ≤ `SettleCrowd` in the
+  `SettleRange` square. LeaveChance 0 draws nothing.
+- **Bunny stress** (bunny.js `stressNow`/`addStress`/`scared`): `stress`/`stressAt`/
+  `scareAt`/`stressFor` per bunny, faded by `StressHalfLife` only when read or added to.
+  FLEE's start adds `ScareStress` (not again within `SCARE_GAP` s), WANDER's start adds
+  `HungerStress` when hungry (SEEK_FOOD found no blade). `emigrateStep` leaves at
+  `LeaveStress` without the crowd roll, and zeroes stress.
+- **Natal dispersal** (`DisperseChance`, `DisperseRun`): decided once a life (`dispFor`, by
+  serial) at the first wander (bunny, in `emigrateStep`) or prowl (wolf, `prowlStep`) as an
+  adult, only for animals with a parent (`aParentA` ≠ 0). Bunnies travel as an emigrant
+  with `natal` set (with a companion, `takeCompanion`; settle on arrival, not by crowd);
+  wolves go to `dispTo` with `goAround` and are home within `DISPERSE_THERE`. A bunny's trip
+  (either kind) starts at `awayFrom`; `farGoal` keeps destinations at least `travelMin`
+  (`TravelMin` × the world's longer side) from it, and neither kind settles nearer. A natal
+  bunny's own length is `tripMin` (`TravelMin`..`DisperseFar` of that side; DisperseRun
+  tiles if DisperseFar is blank); it is home on crossing it, and detours aim only as far as
+  is left (`natalRun`).
+- **Going around** (animals.js `AS.edgeStep(sim, s, goal, key, canEnter)`): a step toward a
+  goal the path search can't reach; greedy while a 4-neighbor gets closer, else edge
+  following with the animal's hand (`aSerial & 1`: 1 right, 0 left) on the obstacle,
+  leaving the edge once closer than where it met it; `EdgeFollow` steps of edge per trip
+  (`key`: a destination tile, or minus a target's serial), then it returns -1 and the key
+  stays given up. Per-slot memory in a WeakMap by world; `AS.edgeReset` (the decide loop on
+  a state change, and callers when a path is found again). wolf.js `goAround` (chew or
+  step) for HUNT, FEED, MATE and the far trips (roam, dispersal); bunny.js for emigrant
+  trips (`emigrateStep`) and `followStep`. wolf.js `forget`: when even that fails, the
+  target's serial is ignored (`skip`/`skipUntil` in `mem`, read by the matchers through
+  `mSkip`) for `ForgetSeconds`.
 - **Events:** `sim.emit(AS.EV.X, tile)` into a ring (`sim.events`): BITE, BIRTH, DEATH,
-  GRAZE (bunny grazing or wolf chewing). render.js keeps its own cursor and turns them into poses.
+  GRAZE (bunny grazing or wolf chewing). render.js keeps its own cursor and turns them into
+  poses.
 - **History:** `sim.history` = `{ length, grass, bunnies, wolves, humans }`, one sample per
   in-world hour (Uint32Arrays, doubling). The graph and the lab read it.
 
 ## Sprite poses (render.js + sprites.js)
 
+The sprites are bitmaps (ten frames per animal: stand, walk, idle, eat/bite, runA, runB,
+rest, winded, dead, pregnant; plus a dimmed dead-pose carcass per species,
+`spriteCarcass`; water in three still variants chosen by tile position, `spriteWater`).
+`spritePose` (pure) picks the frame: hold, sprint run cycle, walk, winded/resting,
+pregnant, idle fidget, stand; a species' `winds` flag decides whether it has a winded
+frame.
+
 The renderer reads the sim and never writes it. Each frame, `consumeEvents` reads the
-events since its cursor (a swapped-in sim or a ring overrun is handled like any reader's) and
-sets **holds**, in real ms (`performance.now()`, so a pose lasts the same at any speed):
-DEATH shows the body on that tile's corpse for a moment (`deathUntil`, per tile; only matters for a corpse with no meat, since one with `cMeat > 0` always draws as its carcass, lying flat with its eye shut, and as its species' skull once eaten), BITE makes the
-bunny there flinch (runA), BIRTH hops the baby, and BITE/GRAZE mark the adjacent animal
-that targets that tile as biting or eating (ACTION). A bite is also spotted as an animal's
+events since its cursor (a swapped-in sim or a ring overrun is handled like any reader's)
+and sets **holds**, in real ms (`performance.now()`, so a pose lasts the same at any speed):
+DEATH shows the body on that tile's corpse for a moment (`deathUntil`, per tile; only
+matters for a corpse with no meat, since one with `cMeat > 0` always draws as its carcass,
+lying flat with its eye shut, and as its species' skull once eaten), BITE makes the bunny
+there flinch (runA), BIRTH hops the baby, and BITE/GRAZE mark the adjacent animal that
+targets that tile as biting or eating (ACTION). A bite is also spotted as an animal's
 `aBiteLeft` rising since the last frame it was drawn (the event route covers fast speeds
-where the timer has run down within a frame). `spritePose` picks the frame: hold, sprint run
-cycle, walk, winded/resting, pregnant, idle fidget, stand. Steps shorter than
-`SPRITE_MIN_STEP_MS` of real time (the `speed` passed to `draw`) glide in the standing pose.
-Mating animals face their partner. **In water** (the tile under it mid-glide: the nearer one): deeper than it wades, it is drawn in its standing frame with only the rows down to `SWIM_BELOW` under its eye (`spriteEyeRow`) shown, set lower so the water meets it at row `SWIM_CUT`, bobbing a row every half `SWIM_BOB_MS` (real time, its own phase); at 0 Stamina (drowning) down to its eye row, still. A `WATERLINE` under the next row's span (`spriteRowSpan`), and a fading V wake (`WAKE_STEPS`) behind one swimming sideways. Wading: its pose without the bottom (feet) row, the line under it. `spriteRowPx`/`spriteColPx` place rows and columns as `paint` does (babies smaller). Grass leans in a rare gust (`grassLeans`, real seconds: a diagonal band, `GUST_EVERY` apart; sprite mode only, lean variants are extra sheet sprites). Cell mode still consumes events, so holds don't replay on
-zoom-in. Holds never flash: see DESIGN.md, Photosensitivity.
+where the timer has run down within a frame). Steps shorter than `SPRITE_MIN_STEP_MS` of
+real time (the `speed` passed to `draw`) glide in the standing pose. Mating animals face
+their partner. Cell mode still consumes events, so holds don't replay on zoom-in. Holds
+never flash: see DESIGN.md, Photosensitivity.
+
+- **In water** (the tile under it mid-glide: the nearer one): deeper than it wades, it is
+  drawn in its standing frame with only the rows down to `SWIM_BELOW` under its eye
+  (`spriteEyeRow`) shown, set lower so the water meets it at row `SWIM_CUT`, bobbing a row
+  every half `SWIM_BOB_MS` (real time, its own phase); at 0 Stamina (drowning) down to its
+  eye row, still. A `WATERLINE` under the next row's span (`spriteRowSpan`), and a fading V
+  wake (`WAKE_STEPS`) behind one swimming sideways. Wading: its pose without the bottom
+  (feet) row, the line under it. `spriteRowPx`/`spriteColPx` place rows and columns as
+  `paint` does (babies smaller).
+- **Grass** leans in a rare gust (`grassLeans`, real seconds: a diagonal band,
+  `GUST_EVERY` apart; sprite mode only, lean variants are extra sheet sprites).
+- **Overlays** (render.js): scorched ground; the Radius slider's fading preview
+  (`radiusPreview`, `RADIUS_*`); topo lines from `W.elev` when on (`setContours`, spacing
+  `setContourStep`, each spacing cached per world, `CONTOUR_*`: marching squares in
+  `CONTOUR_CHUNK` squares, a square on screen worked out again when its wet tiles changed);
+  the locate rings for the kinds a count toggles on (`locate(kinds, top)`, `LOCATE_*`,
+  `AS.LOCATE_COLORS`: steady rings, edge pips for animals off screen); the nuke's ring and
+  glow over real time (`blast()`); past the world's edge, `OUTSIDE` with an `EDGE_LINE`.
+
+## The page
+
+- **The bar and tabs** (ui.js): speeds, day, the Info and PAINT tabs, plus Debug only with
+  `?debug` (keys `info`, `god`, `debug`), and Hide UI (`H`). Each tab is a stack of labeled
+  rows made by `section(tab, title)`, to which a new control is appended; each its own
+  window, toggled by its button (`setWindow(key, on)`, `ui.windows`, `onWindows` → main.js
+  keeps them in localStorage `life-ui-windows`). On a computer they float (CSS, `--side-w`,
+  `--hud-bar`: Info down the left, `body.side-open` moving the graph and minimap aside;
+  PAINT bottom right; Debug right), dragged by their title bars (drag.js).
+  - **Info:** per-species counts, each a toggle that rings that kind on the map through
+    `onLocate(key, on)` and wears its color while on; a Total; the Graph and Minimap
+    buttons; Topo lines (`onElevation`) and their spacing (`onContourStep`); Intent lines
+    (`onLines`); Properties Off/Click/Hover through `onInspect`; Inspect Empty Tiles through
+    `onInspectEmpty`.
+  - **PAINT:** the modes (NUKE, GRASS, RABBIT, WOLF, HUMAN, WATER: one at a time, `ui.mode`;
+    icons once `setIcons` runs (main.js `ICON_SPRITE`), the name kept as `aria-label` and in
+    the tooltip; the nuke icon is sprites.js `spriteNuke`) with a Radius slider (0–100; each
+    mode keeps its own value in localStorage, defaults from `NukeRadius`/`BrushRadius`) and
+    the "That's a crowd" card (`ui.crowd`).
+  - **Debug:** the Water button (kept per viewer in localStorage `life-water`; starts a new
+    world with `opts.water`), the seed, Benchmark and the debug tools.
+  - Also ui.js: the properties window (a heading row renders as a section title), the
+    errors page, keys for speed.
+- **PAINT's powers** (god.js): `paintCircle(sim, 'grass'|'bunny'|'wolf'|'human'|'water',
+  cx, cy, r, cap?)` is the brush (empty eligible tiles only; random ages, but a species
+  with no `LitterSize` (humans) stays adult; radius 0 = one tile; `cap = { room, hit }`
+  stops animals at the soft limit; `water` goes through `pourWater`). `nuke(sim, tile,
+  radius?)` destroys everything within the radius (the slider's, default `NukeRadius`):
+  animals with no corpse and no event, blades, corpses, holes, and scorches the ground
+  (`W.scorch`, days left, `ScorchDays` at the center, shorter to the rim).
+- **main.js:** selection (`pickAt`, which with Inspect Empty Tiles returns bare ground as
+  `{ empty: true }`, kept picked whatever comes onto it; the properties mode
+  `inspectMode`: off, click, or hover, which re-picks under the mouse once per frame after
+  it moves), the brush (`paintAt`/`paintLine`, sized by the Radius slider) and the soft
+  limit on painted animals (`app.animalLimit`, `AnimalWarnAt`), and `makeWorld` (the world
+  grown in the worker, then `AS.Sim`).
+- **graph.js:** a draggable, see-through floating window (position and its +/− big or small
+  size kept in localStorage, clamped to the viewport; day labels thin out to fit the width).
+- **minimap.js** (`#minimap`): the far view's picture (`renderer.farCanvas`, refreshed
+  every `MINI_REFRESH_MS`), the view box and dots for the ringed kinds every frame; click
+  or drag moves `cam`; +/− size and open state kept in localStorage.
 
 ## Recipes
 
@@ -150,11 +387,18 @@ zoom-in. Holds never flash: see DESIGN.md, Photosensitivity.
 - **A new inspector row:** a row in `variables.csv` (Applies to: all / bunny / wolf / human /
   grass / corpse / female) and a reader in inspect.js's `READERS`; without a reader the
   row shows "—" and a startup warning.
-- **A new animal species:** a column in species.csv (after the last animal, before Grass) and states in states.csv; an entry in each list in world.js (`SPECIES`, `SPECIES_KEY`, `POP_KEY`, `KIND`) and tables.js (`ANIMALS`); its `Prey` and `EatsCarcass` rows say who it hunts and eats (everything that hunts or eats reads those, nothing names a species); bitmaps and colors (sprites.js `BITMAPS`/`BY_SPECIES`/`ANIM`, glyphs.js, render.js `FAR_ANIMAL`); a count and graph series (ui.js `COUNTS`, graph.js `SERIES`, main.js `ICON_SPRITE`); `human-check.js` is the template.
-- **Desperate hunters** (animals.js, wolf.js): a hunter in PROWL that has seen no prey for `RoamAfter` days is roaming (`AS.isRoaming`, set by `prowlStep`); walking then burns `RoamHunger` times `HungerRate`.
-- **Thirst** (animals.js): `aWater` (like Fullness: `WaterMax`, drained each tick by `ThirstRate` times the same activity factor as hunger, only when the world has water; 0 loses `ThirstDamage` HP/s and stops healing). **DRINK** is `AS.drinkState`, shared by every species' file: enters below `ThirstyAt` when wading or when `wDist` is within `WaterSense` (and stays until the meter is within one tick's burn of full), walks by one rule (the cheapest local walk to a free beach tile when one is within `VisionRange`, else the water field's next tile), drinks `DrinkRate` per s from its own tile if wading, else a wet neighbor (`waterAt`), takes the water from `W.water` (`drinkFrom`: `WaterLiters` a meter) and sets `aBiteLeft` per sip for the head-down pose. Priority: below HIDE and FLEE for bunnies, first for wolves and humans.
+- **A new animal species:** a column in species.csv (after the last animal, before Grass)
+  and states in states.csv; an entry in each list in world.js (`SPECIES`, `SPECIES_KEY`,
+  `POP_KEY`, `KIND`) and tables.js (`ANIMALS`); its `Prey` and `EatsCarcass` rows say who it
+  hunts and eats (everything that hunts or eats reads those, nothing names a species);
+  bitmaps and colors (sprites.js `BITMAPS`/`BY_SPECIES`/`ANIM`, glyphs.js, render.js
+  `FAR_ANIMAL`); a count and graph series (ui.js `COUNTS`, graph.js `SERIES`, main.js
+  `ICON_SPRITE`); `human-check.js` is the template.
 - **A new animal field:** one line in `ANIMAL_FIELDS` (world.js); `addAnimal` zeroes it.
-- **A new event:** add to `AS.EV` (sim.js), emit it, give it a pose in render.js (`consumeEvents`) and sprites.js.
+- **A new event:** add to `AS.EV` (sim.js), emit it, give it a pose in render.js
+  (`consumeEvents`) and sprites.js.
+- **A new check:** start from `_tools/kit.js` (`stage`, `tally`) and add it to check-all's
+  list (`slow: true` if it runs the real world for weeks).
 
 ## Colors
 

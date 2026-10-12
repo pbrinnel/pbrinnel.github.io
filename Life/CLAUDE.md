@@ -6,8 +6,10 @@ The goal is a self-sustaining ecosystem (DESIGN.md, top).
 
 ## Start here
 
-1. `DESIGN.md`: the spec, the milestones (all done) and the tuning notes. Everything in it is decided
-   by Paul. Don't change a decision without asking him.
+1. `DESIGN.md`: the spec, by system. Everything in it is decided by Paul. Don't change a
+   decision without asking him. `HISTORY.md` is the record behind it: measurements, what
+   was tried and dropped, the milestones and the tuning notes. A measured change or a
+   rejected idea goes there; the rule it leads to goes in DESIGN.md.
 2. `MAP.md`: the code map: files, load order, data layout, who writes what, the tick,
    the tools. Read it before opening code; keep it true when you change structure.
 3. `tables/*.csv`: every number, and the source of truth. The sim reads them at startup;
