@@ -95,7 +95,12 @@ watching the sim run. Everything else in this doc is decided.
   choice with at least that share of its Stamina, so a rested wolf crosses a river after a
   bunny or to a carcass; one without (rabbits) goes in only to flee, and lasts seconds.
   Once in, an animal carries on while its Stamina is above `RestBelow`, then makes for the
-  nearest land; one the water rises over, or with nowhere to go, walks out first. **Drinking takes real water**: `WaterLiters` fill a
+  nearest land; one the water rises over, or with nowhere to go, walks out first.
+  **How it looks** (Paul's picks from a mockup, 12 Oct 2026): a swimmer sits low, its head
+  and the top of its back above a lighter waterline, its legs under, bobbing one sprite pixel
+  every 0.8 s, with a short fading V wake behind it when it swims sideways; a drowning one
+  (no Stamina) sinks to its eyes and stops bobbing; a wading animal's feet are hidden under
+  the waterline. Nothing flashes: the bob is slow and the wake moves only with the swimmer. **Drinking takes real water**: `WaterLiters` fill a
   meter, taken from the tile drunk from (tiny against a lake; a puddle can be drunk dry), and
   a wading animal drinks where it stands. The bare beach moves with the shore. WATER MODE
   (PAINT) pours 1 m onto every tile of the brush, into the same rules, and it flows from

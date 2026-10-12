@@ -184,6 +184,22 @@
     out[0] = clock % IDLE_PERIOD < IDLE_LEN ? a.idle : FRAME.STAND;
   };
 
+  // ---- in the water ------------------------------------------------------------------
+  // Swimming (Paul's pick, 12 Oct 2026, option B of four): an animal in water deeper than it
+  // wades sits low, the water meeting it at sprite row SWIM_CUT of its cell, with its head
+  // and the top of its back above: SWIM_BELOW rows under its eye (the bunny's eye sits lower
+  // in its art than the wolf's or the human's, so it is measured from the eye). It bobs one
+  // sprite pixel every half SWIM_BOB_MS. Out of Stamina (drowning) it sinks to its eyes and
+  // stops bobbing. Wading, only its feet (the bottom row) are under. render.js draws these.
+  AS.SWIM_CUT = 6;
+  AS.SWIM_BELOW = 1;
+  AS.SWIM_BOB_MS = 1600;
+  // Where sprite row j (column i) starts, in device px from the top (left) of an animal's
+  // cell at tile size px, by stage: a baby is drawn smaller, bottom-centered, as paint() does.
+  const scaledPx = (px, stage) => Math.max(MIN_SCALED_PX, Math.round(px * (stage === AS.STAGE.BABY ? BABY_SCALE : 1)));
+  AS.spriteRowPx = (px, stage, j) => { const b = scaledPx(px, stage); return px - b + Math.round(j * b / SIZE); };
+  AS.spriteColPx = (px, stage, i) => { const b = scaledPx(px, stage); return Math.floor((px - b) / 2) + Math.round(i * b / SIZE); };
+
   // ---- sheet layout -----------------------------------------------------------------
   // Animals: ((((species*2+sex)*3+stage)*2+faceLeft)*FRAMES+frame), then each species'
   // skull, the three grass thirds, the three leaning ones, each species' carcass, the hole,
@@ -195,6 +211,18 @@
   const HOLE0 = CARCASS0 + N_SPECIES, PEEK0 = HOLE0 + 1, WATER0 = PEEK0 + 2, COUNT = WATER0 + WATER_DEPTHS.length * WATER_BITMAPS.length;
   const SHEET_COLS = 19;
   const BY_SPECIES = [BUNNY, WOLF, HUMAN];
+  // The row of a species' standing eye, and the columns a frame's row covers ([first, last],
+  // mirrored when facing left; null if the row is empty): where a swimmer's water meets it.
+  AS.spriteEyeRow = species => BY_SPECIES[species][FRAME.STAND].findIndex(r => /[ey]/.test(r));
+  AS.spriteRowSpan = function (species, frame, row, faceLeft) {
+    const r = BY_SPECIES[species][frame][row];
+    if (!r) return null;
+    const lo = r.search(/[^.]/);
+    if (lo < 0) return null;
+    let hi = SIZE - 1;
+    while (r[hi] === '.') hi--;
+    return faceLeft ? [SIZE - 1 - hi, SIZE - 1 - lo] : [lo, hi];
+  };
   AS.SPRITE_COUNT = COUNT;
   AS.SPRITE_FRAMES = FRAMES;
   AS.spriteSkull = species => SKULL0 + species;

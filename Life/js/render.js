@@ -97,6 +97,10 @@
   const CONTOUR_CSS_PX = [1, 1.6];        // thin, bold: zoomed out
   const CONTOUR_NEAR_CSS_PX = [1.5, 2.5]; // thin, bold: at play zoom (sprites)
   const CONTOUR_CHUNK = 32;
+  // Water against an animal (sprites.js "in the water"): the line where it meets the body,
+  // and a swimmer's wake, WAKE_STEPS sprite pixels long, fading from WAKE_ALPHA.
+  const WATERLINE = '#8fb4d6';
+  const WAKE_STEPS = 4, WAKE_ALPHA = 0.75;
 
   // The Radius slider's preview (Paul, 12 Oct 2026): a circle the size the armed mode will
   // cover, in the middle of the map, held RADIUS_HOLD_MS then faded out over RADIUS_FADE_MS
@@ -350,6 +354,31 @@
         const stepMs = stepSpeed > 0 ? W.aStepDur[a] * 1000 / stepSpeed : Infinity;
         AS.spritePose(sp, moving, W.aSprint[a] === 1, restState[sp][st] === 1, W.aWinded[a] === 1,
           W.aPregnant[a] > 0, hold, stepMs, p, clock + AS.spriteIdleOffset(serial), posed);
+        // In water (sprites.js, "in the water"): the tile under it now, mid-glide the one it is
+        // nearer. Swimming: low, legs under, bobbing; drowning: down to its eyes. Wading: feet under.
+        const under = p < 0.5 ? W.aFrom[a] : W.aTile[a], depth = W.wDepth[under];
+        if (depth > 0) {
+          const stage = stageOf(sim, a, W), left = facing.left(a);
+          const dx = Math.round(ax * s - ox), dy = Math.round(ay * s - oy);
+          if (depth > AS.wadeOf(sim, a)) {
+            const drowning = !(W.aStamina[a] > 0);
+            const bob = drowning ? 0 : ((nowMs + AS.spriteIdleOffset(serial) * 1000) % AS.SWIM_BOB_MS < AS.SWIM_BOB_MS / 2 ? 0 : 1);
+            const firstHidden = AS.spriteEyeRow(sp) + 1 + (drowning ? 0 : AS.SWIM_BELOW) - bob;
+            const id = AS.spriteIndex(sp, W.aSex[a], stage, left, AS.SPRITE_FRAME.STAND);
+            const cutY = AS.spriteRowPx(px, stage, AS.SWIM_CUT), shownH = AS.spriteRowPx(px, stage, firstHidden);
+            ctx.drawImage(img, sh.sx(id), sh.sy(id), px, shownH, dx, dy + cutY - shownH, px, shownH);
+            const lineH = Math.max(1, AS.spriteRowPx(px, stage, firstHidden + 1) - shownH);
+            const span = AS.spriteRowSpan(sp, AS.SPRITE_FRAME.STAND, firstHidden, left);
+            if (span) waterline(dx, dy + cutY, px, stage, span, lineH, moving && !drowning && W.aTile[a] % W.w !== W.aFrom[a] % W.w ? (left ? 1 : -1) : 0);
+          } else {
+            const id = AS.spriteIndex(sp, W.aSex[a], stage, left, posed[0]);
+            const feetY = AS.spriteRowPx(px, stage, AS.SPRITE_SIZE - 1), lift = Math.round(posed[1] * unit);
+            ctx.drawImage(img, sh.sx(id), sh.sy(id), px, feetY, dx, dy - lift, px, feetY);
+            const span = AS.spriteRowSpan(sp, posed[0], AS.SPRITE_SIZE - 1, left);
+            if (span) waterline(dx, dy + feetY, px, stage, span, Math.max(1, px - feetY), 0);
+          }
+          continue;
+        }
         // A bunny that has reached a hole shows only its ears and eyes (arriving or leaving, it
         // is drawn whole, gliding over the hole).
         const peeking = sp === 0 && !moving && W.hole[W.aTile[a]] === 1;
@@ -361,6 +390,25 @@
           Math.round(ax * s - ox), Math.round(ay * s - oy) - Math.round((peeking ? 0 : posed[1]) * unit), px, px);
       }
       ctx.imageSmoothingEnabled = true;
+    }
+
+    // Where the water meets an animal: a lighter line under the columns its body covers in the
+    // first row under water, and swimming sideways (back: -1 behind a right-facing swimmer,
+    // 1 a left-facing one; 0 none) a short V wake that fades behind it. It moves only with
+    // the animal (Paul's pick, 12 Oct 2026).
+    function waterline(dx, y, px, stage, span, h, back) {
+      const x0 = dx + AS.spriteColPx(px, stage, span[0]), x1 = dx + AS.spriteColPx(px, stage, span[1] + 1);
+      ctx.fillStyle = WATERLINE;
+      ctx.fillRect(x0, y, Math.max(1, x1 - x0), h);
+      if (!back) return;
+      const cw = Math.max(1, AS.spriteColPx(px, stage, 1) - AS.spriteColPx(px, stage, 0));
+      for (let k = 1; k <= WAKE_STEPS; k++) {
+        ctx.globalAlpha = WAKE_ALPHA * (1 - (k - 1) / WAKE_STEPS);
+        const x = back < 0 ? x0 - k * cw : x1 + (k - 1) * cw, spread = Math.ceil(k / 2) * h;
+        ctx.fillRect(x, y - spread, cw, h);
+        ctx.fillRect(x, y + spread, cw, h);
+      }
+      ctx.globalAlpha = 1;
     }
 
     // Scorched tiles under everything else. Alpha is the share of ScorchDays left, in steps.

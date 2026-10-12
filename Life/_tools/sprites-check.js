@@ -155,5 +155,18 @@ check(offs.size > 40, 'idle offsets differ per serial');
   W.aCap = 100; W.aHigh = 50; for (let i = 1; i < 50; i++) { W.aAlive[i] = 1; W.aSerial[i] = i; W.aTile[i] = 1; W.aFrom[i] = 2; }
   f.update(W); check(f.left(49) === 1 && f.left(0) === 0, 'grows with aCap, keeping slots');
 }
+// In the water: each species has an eye in its standing frame, above the swimming cut, so a
+// swimmer always shows its eyes; rows and columns land where paint() puts them; spans mirror.
+{
+  const F = AS.SPRITE_FRAME, S = AS.STAGE;
+  for (let sp = 0; sp < AS.SPECIES_COUNT; sp++) {
+    const e = AS.spriteEyeRow(sp);
+    check(e >= 0 && e + 1 + AS.SWIM_BELOW <= AS.SWIM_CUT, `species ${sp}: eye row ${e} stays above the water when swimming`);
+    const r = AS.spriteRowSpan(sp, F.STAND, e + 1, false), l = AS.spriteRowSpan(sp, F.STAND, e + 1, true);
+    check(r && l && l[0] === 7 - r[1] && l[1] === 7 - r[0], `species ${sp}: a waterline span mirrors when facing left`);
+  }
+  check(AS.spriteRowPx(48, S.ADULT, 3) === 18 && AS.spriteColPx(48, S.ADULT, 8) === 48, 'an adult\'s rows and columns are whole sprite pixels of its cell');
+  check(AS.spriteRowPx(48, S.BABY, 8) === 48 && AS.spriteRowPx(48, S.BABY, 0) > 0, 'a baby\'s rows end at its cell\'s bottom (drawn smaller, bottom-centered)');
+}
 console.log(bad ? `FAIL (${bad})` : `PASS (${maps.length} bitmaps, ${seen.size} sprites)`);
 process.exit(bad ? 1 : 0);

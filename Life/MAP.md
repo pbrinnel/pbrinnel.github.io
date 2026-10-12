@@ -134,7 +134,7 @@ that targets that tile as biting or eating (ACTION). A bite is also spotted as a
 where the timer has run down within a frame). `spritePose` picks the frame: hold, sprint run
 cycle, walk, winded/resting, pregnant, idle fidget, stand. Steps shorter than
 `SPRITE_MIN_STEP_MS` of real time (the `speed` passed to `draw`) glide in the standing pose.
-Mating animals face their partner. Grass leans in a rare gust (`grassLeans`, real seconds: a diagonal band, `GUST_EVERY` apart; sprite mode only, lean variants are extra sheet sprites). Cell mode still consumes events, so holds don't replay on
+Mating animals face their partner. **In water** (the tile under it mid-glide: the nearer one): deeper than it wades, it is drawn in its standing frame with only the rows down to `SWIM_BELOW` under its eye (`spriteEyeRow`) shown, set lower so the water meets it at row `SWIM_CUT`, bobbing a row every half `SWIM_BOB_MS` (real time, its own phase); at 0 Stamina (drowning) down to its eye row, still. A `WATERLINE` under the next row's span (`spriteRowSpan`), and a fading V wake (`WAKE_STEPS`) behind one swimming sideways. Wading: its pose without the bottom (feet) row, the line under it. `spriteRowPx`/`spriteColPx` place rows and columns as `paint` does (babies smaller). Grass leans in a rare gust (`grassLeans`, real seconds: a diagonal band, `GUST_EVERY` apart; sprite mode only, lean variants are extra sheet sprites). Cell mode still consumes events, so holds don't replay on
 zoom-in. Holds never flash: see DESIGN.md, Photosensitivity.
 
 ## Recipes
