@@ -90,8 +90,7 @@
   // tile within r of (cx, cy), into the world's water rules (water.js), which take it from
   // there: downhill, into the soil, out at the river mouths. What it reaches it treats as any
   // water would (drowned grass and holes, corpses washed away, animals wading or stepping
-  // out). A world made without water gets the rules here, dry, with no river mouths. The
-  // grass-shore boost (W.shore) stays as the world was built.
+  // out). A world made without water gets the rules here, dry, with no river mouths.
   const POUR_DEPTH = 1;
   function pourWater(sim, cx, cy, r) {
     const W = sim.W, reach = Math.floor(r), r2 = r * r;

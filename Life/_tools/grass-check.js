@@ -21,16 +21,15 @@ function make(size, seed = 1, edit) {
 }
 const day = AS => AS.TICK_HZ * AS.DAY_SECONDS;
 
-// (a) lone sprout fills in 1/GrowthRate days, within one tick
+// (a) lone sprout fills in 1/GrowthRate days, within the hour its growth comes in
 {
   const { AS, T, sim } = make(9);
   const W = sim.W, t = W.tile(4, 4);
   W.addGrass(t, 0, 0);
   const ticks = Math.round(day(AS) / T.grass.GrowthRate);
-  for (let i = 0; i < ticks - 1; i++) sim.tick();
-  const before = W.gSize[t];
-  sim.tick();
-  ok(before < 1 && W.gSize[t] >= 1 - 1e-5 && W.gSize[t] <= 1, `a: sprout reaches 1 at tick ${ticks} (1/GrowthRate days); size before ${before.toFixed(4)}`);
+  let full = -1;
+  for (let i = 0; i < ticks + 2 * AS.TICKS_PER_HOUR && full < 0; i++) { sim.tick(); if (W.gSize[t] >= 1 - 1e-5) full = i + 1; }
+  ok(full > 0 && Math.abs(full - ticks) <= AS.TICKS_PER_HOUR && W.gSize[t] <= 1, `a: sprout full at tick ${full}, 1/GrowthRate days is ${ticks} (within an hour = ${AS.TICKS_PER_HOUR})`);
 }
 
 // (b) seeding rate matches SeedChance
@@ -73,8 +72,10 @@ const day = AS => AS.TICK_HZ * AS.DAY_SECONDS;
   const W = sim.W, c = W.tile(4, 4), g = W.tile(5, 4);
   W.addCorpse(c, AS.SPECIES.WOLF); AS.corpseAdded(sim, c);
   W.addGrass(g, 0, 0);
-  const nut0 = W.cNut[c], boost = T.wolf.CorpseBoost, base = T.grass.GrowthRate * AS.DT_DAYS;
-  sim.tick();
+  // Grass grows once an hour, an hour's worth, so each of these runs one hour.
+  const hour = AS.TICKS_PER_HOUR, base = T.grass.GrowthRate * hour * AS.DT_DAYS;
+  const nut0 = W.cNut[c], boost = T.wolf.CorpseBoost;
+  for (let i = 0; i < hour; i++) sim.tick();
   const grown = W.gSize[g], used = nut0 - W.cNut[c];
   ok(Math.abs(grown - base * boost) < 1e-7, `d: boosted growth ${grown.toExponential(3)} = ${boost} x base ${base.toExponential(3)}`);
   ok(Math.abs(used - (grown - base)) < 1e-6, `d: nutrient fell ${used.toExponential(3)} = extra growth ${(grown - base).toExponential(3)}`);
@@ -82,13 +83,13 @@ const day = AS => AS.TICK_HZ * AS.DAY_SECONDS;
   const { AS: A2, sim: s2 } = make(9);
   s2.W.addCorpse(s2.W.tile(4, 4), A2.SPECIES.WOLF); A2.corpseAdded(s2, s2.W.tile(4, 4));
   s2.W.addGrass(s2.W.tile(5, 4), 1, 0);
-  const n0 = s2.W.cNut[s2.W.tile(4, 4)]; s2.tick();
+  const n0 = s2.W.cNut[s2.W.tile(4, 4)]; for (let i = 0; i < hour; i++) s2.tick();
   ok(s2.W.cNut[s2.W.tile(4, 4)] === n0, 'd: a full blade does not drink');
   // Outside the radius: no boost
   const { AS: A3, sim: s3 } = make(15);
   const c3 = s3.W.tile(7, 7), far = s3.W.tile(7 + Math.ceil(T.wolf.CorpseRadius) + 1, 7);
-  s3.W.addCorpse(c3, A3.SPECIES.WOLF); A3.corpseAdded(s3, c3); s3.W.addGrass(far, 0, 0); s3.tick();
-  ok(Math.abs(s3.W.gSize[far] - base) < 1e-9, 'd: grass outside CorpseRadius grows at base rate');
+  s3.W.addCorpse(c3, A3.SPECIES.WOLF); A3.corpseAdded(s3, c3); s3.W.addGrass(far, 0, 0); for (let i = 0; i < hour; i++) s3.tick();
+  ok(Math.abs(s3.W.gSize[far] - base) < 1e-7, 'd: grass outside CorpseRadius grows at base rate');   // sizes are float32
 }
 
 // (e) decay, drain, handover
@@ -126,7 +127,7 @@ const day = AS => AS.TICK_HZ * AS.DAY_SECONDS;
   W3.addCorpse(c, A3.SPECIES.BUNNY); A3.corpseAdded(s3.sim, c);
   for (const t of [W3.tile(3, 4), W3.tile(5, 4)]) W3.addGrass(t, 0, 0);
   W3.cNut[c] = 1e-4;
-  for (let i = 0; i < 5; i++) s3.sim.tick();
+  for (let i = 0; i < A3.TICKS_PER_HOUR + 5; i++) s3.sim.tick();
   ok(W3.kind[c] !== A3.KIND.CORPSE && W3.cCount === 0, 'e: drained corpse is removed early');
   let ref = 0; for (let t = 0; t < W3.n; t++) if (W3.boostSrc[t] >= 0) ref++;
   ok(ref === 0, 'e: drained corpse leaves no boostSrc');

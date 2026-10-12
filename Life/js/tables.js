@@ -105,8 +105,6 @@
     ['SproutSize', 'frac', ['Grass']],
     ['SproutChance', 'frac', ['Grass']],
     ['SeedChance', 'frac', ['Grass']],
-    ['WaterRadius', 'num', ['Grass']],
-    ['WaterBoost', 'num', ['Grass']],
     ['CorpseNutrient', 'num', ANIMALS],
     ['CorpseDecay', 'pos', ANIMALS],
     ['MeatOnBody', 'num', ANIMALS],

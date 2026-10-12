@@ -2,9 +2,9 @@
 // The ground and its water (terrain.js, water.js; world.js wDepth and KIND.WATER): every world
 // has an elevation grown before day 0; the water rules settle water on it, lower than the land,
 // more with more Rain, leaving the map only at river mouths, and keep running, so day 0 is
-// already at rest; animals wade water no deeper than WadeDepth and never stand in deeper;
-// drinking takes real water; water holds nothing else, never blocks sight, survives a nuke,
-// and grass grows and seeds faster along it; Scatter has no water.
+// already at rest; animals wade water no deeper than WadeDepth and swim deeper; drinking
+// takes real water; water holds nothing else, never blocks sight and survives a nuke; Scatter
+// has no water.
 const { load, audit, editCSV, failures } = require('./harness.js');
 let bad = 0;
 function ok(c, m) { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) bad++; }
@@ -124,9 +124,27 @@ function landPieces(AS, W) {
 // ---- Rain 0, and Scatter, have no water (but still have ground) ----
 {
   const a = make(3, [set('Rain', 0)]);
-  ok(landPieces(a.AS, a.W).water === 0 && a.W.shore.every(v => v === 1) && a.W.water, 'Rain 0: no water and no shore boost, but the water rules, for water poured in');
+  ok(landPieces(a.AS, a.W).water === 0 && a.W.water, 'Rain 0: no water, but the water rules, for water poured in');
   const b = make(3, [set('StartLayout', 'Scatter')]);
-  ok(landPieces(b.AS, b.W).water === 0 && b.W.shore.every(v => v === 1) && b.W.elev.some(e => e > 0) && !b.W.water, 'Scatter: no water and no water rules, but the ground has height');
+  ok(landPieces(b.AS, b.W).water === 0 && b.W.elev.some(e => e > 0) && !b.W.water, 'Scatter: no water and no water rules, but the ground has height');
+}
+
+// ---- Grown elsewhere (main.js grows it in a worker): the same world, tile for tile ----
+{
+  const direct = make(6);
+  const elsewhere = make(6);   // its own sandbox, as a worker has
+  const { AS: A2, T: T2 } = elsewhere;
+  const grown = A2.growTerrain({ T: T2, seed: 6, W: A2.World(T2) }, true);
+  const copy = structuredClone(grown);   // what crosses to the page
+  const laid = direct.AS.Sim(direct.T, 6, { terrain: copy });
+  const a = direct.W, b = laid.W;
+  let same = a.waterCount === b.waterCount && a.bunnies === b.bunnies && a.wolves === b.wolves && a.gCount === b.gCount;
+  for (let t = 0; t < a.n && same; t++) if (a.kind[t] !== b.kind[t] || a.elev[t] !== b.elev[t] || a.wDepth[t] !== b.wDepth[t] || a.water.G[t] !== b.water.G[t]) same = false;
+  ok(same, 'a world laid from terrain grown in another sandbox is the same as one grown in place');
+  for (let i = 0; i < DAY; i++) { direct.sim.tick(); laid.tick(); }
+  let still = direct.W.bunnies === b.bunnies && direct.W.wolves === b.wolves;
+  for (let t = 0; t < a.n && still; t++) if (a.kind[t] !== b.kind[t] || a.wDepth[t] !== b.wDepth[t]) still = false;
+  ok(still, 'and a day later they are still the same');
 }
 
 // ---- Same seed, same ground and water ----
@@ -313,69 +331,6 @@ function landPieces(AS, W) {
     if (W.aTargetTile[wolf] >= 0) hunted = true;
   }
   ok(hunted && onWater === 0, 'a wolf that can\'t swim sees a bunny across deep water, hunts it and never enters the water');
-}
-
-// ---- Grass likes water ----
-{
-  // A bare 120 x 70 world: water in the top rows (Water off: no rules to move it), so rows
-  // within WaterRadius of it are shore and rows far below are not. WaterRadius is raised to
-  // give both regions room.
-  const R = 25;
-  const edits = [set('WorldWidth', 120), set('WorldHeight', 70), set('StartGrass', 0), set('StartBunnies', 0), set('StartWolves', 0), set('Water', 'off'),
-    ['species', 'WaterBoost', 'Grass', '2'],   // pinned: the shipped value may be 1 (no boost), but the rule is tested at 2
-    ['species', 'WaterRadius', 'Grass', String(R)], ['species', 'SproutChance', 'Grass', '0%'], ['species', 'SeedChance', 'Grass', '10%']];
-  const build = extra => {
-    const m = make(5, [...edits, ...extra]);
-    for (let y = 0; y < 8; y++) for (let x = 0; x < m.W.w; x++) m.W.addWater(m.W.tile(x, y));
-    m.W.setShore(m.T.grass.WaterRadius, m.T.grass.WaterBoost);
-    return m;
-  };
-  const boost = 2;   // pinned in `edits` above
-  const nearRows = [10, 30], farRows = [40, 68];   // the shore ends at row 7 + R = 32
-  const inRows = (W, rows, t) => W.ty(t) >= rows[0] && W.ty(t) <= rows[1];
-  {
-    const { W, sim } = build([]);
-    ok(W.shore[W.tile(5, 9)] === boost && W.shore[W.tile(5, 7 + R)] === boost && W.shore[W.tile(5, 7 + R + 1)] === 1,
-      `W.shore is WaterBoost within WaterRadius of a lake (${boost}), 1 beyond it`);
-    // Growth: a sprout on the shore and one far away, same ticks.
-    const near = W.tile(60, 20), far = W.tile(60, 55);
-    W.addGrass(near, 0.1, 0.5); W.addGrass(far, 0.1, 0.5);
-    for (let i = 0; i < 6; i++) sim.tick();
-    const gn = W.gSize[near] - 0.1, gf = W.gSize[far] - 0.1;
-    ok(gf > 0 && Math.abs(gn / gf - boost) < 1e-3, `a blade on the shore grows ${boost} times as fast (ratio ${(gn / gf).toFixed(3)})`);
-  }
-  {
-    // Seeding: mature blades on a spaced grid in the shore region and in the far region.
-    const { W, sim } = build([]);
-    const startNear = [], startFar = [];
-    for (let y = 10; y <= 30; y += 3) for (let x = 1; x < W.w; x += 3) { W.addGrass(W.tile(x, y), 1, 1); startNear.push(W.tile(x, y)); }
-    for (let y = 44; y <= 64; y += 3) for (let x = 1; x < W.w; x += 3) { W.addGrass(W.tile(x, y), 1, 1); startFar.push(W.tile(x, y)); }
-    const known = new Set([...startNear, ...startFar]);
-    for (let i = 0; i < DAY; i++) sim.tick();
-    let nNear = 0, nFar = 0;
-    for (let t = 0; t < W.n; t++) if (W.kind[t] === 1 /* KIND.GRASS */ && !known.has(t)) { if (inRows(W, nearRows, t)) nNear++; else if (inRows(W, farRows, t)) nFar++; }
-    ok(nFar > 20 && nNear > nFar * (1 + (boost - 1) * 0.5), `blades near water seed faster: ${nNear} new beside the lake, ${nFar} far from it (WaterBoost ${boost})`);
-  }
-  {
-    // Sprouting on bare ground.
-    const { W, sim } = build([['species', 'SproutChance', 'Grass', '30%'], ['species', 'SeedChance', 'Grass', '0%']]);
-    for (let i = 0; i < DAY; i++) sim.tick();
-    let nNear = 0, nFar = 0;
-    for (let t = 0; t < W.n; t++) if (W.kind[t] === 1 /* KIND.GRASS */) { if (inRows(W, nearRows, t)) nNear++; else if (inRows(W, farRows, t)) nFar++; }
-    // Per tile, since the two regions differ in size.
-    const dNear = nNear / ((nearRows[1] - nearRows[0] + 1) * W.w), dFar = nFar / ((farRows[1] - farRows[0] + 1) * W.w);
-    ok(nFar > 100 && dNear > dFar * (1 + (boost - 1) * 0.5), `bare shore sprouts faster: ${dNear.toFixed(3)} of tiles beside the lake, ${dFar.toFixed(3)} far from it`);
-  }
-  {
-    // A corpse's boost multiplies with the shore's rather than replacing it.
-    const { AS, W, sim, T } = build([]);
-    const a = W.tile(60, 20), b = W.tile(60, 60);
-    for (const t of [a, b]) { W.addGrass(W.tile(W.tx(t) + 1, W.ty(t)), 0.1, 0.5); AS.debugDropCorpse(sim, t, AS.SPECIES.BUNNY); }
-    const ga = W.tile(61, 20), gb = W.tile(61, 60);
-    for (let i = 0; i < 4; i++) sim.tick();
-    const ra = W.gSize[ga] - 0.1, rb = W.gSize[gb] - 0.1;
-    ok(rb > 0 && Math.abs(ra / rb - boost) < 1e-3, `corpse and shore boosts multiply (ratio ${(ra / rb).toFixed(3)} = WaterBoost)`);
-  }
 }
 
 // ---- Wading: water no deeper than an animal's WadeDepth is ground to it, slower ----

@@ -1,6 +1,6 @@
-// Grass: growth every tick, then age, seeding and old-age death rolled once per in-world
-// hour. The hour is spread over TICKS_PER_HOUR ticks, one slice of tiles per tick, so no
-// single tick pays for the whole meadow.
+// Grass: growth, age, seeding and old-age death, all once per in-world hour. The hour is
+// spread over TICKS_PER_HOUR ticks, one slice of tiles per tick, so no single tick pays for
+// the whole meadow.
 (function (AS) {
   'use strict';
 
@@ -10,9 +10,10 @@
   const DEAD_SIZE = 1e-6;
 
   // SeedChance is "seeds at least once per day", so it becomes a per-day hazard rate and the
-  // hourly chance follows from it. Boost multiplies the rate, not the chance, so it can never
-  // push the chance past 1; the lakeshore's boost (W.shore) multiplies it the same way. Rebuilt when the tables change (one per sim in practice).
-  let cachedT = null, hourlyRate = 0, seedsAlways = false, sproutRate = 0;
+  // hourly chance follows from it. A corpse's boost multiplies the rate, not the chance, so it
+  // can never push the chance past 1. Rebuilt when the tables change (one per sim in practice).
+  // sproutP and seedP: the hourly chances with no boost, worked out once.
+  let cachedT = null, hourlyRate = 0, seedsAlways = false, sproutRate = 0, sproutP = 0, seedP = 0;
   // Per-day chance → per-hour hazard rate, so a boost multiplies the rate, not the chance.
   const hourlyHazard = c => (c > 0 && c < 1 ? -Math.log(1 - c) / HOURS_PER_DAY : 0);
   function prepare(T) {
@@ -21,6 +22,8 @@
     seedsAlways = c >= 1;
     hourlyRate = hourlyHazard(c);
     sproutRate = T.grass.SproutChance >= 1 ? Infinity : hourlyHazard(T.grass.SproutChance);
+    sproutP = 1 - Math.exp(-sproutRate);
+    seedP = 1 - Math.exp(-hourlyRate);
   }
 
   const nb = new Int32Array(4);
@@ -28,26 +31,10 @@
   AS.grassTick = function (sim) {
     const { T, W, rng } = sim;
     if (T !== cachedT) prepare(T);
-    const g = T.grass, gSize = W.gSize, gList = W.gList, boostSrc = W.boostSrc, cNut = W.cNut;
-    const base = g.GrowthRate * AS.DT_DAYS, shore = W.shore;
-
-    for (let i = 0, n = W.gCount; i < n; i++) {
-      const t = gList[i], s = gSize[t];
-      if (s >= 1) continue;
-      // A lakeshore's boost multiplies the base rate, so a corpse's boost multiplies on top of it.
-      const rate = base * shore[t];
-      let grown = s + rate;
-      const src = boostSrc[t];
-      if (src >= 0 && grown < 1) {
-        // Each unit of extra growth costs the corpse one unit of Nutrient.
-        const boost = sim.T[AS.SPECIES_KEY[W.cSpecies[src]]].CorpseBoost;
-        let extra = rate * (boost - 1);
-        if (extra > 1 - grown) extra = 1 - grown;
-        if (extra > cNut[src]) extra = cNut[src];
-        if (extra > 0) { cNut[src] -= extra; grown += extra; }
-      }
-      gSize[t] = grown < 1 ? grown : 1;
-    }
+    const g = T.grass, gSize = W.gSize, boostSrc = W.boostSrc, cNut = W.cNut;
+    // A blade grows an hour's worth when the hourly pass reaches its tile (not a sliver every
+    // tick: the same growth a day, a 25th of the work).
+    const rate = g.GrowthRate * DAYS_PER_HOUR;
 
     const phase = sim.tickCount % AS.TICKS_PER_HOUR;
     const firstNew = W.nextSerial;   // blades seeded in this pass wait for the next hour
@@ -60,12 +47,26 @@
       // land it has lost; a nearby corpse speeds that up like it speeds seeding.
       if (W.kind[t] === AS.KIND.EMPTY) {
         if (sproutRate > 0 && !W.hole[t] && burnt === 0 && !W.beach[t]) {
-          const ps = 1 - Math.exp(-sproutRate * shore[t] * (boostSrc[t] >= 0 ? AS.corpseBoost(sim, t) : 1));
+          const ps = boostSrc[t] >= 0 ? 1 - Math.exp(-sproutRate * AS.corpseBoost(sim, t)) : sproutP;
           if (rng.chance(ps)) W.addGrass(t, g.SproutSize, 0);
         }
         continue;
       }
       if (W.kind[t] !== AS.KIND.GRASS || W.serial[t] >= firstNew) continue;
+      const s = gSize[t];
+      if (s < 1) {
+        let grown = s + rate;
+        const src = boostSrc[t];
+        if (src >= 0 && grown < 1) {
+          // Each unit of extra growth costs the corpse one unit of Nutrient.
+          const boost = sim.T[AS.SPECIES_KEY[W.cSpecies[src]]].CorpseBoost;
+          let extra = rate * (boost - 1);
+          if (extra > 1 - grown) extra = 1 - grown;
+          if (extra > cNut[src]) extra = cNut[src];
+          if (extra > 0) { cNut[src] -= extra; grown += extra; }
+        }
+        gSize[t] = grown < 1 ? grown : 1;
+      }
       const age = W.gAge[t] += DAYS_PER_HOUR;
       if (age >= g.Lifespan) { W.removeGrass(t); continue; }
       if (gSize[t] < 1) continue;
@@ -74,7 +75,7 @@
       else if (hourlyRate === 0) continue;
       else {
         const src = boostSrc[t];
-        p = 1 - Math.exp(-hourlyRate * shore[t] * (src >= 0 ? AS.corpseBoost(sim, t) : 1));
+        p = src >= 0 ? 1 - Math.exp(-hourlyRate * AS.corpseBoost(sim, t)) : seedP;
       }
       if (p < 1 && !rng.chance(p)) continue;
       const k = W.neighbors4(t, nb);

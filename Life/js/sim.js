@@ -20,7 +20,8 @@
   // to) instead of StartGrassAge, and opts.bodies 'mixed' starts each animal at a random
   // Fullness, so some are hungry and hunting or seeking food from the first second. Both
   // make a benchmark world cost what a world mid-run does. opts.layout overrides
-  // settings.csv's StartLayout.
+  // settings.csv's StartLayout. opts.water overrides its Water, and opts.terrain is
+  // AS.growTerrain's result for this seed and water, made elsewhere (main.js: in a worker).
   // Population history, one sample per in-world hour (counts at the start of that hour; humans are never placed at the start, so their series starts at 0),
   // for the graph. It grows by doubling, so a long run costs a few bytes per hour.
   const HISTORY_START = 24 * 64;

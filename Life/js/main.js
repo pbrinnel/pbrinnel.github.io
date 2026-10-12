@@ -141,13 +141,28 @@
     return;
   }
 
-  // Making a world takes seconds (terrain.js grows the ground, the water settles), so the
-  // loading card shows first and gets two frames to paint before the work starts.
+  // Making a world takes seconds (terrain.js grows the ground, the water settles). That part
+  // runs in a worker (terrain-worker.js) so the page stays alive, with the loading card up;
+  // the page then lays the world from it. Without workers (a page opened as a file) the
+  // page grows it itself, after giving the card two frames to paint.
   const loadingEl = document.getElementById('loading');
   const nextFrame = () => new Promise(r => requestAnimationFrame(() => r()));
+  function growInWorker(seed) {
+    return new Promise(resolve => {
+      let wk;
+      try { wk = new Worker(AS.BASE + 'js/terrain-worker.js?v=' + AS.V); } catch (e) { resolve(null); return; }
+      const done = r => { wk.terminate(); resolve(r); };
+      wk.onmessage = e => done(e.data);
+      wk.onerror = e => { e.preventDefault(); done(null); };
+      wk.postMessage({ base: new URL(AS.BASE, location.href).href, v: AS.V, T, seed, water: waterOn });
+    });
+  }
   async function makeWorld(seed) {
     if (loadingEl) { loadingEl.hidden = false; await nextFrame(); await nextFrame(); }
-    try { return AS.Sim(T, seed, { water: waterOn }); } finally { if (loadingEl) loadingEl.hidden = true; }
+    try {
+      const grown = typeof Worker === 'function' ? await growInWorker(seed) : null;
+      return AS.Sim(T, seed, { water: waterOn, terrain: grown || undefined });
+    } finally { if (loadingEl) loadingEl.hidden = true; }
   }
 
   const { T, errors, warnings } = await AS.loadTables(AS.V);

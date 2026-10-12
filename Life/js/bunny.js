@@ -124,7 +124,8 @@
     own(W, m, s);
     mW = W;
     mThreat = AS.relations(sim.T).threat[AS.SPECIES.BUNNY];
-    const t = AS.nearestVisible(sim, W.aTile[s], AS.speciesStats(sim, s).VisionRange, isThreat);
+    const range = AS.speciesStats(sim, s).VisionRange;
+    const t = W.anyNear(W.aTile[s], range, mThreat) ? AS.nearestVisible(sim, W.aTile[s], range, isThreat) : -1;
     if (t >= 0) m.threatAt[s] = sim.simSeconds;
     return t;
   }

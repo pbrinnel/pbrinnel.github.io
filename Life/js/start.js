@@ -133,7 +133,7 @@
     const { W, T } = sim, S = T.world;
     // The ground, and with Water on the lakes and rivers it makes (terrain.js). Off: no water
     // at all, which is also no thirst (animals.js), the world as it was before water.
-    const lakes = AS.layTerrain(sim, opts.water !== undefined ? opts.water : S.Water);
+    const lakes = AS.layTerrain(sim, opts.water !== undefined ? opts.water : S.Water, opts.terrain);
     const vals = meadowField(sim);
     const th = threshold(vals, S.StartGrass, W);
     // StartGrass 0 means no grass at all, not even lone seedlings (checks build empty worlds).

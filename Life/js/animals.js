@@ -605,11 +605,11 @@
         decide(sim, s, key);
         W.aDecideLeft[s] += 1 / S.DecidePerSec;
       }
-      const swimming = inDeep(sim, s);
+      const wade = S.WadeDepth || 0, swimming = W.wDepth[W.aTile[s]] > wade;
       if (swimming && !AS.swimsNow(sim, s)) { wadeOut(sim, s); continue; }
       if (W.aState[s] !== NO_STATE) IMPL[key][T.states[key][W.aState[s]].name].act(sim, s);
       // Swimming with nowhere to go (a plain wander, say) is no reason to stay in: out.
-      if (swimming && W.aAlive[s] && inDeep(sim, s) && W.aStepLeft[s] <= 0 && W.aTargetTile[s] < 0) wadeOut(sim, s);
+      if (swimming && W.aAlive[s] && W.wDepth[W.aTile[s]] > wade && W.aStepLeft[s] <= 0 && W.aTargetTile[s] < 0) wadeOut(sim, s);
     }
   };
 })(globalThis.AS);

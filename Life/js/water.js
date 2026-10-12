@@ -55,6 +55,9 @@
   AS.Water = function (grid, S, outlet) {
     const { w, h, n } = grid, E = grid.elev;
     const H = new Float64Array(n), G = new Float64Array(n), dH = new Float64Array(n), dG = new Float64Array(n), L = new Float64Array(n);
+    // The soil's floor under each tile (the ground minus SoilDepth): the ground doesn't move.
+    const floor = new Float64Array(n);
+    for (let i = 0; i < n; i++) floor[i] = E[i] - S.SoilDepth;
     const wet = new Int32Array(n), touched = new Int32Array(n), mark = new Uint8Array(n);
     let wetN = 0;
     const room = S.SoilDepth * POROSITY;
@@ -133,18 +136,18 @@
     // minus SoilDepth, plus the water's height in it); out of the map only at a river mouth.
     // Darcy: SoilFlow × thickness × (drop / TILE_M) × dt over a tile's width, as water (× POROSITY).
     function soil(dt) {
-      const k = S.SoilFlow * dt * POROSITY / (TILE_M * TILE_M), floor = S.SoilDepth;
-      for (let i = 0; i < n; i++) { L[i] = E[i] - floor + G[i] / POROSITY; dG[i] = 0; }
+      const k = S.SoilFlow * dt * POROSITY / (TILE_M * TILE_M), perM = 1 / POROSITY, capK = POROSITY / 5;
+      for (let i = 0; i < n; i++) { L[i] = floor[i] + G[i] * perM; dG[i] = 0; }
       for (let y = 0, i = 0; y < h; y++) {
         for (let x = 0; x < w; x++, i++) {
           const g = G[i];
           if (g <= 0) continue;
-          const thick = g / POROSITY, top = L[i], kt = k * thick;
+          const thick = g * perM, top = L[i], kt = k * thick;
           let total = 0, scale = 1, a = 0, b = 0, c = 0, d = 0;
-          if (x > 0) { const dr = top - L[i - 1]; if (dr > 0) { a = kt * dr; const cap = dr * POROSITY / 5; if (a > cap) scale = min(scale, cap / a); total += a; } }
-          if (x < w - 1) { const dr = top - L[i + 1]; if (dr > 0) { b = kt * dr; const cap = dr * POROSITY / 5; if (b > cap) scale = min(scale, cap / b); total += b; } }
-          if (y > 0) { const dr = top - L[i - w]; if (dr > 0) { c = kt * dr; const cap = dr * POROSITY / 5; if (c > cap) scale = min(scale, cap / c); total += c; } }
-          if (y < h - 1) { const dr = top - L[i + w]; if (dr > 0) { d = kt * dr; const cap = dr * POROSITY / 5; if (d > cap) scale = min(scale, cap / d); total += d; } }
+          if (x > 0) { const dr = top - L[i - 1]; if (dr > 0) { a = kt * dr; const cap = dr * capK; if (a > cap) scale = min(scale, cap / a); total += a; } }
+          if (x < w - 1) { const dr = top - L[i + 1]; if (dr > 0) { b = kt * dr; const cap = dr * capK; if (b > cap) scale = min(scale, cap / b); total += b; } }
+          if (y > 0) { const dr = top - L[i - w]; if (dr > 0) { c = kt * dr; const cap = dr * capK; if (c > cap) scale = min(scale, cap / c); total += c; } }
+          if (y < h - 1) { const dr = top - L[i + w]; if (dr > 0) { d = kt * dr; const cap = dr * capK; if (d > cap) scale = min(scale, cap / d); total += d; } }
           const off = outlet[i] ? kt * thick : 0;
           total += off;
           if (total <= 0) continue;

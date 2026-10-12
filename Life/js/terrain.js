@@ -330,12 +330,10 @@
     return S;
   };
 
-  // Every world: the ground; with `water`, the water the rules settle on it (world.js
-  // addWater, W.wDepth) and the shore the grass is boosted along. Returns the
-  // centers of the lakes (bodies of water of LAKE_MIN tiles or more).
-  const LAKE_MIN = 40;
-  AS.layTerrain = function (sim, water) {
-    const { W, T } = sim, rng = AS.makeRng((sim.seed ^ SEED_SALT) >>> 0);
+  // The slow part, which needs nothing of the world but its size: the ground into W.elev and,
+  // with `water`, the rules settled on it. Returns { S, outlet, wat }.
+  function grow(sim, water) {
+    const W = sim.W, rng = AS.makeRng((sim.seed ^ SEED_SALT) >>> 0);
     const S = AS.terrainOf(sim, rng);
     const spots = [];
     for (let i = 0; i < max(1, S.RiverMouths); i++) spots.push(rng.next());
@@ -362,14 +360,13 @@
     for (let t = 0; t < W.n; t++) { if (E[t] < lo) lo = E[t]; if (E[t] > hi) hi = E[t]; }
     const k2 = hi > lo ? S.Relief / (hi - lo) : 0;
     for (let t = 0; t < W.n; t++) E[t] = (E[t] - lo) * k2;
-    if (!water) return [];
+    if (!water) return { S, outlet: null, wat: null };
 
     // The water: a rough first guess, then the rules for PreRunDays. A world with no rain
     // still gets the rules (dry), so water poured into it flows.
     const outlet = mouths(W.w, W.h, spots);
-    W.outlet = outlet;
     const wat = AS.Water(W, S, outlet);
-    if (!(S.Rain > 0)) { W.water = wat; return []; }
+    if (!(S.Rain > 0)) return { S, outlet, wat };
     const F = restingLevel(W, outlet);
     for (let t = 0; t < W.n; t++) {
       const d = (F[t] - E[t]) * GUESS_FULL;
@@ -378,6 +375,36 @@
     }
     wat.listWet();
     wat.preRun(S.PreRunDays);
+    return { S, outlet, wat };
+  }
+
+  // grow() as plain arrays, for a worker to send back (main.js, terrain-worker.js): the same
+  // seed and tables make the same numbers wherever it runs.
+  AS.growTerrain = function (sim, water) {
+    const { S, outlet, wat } = grow(sim, water);
+    return { S, water: !!water, elev: sim.W.elev, outlet, H: wat ? wat.H : null, G: wat ? wat.G : null };
+  };
+
+  // Every world: the ground; with `water`, the water the rules settle on it (world.js
+  // addWater, W.wDepth). `grown` is growTerrain's result for this seed, made elsewhere, or
+  // left out to grow it here. Returns the centers of the lakes (bodies of water of LAKE_MIN
+  // tiles or more).
+  const LAKE_MIN = 40;
+  AS.layTerrain = function (sim, water, grown) {
+    const W = sim.W;
+    let S, outlet, wat;
+    if (grown && grown.water === !!water) {
+      sim.terrain = S = grown.S;
+      W.elev.set(grown.elev);
+      outlet = grown.outlet;
+      if (outlet) {
+        wat = AS.Water(W, S, outlet);
+        if (grown.H) { wat.H.set(grown.H); wat.G.set(grown.G); wat.listWet(); }
+      }
+    } else ({ S, outlet, wat } = grow(sim, water));
+    if (!water) return [];
+    W.outlet = outlet;
+    if (!(S.Rain > 0)) { W.water = wat; return []; }
     const wet = new Uint8Array(W.n);
     for (let t = 0; t < W.n; t++) {
       if (!(wat.H[t] > 0)) continue;
@@ -385,7 +412,6 @@
       W.addWater(t, wat.H[t]);
     }
     W.water = wat;   // after laying it, which would otherwise copy each tile back into it
-    W.setShore(T.grass.WaterRadius, T.grass.WaterBoost);
     // The lakes' centers: bodies of water LAKE_MIN tiles or more.
     const { label, sizes } = landPieces(W, wet.map(v => (v ? 0 : 1)));
     const sx = new Float64Array(sizes.length), sy = new Float64Array(sizes.length);

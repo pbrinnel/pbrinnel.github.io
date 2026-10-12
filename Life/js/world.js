@@ -19,6 +19,7 @@
   const SP = AS.SPECIES = Object.freeze({ BUNNY: 0, WOLF: 1, HUMAN: 2 });
   AS.SPECIES_KEY = Object.freeze(['bunny', 'wolf', 'human']);
   AS.SPECIES_COUNT = AS.SPECIES_KEY.length;
+  const SP_COUNT = AS.SPECIES_COUNT;
   AS.ANIMAL_KIND0 = KIND.BUNNY;
   AS.kindOf = species => KIND.BUNNY + species;
   // The world's live head count of each species, by code (W.bunnies, W.wolves, W.humans).
@@ -36,6 +37,8 @@
   const WATER_NONE = AS.WATER_NONE = 0xFFFF;
   // Meters of water addWater lays when not told a depth.
   const LAID_DEPTH = 1;
+  // Tiles across a block of the animal counts (W.anyNear).
+  const NEAR_BLOCK = 8;
 
   // Fields of one animal, by array type. A new field is one line here. Countdown timers are
   // Float64: counted down by 1/30 s a tick, Float32 rounding lands a whole tick late.
@@ -119,10 +122,6 @@
       // hole may be dug; animals walk over it. Only a ground property, so `kind` is untouched.
       scorch: new Float32Array(n),
 
-      // Grass growth multiplier by tile (1 = none), fixed at world build by setShore: the shore
-      // of a lake grows grass faster. Static, so grass.js only reads it.
-      shore: new Float32Array(n).fill(1),
-
       // How deep the water on a tile is, in meters (0 on land). Any depth makes the tile water.
       wDepth: new Float32Array(n),
       // River mouths: 1 where water leaves the map (terrain.js), or null in a world without water.
@@ -162,6 +161,26 @@
       bunnies: 0,
       wolves: 0,
       humans: 0,
+
+      // How many of each species are in each NEAR_BLOCK × NEAR_BLOCK block, kept by
+      // addAnimal, removeAnimal and moveAnimal: a search for hunters or prey can first ask
+      // anyNear whether any are about, and skip its scan when none are (most of the time).
+      nearCount: new Uint16Array(Math.ceil(w / NEAR_BLOCK) * Math.ceil(h / NEAR_BLOCK) * SP_COUNT),
+    };
+    const nearCols = Math.ceil(w / NEAR_BLOCK);
+    const blockOf = t => (((t / w) | 0) / NEAR_BLOCK | 0) * nearCols + ((t % w) / NEAR_BLOCK | 0);
+    // Whether any animal of the species in `mask` (bit = species code) is within `range` tiles
+    // of tile t (a square, so a circle's search can trust a no).
+    W.anyNear = function (t, range, mask) {
+      const x = t % w, y = (t / w) | 0, r = Math.ceil(range);
+      const bx0 = Math.max(0, x - r) / NEAR_BLOCK | 0, bx1 = Math.min(w - 1, x + r) / NEAR_BLOCK | 0;
+      const by0 = Math.max(0, y - r) / NEAR_BLOCK | 0, by1 = Math.min(h - 1, y + r) / NEAR_BLOCK | 0;
+      const C = W.nearCount;
+      for (let by = by0; by <= by1; by++) for (let bx = bx0; bx <= bx1; bx++) {
+        const b = (by * nearCols + bx) * SP_COUNT;
+        for (let sp = 0; sp < SP_COUNT; sp++) if (((mask >> sp) & 1) && C[b + sp] > 0) return true;
+      }
+      return false;
     };
 
     function growAnimals(cap) {
@@ -306,25 +325,6 @@
     };
     W.ensureWaterField = () => { if (W.waterStale || !W.wDist) W.buildWaterField(); };
 
-    // Land within `radius` tiles (a circle) of any water tile grows grass `boost` times faster.
-    // Done once after the lakes are in, so no tick does distance work.
-    W.setShore = function (radius, boost) {
-      W.shore.fill(1);
-      const R2 = radius * radius, reach = Math.floor(radius);
-      for (let t = 0; t < n; t++) {
-        if (W.kind[t] !== KIND.WATER) continue;
-        const cx = t % w, cy = (t / w) | 0;
-        // Only a lake's rim can reach land, and its rim's circles cover whatever the inner tiles' would.
-        if ((cx > 0 && W.kind[t - 1] === KIND.WATER) && (cx < w - 1 && W.kind[t + 1] === KIND.WATER) &&
-            (cy > 0 && W.kind[t - w] === KIND.WATER) && (cy < h - 1 && W.kind[t + w] === KIND.WATER)) continue;
-        for (let y = Math.max(0, cy - reach); y <= Math.min(h - 1, cy + reach); y++) {
-          for (let x = Math.max(0, cx - reach); x <= Math.min(w - 1, cx + reach); x++) {
-            if ((x - cx) ** 2 + (y - cy) ** 2 <= R2) W.shore[y * w + x] = boost;
-          }
-        }
-      }
-    };
-
     // Digs a hole on tile t. Bare ground only: no blade on it, no wolf standing there, no water, not scorched.
     W.addHole = function (t, usedAt) {
       if (W.hole[t]) throw new Error(`tile ${t} is already a hole`);
@@ -403,6 +403,7 @@
       W.aTargetSlot[s] = -1;
       W.aSlot[t] = s;
       W[POP_KEY[species]]++;
+      W.nearCount[blockOf(t) * SP_COUNT + species]++;
       return s;
     };
 
@@ -412,6 +413,7 @@
       W.aSlot[t] = -1;
       free(t);
       W[POP_KEY[W.aSpecies[s]]]--;
+      W.nearCount[blockOf(t) * SP_COUNT + W.aSpecies[s]]--;
       W.aFree.push(s);
     };
 
@@ -422,6 +424,8 @@
       if (W.hole[t2] && !AS.canEnterHole(W.aSpecies[s])) throw new Error(`tile ${t2} is a warren hole; only bunnies can enter`);
       claim(t2, W.kind[t], true);
       free(t);
+      const b1 = blockOf(t), b2 = blockOf(t2);
+      if (b1 !== b2) { W.nearCount[b1 * SP_COUNT + W.aSpecies[s]]--; W.nearCount[b2 * SP_COUNT + W.aSpecies[s]]++; }
       W.aSlot[t] = -1;
       W.aSlot[t2] = s;
       W.aFrom[s] = t;

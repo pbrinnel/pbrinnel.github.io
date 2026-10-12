@@ -108,7 +108,7 @@ watching the sim run. Everything else in this doc is decided.
   a wading animal drinks where it stands. The bare beach moves with the shore. WATER MODE
   (PAINT) pours 1 m onto every tile of the brush, into the same rules, and it flows from
   there (Paul: it should flow); a world made without water gets the rules when first poured
-  on. The grass-shore boost (`WaterBoost`) stays where the world was built. The terrain settings Relief, Hilliness, Roughness, Bowls,
+  on. The terrain settings Relief, Hilliness, Roughness, Bowls,
   RiverMouths and Rain are ranges: each world draws its own values by its seed (Paul: every
   world feels different under the same rules). Rain 0 makes a dry world. Topo
   lines show the height (Paul chose them over shaded ground in a mockup): a thin line every
@@ -121,7 +121,6 @@ watching the sim run. Everything else in this doc is decided.
   gives it (Depth). Animals see across water; nothing but a wading animal is ever on it, and
   nukes leave it. A one-tile bare beach rings all water: grass never grows
   there, so animals can always reach it to drink (Paul: shore grass blocked drinking).
-  `WaterBoost` (faster grass near water) is kept as a setting, set to 1 (off).
   Bunnies live in `BunnyColonies` colonies just outside meadow edges; wolves run in
   `WolfPacks` packs out in the open, away from the colonies. Populations start smaller and
   concentrated so animals still meet. `StartLayout` Scatter keeps the old even scatter
@@ -458,8 +457,12 @@ Built this way from day one so we don't have to rewrite later:
 - **Typed arrays.** Agent data is stored in flat numeric arrays rather than one JS object
   per agent. That's about 5–10× faster at thousands of agents and keeps the phone's
   garbage collector quiet.
-- **Grass updates in bulk.** Growth is cheap math per blade; seeding and aging are rolled
-  once per in-world hour, not every tick.
+- **Grass updates in bulk.** Growth, seeding and aging happen once per in-world hour per
+  blade, spread over the hour's ticks, not every tick (growth moved there 12 Oct 2026).
+- **Animals look only where something is.** The world keeps a count of each species per
+  8×8-tile block, so an animal looking for hunters or prey skips its scan when none are near.
+- **Worlds are made in the background.** Growing the ground and settling the water (about
+  5 s) runs in a worker thread, so the page stays alive behind the loading card.
 - **Animal decisions are staggered.** Each animal re-decides its state a few times a
   second; it moves every tick.
 - **Only visible tiles are drawn.** Sprites are pre-rendered once into an image sheet, and
@@ -475,7 +478,7 @@ numbers of animals and blades, records how long each tick and each frame take, a
 the largest counts that stay smooth (60 fps at 1×). Run it on the Mac and on your phone.
 That gives real numbers for planning.
 
-**Decided at milestone 7: stay on Canvas 2D, on the main thread.** Drawing never cost more
+**Decided at milestone 7: stay on Canvas 2D, on the main thread** (only world-making moved to a worker since). Drawing never cost more
 than ~4 ms a frame even with 64,000 animals. The sim sets the limit only at speed: smooth
 at 1× to 32,000 animals on the Mac and 64,000 on Paul's iPhone (Safari); at 4,000 animals
 it keeps up to ≈16× (Mac) / ≈31× (iPhone). Revisit with a Web Worker if watching at 20×

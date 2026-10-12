@@ -253,7 +253,7 @@
     if (m.preyFor[s] !== W.aSerial[s]) { m.preyFor[s] = W.aSerial[s]; m.preyAt[s] = now; }
     mW = W; mSkip = skipOf(sim, s);
     mPrey = AS.relations(sim.T).prey[W.aSpecies[s]];
-    if (AS.nearestVisible(sim, t, S.VisionRange, isPrey) >= 0) m.preyAt[s] = now;
+    if (W.anyNear(t, S.VisionRange, mPrey) && AS.nearestVisible(sim, t, S.VisionRange, isPrey) >= 0) m.preyAt[s] = now;
     const roaming = S.RoamAfter > 0 && now - m.preyAt[s] > S.RoamAfter * AS.DAY_SECONDS;
     m.roaming[s] = roaming ? 1 : 0; m.roamingFor[s] = W.aSerial[s];
     // Natal dispersal (Paul): grown up, a hunter born in this world leaves home once, with
@@ -367,7 +367,7 @@
         if (cur === I.GIVE_UP && W.aStamina[s] < S.RestUntil * S.StaminaMax) return false;
         mW = W; mSkip = skipOf(sim, s);
         mPrey = AS.relations(sim.T).prey[W.aSpecies[s]];
-        const t = AS.nearestVisible(sim, W.aTile[s], S.VisionRange, isPrey);
+        const t = W.anyNear(W.aTile[s], S.VisionRange, mPrey) ? AS.nearestVisible(sim, W.aTile[s], S.VisionRange, isPrey) : -1;
         const m = mem(W);
         if (t >= 0) {
           // Any prey in view wins, so a second one appearing mid-search takes over.
