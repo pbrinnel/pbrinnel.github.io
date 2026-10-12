@@ -100,6 +100,9 @@
   // Water against an animal (sprites.js "in the water"): the line where it meets the body,
   // and a swimmer's wake, WAKE_STEPS sprite pixels long, fading from WAKE_ALPHA.
   const WATERLINE = '#8fb4d6';
+  // Past the world's edge (the camera lets the view pan half a screen beyond it): darker than
+  // the ground, with a faint line along the edge, so it is clear where the world ends.
+  const OUTSIDE = '#040504', EDGE_LINE = 'rgba(176,186,150,0.28)';
   const WAKE_STEPS = 4, WAKE_ALPHA = 0.75;
 
   // The Radius slider's preview (Paul, 12 Oct 2026): a circle the size the armed mode will
@@ -697,9 +700,12 @@
         curAlpha = alpha;
         clock = (sim.tickCount + alpha) * AS.DT;
         facing.update(sim.W);
-        ctx.fillStyle = AS.COLORS.background;
+        const s = cam.scale * dpr, W0 = sim.W;
+        const wx = Math.round(-cam.x * s), wy = Math.round(-cam.y * s), ww = Math.round((W0.w - cam.x) * s) - wx, wh = Math.round((W0.h - cam.y) * s) - wy;
+        ctx.fillStyle = OUTSIDE;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        const s = cam.scale * dpr;
+        ctx.fillStyle = AS.COLORS.background;
+        ctx.fillRect(wx, wy, ww, wh);
         if (cam.scale >= CELL_PX) {
           drawSprites(sim, cam, sheet, sel, dpr, nowMs);
         } else {
@@ -710,6 +716,9 @@
           ctx.imageSmoothingEnabled = true;
           if (contoursOn) drawContours(sim, cam, dpr, false);
         }
+        ctx.strokeStyle = EDGE_LINE;
+        ctx.lineWidth = dpr;
+        ctx.strokeRect(wx - dpr / 2, wy - dpr / 2, ww + dpr, wh + dpr);
         if (blasts.length) drawBlasts(cam, dpr, nowMs);
         if (located) for (const key of located) if (LOCATE_COLORS[key]) drawLocate(sim, cam, dpr, key);
         if (sel) drawSelection(sim, cam, sel, dpr);

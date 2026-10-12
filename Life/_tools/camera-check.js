@@ -58,11 +58,12 @@ function make(cw, ch, W = { w: 300, h: 200 }, onStroke) {
   ok(near(cam.x, 0) && near(cam.y, (200 - vh) / 2), 'smaller axis centered (y), fitting axis at 0');
   cam.panBy(500, 500);
   ok(near(cam.y, (200 - vh) / 2), 'pan cannot move a centered axis');
-  const m = make(800, 600).cam;
+  // Zoomed in, it pans past the walls until an edge reaches the middle of the screen, no further.
+  const m = make(800, 600).cam, vw = 800 / 16, vh2 = 600 / 16;
   m.panBy(1e6, 1e6);
-  ok(m.x === 0 && m.y === 0, 'clamped to top-left');
+  ok(near(m.x, -vw / 2) && near(m.y, -vh2 / 2), 'the top-left corner can come to the middle of the screen, no further');
   m.panBy(-1e6, -1e6);
-  ok(near(m.x, 300 - 800 / 16) && near(m.y, 200 - 600 / 16), 'clamped to bottom-right');
+  ok(near(m.x + vw / 2, 300) && near(m.y + vh2 / 2, 200), 'and the bottom-right corner');
 }
 { // visible
   const { cam } = make(800, 600);

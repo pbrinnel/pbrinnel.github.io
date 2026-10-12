@@ -27,6 +27,11 @@
   };
 
   const WHEEL_LINES = 1, WHEEL_PAGES = 2;
+  // How far past its edge the view may pan, as a share of the view (Paul, 12 Oct 2026: with
+  // windows open at the sides, an edge pinned to the screen's edge was always under one). At
+  // a half, any edge or corner can be brought to the middle of the screen, and at least half
+  // the view is always map.
+  const OVERSCROLL = 0.5;
 
   AS.Camera = function (canvas, W) {
     const cam = {
@@ -59,7 +64,8 @@
         cam.clamp();
       },
 
-      // A world smaller than the view sits centered; a larger one never pans past its walls.
+      // A world smaller than the view sits centered; a larger one pans up to OVERSCROLL of the
+      // view past its walls.
       clamp() {
         cam.x = clampAxis(cam.x, canvas.clientWidth / cam.scale, W.w);
         cam.y = clampAxis(cam.y, canvas.clientHeight / cam.scale, W.h);
@@ -108,7 +114,8 @@
 
     function clampAxis(pos, viewTiles, worldTiles) {
       if (worldTiles <= viewTiles) return (worldTiles - viewTiles) / 2;
-      return Math.min(worldTiles - viewTiles, Math.max(0, pos));
+      const over = viewTiles * OVERSCROLL;
+      return Math.min(worldTiles - viewTiles + over, Math.max(-over, pos));
     }
 
     const held = new Set();   // pan keys currently down

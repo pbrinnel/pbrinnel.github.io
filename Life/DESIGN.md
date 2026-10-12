@@ -37,6 +37,9 @@ watching the sim run. Everything else in this doc is decided.
 ### World
 - A tile grid larger than the screen; drag to pan, scroll or pinch to zoom. On a
   keyboard, WASD or the arrow keys pan too (Shift for faster).
+  Zoomed in, the view pans up to half a screen past the world's edge, so any edge or corner
+  can be brought to the middle, out from under the windows at the sides (Paul, 12 Oct 2026:
+  no further, so the world is never lost); past the edge is darker, with a faint line along it.
 - Solid walls at the edges, no wrap-around.
 - **One thing per tile:** a blade, a corpse, or an animal. Nothing shares a tile.
 - **Movement is 4-directional** (up, down, left, right).
