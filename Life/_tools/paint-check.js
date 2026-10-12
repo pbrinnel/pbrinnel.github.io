@@ -18,7 +18,7 @@ days(4);
 // meadows happen to fall.
 for (const [x, y] of [[72, 47], [78, 53], [70, 52]]) {
   const t = W.tile(x, y);
-  if (W.kind[t] === K.EMPTY && !W.hole[t] && !(W.scorch[t] > 0)) W.addGrass(t, 1, 0);
+  if (W.isBare(t) && !W.hole[t] && !(W.scorch[t] > 0)) W.addGrass(t, 1, 0);
 }
 // Corpses from nowhere in the blast and outside it, so both are exercised.
 const center = W.tile(75, 50);
@@ -92,12 +92,12 @@ W.scorch[t0] = 0;
   const inCircle = (t, r = R) => (W2.tx(t) - cx) ** 2 + (W2.ty(t) - cy) ** 2 <= r * r;
   for (const kind of ['grass', 'bunny', 'wolf', 'human']) {
     // Scatter obstacles: a scorched strip, a few holes, and whatever already stands there.
-    for (let x = cx - 3; x <= cx + 3; x++) { const t = W2.tile(x, cy + 2); if (W2.kind[t] === K.EMPTY && !W2.hole[t]) W2.scorch[t] = 5; }
-    for (const [x, y] of [[cx, cy], [cx + 1, cy + 5], [cx - 4, cy - 3]]) { const t = W2.tile(x, y); if (W2.kind[t] === K.EMPTY && !(W2.scorch[t] > 0) && !W2.hole[t]) W2.addHole(t, 0); }
+    for (let x = cx - 3; x <= cx + 3; x++) { const t = W2.tile(x, cy + 2); if (W2.isBare(t) && !W2.hole[t]) W2.scorch[t] = 5; }
+    for (const [x, y] of [[cx, cy], [cx + 1, cy + 5], [cx - 4, cy - 3]]) { const t = W2.tile(x, y); if (W2.isBare(t) && !(W2.scorch[t] > 0) && !W2.hole[t]) W2.addHole(t, 0); }
     const eligible = [], snap = new Map();
     for (let t = 0; t < W2.n; t++) {
       snap.set(t, W2.kind[t]);
-      if (!inCircle(t) || W2.kind[t] !== K.EMPTY) continue;
+      if (!inCircle(t) || !W2.isBare(t)) continue;
       if (kind === 'grass' ? (W2.hole[t] || W2.scorch[t] > 0) : kind !== 'bunny' && W2.hole[t]) continue;
       eligible.push(t);
     }
@@ -137,7 +137,7 @@ W.scorch[t0] = 0;
     }
   }
   // Bunnies may stand on holes; scorch and edges don't stop them; the world edge clips.
-  const ht = W2.tile(10, 10); if (W2.kind[ht] === K.EMPTY) { if (!W2.hole[ht]) W2.addHole(ht, 0); }
+  const ht = W2.tile(10, 10); if (W2.isBare(ht)) { if (!W2.hole[ht]) W2.addHole(ht, 0); }
   AS.paintCircle(sim2, 'bunny', 10, 10, 2);
   ok(W2.kind[ht] === K.BUNNY, 'a bunny can be painted onto a warren hole');
   let threw = false;
@@ -168,7 +168,7 @@ W.scorch[t0] = 0;
   // Brush at radius 0 is exactly one tile (an animal, or a blade).
   const sim4 = AS.Sim(T, 14), W4 = sim4.W;
   for (const kind of ['grass', 'bunny', 'wolf', 'human']) {
-    let x = 5; const row = 3; while (W4.kind[W4.tile(x, row)] !== K.EMPTY) x++;
+    let x = 5; const row = 3; while (!W4.isBare(W4.tile(x, row))) x++;
     ok(AS.paintCircle(sim4, kind, x, row, 0) === 1, `${kind} at radius 0: exactly one placed`);
   }
   // The animal cap: a brush stops at `room`, says it was cut short, and grass ignores the cap.
@@ -204,9 +204,9 @@ W.scorch[t0] = 0;
   W6.addHole(at(40, 31), 0);
   const placed = A6.paintCircle(sim6, 'water', 40, 30, 3);
   const wetAt = (x, y) => W6.wDepth[at(x, y)] > 0;
-  ok(placed > 0 && W6.waterCount === placed && wetAt(40, 30) && W6.kind[at(40, 30)] === K6.WATER, `WATER MODE pours on all ${placed} tiles of the circle, over grass too`);
+  ok(placed > 0 && W6.waterCount === placed && wetAt(40, 30) && W6.isOpenWater(at(40, 30)), `WATER MODE pours on all ${placed} tiles of the circle, over grass too`);
   ok(W6.aAlive[bun] && wetAt(41, 30) && W6.kind[at(41, 30)] === K6.BUNNY, 'an animal it lands on stays, standing in it');
-  ok(W6.kind[at(39, 30)] === K6.WATER && !W6.hole[at(40, 31)], 'it washes a corpse away and floods a warren hole');
+  ok(W6.isOpenWater(at(39, 30)) && !W6.hole[at(40, 31)], 'it washes a corpse away and floods a warren hole');
   let bladeOnBeach = 0; for (let t = 0; t < W6.n; t++) if (W6.beach[t] && W6.kind[t] === K6.GRASS) bladeOnBeach++;
   ok(bladeOnBeach === 0 && W6.kind[at(50, 30)] === K6.GRASS, 'the new shore is bare (the beach rule); grass away from it stays');
   const f0 = failures.length; audit(A6, sim6, 'after WATER MODE');

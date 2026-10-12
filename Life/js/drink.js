@@ -30,19 +30,21 @@
   // A tile an animal can walk to, grass counting as the bites it costs to chew through.
   const drinkCost = t => {
     const k = dW.kind[t];
-    if (k === KIND.EMPTY) return dW.hole[t] && !dHoles ? Infinity : dInvSpeed;
+    if (k === KIND.EMPTY) {
+      if (dW.flow[t] !== AS.FLOW.NONE) return dW.wDepth[t] <= dWade ? dInvSpeed : Infinity;
+      return dW.hole[t] && !dHoles ? Infinity : dInvSpeed;
+    }
     if (k === KIND.GRASS) return dInvSpeed + AS.chewSeconds(dSim, dSelf, t);
-    if (k === KIND.WATER && dW.wDepth[t] <= dWade) return dInvSpeed;
     return Infinity;
   };
   // A shore tile an animal could drink from (a blade on it is chewed away on arrival).
-  const isShoreGoal = t => dW.wDist[t] === 0 && (dW.kind[t] === KIND.EMPTY ? !dW.hole[t] || dHoles : dW.kind[t] === KIND.GRASS);
+  const isShoreGoal = t => dW.wDist[t] === 0 && (dW.isBare(t) ? !dW.hole[t] || dHoles : dW.kind[t] === KIND.GRASS);
 
   // One move toward neighbor u: a step onto empty ground, or a bite at a blade in the way. A
   // grazer (hunts nothing) eats what it bites, as it would anyway; a hunter just chews through.
   function drinkMove(sim, s, u) {
     const W = sim.W;
-    if (W.kind[u] === KIND.EMPTY || W.kind[u] === KIND.WATER) return AS.stepTo(sim, s, u);
+    if (W.kind[u] === KIND.EMPTY) return AS.stepTo(sim, s, u);
     if (W.kind[u] !== KIND.GRASS || W.aBiteLeft[s] > 0) return false;
     if (AS.relations(sim.T).prey[W.aSpecies[s]] === 0) { AS.grazeBite(sim, s, u); return false; }
     return AS.chewOrStep(sim, s, u);
@@ -119,7 +121,7 @@
       let best = -1, bestD = W.wDist[t];
       for (let i = 0; i < k; i++) {
         const u = dnb[i], d = W.wDist[u];
-        if (d < bestD && (W.kind[u] === KIND.EMPTY ? hole || !W.hole[u] : W.kind[u] === KIND.GRASS)) { best = u; bestD = d; }
+        if (d < bestD && (W.isBare(u) ? hole || !W.hole[u] : W.kind[u] === KIND.GRASS)) { best = u; bestD = d; }
       }
       if (best >= 0) drinkMove(sim, s, best);
     },

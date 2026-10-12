@@ -1,5 +1,5 @@
 'use strict';
-// The ground and its water (terrain.js, water.js; world.js wDepth and KIND.WATER): every world
+// The ground and its water (terrain.js, water.js; world.js wDepth and the flow layer): every world
 // has an elevation grown before day 0; the water rules settle water on it, lower than the land,
 // more with more Rain, leaving the map only at river mouths, and keep running, so day 0 is
 // already at rest; animals wade water no deeper than WadeDepth and swim deeper; drinking
@@ -25,14 +25,14 @@ function landPieces(AS, W) {
   const seen = new Uint8Array(W.n), q = new Int32Array(W.n), nb = new Int32Array(4);
   let pieces = 0, water = 0;
   for (let t0 = 0; t0 < W.n; t0++) {
-    if (W.kind[t0] === AS.KIND.WATER) { water++; continue; }
+    if (W.isOpenWater(t0)) { water++; continue; }
     if (seen[t0]) continue;
     pieces++;
     let head = 0, tail = 0;
     seen[t0] = 1; q[tail++] = t0;
     while (head < tail) {
       const k = W.neighbors4(q[head++], nb);
-      for (let i = 0; i < k; i++) if (!seen[nb[i]] && W.kind[nb[i]] !== AS.KIND.WATER) { seen[nb[i]] = 1; q[tail++] = nb[i]; }
+      for (let i = 0; i < k; i++) if (!seen[nb[i]] && !W.isOpenWater(nb[i])) { seen[nb[i]] = 1; q[tail++] = nb[i]; }
     }
   }
   return { pieces, water };
@@ -55,7 +55,7 @@ function landPieces(AS, W) {
     for (let t = 0; t < W.n; t++) {
       const e = W.elev[t];
       lo = Math.min(lo, e); hi = Math.max(hi, e);
-      if (W.kind[t] === AS.KIND.WATER) wSum += e; else { lSum += e; lN++; }
+      if (W.isOpenWater(t)) wSum += e; else { lSum += e; lN++; }
     }
     // Relief is drawn per world from its span (AS.terrainOf), so the top is that world's own.
     const R = sim.terrain.Relief, span = T.world.Relief;
@@ -95,7 +95,7 @@ function landPieces(AS, W) {
       if (x !== 0 && y !== 0 && x !== W.w - 1 && y !== W.h - 1) continue;
       if (W.outlet[t]) mouthTiles++;
       // A tile on the edge next to a mouth may hold water that is on its way out.
-      else if (W.kind[t] === AS.KIND.WATER && ![t - 1, t + 1, t - W.w, t + W.w, t - 2, t + 2].some(u => u >= 0 && u < W.n && W.outlet[u])) strayEdge++;
+      else if (W.isOpenWater(t) && ![t - 1, t + 1, t - W.w, t + W.w, t - 2, t + 2].some(u => u >= 0 && u < W.n && W.outlet[u])) strayEdge++;
     }
   }
   ok(mouthTiles > 0, `${worlds} worlds have river mouths (${mouthTiles} edge tiles)`);
@@ -147,7 +147,7 @@ function landPieces(AS, W) {
   let same = true, other = false;
   for (let t = 0; t < a.W.n; t++) {
     if (a.W.kind[t] !== b.W.kind[t] || a.W.elev[t] !== b.W.elev[t]) same = false;
-    if ((a.W.kind[t] === a.K.WATER) !== (c.W.kind[t] === c.K.WATER)) other = true;
+    if ((a.W.isOpenWater(t)) !== (c.W.isOpenWater(t))) other = true;
   }
   ok(same && other, 'the same seed makes the same ground and water; another seed makes others');
 }
@@ -202,13 +202,13 @@ function landPieces(AS, W) {
 {
   const m = make(2);
   let wet = 0, beachBad = 0;
-  for (let t = 0; t < m.W.n; t++) if (m.W.kind[t] === m.AS.KIND.WATER) wet++;
+  for (let t = 0; t < m.W.n; t++) if (m.W.isOpenWater(t)) wet++;
   for (let t = 0; t < m.W.n; t++) {
-    const touches = m.W.kind[t] !== m.AS.KIND.WATER && [t - 1, t + 1, t - m.W.w, t + m.W.w].some(u => u >= 0 && u < m.W.n && Math.abs(m.W.tx(u) - m.W.tx(t)) <= 1 && m.W.kind[u] === m.AS.KIND.WATER);
-    if (m.W.kind[t] !== m.AS.KIND.WATER && (m.W.beach[t] === 1) !== touches) beachBad++;
+    const touches = !m.W.isOpenWater(t) && [t - 1, t + 1, t - m.W.w, t + m.W.w].some(u => u >= 0 && u < m.W.n && Math.abs(m.W.tx(u) - m.W.tx(t)) <= 1 && m.W.isOpenWater(u));
+    if (!m.W.isOpenWater(t) && (m.W.beach[t] === 1) !== touches) beachBad++;
   }
   ok(wet > 0 && beachBad === 0, 'water: beach is exactly the land touching it');
-  let wrongDepth = 0; for (let t = 0; t < m.W.n; t++) if ((m.W.kind[t] === m.AS.KIND.WATER) !== (m.W.wDepth[t] > 0)) wrongDepth++;
+  let wrongDepth = 0; for (let t = 0; t < m.W.n; t++) if ((m.W.isOpenWater(t)) !== (m.W.wDepth[t] > 0)) wrongDepth++;
   ok(wrongDepth === 0, 'every water tile has a depth, and no land tile does');
 }
 
@@ -224,7 +224,7 @@ function landPieces(AS, W) {
       for (let t = 0; t < W.n; t++) if (W.beach[t]) { blades += W.kind[t] === K.GRASS ? 1 : 0; onBeach += W.kind[t] === K.GRASS ? 1 : 0; }
     }
     // The brush too.
-    let any = -1; for (let t = 0; t < W.n && any < 0; t++) if (W.beach[t] && W.kind[t] === K.EMPTY) any = t;
+    let any = -1; for (let t = 0; t < W.n && any < 0; t++) if (W.beach[t] && W.isBare(t)) any = t;
     AS.paintCircle(sim, 'grass', W.tx(any), W.ty(any), 5);
     for (let t = 0; t < W.n; t++) if (W.beach[t] && W.kind[t] === K.GRASS) onBeach++;
     let threw = false; try { W.addGrass(any, 1, 0); } catch (e) { threw = true; }
@@ -236,7 +236,7 @@ function landPieces(AS, W) {
 // ---- Nothing but an animal can be put in water ----
 {
   const { AS, sim, W, K } = make(2, [set('StartBunnies', 0), set('StartWolves', 0), set('StartGrass', 0)]);
-  let w = -1; for (let t = 0; t < W.n && w < 0; t++) if (W.kind[t] === K.WATER && W.kind[t - 1] === K.WATER && W.kind[t + 1] === K.WATER) w = t;
+  let w = -1; for (let t = 0; t < W.n && w < 0; t++) if (W.isOpenWater(t) && W.isOpenWater(t - 1) && W.isOpenWater(t + 1)) w = t;
   const throws = f => { try { f(); return false; } catch (e) { return true; } };
   ok(w >= 0, 'found a water tile');
   ok(throws(() => W.addGrass(w, 1, 0)), 'no blade on water');
@@ -246,32 +246,32 @@ function landPieces(AS, W) {
   for (const sp of AS.SPECIES_KEY.map((_, i) => i)) {
     const a = W.addAnimal(w, sp, 0), standing = W.kind[w] === AS.kindOf(sp);
     W.removeAnimal(a);
-    ok(standing && W.kind[w] === K.WATER, `a ${AS.SPECIES_KEY[sp]} can stand in water, and it is water again when it leaves`);
+    ok(standing && W.isOpenWater(w), `a ${AS.SPECIES_KEY[sp]} can stand in water, and it is water again when it leaves`);
   }
   ok(!AS.debugDropCorpse(sim, w, AS.SPECIES.BUNNY), 'the debug corpse drop leaves water alone');
   // The paint modes' brush, centered on the lake and wide enough to cover it.
-  const before = W.kind.slice(), cx = W.tx(w), cy = W.ty(w);
+  const before = W.kind.slice(), wasWet = W.flow.slice(), cx = W.tx(w), cy = W.ty(w);
   for (const kind of ['grass', 'bunny', 'wolf', 'human']) AS.paintCircle(sim, kind, cx, cy, 6);
   let paintedOnWater = 0, placed = 0;
   for (let t = 0; t < W.n; t++) {
-    if (before[t] === K.WATER && W.kind[t] !== K.WATER) paintedOnWater++;
-    if (before[t] !== K.WATER && W.kind[t] !== before[t]) placed++;
+    if (wasWet[t] && W.kind[t] !== before[t]) paintedOnWater++;
+    if (!wasWet[t] && W.kind[t] !== before[t]) placed++;
   }
   ok(paintedOnWater === 0 && placed > 0, `paint modes skip water and still paint the land around it (${placed} tiles)`);
-  // A hole can't be dug on water: the bunny's dig only picks EMPTY bare ground, and bunny.js asks
-  // for kind EMPTY, which water never is.
-  ok(W.isEmpty(w) === false, 'water is not "empty"');
+  // A hole can't be dug on water: the bunny's dig only picks bare ground (W.isBare), which
+  // water never is.
+  ok(W.isBare(w) === false && W.isOpenWater(w), 'open water is not bare');
 }
 
 // ---- A nuke leaves water alone and does not scorch it ----
 {
   const { AS, sim, W, K } = make(2);
-  let w = -1; for (let t = 0; t < W.n && w < 0; t++) if (W.kind[t] === K.WATER) w = t;
-  const before = W.kind.reduce((n, k) => n + (k === K.WATER ? 1 : 0), 0);
+  let w = -1; for (let t = 0; t < W.n && w < 0; t++) if (W.isOpenWater(t)) w = t;
+  const before = W.flow.reduce((n, f) => n + (f === AS.FLOW.WATER ? 1 : 0), 0);
   AS.nuke(sim, w, 60);
-  const after = W.kind.reduce((n, k) => n + (k === K.WATER ? 1 : 0), 0);
+  const after = W.flow.reduce((n, f) => n + (f === AS.FLOW.WATER ? 1 : 0), 0);
   let scorchedWater = 0, scorchedLand = 0;
-  for (let t = 0; t < W.n; t++) if (W.scorch[t] > 0) { if (W.kind[t] === K.WATER) scorchedWater++; else scorchedLand++; }
+  for (let t = 0; t < W.n; t++) if (W.scorch[t] > 0) { if (W.isOpenWater(t)) scorchedWater++; else scorchedLand++; }
   ok(before === after && before > 0, `a nuke on a lake leaves all ${before} water tiles`);
   ok(scorchedWater === 0 && scorchedLand > 0, 'water is not scorched; the land around it is');
   const f0 = failures.length; audit(AS, sim, 'after nuke');
@@ -294,11 +294,11 @@ function landPieces(AS, W) {
   let wet = 0, found = 0;
   for (let n = 0; n < 400; n++) {
     const from = sim.rng.int(W.n), gx = sim.rng.int(W.w), gy = sim.rng.int(W.h), goal = W.tile(gx, gy);
-    if (W.kind[from] !== K.EMPTY || W.kind[goal] !== K.EMPTY || from === goal) continue;
+    if (!W.isBare(from) || !W.isBare(goal) || from === goal) continue;
     const step = AS.pathNext(sim, from, t => t === goal, 40);
     if (step < 0) continue;
     found++;
-    if (W.kind[step] === K.WATER) wet++;
+    if (W.isOpenWater(step)) wet++;
     const dx = W.tx(step) - W.tx(from), dy = W.ty(step) - W.ty(from);
     if (step !== from && dx * dx + dy * dy !== 1) wet++;
   }
@@ -307,11 +307,11 @@ function landPieces(AS, W) {
   let wetW = 0, foundW = 0;
   for (let n = 0; n < 200; n++) {
     const from = sim.rng.int(W.n), goal = sim.rng.int(W.n);
-    if (W.kind[from] !== K.EMPTY || W.kind[goal] !== K.EMPTY || from === goal) continue;
-    const step = AS.pathNextWeighted(sim, from, t => t === goal, 40, t => (W.kind[t] === K.WATER ? Infinity : 1));
+    if (!W.isBare(from) || !W.isBare(goal) || from === goal) continue;
+    const step = AS.pathNextWeighted(sim, from, t => t === goal, 40, t => (W.isOpenWater(t) ? Infinity : 1));
     if (step < 0) continue;
     foundW++;
-    if (W.kind[step] === K.WATER) wetW++;
+    if (W.isOpenWater(step)) wetW++;
   }
   ok(foundW > 50 && wetW === 0, `pathNextWeighted with water at Infinity never steps onto it (${foundW} paths)`);
   // A wolf across the lake from a bunny sees it, hunts it, and stays on land the whole time.
@@ -344,7 +344,7 @@ function landPieces(AS, W) {
   const dryDur = 1 / AS.speedOf(sim, wolf);
   ok(Math.abs(W.aStepDur[wolf] - dryDur / T.wolf.WadeSpeed) < 1e-9, `a step into water takes 1 / WadeSpeed as long (${W.aStepDur[wolf].toFixed(3)} s)`);
   W.aStepLeft[wolf] = 0;
-  ok(AS.stepTo(sim, wolf, across) && W.kind[W.tile(20, 6)] === AS.KIND.WATER, 'and out the other side, leaving water behind it');
+  ok(AS.stepTo(sim, wolf, across) && W.isOpenWater(W.tile(20, 6)), 'and out the other side, leaving water behind it');
 }
 
 // ---- Swimming: wolves well, bunnies badly; Stamina runs out, then they drown ----
@@ -421,7 +421,7 @@ function landPieces(AS, W) {
   const { AS, sim, W, T } = make(1, [set('WorldWidth', 40), set('WorldHeight', 20), set('StartGrass', 0), set('StartBunnies', 0), set('StartWolves', 0), set('Rain', 0)]);
   // A small pond poured into the world's rules, and a thirsty wolf on its shore.
   AS.paintCircle(sim, 'water', 20, 10, 1);
-  let shore = -1; for (let t = 0; t < W.n && shore < 0; t++) if (W.beach[t] && W.kind[t] === AS.KIND.EMPTY) shore = t;
+  let shore = -1; for (let t = 0; t < W.n && shore < 0; t++) if (W.beach[t] && W.isBare(t)) shore = t;
   const wolf = AS.spawnStarting(sim, AS.SPECIES.WOLF, shore);
   W.aWater[wolf] = 0;
   let drank = 0, took = 0, sips = 0;
@@ -443,7 +443,7 @@ function landPieces(AS, W) {
 // ---- The inspector names it ----
 {
   const { AS, sim, W, K } = make(2);
-  let w = -1; for (let t = 0; t < W.n && w < 0; t++) if (W.kind[t] === K.WATER) w = t;
+  let w = -1; for (let t = 0; t < W.n && w < 0; t++) if (W.isOpenWater(t)) w = t;
   const text = require('fs').readFileSync(require('path').join(__dirname, '../js/inspect.js'), 'utf8');
   const vm = require('vm');
   vm.runInContext(text, vm.createContext({ AS }), {});   // adds AS.describe next to the sim's own files

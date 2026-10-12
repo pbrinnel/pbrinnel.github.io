@@ -198,7 +198,7 @@ const still = tx => { tx.species = editCSV(editCSV(tx.species, 'WalkSpeed', 'Wol
   W.aFullness[b] = B.FullnessMax; W.aDecideLeft[b] = 0;
   tick(sim, secs(AS, 2));
   const out = at(W, 10 + R + 8, 20);
-  if (W.kind[out] === AS.KIND.EMPTY) W.moveAnimal(b, out);
+  if (W.isBare(out)) W.moveAnimal(b, out);
   W.aRunLeft[b] = 0;
   let back = false;
   for (let i = 0; i < secs(AS, 20) && !back; i++) { tick(sim); back = W.holeNear[W.aTile[b]] > 0; }

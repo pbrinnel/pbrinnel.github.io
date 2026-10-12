@@ -144,7 +144,7 @@
   const isFreeHole = t => mW.hole[t] === 1 && mW.kind[t] === K.EMPTY;
   const isHoleTile = t => t === mGoalTile;
   // Bare ground a bunny can dig: nothing on it, not already a hole, not scorched.
-  const isBare = (W, t) => W.kind[t] === K.EMPTY && W.hole[t] === 0 && W.scorch[t] === 0;
+  const isBare = (W, t) => W.isBare(t) && W.hole[t] === 0 && W.scorch[t] === 0;
   // mHomeOnly: SEEK_FOOD is looking near home only (atHome).
   let mHomeOnly = false;
   const isFreshBlade = t => {

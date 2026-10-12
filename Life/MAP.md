@@ -77,9 +77,15 @@ load time: every file reads other files' `AS.*` inside functions, at call time.
 
 ## Data: struct of arrays (`world.js`)
 
-`W = sim.W`. One thing per tile; `W.kind[t]` (`AS.KIND`: EMPTY, GRASS, CORPSE, WATER, BUNNY,
-WOLF, HUMAN; an animal's kind is `AS.kindOf(species)`) is the truth about who is where.
-Animals tell their own kind by `kind >= BUNNY`. Tiles are `t = y * W.w + x`.
+`W = sim.W`. Tiles are `t = y * W.w + x`, and a tile has layers (DESIGN.md, World):
+- **Solid:** `W.kind[t]` (`AS.KIND`: EMPTY, GRASS, CORPSE, BUNNY, WOLF, HUMAN; an animal's
+  kind is `AS.kindOf(species)`), at most one per tile, the truth about who is where. Animals
+  tell their own kind by `kind >= BUNNY`.
+- **Flow:** `W.flow[t]` (`AS.FLOW`: NONE, WATER; fire comes next), at most one per tile;
+  water's amount is `wDepth`. `W.isBare(t)`: no solid and no flow (where a blade sprouts, a
+  hole is dug, a baby is born, a brush paints); `W.isOpenWater(t)`: water with nothing in it.
+- **Ground:** height (`elev`), holes, scorch, beach, and the soil water (`W.water.G`).
+- **Air:** the world's wind (`sim.wind`, weather.js).
 
 - **Blades** are indexed by tile (they never move): `gSize`, `gAge` (days), plus a dense
   list `gList[0..gCount)` with `gSlot[t]` for O(1) removal.
@@ -174,11 +180,11 @@ graph, ui, bench) only reads.
   and marks the way-to-water field stale every `FIELD_STEPS` steps when shores moved.
 - **Depth is the truth:** `W.wDepth` in meters (0 on land; drawn by `AS.waterBand`:
   shallow, mid, deep). With no rules (a world made with Water off, as the checks'
-  hand-built ones are) water stays as laid. `kind` WATER means wet with nothing on it; a
-  wet tile may instead hold a wading animal (its `kind`), and nothing else: `setDepth`
+  hand-built ones are) water stays as laid. A wet tile's flow is WATER (only `setDepth` and
+  `addWater` write `flow`); its solid layer is empty or a wading animal, nothing else: `setDepth`
   drowns a blade, removes a hole and scorch as a tile gets wet (a corpse is removed first,
   by `syncWater`), and `killAnimal` leaves no corpse in water. `addWater(t, depth)` lays
-  water on an empty tile (and into `W.water` if there is one). `W.waterCount` counts wet
+  water on a bare tile (and into `W.water` if there is one). `W.waterCount` counts wet
   tiles; with none there is no thirst at all. `W.wetFlips` tells render.js which topo
   squares to work out again. `lineOfSight` ignores water. A nuke kills animals in it but
   leaves the water (no scorch).
@@ -191,10 +197,10 @@ graph, ui, bench) only reads.
   `AS.WATER_NONE` where unreachable), `wNext`, `wShore`; wet tiles (by depth) are its
   water; a guide that ignores animals and blades.
 - **Wading and swimming** (moving.js): stepping is one rule, `AS.canStand(W, t, wade)`:
-  EMPTY, or WATER no deeper than `AS.wadeOf` (`WadeDepth`); stepTo, chewOrStep, `pathNext`
+  an empty solid layer, dry or with water no deeper than `AS.wadeOf` (`WadeDepth`); stepTo, chewOrStep, `pathNext`
   (the walker is the animal on `from`), wolf.js's `cost`/`canWalk`/prowl and bunny.js's
   wander, flee and trips all use it. Births, grass, holes and painting (except WATER MODE)
-  use EMPTY only. Deeper than it wades is swimming: `AS.canEnter(sim, s, t)` adds water it
+  use bare tiles only (`isBare`). Deeper than it wades is swimming: `AS.canEnter(sim, s, t)` adds water it
   would swim now (`AS.swimsNow`: `SwimCost` set, not winded, Stamina above `RestBelow`, and
   either `SwimAt` reached (or already in) or fleeing, `AS.isFleeing` from bunny.js). A step
   from land into deep water also needs land two tiles ahead within the swimming reach of
@@ -213,7 +219,7 @@ graph, ui, bench) only reads.
   else a wet neighbor (`waterAt`), takes the water from `W.water` (`drinkFrom`:
   `WaterLiters` a meter) and sets `aBiteLeft` per sip for the head-down pose. Priority:
   below HIDE and FLEE for bunnies, first for wolves and humans.
-- The harness audit checks all of this by depth.
+- The harness audit checks all of this by layer: flow WATER exactly where `wDepth > 0`, a wet tile's solid empty or an animal, no blade, corpse, hole, scorch or beach on it.
 
 ## Behavior
 

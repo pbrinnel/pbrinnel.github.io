@@ -390,7 +390,7 @@ function wolf(AS, sim, x, y) {
     let fled = 0, left = false;
     for (let k = 0; k < scares; k++) {
       // The wolf shows up beside the bunny, then is gone for longer than SCARE_GAP, so each is a new chase.
-      const t = W.aTile[s], near = [t + 3, t - 3, t + 3 * W.w, t - 3 * W.w].find(u => W.kind[u] === AS.KIND.EMPTY);
+      const t = W.aTile[s], near = [t + 3, t - 3, t + 3 * W.w, t - 3 * W.w].find(u => W.isBare(u));
       W.moveAnimal(w, near);
       W.aDecideLeft[s] = 0;
       let saw = false;

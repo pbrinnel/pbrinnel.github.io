@@ -52,16 +52,16 @@ function audit(AS, sim, label) {
   const nb = new Int32Array(4);
   for (let t = 0; t < W.n; t++) {
     const k = W.kind[t];
-    // Depth is the truth about water: a tile is WATER exactly when it is wet with nothing
-    // on it; a wet tile holds at most a wading animal, and no blade, corpse, hole or scorch.
+    // The layers agree: the flow layer holds water exactly where there is depth; a wet tile's
+    // solid layer is empty or a wading animal, and it has no blade, corpse, hole or scorch.
+    check((W.flow[t] === AS.FLOW.WATER) === (W.wDepth[t] > 0), `${label}: tile ${t} flow ${W.flow[t]}, depth ${W.wDepth[t]}`);
     if (W.wDepth[t] > 0) {
       wet++;
-      check(k === K.WATER || k >= K.BUNNY, `${label}: wet tile ${t} holds kind ${k}`);
+      check(k === K.EMPTY || k >= K.BUNNY, `${label}: wet tile ${t} holds kind ${k}`);
       check(W.gSlot[t] === -1 && W.cSlot[t] === -1 && W.hSlot[t] === -1, `${label}: wet tile ${t} is in a store`);
       check(!W.hole[t] && W.scorch[t] === 0 && (k >= K.BUNNY || W.serial[t] === 0), `${label}: wet tile ${t} has a hole, scorch or serial`);
       check(!W.beach[t], `${label}: wet tile ${t} is marked beach`);
     } else {
-      check(k !== K.WATER, `${label}: dry tile ${t} is WATER`);
       let touches = 0;
       for (let i = 0, m = W.neighbors4(t, nb); i < m; i++) if (W.wDepth[nb[i]] > 0) touches = 1;
       check(W.beach[t] === touches, `${label}: tile ${t} beach ${W.beach[t]}, touches water ${touches}`);

@@ -85,7 +85,7 @@
     const k = W.kind[tt];
     if (k === KIND.GRASS) return 'Blade at ' + where;
     if (k === KIND.CORPSE) return 'Corpse at ' + where;
-    if (k === KIND.WATER) return 'Water at ' + where;
+    if (W.isOpenWater(tt)) return 'Water at ' + where;
     return 'Tile ' + where;
   }
 
@@ -205,7 +205,7 @@
       } else if (k === KIND.CORPSE) {
         thing = 'corpse';
         title = speciesName(W.cSpecies[t]) + ' corpse #' + serial(W.serial[t]);
-      } else if (k === KIND.WATER) {
+      } else if (W.isOpenWater(t)) {
         thing = 'water';
         title = 'Water';
       } else if (k === KIND.EMPTY && W.hole[t]) {

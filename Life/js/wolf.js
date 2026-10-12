@@ -108,7 +108,7 @@
   // Where a hunter can step: open ground, water it wades, or a blade it chews away first;
   // never a hole.
   // Deep water only where it would swim and get across (moving.js canEnter).
-  const canWalk = t => (AS.canStand(mW, t, mWade) || mW.kind[t] === K.GRASS || (mSwim && mW.kind[t] === K.WATER && AS.canEnter(mSim, mSelf, t))) && !mW.hole[t];
+  const canWalk = t => (AS.canStand(mW, t, mWade) || mW.kind[t] === K.GRASS || (mSwim && mW.isOpenWater(t) && AS.canEnter(mSim, mSelf, t))) && !mW.hole[t];
   // One step toward a goal the path search can't reach, going around what's in the way
   // (AS.edgeStep). Returns false once it gives up.
   function goAround(sim, s, goal, key) {
@@ -122,9 +122,11 @@
   // when it would swim now); anything else that occupies a tile can't be entered.
   const cost = t => {
     const k = mW.kind[t];
-    if (k === K.EMPTY) return mW.hole[t] ? Infinity : mInvSpeed;   // a hole is a wall to wolves
+    if (k === K.EMPTY) {
+      if (mW.flow[t] === AS.FLOW.WATER) return mW.wDepth[t] <= mWade ? mInvWade : mSwim ? mInvSwim : Infinity;
+      return mW.hole[t] ? Infinity : mInvSpeed;   // a hole is a wall to wolves
+    }
     if (k === K.GRASS) return mInvSpeed + AS.chewSeconds(mSim, mSelf, t);
-    if (k === K.WATER) return mW.wDepth[t] <= mWade ? mInvWade : mSwim ? mInvSwim : Infinity;
     return Infinity;
   };
   // A tile the wolf can bite its goal from: touching the goal tile, and either where it

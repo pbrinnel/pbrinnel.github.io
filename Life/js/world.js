@@ -1,6 +1,8 @@
 // The grid and every agent store, as flat typed arrays (struct of arrays).
 //
-// One thing per tile, so `kind` is the truth about who is where. Only the add/remove/move
+// A tile has layers. `kind` is the solid layer: at most one blade, corpse or animal, and EMPTY
+// when none. `flow` is the flow layer: at most one flowing thing (water, for now). A wading
+// animal is a solid in water's flow. `kind` is the truth about who is where. Only the add/remove/move
 // functions in this file write `kind`, `aSlot` or the dense lists; everything else writes
 // its own fields and calls these to change occupancy, so the grid can't drift from the
 // stores.
@@ -11,9 +13,12 @@
 (function (AS) {
   'use strict';
 
-  // WATER sits below the animal kinds because the code tells an animal by `kind >= BUNNY`;
-  // every other test asks for EMPTY or for one named kind, so water is simply "taken".
-  const KIND = AS.KIND = Object.freeze({ EMPTY: 0, GRASS: 1, CORPSE: 2, WATER: 3, BUNNY: 4, WOLF: 5, HUMAN: 6 });
+  // What the solid layer holds. The animal kinds come last because the code tells an animal by
+  // `kind >= BUNNY`.
+  const KIND = AS.KIND = Object.freeze({ EMPTY: 0, GRASS: 1, CORPSE: 2, BUNNY: 3, WOLF: 4, HUMAN: 5 });
+  // What the flow layer holds: at most one flow per tile, so a new flow is one more entry and
+  // no tile is ever two of them.
+  const FLOW = AS.FLOW = Object.freeze({ NONE: 0, WATER: 1 });
   // Animal species codes, used in `aSpecies` and `cSpecies`. The kind of a species' animals
   // is ANIMAL_KIND0 + its code, so a new species is one entry in each list below.
   const SP = AS.SPECIES = Object.freeze({ BUNNY: 0, WOLF: 1, HUMAN: 2 });
@@ -84,7 +89,9 @@
 
     const W = {
       w, h, n,
-      kind: new Uint8Array(n),
+      kind: new Uint8Array(n),      // the solid layer (AS.KIND)
+      // The flow layer (AS.FLOW). WATER exactly where wDepth > 0; only setDepth and addWater write it.
+      flow: new Uint8Array(n),
       serial: new Uint32Array(n),   // serial of the blade or corpse on a tile
       nextSerial: 1,                // 0 means "nobody", so serials start at 1
 
@@ -124,7 +131,8 @@
       // hole may be dug; animals walk over it. Only a ground property, so `kind` is untouched.
       scorch: new Float32Array(n),
 
-      // How deep the water on a tile is, in meters (0 on land). Any depth makes the tile water.
+      // How deep the water on a tile is, in meters (0 on land). Any depth puts the tile's flow
+      // at WATER.
       wDepth: new Float32Array(n),
       // River mouths: 1 where water leaves the map (terrain.js), or null in a world without water.
       outlet: null,
@@ -234,7 +242,11 @@
     W.tx = t => t % w;
     W.ty = t => (t / w) | 0;
     W.inside = (x, y) => x >= 0 && y >= 0 && x < w && y < h;
-    W.isEmpty = t => W.kind[t] === KIND.EMPTY;
+    // Ground that nothing is on and no flow covers: where a blade may sprout, a hole be dug or
+    // a baby be born. Standing room, which a wade can use, is AS.canStand (moving.js).
+    W.isBare = t => W.kind[t] === KIND.EMPTY && W.flow[t] === FLOW.NONE;
+    // Water with nothing standing in it.
+    W.isOpenWater = t => W.kind[t] === KIND.EMPTY && W.flow[t] === FLOW.WATER;
 
     // The four neighbors of tile t that are inside the world, written into out (an
     // Int32Array of 4). Returns how many. Walls at the edges, no wrap.
@@ -248,15 +260,14 @@
       return k;
     };
 
-    // A tile can be claimed when nothing is on it. `wet` also allows unoccupied water (an
-    // animal wading in).
+    // A tile can be claimed when its solid layer is empty and no flow covers it. `wet` also
+    // allows a flow (an animal wading in).
     function claim(t, kind, wet) {
-      const k = W.kind[t];
-      if (k !== KIND.EMPTY && !(wet && k === KIND.WATER)) throw new Error(`tile ${t} is taken (kind ${W.kind[t]})`);
+      if (W.kind[t] !== KIND.EMPTY || (!wet && W.flow[t] !== FLOW.NONE)) throw new Error(`tile ${t} is taken (kind ${W.kind[t]}, flow ${W.flow[t]})`);
       W.kind[t] = kind;
     }
-    // What a tile shows when whatever was on it leaves: water if it has any, else bare ground.
-    function free(t) { W.kind[t] = W.wDepth[t] > 0 ? KIND.WATER : KIND.EMPTY; }
+    // Whatever stood on a tile has left it; any flow stays.
+    function free(t) { W.kind[t] = KIND.EMPTY; }
 
     W.addGrass = function (t, size, age) {
       if (W.hole[t]) throw new Error(`tile ${t} is a warren hole; no grass grows there`);
@@ -285,9 +296,8 @@
     // Water's depth on a tile, as the water rules (water.js) move it during play. Getting
     // wet drowns a blade, floods a warren hole and puts out scorched ground; a corpse must
     // already be gone (corpse.js lets its grass boost go first); an animal stays (it wades, or
-    // moving.js walks it out if the water is too deep for it). A tile with nothing on it
-    // shows as water while it has any. The bare beach follows the shore: a blade on land that
-    // comes to touch water dies. wetFlips counts shores moved, for whatever caches a picture
+    // moving.js walks it out if the water is too deep for it). The bare beach follows the
+    // shore: a blade on land that comes to touch water dies. wetFlips counts shores moved, for whatever caches a picture
     // of them (render.js's topo lines); wetMoved tells water.js to rebuild the way-to-water
     // field.
     const nbs4 = new Int32Array(4), nbs4b = new Int32Array(4);
@@ -295,16 +305,15 @@
       const was = W.wDepth[t] > 0, now = d > 0;
       W.wDepth[t] = now ? d : 0;
       if (was === now) return;
+      W.flow[t] = now ? FLOW.WATER : FLOW.NONE;
       if (now) {
         if (W.kind[t] === KIND.CORPSE) throw new Error(`tile ${t}: remove the corpse before the water comes`);
         W.waterCount++;
         if (W.kind[t] === KIND.GRASS) W.removeGrass(t);
         if (W.hole[t]) W.removeHole(t);
         W.scorch[t] = 0;   // ground under water isn't burning
-        if (W.kind[t] === KIND.EMPTY) W.kind[t] = KIND.WATER;
       } else {
         W.waterCount--;
-        if (W.kind[t] === KIND.WATER) W.kind[t] = KIND.EMPTY;
       }
       W.wetFlips++;
       W.wetMoved = true;
@@ -318,11 +327,12 @@
       if (beach && W.kind[u] === KIND.GRASS) W.removeGrass(u);
     }
 
-    // Water laid on an empty tile, `depth` meters deep (LAID_DEPTH when not given: the
+    // Water laid on a bare tile, `depth` meters deep (LAID_DEPTH when not given: the
     // checks' hand-built worlds): at world build (terrain.js), before anything else is placed.
     W.addWater = function (t, depth) {
       if (W.hole[t] || W.scorch[t] > 0) throw new Error(`tile ${t} can't take water`);
-      claim(t, KIND.WATER);
+      if (!W.isBare(t)) throw new Error(`tile ${t} can't take water (kind ${W.kind[t]}, flow ${W.flow[t]})`);
+      W.flow[t] = FLOW.WATER;
       W.wDepth[t] = depth > 0 ? depth : LAID_DEPTH;
       if (W.water) { W.water.H[t] = W.wDepth[t]; W.water.listWet(); }   // the rules move it from here
       W.waterCount++;
@@ -365,7 +375,7 @@
     // Digs a hole on tile t. Bare ground only: no blade on it, no wolf standing there, no water, not scorched.
     W.addHole = function (t, usedAt) {
       if (W.hole[t]) throw new Error(`tile ${t} is already a hole`);
-      if (W.kind[t] === KIND.GRASS || W.kind[t] === KIND.WATER || (W.kind[t] >= KIND.BUNNY && W.kind[t] !== KIND.BUNNY)) throw new Error(`tile ${t} can't be dug (kind ${W.kind[t]})`);
+      if (W.kind[t] === KIND.GRASS || W.flow[t] !== FLOW.NONE || (W.kind[t] >= KIND.BUNNY && W.kind[t] !== KIND.BUNNY)) throw new Error(`tile ${t} can't be dug (kind ${W.kind[t]})`);
       if (W.scorch[t] > 0) throw new Error(`tile ${t} is scorched; it can't be dug`);
       W.hole[t] = 1;
       W.holeUsedAt[t] = usedAt || 0;

@@ -46,7 +46,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
         const app = AS.app, W = app.sim.W, cam = app.cam, r = document.getElementById('map').getBoundingClientRect();
         for (let y = Math.ceil(cam.y) + 6; y < cam.y + innerHeight / cam.scale - 2; y++) for (let x = Math.ceil(cam.x) + 2; x < cam.x + innerWidth / cam.scale - 2; x++) {
           let clear = true;
-          for (let dy = -1; dy <= 1 && clear; dy++) for (let dx = -1; dx <= 1; dx++) if (W.kind[W.tile(x + dx, y + dy)] !== AS.KIND.EMPTY) { clear = false; break; }
+          for (let dy = -1; dy <= 1 && clear; dy++) for (let dx = -1; dx <= 1; dx++) if (!W.isBare(W.tile(x + dx, y + dy))) { clear = false; break; }
           if (clear) return [r.left + (x + 0.5 - cam.x) * cam.scale, r.top + (y + 0.5 - cam.y) * cam.scale];
         }
         return null;

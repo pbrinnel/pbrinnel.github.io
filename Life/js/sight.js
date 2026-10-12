@@ -9,7 +9,7 @@
   'use strict';
 
   const K = AS.KIND;
-  const GRASS = K.GRASS, EMPTY = K.EMPTY, WATER = K.WATER, ANIMAL = K.BUNNY;
+  const GRASS = K.GRASS, EMPTY = K.EMPTY, ANIMAL = K.BUNNY;
 
   // ---- Line of sight ----
 
@@ -183,7 +183,7 @@
         const nt = ny * w + nx;
         if (stamp[nt] === gen) continue;
         const kn = kind[nt];
-        if (kn !== EMPTY && (kn !== WATER || depth[nt] > wade)) continue;
+        if (kn !== EMPTY || depth[nt] > wade) continue;
         const ddx = nx - fx, ddy = ny - fy;
         if (ddx * ddx + ddy * ddy > r2) continue;
         stamp[nt] = gen;

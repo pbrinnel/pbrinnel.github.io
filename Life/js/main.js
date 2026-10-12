@@ -235,7 +235,7 @@
     // A hole with nothing on it is selectable too (it has no serial, so `hole` marks it).
     const bareHole = k === AS.KIND.EMPTY && W.hole[t] === 1;
     // Water has no serial (0) and never changes, so its selection simply stays.
-    if (k === AS.KIND.GRASS || k === AS.KIND.CORPSE || k === AS.KIND.WATER || bareHole) return { tile: t, serial: W.serial[t], slot: -1, hole: bareHole };
+    if (k === AS.KIND.GRASS || k === AS.KIND.CORPSE || W.isOpenWater(t) || bareHole) return { tile: t, serial: W.serial[t], slot: -1, hole: bareHole };
     // Inspect Empty Tiles: bare ground is picked as the tile itself (its properties only).
     return inspectEmpty ? { tile: t, serial: 0, slot: -1, empty: true } : null;
   }

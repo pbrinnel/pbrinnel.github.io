@@ -30,7 +30,7 @@
 //     water.totals           m of water since made: { rain, evap, et, out } (per tile area)
 //
 //   AS.waterTick(sim)        the sim's tick: a step when one is due, then the world told (syncWater)
-//   AS.syncWater(sim)        W.wDepth and the tiles' kinds made to match water.H
+//   AS.syncWater(sim)        W.wDepth and the tiles' flow made to match water.H
 //   The world's water is W.water (terrain.js makes it; paint.js makes one to pour into a world
 //   without).
 (function (AS) {

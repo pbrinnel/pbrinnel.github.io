@@ -58,7 +58,7 @@
   // The field value above which the top `cover` share of land tiles lies (lakes aren't land).
   function threshold(vals, cover, W) {
     const land = [];
-    for (let t = 0; t < W.n; t++) if (W.kind[t] !== K.WATER) land.push(vals[t]);
+    for (let t = 0; t < W.n; t++) if (W.flow[t] !== AS.FLOW.WATER) land.push(vals[t]);
     const sorted = Float32Array.from(land).sort();
     return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * (1 - cover)))];
   }
@@ -67,7 +67,7 @@
     const { W, rng } = sim, g = sim.T.grass;
     const range = Math.max(1e-6, 1 - th);
     for (let t = 0; t < W.n; t++) {
-      if (W.kind[t] !== K.EMPTY || W.beach[t]) continue;   // the beach stays bare, for drinking
+      if (!W.isBare(t) || W.beach[t]) continue;   // the beach stays bare, for drinking
       const d = (vals[t] - th) / range;
       let age = -1;
       if (d >= 0) {
@@ -87,7 +87,7 @@
     for (let tries = 0; spots.length < n && tries < SPOT_TRIES; tries++) {
       const t = rng.int(W.n), x = t % W.w, y = (t / W.w) | 0;
       if (x < BORDER || y < BORDER || x >= W.w - BORDER || y >= W.h - BORDER) continue;
-      if (W.kind[t] === K.WATER) continue;
+      if (W.flow[t] === AS.FLOW.WATER) continue;
       if (!likes(t) && rng.next() > UNLIKELY) continue;
       if (spots.some(s => (s.x - x) ** 2 + (s.y - y) ** 2 < gap * gap)) continue;
       spots.push({ x, y });
@@ -104,7 +104,7 @@
       const x = Math.round(c.x + r * Math.cos(a)), y = Math.round(c.y + r * Math.sin(a));
       if (!W.inside(x, y)) continue;
       const t = W.tile(x, y);
-      if (W.kind[t] !== K.EMPTY) continue;
+      if (!W.isBare(t)) continue;
       if (W.hole[t] && !AS.canEnterHole(species)) continue;   // a hole is a wall to all but bunnies
       AS.spawnStarting(sim, species, t, bodies);
       placed++;
@@ -120,7 +120,7 @@
       const x = Math.round(c.x + r * Math.cos(a)), y = Math.round(c.y + r * Math.sin(a));
       if (!W.inside(x, y)) continue;
       const t = W.tile(x, y);
-      if (W.kind[t] !== K.EMPTY || W.hole[t]) continue;
+      if (!W.isBare(t) || W.hole[t]) continue;
       W.addHole(t, 0);
       dug++;
     }

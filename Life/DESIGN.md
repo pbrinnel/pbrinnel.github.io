@@ -47,7 +47,15 @@ tuning so far) is in HISTORY.md.
   middle, out from under the windows at the sides (12 Oct 2026: no further, so the world is
   never lost); past the edge is darker, with a faint line along it.
 - Solid walls at the edges, no wrap-around.
-- **One thing per tile:** a blade, a corpse, or an animal. Nothing shares a tile.
+- **A tile has four layers** (Paul, 12 Oct 2026): **Ground** (its height, soil water, a
+  warren hole, scorch, beach), always there; **Solid**, at most one: a blade, a corpse or an
+  animal; **Flow**, at most one: water (and fire, when it comes); **Air**, always there: the
+  wind (later smoke). So a wading wolf is a solid in water's flow, and a burning blade will
+  be a solid with fire in its flow; water and fire never share a tile. The layers act on
+  each other only through named rules: water drowns grass and carries bodies off; fire will
+  burn the solid under it, put out by water; wind will push fire; soil water sets how
+  readily things burn.
+- **One solid per tile:** a blade, a corpse, or an animal. No two share a tile.
 - **Movement is 4-directional** (up, down, left, right).
 - Every interaction is with an adjacent tile: eating, biting and mating.
 - **Grass blocks movement.** Bunnies eat their way into a meadow. Wolves go around grass

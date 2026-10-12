@@ -8,7 +8,7 @@ const allValues = [];
 const names = d => d.rows.map(r => r.name).join(',');
 const val = (d, n) => d.rows.find(r => r.name === n).value;
 const sim = A.Sim(T, 7), W = sim.W, K = A.KIND;
-const empties = []; for (let t = 0; t < W.n && empties.length < 20; t++) if (W.kind[t] === K.EMPTY && !W.hole[t]) empties.push(t);
+const empties = []; for (let t = 0; t < W.n && empties.length < 20; t++) if (W.isBare(t) && !W.hole[t]) empties.push(t);
 const grassT = W.gList[0];
 check(A.describe(sim, null) === null, 'null selection -> null');
 
@@ -133,7 +133,7 @@ check(dd.rows.some(r => r.name === 'Foo' && r.value === '—') && !dd.rows.some(
 // humans: the animal rows that apply (State, Target, Kills...), but none of a breeder's
 {
   const hs = A.Sim(T, 3), HW = hs.W;
-  let ht = -1; for (let t = 0; t < HW.n; t++) if (HW.kind[t] === K.EMPTY && !HW.hole[t] && HW.tx(t) < HW.w - 10 && [2, 6, 9].every(d => HW.kind[t + d] === K.EMPTY)) { ht = t; break; }
+  let ht = -1; for (let t = 0; t < HW.n; t++) if (HW.isBare(t) && !HW.hole[t] && HW.tx(t) < HW.w - 10 && [2, 6, 9].every(d => HW.isBare(t + d))) { ht = t; break; }
   for (const sex of [0, 1]) {
     const slot = A.spawnStarting(hs, A.SPECIES.HUMAN, ht + sex * 2); HW.aSex[slot] = sex;
     const hd = A.describe(hs, { tile: HW.aTile[slot], serial: HW.aSerial[slot], slot }); allValues.push(hd);
@@ -151,7 +151,7 @@ check(dd.rows.some(r => r.name === 'Foo' && r.value === '—') && !dd.rows.some(
   check(/^Human corpse #\d+$/.test(cd.title) && val(cd, 'Meat') === T.human.MeatOnBody.toFixed(1) + ' / ' + T.human.MeatOnBody, 'human corpse: ' + cd.title + ' ' + val(cd, 'Meat'));
 }
 // An empty tile, picked directly (Inspect Empty Tiles): only the tile's rows.
-{ let et = -1; for (let t = 0; t < W.n && et < 0; t++) if (W.kind[t] === K.EMPTY && !W.hole[t]) et = t;
+{ let et = -1; for (let t = 0; t < W.n && et < 0; t++) if (W.isBare(t) && !W.hole[t]) et = t;
   const de = A.describe(sim, { tile: et, serial: 0, slot: -1, empty: true }); allValues.push(de);
   check(de.title === 'Tile ' + W.tx(et) + ', ' + W.ty(et) && names(de) === 'Position,Elevation,Ground' && /^\d+(\.\d)? m$/.test(val(de, 'Elevation')), 'empty tile: ' + de.title + ' / ' + names(de) + ' / ' + val(de, 'Elevation')); }
 const bads = []; for (const x of allValues) for (const r of x.rows) if (!r.heading && (/NaN|undefined/.test(r.value + r.tip + r.range) || r.value === '')) bads.push(r.name);

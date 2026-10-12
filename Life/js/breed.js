@@ -93,7 +93,7 @@
     let room = 0;
     // A hole is a wall to all but bunnies, so their litters are never born onto one.
     const holes = AS.canEnterHole(W.aSpecies[s]);
-    for (let i = 0; i < k; i++) if (W.kind[nb[i]] === K.EMPTY && (holes || !W.hole[nb[i]])) free[room++] = nb[i];
+    for (let i = 0; i < k; i++) if (W.isBare(nb[i]) && (holes || !W.hole[nb[i]])) free[room++] = nb[i];
     if (room < n) return;
 
     const species = W.aSpecies[s], S = AS.speciesStats(sim, s);

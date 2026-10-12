@@ -5,7 +5,7 @@
 (function (AS) {
   'use strict';
 
-  const KIND = AS.KIND, EV = AS.EV;
+  const KIND = AS.KIND, FLOW = AS.FLOW, EV = AS.EV;
 
   // Wading (Paul, 11 Oct 2026): an animal walks into water up to its WadeDepth (meters;
   // blank = none), slowed to WadeSpeed of its speed there; deeper water is a wall to it.
@@ -13,8 +13,7 @@
   // Whether an animal wading `wade` m deep can step onto t: open ground, or water with
   // nothing in it no deeper than that. Holes are the caller's rule.
   AS.canStand = (W, t, wade) => {
-    const k = W.kind[t];
-    return k === KIND.EMPTY || (k === KIND.WATER && W.wDepth[t] <= wade);
+    return W.kind[t] === KIND.EMPTY && (W.flow[t] === FLOW.NONE || W.wDepth[t] <= wade);
   };
 
   // Swimming (Paul, 12 Oct 2026: wolves swim well and rabbits badly, as they do). Water
@@ -36,7 +35,7 @@
   // Whether animal s can step onto t now: ground or water it can stand on, or deeper water
   // it would swim and can get across.
   AS.canEnter = (sim, s, t) => AS.canStand(sim.W, t, AS.wadeOf(sim, s)) ||
-    (sim.W.kind[t] === KIND.WATER && AS.swimsNow(sim, s) && (inDeep(sim, s) || crossable(sim, s, t)));
+    (sim.W.isOpenWater(t) && AS.swimsNow(sim, s) && (inDeep(sim, s) || crossable(sim, s, t)));
 
   // Into deep water from land only toward land it can see within its swimming reach (Paul,
   // 12 Oct 2026: a rabbit doesn't strike out across water with no far bank in view): the
@@ -59,7 +58,7 @@
         if (crossSeen.has(v) || v === from) continue;
         crossSeen.set(v, d + 1);
         if (AS.canStand(W, v, wade) && (v % W.w - fx) * dx + (((v / W.w) | 0) - fy) * dy >= 2) return true;
-        if (W.kind[v] === KIND.WATER && d < reach) crossQ.push(v);
+        if (W.isOpenWater(v) && d < reach) crossQ.push(v);
       }
     }
     return false;
@@ -102,7 +101,7 @@
   // the step comes on a later tick once the blade is gone. Returns whether it moved.
   AS.chewOrStep = function (sim, s, t2) {
     const W = sim.W;
-    if (W.kind[t2] === KIND.EMPTY || W.kind[t2] === KIND.WATER) return AS.stepTo(sim, s, t2);
+    if (W.kind[t2] === KIND.EMPTY) return AS.stepTo(sim, s, t2);
     if (W.kind[t2] !== KIND.GRASS || W.aStepLeft[s] > 0 || W.aBiteLeft[s] > 0) return false;
     const S = AS.speciesStats(sim, s);
     if (!(S.BiteSize > 0)) return false;
@@ -206,8 +205,7 @@
   const OUT_RANGE = 40;
   let oW = null, oWade = 0, oHoles = false;
   const outCost = t => {
-    const k = oW.kind[t];
-    return (k === KIND.EMPTY || k === KIND.WATER) && (oHoles || !oW.hole[t]) ? 1 : Infinity;
+    return oW.kind[t] === KIND.EMPTY && (oHoles || !oW.hole[t]) ? 1 : Infinity;
   };
   const isStandable = t => AS.canStand(oW, t, oWade) && (oHoles || !oW.hole[t]);
   const onb = new Int32Array(4);

@@ -188,7 +188,7 @@ for (const [name, sp, mk] of [['human', 2, human], ['wolf', 1, wolf]]) {
 {
   const { AS, T, sim, W, events } = make(20, 7);
   const h = human(AS, sim, 10, 10, { full: 100 });
-  for (let t = 0; t < W.n; t++) if (W.kind[t] === AS.KIND.EMPTY) W.addGrass(t, 1, 1);
+  for (let t = 0; t < W.n; t++) if (W.isBare(t)) W.addGrass(t, 1, 1);
   const g0 = W.gCount;
   let moved = false, grazes = 0;
   const start = W.aTile[h];

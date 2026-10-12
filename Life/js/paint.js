@@ -12,7 +12,7 @@
 //
 // AS.paintCircle(sim, kind, cx, cy, r, cap) → number placed       kind: 'grass' | 'bunny' | 'wolf' | 'human'
 //   The paint modes' brush: one new thing of that kind on every eligible tile within r tiles
-//   (a circle) of (cx, cy), each of a random age. Eligible = empty (kind EMPTY, so nothing is
+//   (a circle) of (cx, cy), each of a random age. Eligible = bare (nothing on it and no water, so nothing is
 //   ever displaced); grass also skips holes and scorch, wolves and humans skip holes (bunnies may stand
 //   on one). Tiles are visited in a fixed order and dice come from sim.rng. r = 0 is the
 //   single tile (cx, cy). cap is optional, { room }: animals (not grass) stop going down at
@@ -65,7 +65,7 @@
       for (let x = Math.max(0, cx - reach); x <= Math.min(W.w - 1, cx + reach); x++) {
         if ((x - cx) ** 2 + (y - cy) ** 2 > r2) continue;
         const t = y * W.w + x;
-        if (W.kind[t] !== K.EMPTY) continue;
+        if (!W.isBare(t)) continue;
         if (kind === 'grass') {
           if (W.hole[t] || W.scorch[t] > 0 || W.beach[t]) continue;   // the beach stays bare for drinking
           const age = rng.next() * S.Lifespan;

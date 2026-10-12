@@ -62,7 +62,7 @@ for (const [sp, name] of [[0, 'bunny'], [1, 'wolf'], [2, 'human']]) {
   for (let i = 0; i < secs(AS, 60) && W.aAlive[s]; i++) {
     sim.tick();
     minWater = Math.min(minWater, W.aWater[s]);
-    const t = W.aTile[s], touching = [t - 1, t + 1, t - W.w, t + W.w].some(u => W.kind[u] === K.WATER);
+    const t = W.aTile[s], touching = [t - 1, t + 1, t - W.w, t + W.w].some(u => W.isOpenWater(u));
     if (sname(sim, s) === 'DRINK') {
       drinking = true;
       if (touching && W.aWater[s] > minWater + 1) wasAdjacent = true;
@@ -142,7 +142,7 @@ for (const [sp, name] of [[0, 'bunny'], [1, 'wolf'], [2, 'human']]) {
     for (let i = 0; i < 24; i++) {
       for (let tries = 0; tries < 50; tries++) {
         const x = 18 + sim.rng.int(24), y = 12 + sim.rng.int(26), t = at(W, x, y);
-        if (W.kind[t] !== AS.KIND.EMPTY) continue;
+        if (!W.isBare(t)) continue;
         crowd.push(put(AS, sim, AS.SPECIES.BUNNY, x, y, { water: 10 })); break;
       }
     }
@@ -206,10 +206,10 @@ for (const [sp, name] of [[0, 'bunny'], [1, 'wolf'], [2, 'human']]) {
   W.ensureWaterField();
   let wrongBeach = 0, wrongStep = 0, far = 0;
   for (let t = 0; t < W.n; t++) {
-    if (W.kind[t] === K.WATER) continue;
-    const touches = [t - 1, t + 1, t - W.w, t + W.w].some(u => u >= 0 && u < W.n && Math.abs(W.tx(u) - W.tx(t)) <= 1 && W.kind[u] === K.WATER);
+    if (W.isOpenWater(t)) continue;
+    const touches = [t - 1, t + 1, t - W.w, t + W.w].some(u => u >= 0 && u < W.n && Math.abs(W.tx(u) - W.tx(t)) <= 1 && W.isOpenWater(u));
     if ((W.wDist[t] === 0) !== touches) wrongBeach++;
-    if (W.wDist[t] > 0) { far++; const n = W.wNext[t]; if (!(W.wDist[n] === W.wDist[t] - 1 && Math.abs(W.tx(n) - W.tx(t)) + Math.abs(W.ty(n) - W.ty(t)) === 1 && W.kind[n] !== K.WATER)) wrongStep++; }
+    if (W.wDist[t] > 0) { far++; const n = W.wNext[t]; if (!(W.wDist[n] === W.wDist[t] - 1 && Math.abs(W.tx(n) - W.tx(t)) + Math.abs(W.ty(n) - W.ty(t)) === 1 && !W.isOpenWater(n))) wrongStep++; }
   }
   // distance = Manhattan distance to the lake's nearest shore tile in an open world
   const t0 = at(W, 5, 5), want = Math.abs(5 - 19) + Math.abs(5 - 15);   // to (19, 15), the beach tile nearest

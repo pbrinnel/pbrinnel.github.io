@@ -108,7 +108,7 @@ function refDist(W, from, goal, range) {
   const { AS, sim, W } = mk(70, 50, '30%', 5);
   let s = 7, bad = 0, found = 0;
   const rnd = m => { s = (s * 1664525 + 1013904223) >>> 0; return s % m; };
-  const empty = () => { for (;;) { const t = rnd(W.n); if (W.kind[t] === AS.KIND.EMPTY && !W.hole[t]) return t; } };
+  const empty = () => { for (;;) { const t = rnd(W.n); if (W.isBare(t) && !W.hole[t]) return t; } };
   // Crowds and clusters, so many candidates sit at equal distances.
   for (let i = 0; i < 400; i++) AS.spawnStarting(sim, i % 3 === 0 ? AS.SPECIES.WOLF : AS.SPECIES.BUNNY, empty());
   for (let i = 0; i < 60; i++) { const t = empty(); W.addCorpse(t, AS.SPECIES.BUNNY); AS.corpseAdded(sim, t); }
