@@ -41,6 +41,7 @@ load time: every file reads other files' `AS.*` inside functions, at call time.
 | `grass.js` | growth (an hour's worth), age, seeding, sprouting on empty tiles, old age, all in hourly slices; scorch cooling; bites | `grassTick`, `grassBite`, `grassStage` |
 | `corpse.js` | decay, and the boost field grass drinks from | `corpseTick`, `corpseAdded`, `corpseBoost` |
 | `warren.js` | warren holes' clocks: marks a hole used while a bunny stands on it, collapses holes unused for `CollapseDays` (hourly) | `warrenTick`, `holeWithin` |
+| `weather.js` | the world's wind (`sim.wind = { from, kmh, toX, toY }`, `sim.weather`): three mean-reverting walks per in-world hour around the world's typical wind (`Wind`, a range) and a prevailing direction from the seed, capped at typical × `WindSpells`, changing over `WindChangeHours`; its own generator (never `sim.rng`, so worlds play out the same whatever the wind does); `windWords`, `windFromName` for the UI | `Wind`, `weatherTick`, `windWords`, `windFromName`, `WIND` |
 | `sim.js` | the fixed tick, populate, events ring, population history | `Sim`, `TICK_HZ`, `DT`, `DAY_SECONDS`, `TICKS_PER_HOUR`, `EV`, `debugDropCorpse` |
 | `paint.js` | PAINT's powers: the brushes and the nuke ([The page](#the-page)) | `nuke`, `paintCircle` |
 | `water.js` | the water rules ([Water](#water)) | `Water`, `waterTick`, `syncWater`, `TILE_M`, `WATER_TINY`, `WATER_STEP_DAYS` |
@@ -128,7 +129,7 @@ graph, ui, bench) only reads.
 
 - **Tick:** fixed `AS.DT` = 1/30 s of sim time (`TICK_HZ`); a day is `DAY_SECONDS` = 20 s.
   `sim.tick()` does, in order: record history at the start of each in-world hour →
-  `corpseTick` → `grassTick` → `warrenTick` → `waterTick` → `animalsTick`.
+  `weatherTick` → `corpseTick` → `grassTick` → `warrenTick` → `waterTick` → `animalsTick`.
 - **Grass:** growth/age/seed/sprout/old-age once per in-world hour, spread over
   `TICKS_PER_HOUR` ticks by tile (`t % TICKS_PER_HOUR`).
 - **Water:** a step every `STEP_TICKS` ticks ([Water](#water)).

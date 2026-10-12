@@ -28,7 +28,7 @@ tuning so far) is in HISTORY.md.
 [Ground and water](#ground-and-water) · [Time](#time) · [Bodies](#bodies) ·
 [Hunting and eating](#hunting-and-eating) · [Warrens](#warrens) ·
 [Moving and spreading](#moving-and-spreading) · [Humans](#humans) · [Grass](#grass) ·
-[Corpses](#corpses) · [Looks](#looks) · [Controls](#controls) · [PAINT](#paint) ·
+[Corpses](#corpses) · [Fire and wind (planned)](#fire-and-wind-planned) · [Looks](#looks) · [Controls](#controls) · [PAINT](#paint) ·
 [Platform and scale](#platform-and-scale) · [Photosensitivity](#photosensitivity)
 
 ---
@@ -294,6 +294,42 @@ last only as long as their lives.
 - **Grass drinks the Nutrient.** Each unit of extra growth the boost gives a blade costs
   the corpse one unit of Nutrient. The corpse is gone when its Nutrient runs out or
   `CorpseDecay` ends, whichever comes first, so a bigger body feeds more grass.
+
+## Fire and wind (planned)
+Decided by Paul, 12 Oct 2026; not built yet. Fire comes first of the weather systems, and
+wind is real weather, not an animation.
+
+- **Wind is in the sim.** The world has a wind, a direction and a strength that drift
+  slowly over the world's time from its seed: breezes most of the time, stronger spells now
+  and then, no storms until weather's next part. Grass shows it as **traveling gusts**
+  (Paul's pick from a mockup): bands of leaning grass roll across the meadow downwind, more
+  often and wider the stronger the wind, upright between them; the old drawing-only gust
+  goes. A blade leans for at least 1.2 s of real time once a gust reaches it, and at speeds
+  where gusts would flicker, grass shows the average lean instead. Info shows the wind: an
+  arrow and words ("breeze, 14 km/h from the west").
+- **Fire is a state a tile is in**, like water depth or scorch: a burning blade is still a
+  blade, burning down its fuel. Anything on a tile can burn (grass, corpses, animals);
+  water never does, and **bare ground doesn't**, so beaches, bare patches and water are
+  firebreaks.
+- **Spread** to all 8 neighbors, as a chance per second that grows with the neighbor's fuel
+  and dryness and with the wind behind it. Dryness comes from the soil water the water rules
+  already keep (a setting stands in where there is no water), so droughts need no fire rules
+  of their own.
+- **How a fire looks** (Paul, from a mockup): what burns stays in view about 80% of its burn,
+  charring darker while the fire on it grows (tongues as it catches, taller tongues, then
+  flames with it showing through); the last fifth, full flames engulf it; then embers, then
+  scorched ground with scattered ash. Each flame sways a pixel at most every 0.8 s on its own
+  timer; nothing flashes or brightens all at once.
+- **Afterward**, a short scorch, then the ash makes grass regrow faster, as grassland comes
+  back thicker after fire.
+- **Animals** sense fire and flee it; in or next to it they lose HP and can die (cause:
+  Burned). A bunny in its hole is safe as a fire passes over. A burning animal doesn't carry
+  fire, for now.
+- **Starting fires:** one way in, used by PAINT's FIRE MODE now and by lightning and humans
+  later.
+- **Order:** mockups of the fire and the wind's look; wind; fire; animals and fire; after
+  the fire; later, weather's next part (rain that varies, droughts, lightning) and humans
+  lighting fires.
 
 ## Looks
 - **Sprites:** 8×8 pixel art drawn in code, no image files: a bunny, a wolf (pointed ears,

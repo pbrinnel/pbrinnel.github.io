@@ -12,6 +12,9 @@ Hilliness,70-160,Tiles; how broad the ranges are that rise fastest while the gro
 Roughness,0.4-0.6,0-1; how much smaller bumps ride on those ranges (a range: each world draws its own)
 Bowls,5-13,Lake basins pressed into the grown ground (as glaciers scoop them); water settles in them by the water rules (a range: each world draws its own)
 Rain,1-2,"Water on: mm of rain a day, on every tile (a range: each world draws its own); 0 = no water at all"
+Wind,6-14,"km/h of the world's typical wind (a range: each world draws its own); it drifts around this, with a prevailing direction its seed picks"
+WindSpells,2.5,How many times the typical wind its strongest spells can reach; it never goes beyond
+WindChangeHours,6,Roughly how many in-world hours the wind takes to change noticeably; its stronger spells and wandering direction are slower
 Evaporation,6,mm a day from standing water
 Transpiration,3,"mm a day plants draw from full soil, less as it dries"
 SoilDepth,2,Meters of soil over the bedrock; 30% of it is room for water

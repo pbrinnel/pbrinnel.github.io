@@ -55,8 +55,11 @@
       written: 0,     // total ever written; slot is written % size
     };
 
+    const weather = AS.Wind(T, seed);   // its own generator: never touches rng
     const sim = {
       T, seed, W, rng, events, history,
+      weather,
+      wind: weather.wind,   // { from, kmh, toX, toY }: weather.js
       tickCount: 0,
       get simSeconds() { return sim.tickCount * AS.DT; },
       get day() { return sim.tickCount * AS.DT_DAYS; },
@@ -72,6 +75,7 @@
 
     sim.tick = function () {
       if (sim.tickCount % AS.TICKS_PER_HOUR === 0) history.push(W.gCount, W.bunnies, W.wolves, W.humans);
+      AS.weatherTick(sim);
       AS.corpseTick(sim);
       AS.grassTick(sim);
       AS.warrenTick(sim);
