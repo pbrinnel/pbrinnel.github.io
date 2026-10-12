@@ -336,8 +336,14 @@ never flash: see DESIGN.md, Photosensitivity.
   wake (`WAKE_STEPS`) behind one swimming sideways. Wading: its pose without the bottom
   (feet) row, the line under it. `spriteRowPx`/`spriteColPx` place rows and columns as
   `paint` does (babies smaller).
-- **Grass** leans in a rare gust (`grassLeans`, real seconds: a diagonal band,
-  `GUST_EVERY` apart; sprite mode only, lean variants are extra sheet sprites).
+- **Grass** leans with the wind (`AS.Gusts()` in sprites.js; render.js makes one,
+  `update(sim, realMs, speed, alpha)` each sprite-mode frame, `leans(x, y)` → -1/0/+1 per
+  tile): gusts are objects moved along `sim.wind`'s direction by elapsed sim time, born at the
+  upwind edge, more often, wider and faster with strength (`FULL_KMH`); calm, none. Every
+  blade's lean changes at most once per `HOLD_MS` of real time (a change is refused until the
+  last is that old); when a gust cycle would be shorter than `CYCLE_HOLDS` holds at this
+  speed, blades lean by the average share instead. Left and right lean variants are extra
+  sheet sprites (`spriteGrassLean`, `spriteGrassLeanLeft`). The far view doesn't lean.
 - **Overlays** (render.js): scorched ground; the Radius slider's fading preview
   (`radiusPreview`, `RADIUS_*`); topo lines from `W.elev` when on (`setContours`, spacing
   `setContourStep`, each spacing cached per world, `CONTOUR_*`: marching squares in
@@ -356,7 +362,9 @@ never flash: see DESIGN.md, Photosensitivity.
   `--hud-bar`: Info down the left, `body.side-open` moving the graph and minimap aside;
   PAINT bottom right; Debug right), dragged by their title bars (drag.js).
   - **Info:** per-species counts, each a toggle that rings that kind on the map through
-    `onLocate(key, on)` and wears its color while on; a Total; the Graph and Minimap
+    `onLocate(key, on)` and wears its color while on; Wind (an arrow the way it blows and
+    `windWords`/`windFromName`, from hud's `wind` field, which main.js fills from `sim.wind`;
+    hidden until there is one); a Total; the Graph and Minimap
     buttons; Topo lines (`onElevation`) and their spacing (`onContourStep`); Intent lines
     (`onLines`); Properties Off/Click/Hover through `onInspect`; Inspect Empty Tiles through
     `onInspectEmpty`.

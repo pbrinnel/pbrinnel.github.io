@@ -19,6 +19,8 @@
 //         onNuke(on), onLocate(key, on): a count's ring toggle ('bunnies', 'wolves', 'humans', 'blades', 'corpses') }) → ui
 //   ui.hud({ speedIndex, achieved, day, seed, humansSeen, counts: { bunnies, wolves, humans, total, blades, corpses } })
 //                                 (humansSeen: this world has had a human, so their count shows)
+//     optional wind: { from (radians, the bearing it blows from), kmh }: the Info window's Wind row, an arrow
+//     the way it blows and words ("breeze, 14 km/h from the west"); without it the row stays hidden
 //   ui.windows, ui.setWindow(key, on)  the tab windows open (each tab button toggles its own)
 //   ui.hidden, ui.setHidden(on)      Hide UI (the H key toggles it; never remembered across loads)
 //   ui.nuke, ui.setNuke(on)          NUKE MODE armed (main.js reads it through onNuke)
@@ -44,6 +46,8 @@
 (function (AS) {
   'use strict';
 
+  // The Wind row's arrow points up (north) at rest; CSS rotates it to the way the wind blows.
+  const WIND_ARROW = '<svg width="22" height="22" viewBox="-11 -11 22 22" aria-hidden="true"><path d="M0 -8 L5 4 L0 1 L-5 4 Z" fill="currentColor"/></svg>';
   // Figures below this get one decimal ("2.5×"); above it, whole numbers ("312×").
   const DECIMAL_BELOW = 10;
   const NUMBER_KEYS = '123456';
@@ -168,6 +172,7 @@
       return body;
     }
     const showCounts = section('info', 'Counts', 'Tap a count to ring every one of that kind on the map');
+    const showWind = section('info', 'Wind', 'The world\'s wind: where it blows from and how hard');
     const showWindows = section('info', 'Windows');
     const showElev = section('info', 'Map', 'What is drawn over the world');
     const showProps = section('info', 'Properties', 'The properties window: what something is and how it is doing');
@@ -210,6 +215,14 @@
       countsBox.appendChild(c);
     }
     showCounts.appendChild(countsBox);
+
+    // The Wind row stays hidden until hud() is given a wind (the checks and older callers have none).
+    const windArrow = el('span', 'hud-wind-arrow');
+    windArrow.innerHTML = WIND_ARROW;
+    const windText = el('span', 'hud-wind-text', '');
+    showWind.append(windArrow, windText);
+    const windRow = showWind.parentNode;
+    windRow.hidden = true;
 
     // The window closes itself too (its ×), so the button reads the window's state in hud().
     let graphBtn = null;
@@ -455,6 +468,8 @@
     const setSpeedName = cachedText(speedName);
     const setDay = cachedText(dayEl);
     const setSeed = cachedText(seedNum);
+    const setWindText = cachedText(windText);
+    let windDeg = null;   // the arrow's whole-degree angle as last written
     const setCount = {};
     for (const [, key] of COUNTS) setCount[key] = cachedText(countEls[key]);
 
@@ -482,6 +497,14 @@
       const showHumans = !!s.humansSeen;
       if (countBoxes.humans.hidden === showHumans) countBoxes.humans.hidden = !showHumans;
       setSeed(String(s.seed));
+      if (s.wind) {
+        if (windRow.hidden) windRow.hidden = false;
+        const kmh = Math.round(s.wind.kmh), words = AS.windWords(s.wind.kmh);
+        setWindText(words === 'calm' ? 'calm' : `${words}, ${kmh} km/h from the ${AS.windFromName(s.wind.from)}`);
+        // It blows toward the bearing opposite the one it comes from.
+        const deg = (((Math.round(s.wind.from * 180 / Math.PI) + 180) % 360) + 360) % 360;
+        if (deg !== windDeg) { windDeg = deg; windArrow.style.transform = `rotate(${deg}deg)`; }
+      }
     }
 
     function warnings(list) {

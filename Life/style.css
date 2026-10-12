@@ -92,6 +92,7 @@ html, body {
 .hud-sec + .hud-sec { border-top: 1px solid var(--hud-line); padding-top: 4px; }
 .hud-sec-title { color: var(--hud-dim); font-size: 12px; }
 .hud-sec-body { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-height: var(--hud-h); }
+.hud-sec[hidden] { display: none; }
 .hud-sec-body:empty, .hud-sec:has(.hud-sec-body:empty) { display: none; }
 /* On a computer each tab window floats (Paul: across the top it hid too much of the world):
    Info down the left under the bar, PAINT in the bottom right corner, Debug on the right. Rows
@@ -138,6 +139,11 @@ html, body {
 .hud-slider-label { color: var(--fg); display: inline-block; min-width: 17ch; font-variant-numeric: tabular-nums; }
 .hud-slider-input { width: 140px; height: var(--hud-h); margin: 0; accent-color: var(--hud-on); background: transparent; touch-action: none; }
 .hud-slider-input:disabled { opacity: 0.4; }
+/* The Wind row: an arrow the way it blows, then words. The words are short enough to fit the narrowest window beside it. */
+.hud-sec-body:has(.hud-wind-arrow) { flex-wrap: nowrap; gap: 8px; }
+.hud-wind-arrow { display: inline-grid; place-items: center; flex: none; width: 22px; height: 22px; color: var(--hud-on); }
+.hud-wind-arrow svg { display: block; }
+.hud-wind-text { color: var(--fg); min-width: 0; }
 .hud-counts { display: inline-flex; flex-wrap: wrap; gap: 4px 12px; color: var(--fg); }
 /* A count is a toggle that rings its kind on the map: no button chrome, so the strip reads
    the same, until it's on; then it wears the rings' color (--loc, set by ui.js). */

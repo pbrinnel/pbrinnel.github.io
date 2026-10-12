@@ -84,6 +84,8 @@
   // A gust leans a tuft: its top LEAN_ROWS rows shift one pixel right, the roots stay put.
   const LEAN_ROWS = 4;
   const GRASS_LEAN = GRASS_BITMAPS.map(m => m.map((row, j) => (j < LEAN_ROWS ? '.' + row.slice(0, SIZE - 1) : row)));
+  // ... and the same shift mirrored, for wind that blows toward the left of the screen.
+  const GRASS_LEAN_LEFT = GRASS_BITMAPS.map(m => m.map((row, j) => (j < LEAN_ROWS ? row.slice(1) + '.' : row)));
   // A warren hole: a dark opening in a rim of lighter dirt (r rim, o opening), earthy on
   // purpose so it never reads as an animal. The peeking bunny is the same hole with ears and eyes
   // up out of it, in the bunny's own colors (x body, d inner ear, e eye).
@@ -100,7 +102,7 @@
   // The PAINT window's nuke button (Paul, 12 Oct 2026: icons for the modes): a mushroom cloud
   // in the blast's orange, the only icon with no thing of its own in the world.
   const NUKE_BITMAP = ['..wwww..', '.wxxxxw.', 'wxxddxxw', '.xxxxxx.', '...xx...', '...xx...', '..xxxx..', '.dddddd.'];
-  const BITMAPS = { nuke: [NUKE_BITMAP], hole: [HOLE_BITMAP], water: WATER_BITMAPS, peek: [PEEK_BITMAP], bunny: BUNNY, wolf: WOLF, human: HUMAN, carcass: CARCASS_BITMAPS, skull: SKULL_BITMAPS, grass: GRASS_BITMAPS, grassLean: GRASS_LEAN };
+  const BITMAPS = { nuke: [NUKE_BITMAP], hole: [HOLE_BITMAP], water: WATER_BITMAPS, peek: [PEEK_BITMAP], bunny: BUNNY, wolf: WOLF, human: HUMAN, carcass: CARCASS_BITMAPS, skull: SKULL_BITMAPS, grass: GRASS_BITMAPS, grassLean: GRASS_LEAN, grassLeanLeft: GRASS_LEAN_LEFT };
   AS.SPRITE_BITMAPS = BITMAPS;
   AS.SPRITE_CODES = 'xdweynfprosqmuvk';
   AS.SPRITE_SIZE = SIZE;
@@ -206,12 +208,12 @@
 
   // ---- sheet layout -----------------------------------------------------------------
   // Animals: ((((species*2+sex)*3+stage)*2+faceLeft)*FRAMES+frame), then each species'
-  // skull, the three grass thirds, the three leaning ones, each species' carcass, the hole,
+  // skull, the three grass thirds, the three leaning right, the three leaning left, each species' carcass, the hole,
   // the bunny peeking out of it (by sex), the water (three depths × three variants), and the
   // nuke icon.
   const N_SPECIES = AS.SPECIES_COUNT;
   const ANIMAL_SPRITES = N_SPECIES * 2 * 3 * 2 * FRAMES;
-  const SKULL0 = ANIMAL_SPRITES, GRASS0 = SKULL0 + N_SPECIES, LEAN0 = GRASS0 + 3, CARCASS0 = LEAN0 + 3;
+  const SKULL0 = ANIMAL_SPRITES, GRASS0 = SKULL0 + N_SPECIES, LEAN0 = GRASS0 + 3, LEAN_LEFT0 = LEAN0 + 3, CARCASS0 = LEAN_LEFT0 + 3;
   // Water comes in WATER_DEPTHS shades (shallow, mid, deep), each in every ripple variant.
   const HOLE0 = CARCASS0 + N_SPECIES, PEEK0 = HOLE0 + 1, WATER0 = PEEK0 + 2, NUKE0 = WATER0 + WATER_DEPTHS.length * WATER_BITMAPS.length, COUNT = NUKE0 + 1;
   const SHEET_COLS = 19;
@@ -233,6 +235,7 @@
   AS.spriteSkull = species => SKULL0 + species;
   AS.spriteGrass = third => GRASS0 + third;
   AS.spriteGrassLean = third => LEAN0 + third;
+  AS.spriteGrassLeanLeft = third => LEAN_LEFT0 + third;
   AS.spriteCarcass = species => CARCASS0 + species;
   AS.spriteHole = () => HOLE0;
   AS.spriteNuke = () => NUKE0;
@@ -241,13 +244,113 @@
   // variant from its position, a fixed scramble of x and y, never random.
   AS.spriteWater = (x, y, band = 1) => WATER0 + band * WATER_BITMAPS.length + ((Math.imul(x, 73856093) ^ Math.imul(y, 19349663)) >>> 8) % WATER_BITMAPS.length;
 
-  // Wind: now and then a band sweeps diagonally across the meadow and tufts in it lean.
-  // `clock` is real seconds, so a gust looks the same at any sim speed. Grass otherwise
-  // stands still, so only animals draw the eye.
-  const GUST_EVERY = 25, GUST_SPEED = 18, GUST_WIDTH = 5;   // seconds, tiles/s, tiles
-  AS.grassLeans = function (x, y, clock) {
-    const front = (clock % GUST_EVERY) * GUST_SPEED - GUST_WIDTH, d = x + y * 0.5 - front;
-    return d >= 0 && d < GUST_WIDTH;
+  // ---- wind gusts ----------------------------------------------------------------------
+  // The world's wind (sim.wind) drawn on the grass: bands of leaning blades roll downwind
+  // across the meadow, upright between them. The stronger the wind, the more often a gust
+  // comes, the wider it is and the faster it travels. Band speed is a look, not physics (a
+  // sim day lasts seconds), so it is tiles per sim second, not the wind's km/h.
+  //
+  // Every gust is an object with a position along the wind's axis, moved by (band speed x
+  // elapsed sim time) each frame. New ones are born at the upwind edge on a timer. So when the
+  // wind's strength or direction drifts, bands keep moving from where they are instead of
+  // jumping, and a turning wind swings them around the world's center.
+  //
+  // Photosensitivity (DESIGN.md): the decision per blade goes through one rule. A blade's lean
+  // (-1 left, 0 upright, +1 right) changes at most once per HOLD_MS of real time, whatever the
+  // speed and whatever the wind does, because a change is refused until the last one is
+  // HOLD_MS old. So a blade a band reaches stays leaning for HOLD_MS after it passes, and
+  // stays upright for HOLD_MS before the next. When gusts would come faster than that can
+  // show (cycles under CYCLE_HOLDS holds of real time), the bands are dropped and each blade
+  // leans or not by a dice roll, with the share of time a blade spends leaning at that wind
+  // as the odds, redrawn once per HOLD_MS (per blade offset, so they don't all change together).
+  const HOLD_MS = 1200;
+  const FULL_KMH = 40;               // the wind strength drawn at full strength (s = 1)
+  const GUST_EVERY_CALM = 9, GUST_EVERY_GAIN = 5;      // seconds between gusts: calm - gain x s
+  const GUST_WIDTH_BASE = 1.5, GUST_WIDTH_GAIN = 3;    // tiles
+  const GUST_SPEED_BASE = 4, GUST_SPEED_GAIN = 14;     // tiles per sim second
+  const CYCLE_HOLDS = 3;             // a gust cycle shorter than this many holds of real time is averaged
+  const MAX_SHARE = 0.9;             // never lean every blade, so a strong wind still shows its gaps
+  const SIDE_BLUR = 0.25;            // when |toX| is under this, a side view can't tell which way it blows: blades lean either way
+  const MAX_SPAWNS_PER_FRAME = 64;   // a frame at Max speed spans many cycles; only the ones still on screen matter
+  const SALT_SIDE = 1, SALT_SLOT = 2, SALT_OFFSET = 3;
+  const hash01 = (x, y, k) => (Math.imul(Math.imul(x, 73856093) ^ Math.imul(y, 19349663) ^ Math.imul(k, 83492791), 2654435761) >>> 8) / 16777216;
+
+  AS.GUSTS = Object.freeze({ HOLD_MS, FULL_KMH, CYCLE_HOLDS, SIDE_BLUR, MAX_SHARE });
+
+  // update(sim, realMs, speed, alpha) once per frame, then leans(x, y) per tile. realMs:
+  // performance.now(); speed: the sim speed asked for (0 paused, Infinity max); alpha: 0..1
+  // through the current tick.
+  AS.Gusts = function () {
+    let gusts = [];                  // { pos, width }: front's place along the wind axis, tiles from the world's center
+    let simT = -1, since = 0;        // last sim time seen; sim seconds since the last birth
+    let owner = null, w = 0, h = 0, R = 0;
+    let state = null, changedAt = null;   // per tile: the lean shown, and the real ms it last changed
+    let wind = { toX: 0, toY: 0 }, now = 0, calm = true, averaged = false, share = 0;
+
+    function reset(sim) {
+      owner = sim; w = sim.W.w; h = sim.W.h; R = Math.hypot(w, h) / 2;
+      state = new Int8Array(w * h);
+      changedAt = new Float64Array(w * h).fill(-Infinity);
+      gusts = []; simT = -1; since = 0;
+    }
+    const strength = kmh => Math.max(0, Math.min(1, kmh / FULL_KMH));
+
+    return {
+      update(sim, realMs, speed, alpha = 0) {
+        if (sim !== owner || sim.W.w !== w || sim.W.h !== h) reset(sim);
+        now = realMs;
+        const wd = sim.wind, t = (sim.tickCount + alpha) * AS.DT;
+        wind = wd;
+        calm = !(wd.kmh >= AS.WIND.CALM_BELOW_KMH);
+        if (calm) { gusts.length = 0; simT = t; since = 0; averaged = false; return; }
+        const s = strength(wd.kmh);
+        const every = GUST_EVERY_CALM - GUST_EVERY_GAIN * s, width = GUST_WIDTH_BASE + GUST_WIDTH_GAIN * s;
+        const bandSpeed = GUST_SPEED_BASE + GUST_SPEED_GAIN * s;
+        if (simT < 0) {
+          // A meadow that has been windy a while: gusts already spread across it.
+          for (let p = R - 0.5 * every * bandSpeed; p > -R; p -= every * bandSpeed) gusts.push({ pos: p, width });
+          since = 0.5 * every;
+          simT = t;
+        }
+        const dt = Math.max(0, t - simT);
+        simT = t;
+        for (const g of gusts) g.pos += bandSpeed * dt;
+        since += dt;
+        if (since >= every) {
+          let n = Math.min(MAX_SPAWNS_PER_FRAME, Math.floor(since / every));
+          since = since % every;
+          // The newest was born `since` ago, the one before it `every` earlier, and so on.
+          for (; n > 0; n--) {
+            const pos = -R + bandSpeed * (since + (n - 1) * every);
+            if (pos - width <= R) gusts.push({ pos, width });
+          }
+        }
+        gusts = gusts.filter(g => g.pos - g.width <= R);
+        // Averaged when a cycle at this speed, in real seconds, is too short for holds to fit.
+        const mult = speed > 0 ? speed : 0;
+        averaged = every / mult < CYCLE_HOLDS * HOLD_MS / 1000;
+        // Share of time a blade leans at 1x: the pass plus the hold that follows it.
+        share = Math.min(MAX_SHARE, (width / bandSpeed + HOLD_MS / 1000) / every);
+      },
+      leans(x, y) {
+        const i = y * w + x;
+        let want = 0;
+        if (!calm) {
+          let lit;
+          if (averaged) lit = hash01(x, y, SALT_SLOT + 16 * Math.floor((now + hash01(x, y, SALT_OFFSET) * HOLD_MS) / HOLD_MS)) < share;
+          else {
+            const a = (x + 0.5 - w / 2) * wind.toX + (y + 0.5 - h / 2) * wind.toY;
+            lit = false;
+            for (const g of gusts) { const d = g.pos - a; if (d >= 0 && d < g.width) { lit = true; break; } }
+          }
+          // Each blade's own threshold spreads the switch from "leans right" to "leans
+          // left" over a range of toX, so a wind swinging past vertical turns blades gradually.
+          if (lit) want = wind.toX + (hash01(x, y, SALT_SIDE) - 0.5) * 2 * SIDE_BLUR >= 0 ? 1 : -1;
+        }
+        if (want !== state[i] && now - changedAt[i] >= HOLD_MS) { state[i] = want; changedAt[i] = now; }
+        return state[i];
+      },
+    };
   };
   AS.spriteIndex = (species, sex, stage, faceLeft, frame) =>
     (((species * 2 + sex) * 3 + stage) * 2 + faceLeft) * FRAMES + frame;
@@ -338,6 +441,7 @@
       for (let i = 0; i < 3; i++) {
         at(GRASS0 + i, (x, y) => paint(g, x, y, px, GRASS_BITMAPS[i], GRASS_COLORS[i], false, 1));
         at(LEAN0 + i, (x, y) => paint(g, x, y, px, GRASS_LEAN[i], GRASS_COLORS[i], false, 1));
+        at(LEAN_LEFT0 + i, (x, y) => paint(g, x, y, px, GRASS_LEAN_LEFT[i], GRASS_COLORS[i], false, 1));
       }
       return { canvas, px, sx: i => sx(i) * px, sy: i => sy(i) * px };
     }

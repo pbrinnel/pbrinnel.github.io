@@ -296,10 +296,10 @@ last only as long as their lives.
   `CorpseDecay` ends, whichever comes first, so a bigger body feeds more grass.
 
 ## Fire and wind (planned)
-Decided by Paul, 12 Oct 2026; not built yet. Fire comes first of the weather systems, and
-wind is real weather, not an animation.
+Decided by Paul, 12 Oct 2026. Wind is built; fire is not yet. Fire comes first of the
+weather systems, and wind is real weather, not an animation.
 
-- **Wind is in the sim.** The world has a wind, a direction and a strength that drift
+- **Wind is in the sim** (built). The world has a wind, a direction and a strength that drift
   slowly over the world's time from its seed: breezes most of the time, stronger spells now
   and then, no storms until weather's next part. Grass shows it as **traveling gusts**
   (Paul's pick from a mockup): bands of leaning grass roll across the meadow downwind, more
@@ -355,9 +355,9 @@ wind is real weather, not an animation.
   lighter waterline, its legs under, bobbing one sprite pixel every 0.8 s, with a short
   fading V wake behind it when it swims sideways; a drowning one (no Stamina) sinks to its
   eyes and stops bobbing; a wading animal's feet are hidden under the waterline.
-- **Wind** (3 Oct 2026): every 25 seconds of real time a gust a few tiles wide rolls
-  diagonally across the meadow and the tufts it passes lean a pixel; the rest of the time
-  grass is still, so the animals stay the only things moving.
+- **Wind** (12 Oct 2026; see [Fire and wind](#fire-and-wind-planned)): the world's wind
+  shows as traveling gusts: bands of leaning tufts rolling downwind, upright between them;
+  calm, the grass is still.
 - **Zoomed far out,** once tiles are too small for a sprite to read, each tile becomes a
   solid square: grass shaded by height on dark ground, animals in brighter colors so herds
   and hunters stand out. Sprites come back as you zoom in.

@@ -15,6 +15,7 @@ class El {
   set hidden(v) { writes++; this._hidden = !!v; } get hidden() { return this._hidden; }
   set title(v) { writes++; this._title = v; }
   appendChild(c) { writes++; this.children.push(c); c.parent = this; return c; }
+  get parentNode() { return this.parent || null; }
   setAttribute(k, v) { (this.attrs || (this.attrs = {}))[k] = String(v); }
   getAttribute(k) { return this.attrs && k in this.attrs ? this.attrs[k] : null; }
   replaceWith(n) { if (this.parent) this.parent.children = this.parent.children.map(c => c === this ? n : c); n.parent = this.parent; }
@@ -37,11 +38,12 @@ function build(debug, extra = {}) {
   vm.createContext(ctx);
   // ui.js builds its debug tools from the species list, which world.js owns.
   vm.runInContext(fs.readFileSync(require('path').join(__dirname, '../js/world.js'), 'utf8'), ctx);
+  for (const f of ['weather']) vm.runInContext(fs.readFileSync(require('path').join(__dirname, '../js/' + f + '.js'), 'utf8'), ctx);
   for (const f of ['ui-parts', 'cards', 'properties', 'paint-tab', 'ui']) vm.runInContext(fs.readFileSync(require('path').join(__dirname, '../js/' + f + '.js'), 'utf8'), ctx);
   const calls = [], tools = [];
   const speeds = [0, 1, 2, 5, 20, Infinity];
   const ui = ctx.AS.UI({ debug, speeds, onSpeed: i => calls.push(i), onDebugTool: m => tools.push(m), onCloseInspector: () => calls.push('closed'), onBench: () => calls.push('bench'), onGraph: () => calls.push('graph'), ...extra });
-  return { ui, ids, doc, calls, tools, body };
+  return { ui, ids, doc, calls, tools, body, ctx };
 }
 // The speed buttons only (not the tabs, Hide UI or the debug tools).
 const btns = (ids) => ids.hud.all(e => e.className === 'hud-speeds')[0].children;
@@ -322,5 +324,35 @@ const winOf = (ids, key) => ids.hud.all(e => e.className === 'hud-tabstrip hud-w
   ui.crowd({ limit: 40000, onKeep() {}, onStop() {} });
   assert(cards().length === 1 && /40,000/.test(cards()[0].textContent)); ok('showing it again replaces the old card');
   ui.crowd(null); assert(cards().length === 0); ok('null hides it');
+}
+// ---- the Info window's Wind row ----
+{ const { ui, ids, ctx } = build(false);
+  const AS = ctx.AS, row = ids.hud.all(e => e.className === 'hud-sec hud-sec-wind')[0];
+  const names = panelOf(ids, 'info').children.map(c => c.className);
+  assert(row && names.indexOf('hud-sec hud-sec-counts') + 1 === names.indexOf('hud-sec hud-sec-wind') && names.indexOf('hud-sec hud-sec-wind') + 1 === names.indexOf('hud-sec hud-sec-windows')); ok('Info has a Wind row after Counts and before Windows');
+  assert(/wind/i.test(row.children[0]._title)); ok('the Wind row has a tooltip');
+  const text = () => row.all(e => e.className === 'hud-wind-text')[0].textContent;
+  const arrow = row.all(e => e.className === 'hud-wind-arrow')[0];
+  assert(row.hidden); ui.hud(input); assert(row.hidden && text() === ''); ok('hud() without wind leaves the row hidden and does not throw');
+  const { CALM_BELOW_KMH, WINDY_FROM_KMH } = AS.WIND, PI = Math.PI;
+  const west = 1.5 * PI;   // bearings are radians from north, clockwise
+  const cases = [
+    [CALM_BELOW_KMH / 2, west, 'calm'],
+    [(CALM_BELOW_KMH + WINDY_FROM_KMH) / 2 + 0.4, west, `breeze, ${Math.round((CALM_BELOW_KMH + WINDY_FROM_KMH) / 2 + 0.4)} km/h from the west`],
+    [WINDY_FROM_KMH + 6.3, PI / 4, `windy, ${WINDY_FROM_KMH + 6} km/h from the northeast`],
+  ];
+  for (const [kmh, from, want] of cases) {
+    ui.hud({ ...input, wind: { from, kmh } });
+    assert(!row.hidden); assert.strictEqual(text(), want);
+  } ok('calm, breeze and windy words, rounded km/h and the compass point it comes from');
+  for (const [from, deg] of [[0, 180], [PI / 2, 270], [PI, 0], [1.5 * PI, 90], [PI / 4, 225]]) {
+    ui.hud({ ...input, wind: { from, kmh: 10 } });
+    assert.strictEqual(arrow.style.transform, `rotate(${deg}deg)`);
+  } ok('the arrow points the way the wind blows (opposite its bearing)');
+  const w = (ui.hud({ ...input, wind: { from: 1, kmh: 10.2 } }), writes);
+  ui.hud({ ...input, wind: { from: 1, kmh: 10.4 } }); ui.hud({ ...input, wind: { from: 1.0001, kmh: 10.2 } });
+  assert.strictEqual(writes, w); ok('a second identical hud() with wind writes nothing (text and angle only change when what shows changes)');
+  ui.hud({ ...input, wind: { from: 1, kmh: 10.2 } }); const before = arrow.style.transform;
+  ui.hud({ ...input }); assert.strictEqual(text(), `breeze, 10 km/h from the east`.replace('east', AS.windFromName(1))); assert.strictEqual(arrow.style.transform, before); ok('a later hud() without wind keeps the last reading');
 }
 console.log('all passed');

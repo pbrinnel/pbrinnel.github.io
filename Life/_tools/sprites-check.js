@@ -17,6 +17,7 @@ B.skull.forEach((m, i) => maps.push([`skull ${i}`, m]));
 B.hole.forEach((m, i) => maps.push([`hole ${i}`, m]));
 B.peek.forEach((m, i) => maps.push([`peek ${i}`, m]));
 B.grassLean.forEach((m, i) => maps.push([`grass lean ${i}`, m]));
+B.grassLeanLeft.forEach((m, i) => maps.push([`grass lean left ${i}`, m]));
 B.grass.forEach((m, i) => maps.push([`grass ${i}`, m]));
 B.water.forEach((m, i) => maps.push([`water ${i}`, m]));
 B.nuke.forEach((m, i) => maps.push([`nuke icon ${i}`, m]));
@@ -50,6 +51,7 @@ add(AS.spriteHole(), 'hole');
 add(AS.spriteNuke(), 'nuke icon');
 for (let sx = 0; sx < 2; sx++) add(AS.spritePeek(sx), `peek sex${sx}`);
 for (let t = 0; t < 3; t++) add(AS.spriteGrassLean(t), `grass lean ${t}`);
+for (let t = 0; t < 3; t++) add(AS.spriteGrassLeanLeft(t), `grass lean left ${t}`);
 for (let t = 0; t < 3; t++) add(AS.spriteGrass(t), `grass ${t}`);
 // Water: in each depth band (AS.waterBand) every variant turns up somewhere, by position alone.
 const waterSeen = new Set(), bands = AS.WATER_DEPTH_SHADES.length;
@@ -117,23 +119,81 @@ eq(pose(2, false, false, false, true, false, H.NONE, SLOW, 0, 0), F.WINDED, 0, '
 eq(pose(1, false, false, true, true, false, H.NONE, SLOW, 0, 0), F.WINDED, 0, 'winded wolf resting');
 eq(pose(1, false, false, false, true, false, H.NONE, SLOW, 0, 0), F.WINDED, 0, 'winded wolf standing');
 eq(pose(0, false, false, true, true, false, H.NONE, SLOW, 0, 0), F.REST, 0, 'bunny never shows winded');
-// Lean bitmaps: top rows shifted right by one, the rest unchanged.
+// Lean bitmaps: top rows shifted one pixel, the rest unchanged; left is the mirror shift.
 B.grass.forEach((m, i) => m.forEach((row, j) => {
   const want = j < 4 ? '.' + row.slice(0, 7) : row;
   check(B.grassLean[i][j] === want, `grass lean ${i} row ${j}`);
+  const wantL = j < 4 ? row.slice(1) + '.' : row;
+  check(B.grassLeanLeft[i][j] === wantL, `grass lean left ${i} row ${j}`);
 }));
-// Gust band: one gust per period; inside the band leans, outside doesn't, between gusts none.
+check(B.grassLeanLeft.length === 3, 'three left-leaning grass bitmaps');
+
+// Wind gusts. A synthetic sim whose wind we drive; frames at 60 fps of real time.
 {
-  const x = 40, y = 10, every = 25, speed = 18, width = 5;
-  // The front reaches this tile at tIn and the band's tail clears it at tOut.
-  const pos = x + y * 0.5, tIn = pos / speed, tOut = (pos + width) / speed;
-  check(AS.grassLeans(x, y, tIn + 0.01), 'tile inside the gust band leans');
-  check(!AS.grassLeans(x, y, tOut + 0.01), 'tile behind the band does not lean');
-  check(!AS.grassLeans(x, y, tIn - 0.05), 'tile ahead of the band does not lean');
-  check(AS.grassLeans(x, y, tIn + 0.01 + every), 'the gust repeats each period');
-  let leaning = 0;
-  for (let c = 0; c < every; c += 0.05) if (AS.grassLeans(x, y, c)) leaning++;
-  check(leaning > 0 && leaning * 0.05 < 2 * (width / speed) + 0.2, `a tile leans only briefly per period (${leaning * 0.05}s)`);
+  const G = AS.GUSTS, HOLD = G.HOLD_MS, FPS_MS = 1000 / 60;
+  const W = 40, H = 30;
+  const mkSim = wind => ({ W: { w: W, h: H }, tickCount: 0, wind });
+  // Tiles sampled: a few hundred, spread over the world.
+  const tiles = [];
+  for (let k = 0; k < 400; k++) tiles.push([(k * 7) % W, (k * 13) % H]);
+
+  // Runs `sec` real seconds at `speed`; windAt(simSec) gives the wind. Returns the shortest
+  // real time seen between two changes of one tile, and counts of lean directions.
+  function run(speed, sec, windAt) {
+    const gu = AS.Gusts(), wind = { from: 0, kmh: 0, toX: 0, toY: 0 }, sim = mkSim(wind);
+    const last = tiles.map(() => 0), at = tiles.map(() => -Infinity);
+    let minGap = Infinity, flips = 0, right = 0, left = 0, frames = 0;
+    let simSec = 0;
+    for (let ms = 0; ms < sec * 1000; ms += FPS_MS) {
+      const dtSim = speed === Infinity ? 5 : speed * FPS_MS / 1000;   // Max: about five sim seconds a frame
+      simSec += dtSim;
+      sim.tickCount = Math.floor(simSec / AS.DT);
+      Object.assign(wind, windAt(simSec));
+      gu.update(sim, ms, speed, (simSec / AS.DT) % 1);
+      tiles.forEach(([x, y], i) => {
+        const l = gu.leans(x, y);
+        if (l > 0) right++; else if (l < 0) left++;
+        if (l !== last[i]) { minGap = Math.min(minGap, ms - at[i]); at[i] = ms; last[i] = l; flips++; }
+      });
+      frames++;
+    }
+    return { minGap, flips, right, left, frames };
+  }
+  const wind = (kmh, from) => ({ from, kmh, toX: -Math.sin(from), toY: Math.cos(from) });
+  // Calm: nothing leans.
+  { const r = run(1, 20, () => wind(AS.WIND.CALM_BELOW_KMH * 0.5, 1)); check(r.flips === 0 && r.right + r.left === 0, 'calm wind: no blade leans'); }
+  // A steady windy wind at 1x: gusts come and go, toward the wind's side.
+  {
+    const to = (from, k = 30) => run(1, 60, () => wind(k, from));
+    const e = to(3 * Math.PI / 2), w = to(Math.PI / 2);   // wind from the west blows east (+x)
+    check(e.flips > 100 && e.right > 0 && e.left === 0, `wind from the west: gusts lean right only (${e.right}/${e.left}, ${e.flips} flips)`);
+    check(w.left > 0 && w.right === 0, `wind from the east: gusts lean left only (${w.right}/${w.left})`);
+    const v = to(0);   // from the north: straight down the screen
+    check(v.left > 0 && v.right > 0, `wind straight down the screen: blades lean either way (${v.right}/${v.left})`);
+    const share = (e.right + e.left) / (e.frames * tiles.length);
+    check(share > 0.02 && share < 0.8, `gusts leave room between them (${share.toFixed(3)} of blade-frames lean)`);
+  }
+  // The hold rule at every speed, with the wind's strength and direction drifting hard.
+  const drift = t => wind(8 + 30 * (0.5 + 0.5 * Math.sin(t / 3)), 1 + 2.5 * Math.sin(t / 7));
+  const gaps = {};
+  for (const sp of [1, 2, 5, 20, 200, Infinity]) {
+    const r = run(sp === 200 ? 200 : sp, 60, drift);
+    gaps[sp] = [Math.round(r.minGap), r.flips];
+    check(r.minGap >= HOLD, `speed ${sp}: no blade changes lean twice within ${HOLD} ms (shortest ${Math.round(r.minGap)} ms, ${r.flips} changes)`);
+    check(r.flips > 0, `speed ${sp}: blades do lean`);
+  }
+  console.log('gusts: [shortest real gap between changes (ms), changes] by speed', JSON.stringify(gaps));
+  // Pause freezes the bands.
+  {
+    const gu = AS.Gusts(), wd = wind(30, 3 * Math.PI / 2), sim = mkSim(wd);
+    gu.update(sim, 0, 1, 0);
+    let before = ''; for (const [x, y] of tiles) before += gu.leans(x, y);
+    for (let ms = 2000; ms < 8000; ms += 100) gu.update(sim, ms, 0, 0);   // tickCount frozen
+    let mid = ''; for (const [x, y] of tiles) mid += gu.leans(x, y);   // frozen from here on
+    for (let ms = 8000; ms < 12000; ms += 100) gu.update(sim, ms, 0, 0);
+    let after = ''; for (const [x, y] of tiles) after += gu.leans(x, y);
+    check(after === mid, 'paused: the picture is frozen');
+  }
 }
 // Idle offsets spread over the period.
 const offs = new Set();

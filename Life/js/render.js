@@ -137,6 +137,7 @@
     let clock = 0;                     // this frame's sim time in seconds, for the idle fidget
     const posed = new Float64Array(2); // scratch for spritePose: frame, lift
     const facing = AS.SpriteFacing();
+    const gusts = AS.Gusts();          // the wind on the grass (sprites.js)
     let intentLines = false;
     let stepSpeed = 1;                 // sim seconds per real second this frame (0 = paused)
     // Per-slot event holds, in real ms: which pose, until when, for which animal (serial).
@@ -308,7 +309,8 @@
           }
           if (k === KIND.GRASS) {
             const third = AS.grassGlyph(size[row + tx]) - AS.GLYPH.GRASS_0;
-            id = AS.grassLeans(tx, ty, nowMs / 1000) ? AS.spriteGrassLean(third) : AS.spriteGrass(third);
+            const lean = gusts.leans(tx, ty);
+            id = lean > 0 ? AS.spriteGrassLean(third) : lean < 0 ? AS.spriteGrassLeanLeft(third) : AS.spriteGrass(third);
           }
           else if (k === KIND.CORPSE) {
             // A body with meat on it lies flat, eye shut; once the meat is gone, a skull. A
@@ -707,6 +709,7 @@
         ctx.fillStyle = AS.COLORS.background;
         ctx.fillRect(wx, wy, ww, wh);
         if (cam.scale >= CELL_PX) {
+          gusts.update(sim, nowMs, stepSpeed, alpha);
           drawSprites(sim, cam, sheet, sel, dpr, nowMs);
         } else {
           fillCells(sim);

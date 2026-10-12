@@ -353,7 +353,7 @@
     minimap.draw(sim, located, now);
     const W = sim.W;
     ui.hud({
-      speedIndex, achieved, day: sim.day, seed: sim.seed,
+      speedIndex, achieved, day: sim.day, seed: sim.seed, wind: sim.wind,
       humansSeen: humansSeen || (humansSeen = W.humans > 0),
       counts: { bunnies: W.bunnies, wolves: W.wolves, humans: W.humans, total: W.bunnies + W.wolves + W.humans, blades: W.gCount, corpses: W.cCount },
     });
