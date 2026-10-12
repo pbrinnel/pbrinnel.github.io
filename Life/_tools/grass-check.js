@@ -1,24 +1,9 @@
 'use strict';
-const { load, editCSV } = require('./harness.js');
-let bad = 0;
-function ok(c, m) { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) bad++; }
+const { stage, tally, editCSV } = require('./kit.js');
+const { ok, done } = tally();
 
-function make(size, seed = 1, edit) {
-  const { AS, texts } = load();
-  let s = editCSV(texts.settings, 'WorldWidth', 'Value', String(size));
-  s = editCSV(s, 'WorldHeight', 'Value', String(size));
-  s = editCSV(s, 'StartGrass', 'Value', '0%');
-  s = editCSV(s, 'StartBunnies', 'Value', '0');
-  s = editCSV(s, 'Water', 'Value', 'off');   // these hand-place things on tiles, water included: no water rules to move it
-  s = editCSV(s, 'StartWolves', 'Value', '0');
-  texts.settings = s;
-  // Sprouting off unless a test turns it on, so seeding counts only seeding.
-  texts.species = editCSV(texts.species, 'SproutChance', 'Grass', '0%');
-  if (edit) edit(texts);
-  const { T, errors } = AS.parseTables(texts);
-  if (errors.length) throw new Error(errors.join('\n'));
-  return { AS, T, sim: AS.Sim(T, seed) };
-}
+// Sprouting off unless a test turns it on, so seeding counts only seeding.
+const make = (size, seed = 1, edit) => stage({ size, seed, species: [[['SproutChance', 'Grass', '0%']]], edit });
 const day = AS => AS.TICK_HZ * AS.DAY_SECONDS;
 
 // (a) lone sprout fills in 1/GrowthRate days, within the hour its growth comes in
@@ -167,5 +152,4 @@ const day = AS => AS.TICK_HZ * AS.DAY_SECONDS;
   ok(st[0] === 'Sprout' && st[1] === 'Mature', `stage: ${st.join(' -> ')} (ElderAt ${T.grass.ElderAt})`);
 }
 
-console.log(bad ? `\nFAIL (${bad})` : '\nALL PASS');
-process.exit(bad ? 1 : 0);
+done();

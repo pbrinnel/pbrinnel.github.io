@@ -1,34 +1,15 @@
 'use strict';
 // Milestone 4 checks for bunny.js: tiny hand-built worlds, then the real world for 20 days.
-const { load, editCSV } = require('./harness.js');
-let bad = 0;
-function ok(c, m) { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) bad++; }
+const { load, audit, failures } = require('./harness.js');
+const { stage, tally, quiet, editCSV, at, tick, secs, stateName } = require('./kit.js');
+const { ok, done } = tally();
 const near = (a, b, tol) => Math.abs(a - b) <= tol;
 
+// Blades stay as placed: no seeding muddying a short test.
 function make(size, seed = 1, edit) {
-  const { AS, texts } = load();
-  let s = editCSV(texts.settings, 'WorldWidth', 'Value', String(size));
-  s = editCSV(s, 'WorldHeight', 'Value', String(size));
-  s = editCSV(s, 'StartGrass', 'Value', '0%');
-  s = editCSV(s, 'StartBunnies', 'Value', '0');
-  s = editCSV(s, 'Water', 'Value', 'off');   // these hand-place things on tiles, water included: no water rules to move it
-  s = editCSV(s, 'StartWolves', 'Value', '0');
-  texts.settings = s;
-  // Blades stay as placed: no seeding muddying a short test.
-  texts.species = editCSV(texts.species, 'SeedChance', 'Grass', '0%');
-  if (edit) edit(texts);
-  const { T, errors } = AS.parseTables(texts);
-  if (errors.length) throw new Error(errors.join('\n'));
-  const sim = AS.Sim(T, seed);
-  const events = [];
-  const emit = sim.emit;
-  sim.emit = (type, tile) => { events.push([type, tile]); emit(type, tile); };
-  return { AS, T, sim, W: sim.W, B: T.bunny, events };
+  const r = stage({ size, seed, species: [quiet.seeding], events: true, edit });
+  return { ...r, B: r.T.bunny };
 }
-const at = (W, x, y) => y * W.w + x;
-const tick = (sim, n = 1) => { for (let i = 0; i < n; i++) sim.tick(); };
-const secs = (AS, s) => Math.round(s * AS.TICK_HZ);
-const stateName = (sim, s) => sim.W.aState[s] === 255 ? 'none' : sim.T.states.bunny[sim.W.aState[s]].name;
 
 function bunny(AS, sim, x, y, o = {}) {
   const W = sim.W, s = AS.spawnStarting(sim, AS.SPECIES.BUNNY, at(W, x, y));
@@ -62,7 +43,7 @@ function wolf(AS, sim, x, y) {
     tick(sim);
     if (events.length > g0) { bites.push(i); seen.push(W.aFullness[s]); }
   }
-  ok(stateName(sim, s) === 'EAT', 'eat: enters EAT next to a blade when hungry');
+  ok(stateName(AS, sim, s) === 'EAT', 'eat: enters EAT next to a blade when hungry');
   ok(W.aTile[s] === t0, 'eat: does not move while eating');
   ok(bites.length >= 3 && events.every(e => e[0] === AS.EV.GRAZE && e[1] === blade), `eat: GRAZE event per bite (${bites.length} bites in 2.5 s)`);
   const gaps = bites.slice(1).map((b, i) => b - bites[i]);
@@ -93,7 +74,7 @@ function wolf(AS, sim, x, y) {
   tick(sim, secs(AS, 6));
   ok(W.aFullness[s] >= B.HungryAt * B.FullnessMax, 'eat: reaches HungryAt');
   tick(sim, secs(AS, 6)); // one more decision round later
-  ok(stateName(sim, s) !== 'EAT' && stateName(sim, s) !== 'SEEK_FOOD', `eat: not EAT once fed (${stateName(sim, s)}, Fullness ${W.aFullness[s].toFixed(1)})`);
+  ok(stateName(AS, sim, s) !== 'EAT' && stateName(AS, sim, s) !== 'SEEK_FOOD', `eat: not EAT once fed (${stateName(AS, sim, s)}, Fullness ${W.aFullness[s].toFixed(1)})`);
 }
 
 // --- SEEK_FOOD ---
@@ -103,7 +84,7 @@ function wolf(AS, sim, x, y) {
   W.addGrass(blade, 1, 3);
   const s = bunny(AS, sim, 10, 10, { full: 30 });
   tick(sim, 3);
-  ok(stateName(sim, s) === 'SEEK_FOOD' && W.aTargetTile[s] === blade, 'seek: hungry bunny 5 tiles away targets the blade');
+  ok(stateName(AS, sim, s) === 'SEEK_FOOD' && W.aTargetTile[s] === blade, 'seek: hungry bunny 5 tiles away targets the blade');
   const d0 = Math.abs(W.tx(W.aTile[s]) - 15);
   tick(sim, secs(AS, 3));
   ok(Math.abs(W.tx(W.aTile[s]) - 15) < d0 && W.aTargetTile[s] === blade, 'seek: walking toward it');
@@ -118,7 +99,7 @@ function wolf(AS, sim, x, y) {
   W.addGrass(at(W, 15, 10), 1, 3); // behind the wall
   const s = bunny(AS, sim, 10, 10, { full: 30 });
   tick(sim, 3);
-  ok(stateName(sim, s) !== 'SEEK_FOOD' || W.aTargetTile[s] === -1 || W.aTargetTile[s] === at(W, 12, 10) || true, 'seek: (setup)');
+  ok(stateName(AS, sim, s) !== 'SEEK_FOOD' || W.aTargetTile[s] === -1 || W.aTargetTile[s] === at(W, 12, 10) || true, 'seek: (setup)');
   // The wall blade at (12,10) is visible and adjacent-reachable from (11,10); the one behind is not.
   ok(W.aTargetTile[s] !== at(W, 15, 10), 'seek: blade hidden behind the wall is not targeted');
 }
@@ -226,7 +207,7 @@ function wolf(AS, sim, x, y) {
     const s = bunny(AS, sim, bx, by);
     const t0 = W.aTile[s];
     tick(sim, 23);
-    return { dx: W.tx(W.aTile[s]) - W.tx(t0), dy: W.ty(W.aTile[s]) - W.ty(t0), state: stateName(sim, s) };
+    return { dx: W.tx(W.aTile[s]) - W.tx(t0), dy: W.ty(W.aTile[s]) - W.ty(t0), state: stateName(AS, sim, s) };
   }
   const wall = flee(20, 2, 20, 6);
   ok(wall.state === 'FLEE' && Math.abs(wall.dx) >= 2 && wall.dy >= -1, `flee: wolf south, wall north: runs along the wall (moved ${wall.dx},${wall.dy})`);
@@ -266,20 +247,20 @@ function wolf(AS, sim, x, y) {
   const s = bunny(AS, sim, 30, 30, { stamina: B.RestBelow * B.StaminaMax - 1 });
   W.aDecideLeft[s] = 0;
   tick(sim, 3);
-  ok(stateName(sim, s) === 'REST', 'rest: below RestBelow → REST');
+  ok(stateName(AS, sim, s) === 'REST', 'rest: below RestBelow → REST');
   const p = W.aTile[s];
   tick(sim, secs(AS, 2));
   ok(W.aTile[s] === p && W.aTarget === undefined && W.aTargetTile[s] === -1, 'rest: stands still, no target');
   // Above RestBelow but below RestUntil: still resting (hysteresis).
   W.aStamina[s] = B.RestBelow * B.StaminaMax + 5;
   tick(sim, 8);
-  ok(stateName(sim, s) === 'REST' || B.RestUntil <= B.RestBelow, `rest: above RestBelow but below RestUntil keeps resting (${stateName(sim, s)}, stamina ${W.aStamina[s].toFixed(1)})`);
+  ok(stateName(AS, sim, s) === 'REST' || B.RestUntil <= B.RestBelow, `rest: above RestBelow but below RestUntil keeps resting (${stateName(AS, sim, s)}, stamina ${W.aStamina[s].toFixed(1)})`);
   tick(sim, secs(AS, (B.RestUntil * B.StaminaMax - W.aStamina[s]) / B.StaminaRefill + 1));
-  ok(stateName(sim, s) === 'WANDER' && W.aStamina[s] >= B.RestUntil * B.StaminaMax - 1e-3, `rest: leaves at RestUntil (${stateName(sim, s)})`);
+  ok(stateName(AS, sim, s) === 'WANDER' && W.aStamina[s] >= B.RestUntil * B.StaminaMax - 1e-3, `rest: leaves at RestUntil (${stateName(AS, sim, s)})`);
   // Not resting: just above RestBelow does not enter.
   const s2 = bunny(AS, sim, 10, 10, { stamina: B.RestBelow * B.StaminaMax + 5 });
   tick(sim, 3);
-  ok(stateName(sim, s2) !== 'REST', 'rest: not entered above RestBelow when not already resting');
+  ok(stateName(AS, sim, s2) !== 'REST', 'rest: not entered above RestBelow when not already resting');
 }
 
 // --- MATE is covered by breed-check.js; here: a same-sex crowd never enters it ---
@@ -287,7 +268,7 @@ function wolf(AS, sim, x, y) {
   const { AS, sim, W } = make(30, 4);
   for (let i = 0; i < 20; i++) { const s = bunny(AS, sim, 3 + i, 15); W.aSex[s] = AS.SEX.MALE; }
   let seenMate = false;
-  for (let i = 0; i < secs(AS, 10); i++) { tick(sim); for (let s = 0; s < W.aHigh; s++) if (W.aAlive[s] && stateName(sim, s) === 'MATE') seenMate = true; }
+  for (let i = 0; i < secs(AS, 10); i++) { tick(sim); for (let s = 0; s < W.aHigh; s++) if (W.aAlive[s] && stateName(AS, sim, s) === 'MATE') seenMate = true; }
   ok(!seenMate, 'mate: an all-male crowd never enters MATE');
 }
 
@@ -297,7 +278,7 @@ function wolf(AS, sim, x, y) {
   const w = wolf(AS, sim, 15, 20);
   const s = bunny(AS, sim, 20, 20);
   tick(sim, 3);
-  ok(stateName(sim, s) === 'FLEE', 'flee: wolf in view → FLEE');
+  ok(stateName(AS, sim, s) === 'FLEE', 'flee: wolf in view → FLEE');
   const d0 = (W.tx(W.aTile[s]) - 15) ** 2;
   let minStamina = 100, sawSprint = false, away = true;
   for (let i = 0; i < secs(AS, 2); i++) {
@@ -305,7 +286,7 @@ function wolf(AS, sim, x, y) {
     minStamina = Math.min(minStamina, W.aStamina[s]);
     if (W.aSprint[s]) sawSprint = true;
     const tt = W.aTargetTile[s];
-    if (stateName(sim, s) !== 'FLEE') continue;
+    if (stateName(AS, sim, s) !== 'FLEE') continue;
     if (tt < 0 || (W.tx(tt) - 15) ** 2 + (W.ty(tt) - 20) ** 2 <= (W.tx(W.aTile[s]) - 15) ** 2 + (W.ty(W.aTile[s]) - 20) ** 2) away = false;
   }
   ok(sawSprint && minStamina < 100 - 10, `flee: sprints and Stamina drops (min ${minStamina.toFixed(1)})`);
@@ -316,11 +297,11 @@ function wolf(AS, sim, x, y) {
   // Keep fleeing until it drops stamina to 0, then walks (never exceeds sprint speed share)
   tick(sim, secs(AS, 10));
   const dd = (W.tx(W.aTile[s]) - 15) ** 2 + (W.ty(W.aTile[s]) - 20) ** 2;
-  ok(stateName(sim, s) === 'FLEE' ? dd <= B.VisionRange ** 2 : dd > B.VisionRange ** 2 - 4, `flee: keeps going until out of the wolf's sight (${stateName(sim, s)}, dist ${Math.sqrt(dd).toFixed(1)})`);
+  ok(stateName(AS, sim, s) === 'FLEE' ? dd <= B.VisionRange ** 2 : dd > B.VisionRange ** 2 - 4, `flee: keeps going until out of the wolf's sight (${stateName(AS, sim, s)}, dist ${Math.sqrt(dd).toFixed(1)})`);
   // leaving FLEE turns sprint off
   W.removeAnimal(w); W.aKills[w] = 0;
   tick(sim, secs(AS, 1));
-  ok(stateName(sim, s) !== 'FLEE' && !W.aSprint[s], `flee: wolf gone → leaves FLEE, sprint off (${stateName(sim, s)})`);
+  ok(stateName(AS, sim, s) !== 'FLEE' && !W.aSprint[s], `flee: wolf gone → leaves FLEE, sprint off (${stateName(AS, sim, s)})`);
 }
 {
   const { AS, sim, W } = make(41, 6);
@@ -328,7 +309,7 @@ function wolf(AS, sim, x, y) {
   wolf(AS, sim, 14, 20);
   const s = bunny(AS, sim, 20, 20);
   tick(sim, secs(AS, 2));
-  ok(stateName(sim, s) !== 'FLEE', 'flee: wolf behind a grass wall → no FLEE');
+  ok(stateName(AS, sim, s) !== 'FLEE', 'flee: wolf behind a grass wall → no FLEE');
 }
 
 // --- the real world, 20 days ---
@@ -359,10 +340,8 @@ function wolf(AS, sim, x, y) {
   }
   console.log(`(${Date.now() - t0} ms)`);
   ok(W.bunnies >= 0 && !Number.isNaN(W.bunnies), 'real: ran 20 days');
-  const { audit } = require('./harness.js');
-  const before = bad; audit(AS, sim, 'bunny-check');
-  const h = require('./harness.js');
-  ok(h.failures.length === 0, 'real: grid/store audit clean ' + h.failures.slice(0, 3).join('; '));
+  audit(AS, sim, 'bunny-check');
+  ok(failures.length === 0, 'real: grid/store audit clean ' + failures.slice(0, 3).join('; '));
 }
 
 // --- Leaving a crowd: a bunny beside a big crowd strikes out for open land and settles there ---
@@ -410,13 +389,13 @@ function wolf(AS, sim, x, y) {
       W.moveAnimal(w, near);
       W.aDecideLeft[s] = 0;
       let saw = false;
-      for (let i = 0; i < secs(AS, 2); i++) { tick(sim); if (stateName(sim, s) === 'FLEE') saw = true; }
+      for (let i = 0; i < secs(AS, 2); i++) { tick(sim); if (stateName(AS, sim, s) === 'FLEE') saw = true; }
       if (saw) fled++;
       const far = W.tile(W.aTile[s] % W.w < 50 ? 95 : 2, (W.aTile[s] / W.w | 0) < 50 ? 95 : 2);
       W.moveAnimal(w, far);
-      for (let i = 0; i < secs(AS, 4); i++) { tick(sim); if (W.aTargetTile[s] >= 0 && stateName(sim, s) === 'WANDER') left = true; }
+      for (let i = 0; i < secs(AS, 4); i++) { tick(sim); if (W.aTargetTile[s] >= 0 && stateName(AS, sim, s) === 'WANDER') left = true; }
     }
-    for (let i = 0; i < secs(AS, 10); i++) { tick(sim); if (W.aTargetTile[s] >= 0 && stateName(sim, s) === 'WANDER') left = true; }
+    for (let i = 0; i < secs(AS, 10); i++) { tick(sim); if (W.aTargetTile[s] >= 0 && stateName(AS, sim, s) === 'WANDER') left = true; }
     return { fled, left, B };
   }
   const many = scaredRun(8), one = scaredRun(1);
@@ -424,5 +403,4 @@ function wolf(AS, sim, x, y) {
   ok(one.fled === 1 && !one.left, 'stress: a single scare does not');
 }
 
-console.log(bad ? `\nFAIL (${bad})` : '\nALL PASS');
-process.exit(bad ? 1 : 0);
+done();

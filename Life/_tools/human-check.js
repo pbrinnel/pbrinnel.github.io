@@ -3,46 +3,17 @@
 // (hunting bunnies and wolves, one-strike kills, carcasses, foraging, holes, chewing through
 // grass, persistence hunting, being hunted by wolves, never breeding, the God-tab brush),
 // then a world with painted humans audited and replayed.
-const fs = require('fs'), path = require('path'), vm = require('vm');
-const { SIM_FILES, editCSV, audit, failures } = require('./harness.js');
-const ROOT = path.resolve(__dirname, '..');
-let bad = 0;
-function ok(c, m) { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) bad++; }
+const { load, audit, failures } = require('./harness.js');
+const { stage, tally, quiet, editCSV, at, tick, secs } = require('./kit.js');
+const { ok, done } = tally();
 
-function loadAS() {
-  const ctx = vm.createContext({ console, crypto: globalThis.crypto });
-  vm.runInContext('globalThis.AS = { V: 0 };', ctx);
-  for (const f of SIM_FILES) {
-    const file = path.join(ROOT, 'js', f + '.js');
-    vm.runInContext(fs.readFileSync(file, 'utf8'), ctx, { filename: file });
-  }
-  const texts = {};
-  for (const f of ['species', 'variables', 'states', 'settings']) texts[f] = fs.readFileSync(path.join(ROOT, 'tables', f + '.csv'), 'utf8');
-  return { AS: ctx.AS, texts };
-}
 // An empty square world, no grass growth, nobody hungry unless a test says so. Pins are the
 // tests' own; the shipped numbers (speeds, BiteDamage, stamina) are read from T where it matters.
+// The water rules stay as shipped, with no rain.
 function make(size, seed = 1, o = {}) {
-  const { AS, texts } = loadAS();
-  let s = editCSV(texts.settings, 'WorldWidth', 'Value', String(size));
-  s = editCSV(s, 'WorldHeight', 'Value', String(size));
-  for (const [k, v] of [['StartGrass', '0%'], ['StartBunnies', '0'], ['StartWolves', '0'], ['Rain', '0']]) s = editCSV(s, k, 'Value', v);
-  texts.settings = s;
-  if (!o.hunger) for (const sp of ['Bunny', 'Wolf', 'Human']) texts.species = editCSV(texts.species, 'HungerRate', sp, '0');
-  texts.species = editCSV(texts.species, 'SeedChance', 'Grass', '0%');
-  texts.species = editCSV(texts.species, 'GrowthRate', 'Grass', '0');
-  texts.species = editCSV(texts.species, 'SproutChance', 'Grass', '0%');
-  if (o.edit) o.edit(texts);
-  const { T, errors } = AS.parseTables(texts);
-  if (errors.length) throw new Error(errors.join('\n'));
-  const sim = AS.Sim(T, seed);
-  const events = [], emit = sim.emit;
-  sim.emit = (type, tile) => { events.push([type, tile, sim.tickCount]); emit(type, tile); };
-  return { AS, T, sim, W: sim.W, events };
+  return stage({ size, seed, bare: false, settings: { StartGrass: '0%', StartBunnies: 0, StartWolves: 0, Rain: 0 },
+    species: [o.hunger ? [] : quiet.hunger, quiet.grass], events: true, edit: o.edit });
 }
-const at = (W, x, y) => y * W.w + x;
-const tick = (sim, n = 1) => { for (let i = 0; i < n; i++) sim.tick(); };
-const secs = (AS, s) => Math.round(s * AS.TICK_HZ);
 const sname = (sim, s) => sim.W.aState[s] === 255 ? 'none' : sim.T.states[AS_KEY[sim.W.aSpecies[s]]][sim.W.aState[s]].name;
 const AS_KEY = ['bunny', 'wolf', 'human'];
 const M = 0, F = 1;
@@ -79,7 +50,7 @@ const stillHuman = tx => { for (const k of ['WalkSpeed', 'SprintSpeed']) tx.spec
 
 // --- no humans at the start, in either layout ------------------------------------------------
 for (const layout of ['Meadows', 'Scatter']) {
-  const { AS, texts } = loadAS();
+  const { AS, texts } = load();
   texts.settings = editCSV(texts.settings, 'StartLayout', 'Value', layout);
   texts.settings = editCSV(texts.settings, 'WorldWidth', 'Value', '120');
   texts.settings = editCSV(texts.settings, 'WorldHeight', 'Value', '100');
@@ -298,7 +269,7 @@ for (const [name, sp, mk] of [['human', 2, human], ['wolf', 1, wolf]]) {
 // --- a real world with painted humans: audits, replay, history -----------------------------------------------------------------------
 {
   const run = () => {
-    const { AS, texts } = loadAS();
+    const { AS, texts } = load();
     texts.settings = editCSV(texts.settings, 'WorldWidth', 'Value', '150');
     texts.settings = editCSV(texts.settings, 'WorldHeight', 'Value', '100');
     const { T } = AS.parseTables(texts);
@@ -318,5 +289,4 @@ for (const [name, sp, mk] of [['human', 2, human], ['wolf', 1, wolf]]) {
   ok(a.sim.W.humans > 0 || a.sim.W.humans === 0, `humans alive after 10 days: ${a.sim.W.humans} of ${a.placed}`);
 }
 
-console.log(bad ? `\n${bad} FAILED` : '\nAll human checks passed');
-process.exit(bad ? 1 : 0);
+done('All human checks passed');

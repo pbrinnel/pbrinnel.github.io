@@ -169,11 +169,12 @@ zoom-in. Holds never flash: see DESIGN.md, Photosensitivity.
 
 | Command | What it does |
 |---|---|
-| `node Life/_tools/check-all.js` | every headless check below; run before and after changes |
+| `node Life/_tools/check-all.js [--quick]` | every headless check below, several at once; before a commit. `--quick` (about a minute) skips the long real-world runs (breed, wolf, water) and shortens the harness's; use it while working |
 | `Life/_tools/life-local.command` (shortcut: `Life/_▶ DOUBLE-CLICK TO RUN LIFE LOCALLY.command`) | Paul's way to try his working copy: double-click in Finder (or run it); starts the lab server (repo root, no caching) on 8920 and opens `life.html` |
 | `node Life/_tools/thirst-check.js` | the water meter, DRINK, the water field, the crowd at one lake, no-water worlds (Water off is the Rain 0% / RiverDrain 0 world), and cause of death |
-| `node Life/_tools/harness.js [days] [seed]` | runs a seed, audits grid ↔ stores every day, checks same seed → same world. `require('./harness.js')` gives `load()`, `run()`, `editCSV()`, `SIM_FILES` to other scripts |
-| `*-check.js` | one per module (tables, grass, sight, bunny, breed, wolf, human, warren, god, water, inspect, camera, render, ui, graph, bench). Each loads the real files in a Node VM |
+| `node Life/_tools/harness.js [days] [seed]` | runs a seed, audits grid ↔ stores every day, checks same seed → same world. `require('./harness.js')` gives `load()` (the sim's files in a Node VM, plus any extra `js/` files), `audit()`, `run()`, `editCSV()`, `SIM_FILES` to other scripts |
+| `kit.js` | what the checks share: `stage()` builds a bare world (nothing placed, no water rules) from the real tables with the test's edits, `quiet.*` switches off grass growth, hunger or digging, `tally()` counts ok/FAIL lines and exits with the verdict, plus `at`, `tick`, `secs`, `days`, `stateName`. A new check starts here |
+| `*-check.js` | one per module (tables, grass, sight, bunny, breed, wolf, human, warren, god, water, thirst, inspect, camera, render, ui, graph, bench). Each loads the real files in a Node VM. `bench-check.js --slow` also builds the biggest benchmark worlds and prints Node tick timings |
 | `node Life/_tools/profile-tick.js` | where tick time goes at a few world sizes |
 | `node Life/_tools/run-bench.js desktop\|phone\|capped30` | the in-page benchmark in a real windowed Chrome (throwaway profile); prints results, saves a screenshot to `.claude/life-shots/` |
 | `node Life/_tools/shoot.js desktop\|phone out.png [setup.js] [?query]` | screenshot of the live page in Chrome after running `setup.js` in it (async JS; `AS.app` is the running sim) |

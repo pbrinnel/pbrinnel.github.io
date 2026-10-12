@@ -1,23 +1,10 @@
 'use strict';
-const h = require('./harness.js');
+const { stage, at } = require('./kit.js');
 
 let fails = 0;
 function ok(c, m) { if (!c) { fails++; console.log('FAIL: ' + m); } }
 
-function mk(w, ht, grassPct = '0%', seed = 1) {
-  const { AS, texts } = h.load();
-  let s = h.editCSV(texts.settings, 'WorldWidth', 'Value', String(w));
-  s = h.editCSV(s, 'WorldHeight', 'Value', String(ht));
-  s = h.editCSV(s, 'StartGrass', 'Value', grassPct);
-  s = h.editCSV(s, 'StartBunnies', 'Value', '0');
-  s = h.editCSV(s, 'Water', 'Value', 'off');   // these hand-place things on tiles, water included: no water rules to move it
-  s = h.editCSV(s, 'StartWolves', 'Value', '0');
-  const { T, errors } = AS.parseTables({ ...texts, settings: s });
-  if (errors.length) throw new Error(errors.join('\n'));
-  const sim = AS.Sim(T, seed);
-  return { AS, sim, W: sim.W };
-}
-const at = (W, x, y) => y * W.w + x;
+const mk = (w, ht, grassPct = '0%', seed = 1) => stage({ size: [w, ht], seed, settings: { StartGrass: grassPct } });
 const dist2 = (W, a, b) => (W.tx(a) - W.tx(b)) ** 2 + (W.ty(a) - W.ty(b)) ** 2;
 
 // Independent BFS distance (steps over EMPTY tiles, inside circle), or -1.

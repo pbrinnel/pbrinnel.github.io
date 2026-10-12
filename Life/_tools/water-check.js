@@ -5,22 +5,16 @@
 // already at rest; animals wade water no deeper than WadeDepth and swim deeper; drinking
 // takes real water; water holds nothing else, never blocks sight and survives a nuke; Scatter
 // has no water.
-const { load, audit, editCSV, failures } = require('./harness.js');
-let bad = 0;
-function ok(c, m) { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) bad++; }
+const { audit, failures } = require('./harness.js');
+const { stage, tally, editCSV } = require('./kit.js');
+const { ok, done } = tally();
 
 // A world from the real tables with some cells changed: [[file, row, col, value]...].
+// Water on whatever the shipped default, since these are the water checks. Shorter growing and
+// settling than the game's, so dozens of worlds stay quick; the rules are the same.
 function make(seed, edits = []) {
-  const { AS, texts } = load();
-  texts.settings = editCSV(texts.settings, 'Water', 'Value', 'on');   // these are the water checks, whatever the shipped default
-  // Shorter growing and settling than the game's, so dozens of worlds stay quick; the rules are the same.
-  texts.settings = editCSV(texts.settings, 'GrowRounds', 'Value', String(QUICK_ROUNDS));
-  texts.settings = editCSV(texts.settings, 'PreRunDays', 'Value', String(QUICK_DAYS));
-  for (const [file, row, col, v] of edits) texts[file] = editCSV(texts[file], row, col, v);
-  const { T, errors } = AS.parseTables(texts);
-  if (errors.length) { console.log(errors.join('\n')); process.exit(1); }
-  const sim = AS.Sim(T, seed);
-  return { AS, T, sim, W: sim.W, K: AS.KIND };
+  return stage({ seed, bare: false, settings: { Water: 'on', GrowRounds: QUICK_ROUNDS, PreRunDays: QUICK_DAYS },
+    edit: texts => { for (const [file, row, col, v] of edits) texts[file] = editCSV(texts[file], row, col, v); } });
 }
 const set = (k, v) => ['settings', k, 'Value', String(v)];
 const QUICK_ROUNDS = 200, QUICK_DAYS = 20;
@@ -458,5 +452,5 @@ function landPieces(AS, W) {
   ok(d && d.title === 'Water' && ground && ground.value === 'Water' && d.rows.some(r => r.name === 'Elevation'), 'tapping water selects it: the inspector says "Water", with the tile under it');
 }
 
-console.log(bad ? `\n${bad} FAILED` : '\nAll water checks passed');
-if (bad || failures.length) { if (failures.length) console.log([...new Set(failures)].slice(0, 20).join('\n')); process.exit(1); }
+if (failures.length) console.log([...new Set(failures)].slice(0, 20).join('\n'));
+done('All water checks passed', failures.length);

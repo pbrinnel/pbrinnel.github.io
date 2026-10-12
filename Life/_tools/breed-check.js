@@ -1,49 +1,15 @@
 'use strict';
 // Milestone 5: mating, pregnancy, births, and the MATE state, in tiny hand-built worlds,
 // then the real world for 40 days (run twice: same seed, same output).
-const fs = require('fs'), path = require('path'), vm = require('vm');
-const { SIM_FILES, editCSV } = require('./harness.js');
-const ROOT = path.resolve(__dirname, '..');
-let bad = 0;
-function ok(c, m) { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) bad++; }
+const { load, audit, failures } = require('./harness.js');
+const { stage, tally, quiet, editCSV, at, tick, secs, days } = require('./kit.js');
+const { ok, done } = tally();
 const near = (a, b, tol) => Math.abs(a - b) <= tol;
 
-function loadAS() {
-  const ctx = vm.createContext({ console, crypto: globalThis.crypto });
-  vm.runInContext('globalThis.AS = { V: 0 };', ctx);
-  for (const f of [...SIM_FILES, 'inspect']) {
-    const file = path.join(ROOT, 'js', f + '.js');
-    vm.runInContext(fs.readFileSync(file, 'utf8'), ctx, { filename: file });
-  }
-  const texts = {};
-  for (const f of ['species', 'variables', 'states', 'settings']) texts[f] = fs.readFileSync(path.join(ROOT, 'tables', f + '.csv'), 'utf8');
-  return { AS: ctx.AS, texts };
-}
-
 function make(size, seed = 1, edit) {
-  const { AS, texts } = loadAS();
-  let s = editCSV(texts.settings, 'WorldWidth', 'Value', String(size));
-  s = editCSV(s, 'WorldHeight', 'Value', String(size));
-  s = editCSV(s, 'StartGrass', 'Value', '0%');
-  s = editCSV(s, 'StartBunnies', 'Value', '0');
-  s = editCSV(s, 'Water', 'Value', 'off');   // these hand-place things on tiles, water included: no water rules to move it
-  s = editCSV(s, 'StartWolves', 'Value', '0');
-  texts.settings = s;
-  texts.species = editCSV(texts.species, 'HungerRate', 'Bunny', '0');
-  texts.species = editCSV(texts.species, 'SeedChance', 'Grass', '0%');
-  if (edit) edit(texts);
-  const { T, errors } = AS.parseTables(texts);
-  if (errors.length) throw new Error(errors.join('\n'));
-  const sim = AS.Sim(T, seed);
-  const events = [], emit = sim.emit;
-  sim.emit = (type, tile) => { events.push([type, tile]); emit(type, tile); };
-  return { AS, T, sim, W: sim.W, B: T.bunny, events };
+  const r = stage({ size, seed, species: [[['HungerRate', 'Bunny', '0']], quiet.seeding], events: true, files: ['inspect'], edit });
+  return { ...r, B: r.T.bunny };
 }
-const at = (W, x, y) => y * W.w + x;
-const tick = (sim, n = 1) => { for (let i = 0; i < n; i++) sim.tick(); };
-const secs = (AS, s) => Math.round(s * AS.TICK_HZ);
-const days = (AS, d) => Math.round(d * AS.TICK_HZ * AS.DAY_SECONDS);
-const stateName = (sim, s) => sim.W.aState[s] === 255 ? 'none' : sim.T.states.bunny[sim.W.aState[s]].name;
 
 function bunny(AS, sim, x, y, sex, o = {}) {
   const W = sim.W, s = AS.spawnStarting(sim, AS.SPECIES.BUNNY, at(W, x, y));
@@ -211,7 +177,7 @@ const M = 0, F = 1;
 
 // --- real world, 40 days ---
 function realRun() {
-  const { AS, texts } = loadAS();
+  const { AS, texts } = load({}, ['inspect']);
   const { T, errors } = AS.parseTables(texts);
   if (errors.length) throw new Error(errors.join('\n'));
   const lines = [];
@@ -244,9 +210,7 @@ function realRun() {
   console.log('\nreal world, 40 days\n' + a.lines.join('\n'));
   const b = realRun();
   ok(a.lines.join('\n') === b.lines.join('\n'), 'real: same seed, same 40-day output');
-  const h = require('./harness.js');
-  h.audit(a.AS, a.sim, 'breed-check');
-  ok(h.failures.length === 0, 'real: grid/store audit clean ' + h.failures.slice(0, 3).join('; '));
+  audit(a.AS, a.sim, 'breed-check');
+  ok(failures.length === 0, 'real: grid/store audit clean ' + failures.slice(0, 3).join('; '));
 }
-console.log(bad ? `\nFAIL (${bad})` : '\nALL PASS');
-process.exit(bad ? 1 : 0);
+done();

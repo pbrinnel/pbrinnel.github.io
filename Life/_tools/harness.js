@@ -13,10 +13,11 @@ const ROOT = path.resolve(__dirname, '..');
 // glyphs.js is DOM-free until a sheet is built, and holds the life-stage helper animals use.
 const SIM_FILES = ['tables', 'rng', 'world', 'grass', 'corpse', 'warren', 'sim', 'god', 'water', 'terrain', 'start', 'sight', 'animals', 'breed', 'bunny', 'wolf', 'human', 'glyphs'];
 
-function load(overrides = {}) {
+// overrides: CSV texts to use instead of the files; extra: more js/ files to load after the sim's.
+function load(overrides = {}, extra = []) {
   const ctx = vm.createContext({ console, crypto: globalThis.crypto });
   vm.runInContext('globalThis.AS = { V: 0 };', ctx);
-  for (const f of SIM_FILES) {
+  for (const f of [...SIM_FILES, ...extra]) {
     const file = path.join(ROOT, 'js', f + '.js');
     vm.runInContext(fs.readFileSync(file, 'utf8'), ctx, { filename: file });
   }
@@ -24,7 +25,7 @@ function load(overrides = {}) {
   for (const f of ['species', 'variables', 'states', 'settings']) {
     texts[f] = overrides[f] ?? fs.readFileSync(path.join(ROOT, 'tables', f + '.csv'), 'utf8');
   }
-  return { AS: ctx.AS, texts };
+  return { AS: ctx.AS, texts, ctx };   // ctx: the sandbox, for checks that give it a window
 }
 
 // Replace one cell: settings by name, or species by stat + column.

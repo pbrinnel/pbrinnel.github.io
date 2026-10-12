@@ -1,17 +1,6 @@
 'use strict';
-const fs = require('fs'), path = require('path'), vm = require('vm');
-const { load, SIM_FILES } = require('./harness.js');
-const ROOT = path.resolve(__dirname, '..');
-const { AS, texts } = load();
-const ctx = vm.getContext ? null : null;
-// harness's context isn't exposed; run glyphs + inspect in AS's own realm via a fresh context
-const vctx = vm.createContext({ console, crypto: globalThis.crypto });
-vm.runInContext('globalThis.AS = { V: 0 };', vctx);
-for (const f of [...SIM_FILES, 'inspect']) {
-  const file = path.join(ROOT, 'js', f + '.js');
-  vm.runInContext(fs.readFileSync(file, 'utf8'), vctx, { filename: file });
-}
-const A = vctx.AS;
+const { load } = require('./harness.js');
+const { AS: A, texts } = load({}, ['inspect']);
 const { T } = A.parseTables(texts);
 let bad = 0;
 const check = (c, m) => { console.log((c ? 'PASS: ' : 'FAIL: ') + m); if (!c) bad++; };

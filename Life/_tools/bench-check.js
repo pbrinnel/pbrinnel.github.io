@@ -1,19 +1,20 @@
-// Checks AS.benchMath (the pure parts of Life/js/bench.js) in a Node vm, and
-// prints one tick's cost at each step as a first look at the numbers.
+// Checks AS.benchMath (the pure parts of Life/js/bench.js) in a Node vm.
+//
+//   node Life/_tools/bench-check.js [--slow]
+//
+// --slow also builds the biggest benchmark worlds (minutes: growing their ground is most of it)
+// and prints one tick's cost at each step as a first look at the numbers. The browser's numbers
+// differ, so nothing asserts on them.
 'use strict';
-const fs = require('fs'), path = require('path'), vm = require('vm'), assert = require('assert');
+const assert = require('assert');
+const { load } = require('./harness.js');
 
-const ROOT = path.resolve(__dirname, '..');
-const ctx = vm.createContext({ console, crypto: globalThis.crypto });
-vm.runInContext('globalThis.AS = { V: 0 };', ctx);
-for (const f of [...require('./harness.js').SIM_FILES, 'bench']) {
-  const file = path.join(ROOT, 'js', f + '.js');
-  vm.runInContext(fs.readFileSync(file, 'utf8'), ctx, { filename: file });
-}
-const AS = ctx.AS;
+const SLOW = process.argv.includes('--slow');
+// Without --slow, worlds are built for the first QUICK_STEPS blade steps only: the bigger ones
+// are the same sizing math, and take minutes to grow.
+const QUICK_STEPS = 4;
+const { AS, texts } = load({}, ['bench']);
 AS.TICK_BUDGET_MS = 12;   // main.js sets this in the browser
-const texts = {};
-for (const f of ['species', 'variables', 'states', 'settings']) texts[f] = fs.readFileSync(path.join(ROOT, 'tables', f + '.csv'), 'utf8');
 const { T, errors } = AS.parseTables(texts);
 assert(!errors.length, errors.join('\n'));
 const M = AS.benchMath;
@@ -23,17 +24,18 @@ const near = (a, b, eps, m) => assert(Math.abs(a - b) <= eps, `${m}: ${a} vs ${b
 
 // worldFor
 const paul = Math.round(T.world.WorldWidth * T.world.WorldHeight * T.world.StartGrass);
-for (const blades of M.BLADE_STEPS) {
+for (const [i, blades] of M.BLADE_STEPS.entries()) {
   const { w, h, share, fits } = M.worldFor(T, blades);
   assert(fits && w <= 2000 && h <= 2000, 'fits ' + blades);
   near(w / h, T.world.WorldWidth / T.world.WorldHeight, 0.02 * T.world.WorldWidth / T.world.WorldHeight, 'aspect ' + blades);
   assert(share >= T.world.StartGrass && share <= 1);
+  if (!SLOW && i >= QUICK_STEPS) continue;
   const sim = AS.Sim(M.derive(T, w, h, { bunnies: 0, wolves: 0 }, share), 1, { grassAges: 'mixed' });
   const got = sim.W.gCount;
   assert(Math.abs(got - blades) / blades <= 0.01, `${blades}: got ${got}`);
   console.log(`   ${String(blades).padStart(7)} -> ${w}x${h} @ ${(share * 100).toFixed(1)}%  (${got} blades)`);
 }
-ok('worldFor: aspect, sides <= 2000, blades within 1% for every step');
+ok(`worldFor: aspect and sides <= 2000 for every step, blades within 1% for ${SLOW ? 'every step' : 'the first ' + QUICK_STEPS}`);
 { // From the tables: a blade count that fits at StartGrass, and one past what the side cap holds.
   const aspect = T.world.WorldWidth / T.world.WorldHeight;
   const capTiles = aspect >= 1 ? 2000 * Math.round(2000 / aspect) : Math.round(2000 * aspect) * 2000;
@@ -157,24 +159,26 @@ assert.deepStrictEqual([1, 0.05, 12, 123.4, 0.135, 12.34].map(M.fmtTick), ['1.00
 }
 
 // Early numbers: one tick per step, in Node (the browser will differ).
-console.log('\nNode tick timings (median of 40 ticks after 30 warm-up ticks):');
-for (const blades of M.BLADE_STEPS.filter(b => b <= 192000)) {
-  const { w, h } = M.worldFor(T, blades);
-  const sim = AS.Sim(M.derive(T, w, h, { bunnies: 0, wolves: 0 }, M.worldFor(T, blades).share), 20240611, { grassAges: 'mixed' });
-  for (let i = 0; i < 30; i++) sim.tick();
-  const ms = [];
-  for (let i = 0; i < 40; i++) { const t0 = process.hrtime.bigint(); sim.tick(); ms.push(Number(process.hrtime.bigint() - t0) / 1e6); }
-  const med = M.percentile(ms, 50);
-  console.log(`  ${String(sim.W.gCount).padStart(7)} blades  ${w}x${h}  ${med.toFixed(3)} ms/tick  keeps up ${M.speedText(M.keepUpSpeed(med))}`);
-}
-console.log('\nNode tick timings with animals (600x400, mixed bodies):');
-for (const n of M.ANIMAL_STEPS) {
-  const b = M.animalWorldFor(T, n);
-  const sim = AS.Sim(M.derive(T, b.w, b.h, b.animals, b.share), 20240611, { grassAges: 'mixed', bodies: 'mixed' });
-  for (let i = 0; i < 10; i++) sim.tick();
-  const ms = [];
-  for (let i = 0; i < 10; i++) { const t0 = process.hrtime.bigint(); sim.tick(); ms.push(Number(process.hrtime.bigint() - t0) / 1e6); }
-  const med = M.percentile(ms, 50);
-  console.log(`  ${String(n).padStart(6)} animals  ${med.toFixed(2)} ms/tick  keeps up ${M.speedText(M.keepUpSpeed(med))}`);
+if (SLOW) {
+  console.log('\nNode tick timings (median of 40 ticks after 30 warm-up ticks):');
+  for (const blades of M.BLADE_STEPS.filter(b => b <= 192000)) {
+    const { w, h } = M.worldFor(T, blades);
+    const sim = AS.Sim(M.derive(T, w, h, { bunnies: 0, wolves: 0 }, M.worldFor(T, blades).share), 20240611, { grassAges: 'mixed' });
+    for (let i = 0; i < 30; i++) sim.tick();
+    const ms = [];
+    for (let i = 0; i < 40; i++) { const t0 = process.hrtime.bigint(); sim.tick(); ms.push(Number(process.hrtime.bigint() - t0) / 1e6); }
+    const med = M.percentile(ms, 50);
+    console.log(`  ${String(sim.W.gCount).padStart(7)} blades  ${w}x${h}  ${med.toFixed(3)} ms/tick  keeps up ${M.speedText(M.keepUpSpeed(med))}`);
+  }
+  console.log('\nNode tick timings with animals (600x400, mixed bodies):');
+  for (const n of M.ANIMAL_STEPS) {
+    const b = M.animalWorldFor(T, n);
+    const sim = AS.Sim(M.derive(T, b.w, b.h, b.animals, b.share), 20240611, { grassAges: 'mixed', bodies: 'mixed' });
+    for (let i = 0; i < 10; i++) sim.tick();
+    const ms = [];
+    for (let i = 0; i < 10; i++) { const t0 = process.hrtime.bigint(); sim.tick(); ms.push(Number(process.hrtime.bigint() - t0) / 1e6); }
+    const med = M.percentile(ms, 50);
+    console.log(`  ${String(n).padStart(6)} animals  ${med.toFixed(2)} ms/tick  keeps up ${M.speedText(M.keepUpSpeed(med))}`);
+  }
 }
 console.log('all passed');

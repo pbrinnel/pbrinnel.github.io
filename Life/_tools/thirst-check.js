@@ -4,47 +4,17 @@
 // one too far from known water doesn't go, a dry animal loses HP and dies of thirst, DRINK sits
 // between the safety states and the food states, a crowd at one small lake all drink, worlds
 // without water have no thirst at all, and every corpse records how it died.
-const fs = require('fs'), path = require('path'), vm = require('vm');
-const { SIM_FILES, editCSV, audit, failures } = require('./harness.js');
-const ROOT = path.resolve(__dirname, '..');
-let bad = 0;
-function ok(c, m) { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) bad++; }
-
-function loadAS() {
-  const ctx = vm.createContext({ console, crypto: globalThis.crypto });
-  vm.runInContext('globalThis.AS = { V: 0 };', ctx);
-  for (const f of SIM_FILES) {
-    const file = path.join(ROOT, 'js', f + '.js');
-    vm.runInContext(fs.readFileSync(file, 'utf8'), ctx, { filename: file });
-  }
-  const texts = {};
-  for (const f of ['species', 'variables', 'states', 'settings']) texts[f] = fs.readFileSync(path.join(ROOT, 'tables', f + '.csv'), 'utf8');
-  return { AS: ctx.AS, texts };
-}
+const { load, audit, failures } = require('./harness.js');
+const { stage, tally, quiet, editCSV, at, tick, secs } = require('./kit.js');
+const { ok, done } = tally();
 const KEYS = ['bunny', 'wolf', 'human'];
 // A bare world, nobody hungry and nothing growing unless a test says so, made with Water off:
 // no lakes or rivers of its own and no water rules, so the lakes tests dig with W.addWater
 // stay as dug.
 function make(w, h, o = {}) {
-  const { AS, texts } = loadAS();
-  let s = editCSV(texts.settings, 'WorldWidth', 'Value', String(w));
-  s = editCSV(s, 'WorldHeight', 'Value', String(h));
-  for (const [k, v] of [['StartGrass', '0%'], ['StartBunnies', '0'], ['StartWolves', '0'], ['Water', o.water || 'off']]) s = editCSV(s, k, 'Value', v);
-  texts.settings = s;
-  if (!o.hunger) for (const sp of ['Bunny', 'Wolf', 'Human']) texts.species = editCSV(texts.species, 'HungerRate', sp, '0');
-  texts.species = editCSV(texts.species, 'SeedChance', 'Grass', '0%');
-  texts.species = editCSV(texts.species, 'GrowthRate', 'Grass', '0');
-  texts.species = editCSV(texts.species, 'SproutChance', 'Grass', '0%');
-  texts.species = editCSV(texts.species, 'DigChance', 'Bunny', '0%');
-  if (o.edit) o.edit(texts);
-  const { T, errors } = AS.parseTables(texts);
-  if (errors.length) throw new Error(errors.join('\n'));
-  const sim = AS.Sim(T, o.seed || 1);
-  return { AS, T, sim, W: sim.W, K: AS.KIND };
+  return stage({ size: [w, h], seed: o.seed || 1, settings: { Water: o.water || 'off' },
+    species: [o.hunger ? [] : quiet.hunger, quiet.grass, quiet.digging], edit: o.edit });
 }
-const at = (W, x, y) => y * W.w + x;
-const tick = (sim, n = 1) => { for (let i = 0; i < n; i++) sim.tick(); };
-const secs = (AS, s) => Math.round(s * AS.TICK_HZ);
 const sname = (sim, s) => sim.W.aState[s] === 255 ? 'none' : sim.T.states[KEYS[sim.W.aSpecies[s]]][sim.W.aState[s]].name;
 const lake = (W, x0, y0, x1, y1) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) W.addWater(at(W, x, y)); };
 function put(AS, sim, sp, x, y, o = {}) {
@@ -214,7 +184,7 @@ for (const [sp, name] of [[0, 'bunny'], [1, 'wolf'], [2, 'human']]) {
     return h + ':' + W.bunnies + ':' + W.wolves + ':' + W.gCount;
   };
   const build = (edits) => {
-    const { AS, texts } = loadAS();
+    const { AS, texts } = load();
     for (const [f, k, c, v] of edits) texts[f] = editCSV(texts[f], k, c, v);
     texts.settings = editCSV(texts.settings, 'WorldWidth', 'Value', '200'); texts.settings = editCSV(texts.settings, 'WorldHeight', 'Value', '140');
     texts.settings = editCSV(texts.settings, 'StartBunnies', 'Value', '120'); texts.settings = editCSV(texts.settings, 'StartWolves', 'Value', '30');
@@ -291,5 +261,5 @@ for (const [sp, name] of [[0, 'bunny'], [1, 'wolf'], [2, 'human']]) {
   W.removeCorpse(spot); ok(cause(spot) === 0, 'removing a corpse clears its cause');
 }
 
-console.log(bad ? `\n${bad} FAILED` : '\nAll thirst checks passed');
-if (bad || failures.length) { if (failures.length) console.log([...new Set(failures)].slice(0, 20).join('\n')); process.exit(1); }
+if (failures.length) console.log([...new Set(failures)].slice(0, 20).join('\n'));
+done('All thirst checks passed', failures.length);

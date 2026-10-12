@@ -1,14 +1,7 @@
 // Node check of sprites.js (no DOM): bitmaps, sprite indices, the pose rule, facing memory.
 'use strict';
-const fs = require('fs'), path = require('path'), vm = require('vm');
-const ROOT = path.resolve(__dirname, '..');
-const ctx = vm.createContext({ console, crypto: globalThis.crypto });
-vm.runInContext('globalThis.AS = { V: 0 };', ctx);
-for (const f of [...require('./harness.js').SIM_FILES, 'sprites']) {
-  const file = path.join(ROOT, 'js', f + '.js');
-  vm.runInContext(fs.readFileSync(file, 'utf8'), ctx, { filename: file });
-}
-const AS = ctx.AS;
+const { load } = require('./harness.js');
+const { AS, texts } = load({}, ['sprites']);
 let bad = 0;
 const check = (c, m) => { if (!c) { bad++; console.log('FAIL: ' + m); } };
 

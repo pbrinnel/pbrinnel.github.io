@@ -1,51 +1,16 @@
 'use strict';
 // Milestone 6: wolves. Hand-built worlds, then the real world for 60 days (twice).
-const fs = require('fs'), path = require('path'), vm = require('vm');
-const { SIM_FILES, editCSV } = require('./harness.js');
-const ROOT = path.resolve(__dirname, '..');
-let bad = 0;
-function ok(c, m) { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) bad++; }
+const { load, audit, failures } = require('./harness.js');
+const { stage, tally, editCSV, at, tick, secs, days } = require('./kit.js');
+const { ok, done } = tally();
 const near = (a, b, tol) => Math.abs(a - b) <= tol;
 
-function loadAS() {
-  const ctx = vm.createContext({ console, crypto: globalThis.crypto });
-  vm.runInContext('globalThis.AS = { V: 0 };', ctx);
-  const files = SIM_FILES.includes('wolf') ? SIM_FILES : SIM_FILES.concat('wolf');
-  for (const f of files) {
-    const file = path.join(ROOT, 'js', f + '.js');
-    vm.runInContext(fs.readFileSync(file, 'utf8'), ctx, { filename: file });
-  }
-  const texts = {};
-  for (const f of ['species', 'variables', 'states', 'settings']) texts[f] = fs.readFileSync(path.join(ROOT, 'tables', f + '.csv'), 'utf8');
-  return { AS: ctx.AS, texts };
-}
+// Blades stay as placed; nobody gets hungry unless the test is about hunger.
 function make(size, seed = 1, hunger = false, edit) {
-  const { AS, texts } = loadAS();
-  let s = editCSV(texts.settings, 'WorldWidth', 'Value', String(size));
-  s = editCSV(s, 'WorldHeight', 'Value', String(size));
-  s = editCSV(s, 'StartGrass', 'Value', '0%');
-  s = editCSV(s, 'StartBunnies', 'Value', '0');
-  s = editCSV(s, 'Water', 'Value', 'off');   // these hand-place things on tiles, water included: no water rules to move it
-  s = editCSV(s, 'StartWolves', 'Value', '0');
-  texts.settings = s;
-  if (!hunger) {
-    texts.species = editCSV(texts.species, 'HungerRate', 'Bunny', '0');
-    texts.species = editCSV(texts.species, 'HungerRate', 'Wolf', '0');
-  }
-  texts.species = editCSV(texts.species, 'SeedChance', 'Grass', '0%');
-  texts.species = editCSV(texts.species, 'GrowthRate', 'Grass', '0');
-  if (edit) edit(texts);
-  const { T, errors } = AS.parseTables(texts);
-  if (errors.length) throw new Error(errors.join('\n'));
-  const sim = AS.Sim(T, seed);
-  const events = [], emit = sim.emit;
-  sim.emit = (type, tile) => { events.push([type, tile, sim.tickCount]); emit(type, tile); };
-  return { AS, T, sim, W: sim.W, B: T.bunny, Wf: T.wolf, events };
+  const fed = hunger ? [] : [['HungerRate', 'Bunny', '0'], ['HungerRate', 'Wolf', '0']];
+  const r = stage({ size, seed, species: [fed, [['SeedChance', 'Grass', '0%'], ['GrowthRate', 'Grass', '0']]], events: true, edit });
+  return { ...r, B: r.T.bunny, Wf: r.T.wolf };
 }
-const at = (W, x, y) => y * W.w + x;
-const tick = (sim, n = 1) => { for (let i = 0; i < n; i++) sim.tick(); };
-const secs = (AS, s) => Math.round(s * AS.TICK_HZ);
-const days = (AS, d) => Math.round(d * AS.TICK_HZ * AS.DAY_SECONDS);
 const sname = (sim, s, key) => sim.W.aState[s] === 255 ? 'none' : sim.T.states[key][sim.W.aState[s]].name;
 const M = 0, F = 1;
 function animal(AS, sim, sp, x, y, sex, o = {}) {
@@ -508,7 +473,7 @@ const d2 = (W, a, b) => (W.tx(a) - W.tx(b)) ** 2 + (W.ty(a) - W.ty(b)) ** 2;
 
 // --- real world, 60 days ---
 function realRun() {
-  const { AS, texts } = loadAS();
+  const { AS, texts } = load();
   const { T, errors } = AS.parseTables(texts);
   if (errors.length) throw new Error(errors.join('\n'));
   const c = { bBite: 0, bStarve: 0, bOld: 0, wStarve: 0, wOld: 0, bBirth: 0, wBirth: 0, kills: 0 };
@@ -547,9 +512,8 @@ function realRun() {
   console.log('\nreal world, 60 days\n' + a.lines.join('\n'));
   const b = realRun();
   ok(a.lines.join('\n') === b.lines.join('\n'), 'real: same seed, same 60-day output');
-  const h = require('./harness.js');
-  h.audit(a.AS, a.sim, 'wolf-check');
-  ok(h.failures.length === 0, 'real: grid/store audit clean ' + h.failures.slice(0, 3).join('; '));
+  audit(a.AS, a.sim, 'wolf-check');
+  ok(failures.length === 0, 'real: grid/store audit clean ' + failures.slice(0, 3).join('; '));
 }
 // --- Natal dispersal: grown up, one born in the world leaves home and settles far off; the
 // first generation (placed where the world began) stays. Both species. ---
@@ -578,5 +542,4 @@ function realRun() {
   }
   ok(W.aTargetTile[born[0]] < 0 && W.aTargetTile[born[1]] < 0, 'disperse: both are home, with no destination left');
 }
-console.log(bad ? `\nFAIL (${bad})` : '\nALL PASS');
-process.exit(bad ? 1 : 0);
+done();

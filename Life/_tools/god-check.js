@@ -3,19 +3,14 @@
 // and no event, blades, corpses, holes) and nothing outside it; the grid and stores still
 // audit; the ground is scorched, longest at the center; nothing grows or is dug on it until
 // it cools, and then grass can return.
-const { load, audit, editCSV, failures } = require('./harness.js');
-let bad = 0;
-function ok(c, m) { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) bad++; }
+const { audit, failures } = require('./harness.js');
+const kit = require('./kit.js'), { stage } = kit;
+const { ok, done } = kit.tally();
 
 const RADIUS = 20, DAYS = 8;
-const { AS, texts } = load();
-let s = texts.settings;
-for (const [k, v] of [['WorldWidth', '150'], ['WorldHeight', '100'], ['NukeRadius', String(RADIUS)], ['ScorchDays', String(DAYS)], ['Rain', '0']]) s = editCSV(s, k, 'Value', v);
-texts.settings = s;
-texts.species = editCSV(texts.species, 'DigChance', 'Bunny', '100%');   // bunnies dig whenever they may
-const { T, errors } = AS.parseTables(texts);
-if (errors.length) { console.log(errors.join('\n')); process.exit(1); }
-const sim = AS.Sim(T, 7), W = sim.W, K = AS.KIND;
+// The shipped world, with bunnies digging whenever they may.
+const { AS, T, sim, W, K } = stage({ bare: false, size: [150, 100], seed: 7, settings: { NukeRadius: RADIUS, ScorchDays: DAYS, Rain: 0 },
+  species: [[['DigChance', 'Bunny', '100%']]] });
 const DAY = AS.TICK_HZ * AS.DAY_SECONDS;
 const days = n => { for (let i = 0; i < n * DAY; i++) sim.tick(); };
 days(4);
@@ -196,13 +191,9 @@ W.scorch[t0] = 0;
 }
 // ---- WATER MODE: water poured into the world's water rules, and it flows ----
 {
-  const { AS: A6, texts: t6 } = load();
-  let s6 = t6.settings;
   // No rain, so every drop in the world is what was poured.
-  for (const [k, v] of [['WorldWidth', '80'], ['WorldHeight', '60'], ['StartGrass', '0%'], ['StartBunnies', '0'], ['StartWolves', '0'], ['Rain', '0']]) s6 = editCSV(s6, k, 'Value', v);
-  t6.settings = s6;
-  const { T: T6 } = A6.parseTables(t6);
-  const sim6 = A6.Sim(T6, 3), W6 = sim6.W, K6 = A6.KIND;
+  const { AS: A6, T: T6, sim: sim6, W: W6, K: K6 } = stage({ bare: false, size: [80, 60], seed: 3,
+    settings: { StartGrass: '0%', StartBunnies: 0, StartWolves: 0, Rain: 0 } });
   const at = (x, y) => W6.tile(x, y);
   ok(W6.water && W6.waterCount === 0, 'a world with Water on and no rain is dry, but has the water rules');
   W6.addGrass(at(40, 30), 1, 0);                         // drowned
@@ -241,15 +232,10 @@ W.scorch[t0] = 0;
 }
 {
   // A world made with Water off gets the rules when water is first poured, so it flows too.
-  const { AS: A7, texts: t7 } = load();
-  let s7 = t7.settings;
-  for (const [k, v] of [['WorldWidth', '60'], ['WorldHeight', '40'], ['StartGrass', '0%'], ['StartBunnies', '0'], ['StartWolves', '0'], ['Water', 'off']]) s7 = editCSV(s7, k, 'Value', v);
-  t7.settings = s7;
-  const sim7 = A7.Sim(A7.parseTables(t7).T, 4), W7 = sim7.W;
+  const { AS: A7, sim: sim7, W: W7 } = stage({ size: [60, 40], seed: 4 });
   ok(!W7.water, 'Water off: no water rules');
   const placed = A7.paintCircle(sim7, 'water', 30, 20, 2);
   for (let i = 0; i < A7.TICK_HZ * A7.DAY_SECONDS; i++) sim7.tick();
   ok(W7.water && W7.waterCount > 0 && W7.waterCount !== placed, `pouring gives it the rules, and the water spreads (${placed} → ${W7.waterCount} tiles)`);
 }
-console.log(bad ? `${bad} FAILED` : 'all passed');
-process.exit(bad ? 1 : 0);
+done('all passed');

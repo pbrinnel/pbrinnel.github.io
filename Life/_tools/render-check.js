@@ -1,14 +1,7 @@
 // Node check of glyphs.js (no DOM): ids, colors, glyphFor, animalGlyph, stageOf.
 'use strict';
-const fs = require('fs'), path = require('path'), vm = require('vm');
-const ROOT = path.resolve(__dirname, '..');
-const ctx = vm.createContext({ console, crypto: globalThis.crypto });
-vm.runInContext('globalThis.AS = { V: 0 };', ctx);
-for (const f of [...require('./harness.js').SIM_FILES, 'sprites', 'render']) {
-  const file = path.join(ROOT, 'js', f + '.js');
-  vm.runInContext(fs.readFileSync(file, 'utf8'), ctx, { filename: file });
-}
-const AS = ctx.AS;
+const { load } = require('./harness.js');
+const { AS, texts, ctx } = load({}, ['sprites', 'render']);
 let bad = 0;
 const check = (c, m) => { if (!c) { bad++; console.log('FAIL: ' + m); } };
 
@@ -34,8 +27,6 @@ check(AS.COLORS[AS.GLYPH.BUNNY_MALE_BABY] === AS.COLORS[AS.GLYPH.BUNNY_MALE_ADUL
 check(AS.COLORS[AS.GLYPH.WOLF_MALE_ELDER] !== AS.COLORS[AS.GLYPH.WOLF_MALE_ADULT], 'elder dimmer');
 
 // glyphFor on a real world
-const { load } = require('./harness.js');
-const { texts } = load();
 const { T } = AS.parseTables(texts);
 const sim = AS.Sim(T, 1), W = sim.W;
 const empties = [];

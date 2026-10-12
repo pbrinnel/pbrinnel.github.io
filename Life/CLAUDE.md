@@ -13,8 +13,9 @@ The goal is a self-sustaining ecosystem (DESIGN.md, top).
 3. `tables/*.csv`: every number, and the source of truth. The sim reads them at startup;
    never hard-code a value that has a column there. Every number is a placeholder for
    tuning, so neither the code nor the checks may depend on any particular value.
-4. Before and after any change: `node Life/_tools/check-all.js` (about 3 minutes, no
-   browser). It must end "All checks passed".
+4. While working: `node Life/_tools/check-all.js --quick` (about a minute, no browser).
+   Before a commit: `node Life/_tools/check-all.js` (a few minutes). Both must end "All
+   checks passed".
 
 `_original-notes.txt` is Paul's first sketch, kept for history; DESIGN.md supersedes it.
 

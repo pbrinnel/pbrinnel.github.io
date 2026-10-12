@@ -3,48 +3,16 @@
 // hunted, a fleeing bunny runs to a free hole and hides, holes collapse when unused, grass
 // never grows on one, bunnies dig, and the Meadows start digs each colony's holes.
 // Hand-built worlds like wolf-check's.
-const fs = require('fs'), path = require('path'), vm = require('vm');
-const { SIM_FILES, editCSV } = require('./harness.js');
-const ROOT = path.resolve(__dirname, '..');
-let bad = 0;
-function ok(c, m) { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) bad++; }
+const { load } = require('./harness.js');
+const { stage, tally, quiet, editCSV, at, tick, secs, days } = require('./kit.js');
+const { ok, done } = tally();
 
-function loadAS() {
-  const ctx = vm.createContext({ console, crypto: globalThis.crypto });
-  vm.runInContext('globalThis.AS = { V: 0 };', ctx);
-  for (const f of SIM_FILES) {
-    const file = path.join(ROOT, 'js', f + '.js');
-    vm.runInContext(fs.readFileSync(file, 'utf8'), ctx, { filename: file });
-  }
-  const texts = {};
-  for (const f of ['species', 'variables', 'states', 'settings']) texts[f] = fs.readFileSync(path.join(ROOT, 'tables', f + '.csv'), 'utf8');
-  return { AS: ctx.AS, texts };
-}
 // A bare world with no animals, no growth and no hunger, and no random digging unless asked.
 function make(size, edit, layout = 'Scatter') {
-  const { AS, texts } = loadAS();
-  let s = editCSV(texts.settings, 'WorldWidth', 'Value', String(size));
-  s = editCSV(s, 'WorldHeight', 'Value', String(size));
-  s = editCSV(s, 'StartGrass', 'Value', '0%');
-  s = editCSV(s, 'StartBunnies', 'Value', '0');
-  s = editCSV(s, 'Water', 'Value', 'off');   // these hand-place things on tiles, water included: no water rules to move it
-  s = editCSV(s, 'StartWolves', 'Value', '0');
-  s = editCSV(s, 'StartLayout', 'Value', layout);
-  texts.settings = s;
-  for (const sp of ['Bunny', 'Wolf']) texts.species = editCSV(texts.species, 'HungerRate', sp, '0');
-  texts.species = editCSV(texts.species, 'SeedChance', 'Grass', '0%');
-  texts.species = editCSV(texts.species, 'GrowthRate', 'Grass', '0');
-  texts.species = editCSV(texts.species, 'DigChance', 'Bunny', '0%');
-  if (edit) edit(texts);
-  const { T, errors } = AS.parseTables(texts);
-  if (errors.length) throw new Error(errors.join('\n'));
-  const sim = AS.Sim(T, 1);
-  return { AS, T, sim, W: sim.W, B: T.bunny };
+  const r = stage({ size, settings: { StartLayout: layout },
+    species: [[['HungerRate', 'Bunny', '0'], ['HungerRate', 'Wolf', '0'], ['SeedChance', 'Grass', '0%'], ['GrowthRate', 'Grass', '0']], quiet.digging], edit });
+  return { ...r, B: r.T.bunny };
 }
-const at = (W, x, y) => y * W.w + x;
-const tick = (sim, n = 1) => { for (let i = 0; i < n; i++) sim.tick(); };
-const secs = (AS, s) => Math.round(s * AS.TICK_HZ);
-const days = (AS, d) => Math.round(d * AS.TICK_HZ * AS.DAY_SECONDS);
 const sname = (sim, s, key) => sim.W.aState[s] === 255 ? 'none' : sim.T.states[key][sim.W.aState[s]].name;
 function animal(AS, sim, sp, x, y, o = {}) {
   const W = sim.W, s = AS.spawnStarting(sim, sp, at(W, x, y));
@@ -357,7 +325,7 @@ const dig = (tx, extra) => {
 
 // --- the Meadows start digs each colony's holes; Scatter digs none ---
 {
-  const { AS, texts } = loadAS();
+  const { AS, texts } = load();
   const tx = { ...texts };
   tx.settings = editCSV(tx.settings, 'StartBunnies', 'Value', '60');
   const { T, errors } = AS.parseTables(tx);
@@ -378,7 +346,7 @@ const dig = (tx, extra) => {
 }
 {
   // The colonies' own holes sit by the colony: each colony center has HolesPerColony within a few spreads.
-  const { AS, texts } = loadAS();
+  const { AS, texts } = load();
   const dry = x => editCSV(x, 'Rain', 'Value', '0');   // startMeadows is run twice on one world here: no water to lay twice
   const t0 = { ...texts };
   t0.settings = dry(editCSV(editCSV(editCSV(t0.settings, 'StartBunnies', 'Value', '0'), 'StartWolves', 'Value', '0'), 'StartGrass', 'Value', '0%'));
@@ -398,5 +366,4 @@ const dig = (tx, extra) => {
   ok(perfect, 'start: every colony has exactly HolesPerColony holes near its center');
 }
 
-console.log(bad ? `\nFAIL (${bad})` : '\nALL PASS');
-process.exit(bad ? 1 : 0);
+done();
