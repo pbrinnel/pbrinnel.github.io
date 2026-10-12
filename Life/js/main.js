@@ -28,8 +28,10 @@
   const INSPECT_EMPTY_KEY = 'life-inspect-empty';
   const CONTOUR_KEY = 'life-contour-m';
   const WATER_KEY = 'life-water';
-  // The open tab windows (keys of 'info', 'god', 'debug', comma-separated), remembered per browser.
+  // The open tab windows (keys of 'info', 'paint', 'debug', comma-separated), remembered per
+  // browser. PAINT's key was 'god' until 12 Oct 2026, and a list saved then reads the same.
   const WINDOWS_KEY = 'life-ui-windows';
+  const OLD_WINDOW_KEYS = { god: 'paint' };
 
   const debug = new URLSearchParams(location.search).has('debug');
   let speedIndex = START_SPEED;
@@ -65,7 +67,7 @@
   try { linesOn = localStorage.getItem(LINES_KEY) === '1'; } catch (e) { /* stays off */ }
   // Which tab windows are open is also the viewer's choice. Nothing stored (or storage blocked): Info.
   let savedWindows;
-  try { const v = localStorage.getItem(WINDOWS_KEY); if (v !== null) savedWindows = v ? v.split(',') : []; } catch (e) { /* default */ }
+  try { const v = localStorage.getItem(WINDOWS_KEY); if (v !== null) savedWindows = v ? v.split(',').map(k => OLD_WINDOW_KEYS[k] || k) : []; } catch (e) { /* default */ }
   let nukeOn = false;   // NUKE MODE: a tap on the world drops a nuke instead of selecting
   let brush = '';   // GRASS / RABBIT / WOLF / HUMAN MODE: the kind a tap or drag paints, or ''
   let radiusOf = () => 0;   // the Radius slider's value for a mode; the real one exists once the UI does
@@ -415,7 +417,7 @@
     get sim() { return sim; },
     get sel() { return sel; },
     get speedIndex() { return speedIndex; },
-    // Drops a nuke on tile (tx, ty): the sim side (god.js) and the explosion drawn over it.
+    // Drops a nuke on tile (tx, ty): the sim side (paint.js) and the explosion drawn over it.
     nukeAt(tx, ty) {
       const r = radiusOf('nuke');
       const out = AS.nuke(sim, sim.W.tile(tx, ty), r);

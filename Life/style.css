@@ -112,14 +112,14 @@ html, body {
     border-bottom: 1px solid var(--hud-line);
     padding: 6px 10px 8px calc(env(safe-area-inset-left) + 10px);
   }
-  .hud-tabstrip.hud-win-god, .hud-tabstrip.hud-win-debug {
+  .hud-tabstrip.hud-win-paint, .hud-tabstrip.hud-win-debug {
     left: auto;
     right: calc(env(safe-area-inset-right) + 8px);
     border: 1px solid var(--hud-line);
     padding-left: 10px;
     max-height: calc(50vh - var(--hud-bar, 41px));
   }
-  .hud-tabstrip.hud-win-god { top: auto; bottom: calc(env(safe-area-inset-bottom) + 8px); }
+  .hud-tabstrip.hud-win-paint { top: auto; bottom: calc(env(safe-area-inset-bottom) + 8px); }
   .hud-tabstrip.hud-win-debug { top: 50vh; }
   .hud-tabstrip .hud-sec { grid-template-columns: 1fr; gap: 2px 8px; }
   .hud-tabstrip .hud-sec-body { gap: 4px 8px; }
@@ -238,7 +238,7 @@ body.nuke-armed #map, body.paint-armed #map { cursor: crosshair; }
 .err-warns { color: var(--hud-dim); }
 .err-foot { margin-top: 28px; color: var(--hud-dim); }
 
-/* ---- Inspector ---- */
+/* ---- The properties window (#inspector) ---- */
 /* JS sets --hud-bottom to the strip's current height. */
 #inspector {
   position: fixed;
@@ -286,8 +286,8 @@ body.nuke-armed #map, body.paint-armed #map { cursor: crosshair; }
 /* The close button stays in reach while the rows scroll. */
 .insp-head { position: sticky; top: -4px; background: var(--bg); padding-top: 4px; }
 
-/* ---- Benchmark ---- */
-.hud-bench {
+/* ---- Buttons inside the windows and cards (the bar's are .hud-btn) ---- */
+.hud-control {
   font: inherit;
   color: var(--hud-dim);
   background: transparent;
@@ -297,11 +297,12 @@ body.nuke-armed #map, body.paint-armed #map { cursor: crosshair; }
   padding: 0 10px;
   cursor: pointer;
 }
-.hud-bench:hover { color: var(--fg); border-color: #4a5046; }
-.hud-btn:disabled, .hud-bench:disabled { opacity: 0.4; cursor: default; }
-.hud-btn:disabled:hover, .hud-bench:disabled:hover { color: var(--hud-dim); border-color: var(--hud-line); }
-@media (max-width: 600px) { .hud-bench { padding: 0 6px; } }
+.hud-control:hover { color: var(--fg); border-color: #4a5046; }
+.hud-btn:disabled, .hud-control:disabled { opacity: 0.4; cursor: default; }
+.hud-btn:disabled:hover, .hud-control:disabled:hover { color: var(--hud-dim); border-color: var(--hud-line); }
+@media (max-width: 600px) { .hud-control { padding: 0 6px; } }
 
+/* ---- Benchmark ---- */
 /* Swallows pointer and wheel input while the benchmark runs. It paints nothing: every
    overlay costs compositing time, and that time is what is being measured. */
 .bench-block { position: fixed; inset: 0; z-index: 30; touch-action: none; }
@@ -351,11 +352,11 @@ body.nuke-armed #map, body.paint-armed #map { cursor: crosshair; }
 
 /* ---- Population graph ---- */
 /* Any toggle in a tab shows it is on the same way (NUKE MODE overrides it below). */
-.hud-bench.on, .hud-bench.on:hover { color: var(--bg); background: var(--hud-on); border-color: var(--hud-on); }
+.hud-control.on, .hud-control.on:hover { color: var(--bg); background: var(--hud-on); border-color: var(--hud-on); }
 /* NUKE MODE armed: a steady orange-red fill, unmistakable and never animated. */
 /* The PAINT modes as icons (setIcons): square buttons, the icon centered. NUKE keeps a red
    edge even when off, so it never reads as just another brush. */
-.hud-bench.hud-mode-icon { min-width: 0; width: 36px; padding: 0; display: inline-grid; place-items: center; }
+.hud-control.hud-mode-icon { min-width: 0; width: 36px; padding: 0; display: inline-grid; place-items: center; }
 .hud-mode-icon .hud-icon { margin: 0; vertical-align: 0; }
 .hud-nuke { border-color: #8a3a1c; }
 .hud-nuke:hover { border-color: #e0662f; }
@@ -363,7 +364,7 @@ body.nuke-armed #map, body.paint-armed #map { cursor: crosshair; }
 /* A brush armed: a steady fill like the graph's on state, so the active mode is plain. */
 .hud-brush.on, .hud-brush.on:hover { color: var(--bg); background: var(--hud-on); border-color: var(--hud-on); }
 /* Armed, an icon keeps its own colors: a tint behind it and a doubled edge, not a fill. */
-.hud-bench.hud-mode-icon.on, .hud-bench.hud-mode-icon.on:hover { background: rgba(232, 217, 160, 0.16); border-color: var(--hud-on); box-shadow: inset 0 0 0 1px var(--hud-on); }
+.hud-control.hud-mode-icon.on, .hud-control.hud-mode-icon.on:hover { background: rgba(232, 217, 160, 0.16); border-color: var(--hud-on); box-shadow: inset 0 0 0 1px var(--hud-on); }
 .hud-nuke.hud-mode-icon.on, .hud-nuke.hud-mode-icon.on:hover { background: rgba(184, 67, 26, 0.32); border-color: #e0662f; box-shadow: inset 0 0 0 1px #e0662f; }
 
 /* ---- Population graph: a floating window ---- */

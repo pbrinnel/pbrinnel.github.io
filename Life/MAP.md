@@ -42,7 +42,7 @@ load time: every file reads other files' `AS.*` inside functions, at call time.
 | `corpse.js` | decay, and the boost field grass drinks from | `corpseTick`, `corpseAdded`, `corpseBoost` |
 | `warren.js` | warren holes' clocks: marks a hole used while a bunny stands on it, collapses holes unused for `CollapseDays` (hourly) | `warrenTick`, `holeWithin` |
 | `sim.js` | the fixed tick, populate, events ring, population history | `Sim`, `TICK_HZ`, `DT`, `DAY_SECONDS`, `TICKS_PER_HOUR`, `EV`, `debugDropCorpse` |
-| `god.js` | PAINT's powers: the brushes and the nuke ([The page](#the-page)) | `nuke`, `paintCircle` |
+| `paint.js` | PAINT's powers: the brushes and the nuke ([The page](#the-page)) | `nuke`, `paintCircle` |
 | `water.js` | the water rules ([Water](#water)) | `Water`, `waterTick`, `syncWater`, `TILE_M`, `WATER_TINY`, `WATER_STEP_DAYS` |
 | `terrain.js` | every world's ground, grown before day 0, and its first water ([Water](#water)) | `growTerrain`, `layTerrain`, `terrainOf`, `terrainShape` |
 | `terrain-worker.js` | not a page script: main.js runs it as a Worker to grow a world off the main thread ([Water](#water)) | — |
@@ -179,7 +179,7 @@ graph, ui, bench) only reads.
   leaves the water (no scorch).
 - **The beach:** `W.beach` (Uint8) marks dry land 4-adjacent to water, kept by `addWater`
   and `setDepth` (which also drops a blade the moving shore reaches); no blade is ever on
-  one (`addGrass` throws; grass.js seeding/sprouting, god.js painting and start.js skip
+  one (`addGrass` throws; grass.js seeding/sprouting, paint.js painting and start.js skip
   them), so animals can always reach the water.
 - **The water field** (`buildWaterField`, on first need through `ensureWaterField`, again
   when `waterStale`): `wDist` (walking distance to the nearest beach tile, 0 on one,
@@ -344,7 +344,7 @@ never flash: see DESIGN.md, Photosensitivity.
 ## The page
 
 - **The bar and tabs** (ui.js): speeds, day, the Info and PAINT tabs, plus Debug only with
-  `?debug` (keys `info`, `god`, `debug`), and Hide UI (`H`). Each tab is a stack of labeled
+  `?debug` (keys `info`, `paint`, `debug`), and Hide UI (`H`). Each tab is a stack of labeled
   rows made by `section(tab, title)`, to which a new control is appended; each its own
   window, toggled by its button (`setWindow(key, on)`, `ui.windows`, `onWindows` → main.js
   keeps them in localStorage `life-ui-windows`). On a computer they float (CSS, `--side-w`,
@@ -366,7 +366,7 @@ never flash: see DESIGN.md, Photosensitivity.
   - The properties window (properties.js, `ui.inspector`): a heading row renders as a
     section title. The cards and the error page (cards.js: `ui.ended`, `ui.crowd`,
     `ui.errors`). Keys for speed and Hide UI are ui.js's.
-- **PAINT's powers** (god.js): `paintCircle(sim, 'grass'|'bunny'|'wolf'|'human'|'water',
+- **PAINT's powers** (paint.js): `paintCircle(sim, 'grass'|'bunny'|'wolf'|'human'|'water',
   cx, cy, r, cap?)` is the brush (empty eligible tiles only; random ages, but a species
   with no `LitterSize` (humans) stays adult; radius 0 = one tile; `cap = { room, hit }`
   stops animals at the soft limit; `water` goes through `pourWater`). `nuke(sim, tile,
@@ -427,7 +427,7 @@ never flash: see DESIGN.md, Photosensitivity.
 | `node Life/_tools/harness.js [days] [seed]` | runs a seed, audits grid ↔ stores every day, checks same seed → same world. `require('./harness.js')` gives `load()` (the sim's files in a Node VM, plus any extra `js/` files), `audit()`, `run()`, `editCSV()`, `SIM_FILES` to other scripts |
 | `kit.js` | what the checks share: `stage()` builds a bare world (nothing placed, no water rules) from the real tables with the test's edits, `quiet.*` switches off grass growth, hunger or digging, `tally()` counts ok/FAIL lines and exits with the verdict, plus `at`, `tick`, `secs`, `days`, `stateName`. A new check starts here |
 | `node Life/_tools/files-check.js` | life.html loads every `js/` file with one `?v=`, and the harness's and the lab worker's sim file lists match the page's order. Add a new file to all three |
-| `*-check.js` | one per module (tables, grass, sight, bunny, breed, wolf, human, warren, god, water, thirst, inspect, camera, render, ui, graph, bench). Each loads the real files in a Node VM. `bench-check.js --slow` also builds the biggest benchmark worlds and prints Node tick timings |
+| `*-check.js` | one per module (tables, grass, sight, bunny, breed, wolf, human, warren, paint, water, thirst, inspect, camera, render, ui, graph, bench). Each loads the real files in a Node VM. `bench-check.js --slow` also builds the biggest benchmark worlds and prints Node tick timings |
 | `node Life/_tools/profile-tick.js` | where tick time goes at a few world sizes |
 | `node Life/_tools/run-bench.js desktop\|phone\|capped30` | the in-page benchmark in a real windowed Chrome (throwaway profile); prints results, saves a screenshot to `.claude/life-shots/` |
 | `node Life/_tools/shoot.js desktop\|phone out.png [setup.js] [?query]` | screenshot of the live page in Chrome after running `setup.js` in it (async JS; `AS.app` is the running sim) |

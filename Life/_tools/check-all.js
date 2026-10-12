@@ -27,7 +27,7 @@ const CHECKS = [
   { file: path.join(TOOLS, 'wolf-check.js'), slow: true },
   { file: path.join(TOOLS, 'human-check.js') },
   { file: path.join(TOOLS, 'warren-check.js') },
-  { file: path.join(TOOLS, 'god-check.js') },
+  { file: path.join(TOOLS, 'paint-check.js') },
   { file: path.join(TOOLS, 'water-check.js'), slow: true },
   { file: path.join(TOOLS, 'thirst-check.js') },
   { file: path.join(TOOLS, 'inspect-check.js') },

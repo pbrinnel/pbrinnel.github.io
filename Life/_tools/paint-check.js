@@ -1,5 +1,5 @@
 'use strict';
-// The PAINT tab's nuke (js/god.js): everything within NukeRadius goes (animals with no corpse
+// The PAINT tab's nuke (js/paint.js): everything within NukeRadius goes (animals with no corpse
 // and no event, blades, corpses, holes) and nothing outside it; the grid and stores still
 // audit; the ground is scorched, longest at the center; nothing grows or is dug on it until
 // it cools, and then grass can return.

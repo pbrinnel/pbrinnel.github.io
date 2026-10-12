@@ -31,7 +31,7 @@
 //
 //   AS.waterTick(sim)        the sim's tick: a step when one is due, then the world told (syncWater)
 //   AS.syncWater(sim)        W.wDepth and the tiles' kinds made to match water.H
-//   The world's water is W.water (terrain.js makes it; god.js makes one to pour into a world
+//   The world's water is W.water (terrain.js makes it; paint.js makes one to pour into a world
 //   without).
 (function (AS) {
   'use strict';

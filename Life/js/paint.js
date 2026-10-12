@@ -1,6 +1,6 @@
-// God powers: things done to the world from outside the sim's own rules. Sim side, so the
-// Node harness and the lab's workers load it; the page's buttons and the blast's drawing are
-// ui.js, main.js and render.js.
+// PAINT's powers: things done to the world from outside the sim's own rules. Sim side, so
+// the Node harness and the lab's workers load it; the page's buttons and the blast's drawing
+// are paint-tab.js, main.js and render.js.
 //
 // AS.nuke(sim, tile, radius) → { tiles, animals, blades, corpses, holes }
 //   Destroys everything within `radius` tiles (a circle; the PAINT tab's Radius slider, whose

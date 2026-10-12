@@ -14,7 +14,7 @@
 //         inspect ('off' | 'click' | 'hover'), onInspect(mode): the properties window,
 //         inspectEmpty (initial on/off), onInspectEmpty(on): bare tiles can be picked,
 //         onRadius(mode, tiles): the Radius slider moved (for the preview),
-//         windows (the tab windows open at first: keys of 'info', 'god', 'debug'; default ['info']),
+//         windows (the tab windows open at first: keys of 'info', 'paint', 'debug'; default ['info']),
 //         onWindows(keys): the open ones, after the viewer opens or closes one,
 //         onNuke(on), onLocate(key, on): a count's ring toggle ('bunnies', 'wolves', 'humans', 'blades', 'corpses') }) → ui
 //   ui.hud({ speedIndex, achieved, day, seed, humansSeen, counts: { bunnies, wolves, humans, total, blades, corpses } })
@@ -68,9 +68,12 @@
   // 12 Oct 2026: not needed for now).
   const ALL_TABS = [
     ['info', 'Info', 'Counts, rings on the map, the graph, the minimap, topo and intent lines, and the properties window'],
-    ['god', 'PAINT', 'Paint grass, animals and water, or drop a nuke'],
+    ['paint', 'PAINT', 'Paint grass, animals and water, or drop a nuke'],
     ['debug', 'Debug', 'Water, Benchmark, the seed and the debug tools'],
   ];
+  // Where each tab window's dragged place is kept, under the names they first had (Info was
+  // the side panel, PAINT the God tab), so windows stay where viewers put them.
+  const POS_KEYS = { info: 'life-side-pos', paint: 'life-god-pos', debug: 'life-debug-pos' };
   // Counts in HUD order: a label (empty: the sprite icon replaces it once the sheet exists, see
   // setIcons; the total keeps its word), key in the counts object, tooltip.
   const COUNTS = [
@@ -169,8 +172,8 @@
     const showElev = section('info', 'Map', 'What is drawn over the world');
     const showProps = section('info', 'Properties', 'The properties window: what something is and how it is doing');
     const showTables = section('info', 'Tables');
-    const godModes = section('god', 'Modes');
-    const godSize = section('god', 'Size');
+    const paintModes = section('paint', 'Modes');
+    const paintSize = section('paint', 'Size');
     // Without ?debug there is no Debug tab: its controls are built but never shown.
     const offPage = el('div');
     const dbgWorld = tabPanels.debug ? section('debug', 'World') : offPage;
@@ -211,7 +214,7 @@
     // The window closes itself too (its ×), so the button reads the window's state in hud().
     let graphBtn = null;
     if (onGraph) {
-      graphBtn = el('button', 'hud-bench hud-graph', 'Graph');
+      graphBtn = el('button', 'hud-control hud-graph', 'Graph');
       graphBtn.type = 'button';
       graphBtn.title = 'Population over the whole run';
       graphBtn.addEventListener('click', () => { if (!locked) onGraph(); graphBtn.blur(); });
@@ -222,7 +225,7 @@
     let miniBtn = null;
     const miniEl = document.getElementById('minimap');
     if (onMinimap) {
-      miniBtn = el('button', 'hud-bench hud-minimap', 'Minimap');
+      miniBtn = el('button', 'hud-control hud-minimap', 'Minimap');
       miniBtn.type = 'button';
       miniBtn.title = 'The whole world, with a box on what you see: click it to go there';
       miniBtn.addEventListener('click', () => { if (!locked) onMinimap(); miniBtn.blur(); });
@@ -233,7 +236,7 @@
     let linesBtn = null;
     if (onLines) {
       let linesOn = !!opts.lines;
-      linesBtn = el('button', 'hud-bench hud-lines', 'Intent lines');
+      linesBtn = el('button', 'hud-control hud-lines', 'Intent lines');
       linesBtn.type = 'button';
       linesBtn.title = 'Show every animal\'s line to what it is after (the selected animal\'s always shows)';
       linesBtn.classList.toggle('on', linesOn);
@@ -247,7 +250,7 @@
     let elevBtn = null;
     if (onElevation) {
       let elevOn = !!opts.elevation;
-      elevBtn = el('button', 'hud-bench hud-elev', 'Topo lines');
+      elevBtn = el('button', 'hud-control hud-elev', 'Topo lines');
       elevBtn.type = 'button';
       elevBtn.title = 'Show topo lines: how high the ground is';
       elevBtn.classList.toggle('on', elevOn);
@@ -286,7 +289,7 @@
       const box = el('span', 'hud-insp');
       let mode = opts.inspect || 'click';
       for (const [key, label, tip] of [['off', 'Off', 'No properties window'], ['click', 'Click', 'Click or tap something to see its properties'], ['hover', 'Hover', 'See the properties of what the mouse is over (a tap still picks on a touch screen)']]) {
-        const b = el('button', 'hud-bench hud-insp-btn', label);
+        const b = el('button', 'hud-control hud-insp-btn', label);
         b.type = 'button';
         b.title = tip;
         b.classList.toggle('on', key === mode);
@@ -307,7 +310,7 @@
     let emptyBtn = null;
     if (onInspectEmpty) {
       let on = !!opts.inspectEmpty;
-      emptyBtn = el('button', 'hud-bench hud-insp-empty', 'Inspect Empty Tiles');
+      emptyBtn = el('button', 'hud-control hud-insp-empty', 'Inspect Empty Tiles');
       emptyBtn.type = 'button';
       emptyBtn.title = 'Let a click (or hover) on bare ground show that tile: its position, elevation and ground';
       emptyBtn.classList.toggle('on', on);
@@ -322,7 +325,7 @@
     let waterBtn = null;
     if (onWater) {
       let waterOn = !!opts.water;
-      waterBtn = el('button', 'hud-bench hud-water', 'Water');
+      waterBtn = el('button', 'hud-control hud-water', 'Water');
       waterBtn.type = 'button';
       waterBtn.title = 'Starts a new world with/without lakes, rivers and thirst';
       waterBtn.classList.toggle('on', waterOn);
@@ -334,7 +337,7 @@
     }
     let benchBtn = null;
     if (onBench) {
-      benchBtn = el('button', 'hud-bench', 'Benchmark');
+      benchBtn = el('button', 'hud-control', 'Benchmark');
       benchBtn.type = 'button';
       benchBtn.title = 'Measure how large a world this device keeps smooth';
       benchBtn.addEventListener('click', () => { if (!locked) onBench(); benchBtn.blur(); });
@@ -374,8 +377,8 @@
       dbgTools.appendChild(tools);
     }
 
-    // ---- PAINT tab (key 'god') ----
-    const paint = AS.PaintTab(godModes, godSize, { onNuke, onMode, onRadius, isLocked: () => locked });
+    // ---- PAINT tab ----
+    const paint = AS.PaintTab(paintModes, paintSize, { onNuke, onMode, onRadius, isLocked: () => locked });
 
     top.append(strip, ...Object.values(tabWins));
     // The side panel starts just under the bar, whose height can change (it wraps when narrow).
@@ -493,7 +496,7 @@
     // The tab windows drag by their title bars, like the graph.
     if (AS.Draggable) {
       for (const key of Object.keys(tabWins)) {
-        AS.Draggable(tabWins[key], tabHeads[key], key === 'info' ? 'life-side-pos' : 'life-' + key + '-pos', key === 'info' ? (moved => document.body && document.body.classList.toggle('side-moved', moved)) : undefined);
+        AS.Draggable(tabWins[key], tabHeads[key], POS_KEYS[key], key === 'info' ? (moved => document.body && document.body.classList.toggle('side-moved', moved)) : undefined);
       }
     }
     const props = AS.PropertiesWindow(inspEl, { below: top, onClose: onCloseInspector });

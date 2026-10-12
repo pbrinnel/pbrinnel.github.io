@@ -1,7 +1,7 @@
 // What close-up drawing looks like: 8x8 pixel-art sprites with a walk animation, and the
 // sheet that holds every sprite pre-rendered at one tile size so the renderer can copy
-// from it (the same shape glyphs.js's GlyphSheet returns). Sprites replaced the font
-// glyphs because letters can't show which way an animal faces or that it is walking.
+// from it. Sprites replaced the font glyphs the map was first drawn with, because letters
+// can't show which way an animal faces or that it is walking.
 //
 // Bitmaps face right; a left-facing sprite is painted mirrored into its own sheet slot, so
 // the renderer never flips at draw time. Codes: x base color, d darker (shade), w lighter

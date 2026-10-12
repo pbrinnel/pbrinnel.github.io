@@ -33,7 +33,7 @@
     let mode = '';
     const modeBtns = {};
     for (const [name, label, cls, , tip] of MODES) {
-      const b = el('button', 'hud-bench ' + cls, label);
+      const b = el('button', 'hud-control ' + cls, label);
       b.type = 'button';
       b.title = label + ': ' + tip.charAt(0).toLowerCase() + tip.slice(1);
       b.setAttribute('aria-label', label);

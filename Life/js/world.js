@@ -117,7 +117,7 @@
       hSlot: new Int32Array(n).fill(-1),
       hCount: 0,
 
-      // Scorched ground, by tile: days left. A nuke sets it (god.js), the hourly grass pass counts
+      // Scorched ground, by tile: days left. A nuke sets it (paint.js), the hourly grass pass counts
       // it down (grass.js). While it is above 0 no blade may stand, seed or sprout there and no
       // hole may be dug; animals walk over it. Only a ground property, so `kind` is untouched.
       scorch: new Float32Array(n),
@@ -137,7 +137,7 @@
       elev: new Float32Array(n),
 
       // The beach: land tiles 4-adjacent to water (1 = beach), kept by addWater and setDepth. An
-      // animal drinks from one, so no blade may stand on one (addGrass refuses; grass.js, god.js
+      // animal drinks from one, so no blade may stand on one (addGrass refuses; grass.js, paint.js
       // and start.js skip them), or a lakeshore of grass would wall the animals off the water.
       beach: new Uint8Array(n),
 

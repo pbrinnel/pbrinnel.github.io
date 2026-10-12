@@ -44,10 +44,10 @@
       for (const t of info.titles) endEl.appendChild(el('div', 'end-title', t));
       endEl.appendChild(el('div', 'end-day', `Day ${info.day.toFixed(1)}`));
       const row = el('div', 'end-buttons');
-      const again = el('button', 'hud-bench', 'New world');
+      const again = el('button', 'hud-control', 'New world');
       again.type = 'button';
       again.addEventListener('click', () => info.onNew());
-      const watch = el('button', 'hud-bench', 'Keep watching');
+      const watch = el('button', 'hud-control', 'Keep watching');
       watch.type = 'button';
       watch.addEventListener('click', () => info.onContinue());
       row.appendChild(again);
@@ -68,10 +68,10 @@
       crowdEl.appendChild(el('div', 'crowd-text',
         `Over ${fmtInt(info.limit)} animals can make the sim slow down or stutter, especially on phones. Add more anyway?`));
       const row = el('div', 'end-buttons');
-      const keep = el('button', 'hud-bench crowd-keep', 'Keep adding');
+      const keep = el('button', 'hud-control crowd-keep', 'Keep adding');
       keep.type = 'button';
       keep.addEventListener('click', () => info.onKeep());
-      const stop = el('button', 'hud-bench crowd-stop', 'Stop here');
+      const stop = el('button', 'hud-control crowd-stop', 'Stop here');
       stop.type = 'button';
       stop.addEventListener('click', () => info.onStop());
       row.append(keep, stop);

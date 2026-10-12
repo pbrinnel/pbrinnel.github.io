@@ -130,11 +130,11 @@ const input = { speedIndex: 1, achieved: 1, day: 3.24, seed: 1234567, counts: { 
   close.fire('click'); assert(I.hidden && calls.includes('closed')); ok('x hides and calls onCloseInspector');
 }
 { const { ui, ids, doc, calls, tools } = build(true);
-  const bench = ids.hud.all(e => e.className === 'hud-bench')[0];
+  const bench = ids.hud.all(e => e.className === 'hud-control')[0];
   const info = ids.hud.all(e => e.className === 'hud-panel hud-panel-debug')[0];
   // The tab is labeled rows now (Overlays, World, Tools), so read every element in order.
   const names = info.all(() => true).map(c => c.className);
-  assert(names.indexOf('hud-seed') < names.indexOf('hud-bench') && names.indexOf('hud-bench') < names.indexOf('hud-tools')); ok('Debug tab: the World row (seed) before the Tools row (Benchmark, then the debug tools)');
+  assert(names.indexOf('hud-seed') < names.indexOf('hud-control') && names.indexOf('hud-control') < names.indexOf('hud-tools')); ok('Debug tab: the World row (seed) before the Tools row (Benchmark, then the debug tools)');
   bench.fire('click'); assert.deepStrictEqual(calls, ['bench']); ok('Benchmark button calls onBench');
   calls.length = 0;
   const kd = e => doc.listeners.keydown.forEach(f => f({ ctrlKey: false, metaKey: false, altKey: false, target: {}, preventDefault() {}, ...e }));
@@ -148,7 +148,7 @@ const input = { speedIndex: 1, achieved: 1, day: 3.24, seed: 1234567, counts: { 
   assert.deepStrictEqual(calls, [2, 'bench', 3]); assert.deepStrictEqual(tools, ['corpse-bunny']); assert(!bench.disabled && btns(ids).every(b => !b.disabled)); ok('lock(false) restores everything');
 }
 { const { ids } = build(false);
-  assert.strictEqual(ids.hud.all(e => e.className === 'hud-bench').length, 0); ok('Benchmark button hidden without ?debug (Paul, 12 Oct 2026)');
+  assert.strictEqual(ids.hud.all(e => e.className === 'hud-control').length, 0); ok('Benchmark button hidden without ?debug (Paul, 12 Oct 2026)');
 }
 { const { ui, ids, calls } = build(false);
   const g = ids.hud.all(e => e.className.split(' ').includes('hud-graph'))[0];
@@ -198,10 +198,10 @@ const winOf = (ids, key) => ids.hud.all(e => e.className === 'hud-tabstrip hud-w
   assert.strictEqual(ids.hud.all(e => e.className.includes('hud-hide'))[0].textContent, 'Hide UI'); ok('a Hide UI button');
 }
 { const { ui, ids } = build(true, { onLines() {} });
-  assert.strictEqual(ui.windows.join(','), 'info'); assert(!winOf(ids, 'info').hidden && winOf(ids, 'debug').hidden && winOf(ids, 'god').hidden); ok('Info is open by default, alone');
+  assert.strictEqual(ui.windows.join(','), 'info'); assert(!winOf(ids, 'info').hidden && winOf(ids, 'debug').hidden && winOf(ids, 'paint').hidden); ok('Info is open by default, alone');
   assert(panelOf(ids, 'info').textContent.includes('Graph') && panelOf(ids, 'info').all(e => e.className === "hud-glyph").length === 6); ok('Info holds the six counts (humans and the Total included) and the Graph button');
   assert(panelOf(ids, 'info').all(e => e.className.includes('hud-lines')).length === 1 && panelOf(ids, 'debug').textContent.includes('Benchmark') && panelOf(ids, 'debug').textContent.includes('Seed')); ok('Info holds Intent lines; Debug holds Benchmark and the Seed');
-  assert(panelOf(ids, 'god').textContent.includes('NUKE MODE')); ok('PAINT holds NUKE MODE');
+  assert(panelOf(ids, 'paint').textContent.includes('NUKE MODE')); ok('PAINT holds NUKE MODE');
 }
 { const seen = [];
   const { ui, ids } = build(true, { windows: [], onWindows: k => seen.push(k.join(',')) });
@@ -209,13 +209,13 @@ const winOf = (ids, key) => ids.hud.all(e => e.className === 'hud-tabstrip hud-w
   tabBtn(ids, 'Debug').fire('click');
   assert(!winOf(ids, 'debug').hidden && winOf(ids, 'info').hidden && tabBtn(ids, 'Debug').classList.contains('on')); ok('a tab button opens its own window');
   tabBtn(ids, 'PAINT').fire('click');
-  assert(!winOf(ids, 'debug').hidden && !winOf(ids, 'god').hidden && tabBtn(ids, 'Debug').classList.contains('on') && tabBtn(ids, 'PAINT').classList.contains('on')); ok('another opens beside it: both stay open');
+  assert(!winOf(ids, 'debug').hidden && !winOf(ids, 'paint').hidden && tabBtn(ids, 'Debug').classList.contains('on') && tabBtn(ids, 'PAINT').classList.contains('on')); ok('another opens beside it: both stay open');
   tabBtn(ids, 'PAINT').fire('click');
-  assert(winOf(ids, 'god').hidden && !winOf(ids, 'debug').hidden && !tabBtn(ids, 'PAINT').classList.contains('on')); ok('clicking an open one closes just that window');
-  assert.deepStrictEqual(seen, ['debug', 'debug,god', 'debug']); ok('onWindows reports the open ones after each change (for remembering them)');
+  assert(winOf(ids, 'paint').hidden && !winOf(ids, 'debug').hidden && !tabBtn(ids, 'PAINT').classList.contains('on')); ok('clicking an open one closes just that window');
+  assert.deepStrictEqual(seen, ['debug', 'debug,paint', 'debug']); ok('onWindows reports the open ones after each change (for remembering them)');
 }
-{ const { ui, ids } = build(false, { windows: ['god', 'info'] });
-  assert(!winOf(ids, 'god').hidden && !winOf(ids, 'info').hidden && ui.windows.length === 2); ok('remembered windows open at load');
+{ const { ui, ids } = build(false, { windows: ['paint', 'info'] });
+  assert(!winOf(ids, 'paint').hidden && !winOf(ids, 'info').hidden && ui.windows.length === 2); ok('remembered windows open at load');
   const { ui: u2 } = build(false, { windows: ['nonsense', 'debug'] }); assert.strictEqual(u2.windows.length, 0); ok('an unknown remembered window (or Debug without ?debug) stays shut');
 }
 { const { ui, ids, doc, body } = build(false);
@@ -243,10 +243,10 @@ const winOf = (ids, key) => ids.hud.all(e => e.className === 'hud-tabstrip hud-w
 }
 { const modes = [], nukes = [];
   const { ui, ids, body } = build(false, { onMode: m => modes.push(m), onNuke: on => nukes.push(on) });
-  const by = label => ids.hud.all(e => e.textContent === label && e.tagName === 'button' || e.textContent === label && e.className.includes('hud-bench'))[0];
+  const by = label => ids.hud.all(e => e.textContent === label && e.tagName === 'button' || e.textContent === label && e.className.includes('hud-control'))[0];
   const names = ['NUKE MODE', 'GRASS MODE', 'RABBIT MODE', 'WOLF MODE', 'HUMAN MODE'], b = names.map(by);
   assert(b.every(Boolean)); ok('the five God modes exist as buttons');
-  assert(ids.hud.all(e => e.textContent === 'WOLF MODE').length >= 1 && panelOf(ids, 'god').textContent.includes('RABBIT MODE')); ok('they sit in the God tab');
+  assert(ids.hud.all(e => e.textContent === 'WOLF MODE').length >= 1 && panelOf(ids, 'paint').textContent.includes('RABBIT MODE')); ok('they sit in the PAINT tab');
   b[1].fire('click');
   assert(ui.mode === 'grass' && b[1].classList.contains('on') && body.classList.contains('paint-armed') && !body.classList.contains('nuke-armed')); ok('GRASS MODE arms: highlighted, crosshair class');
   b[0].fire('click');
@@ -277,7 +277,7 @@ const winOf = (ids, key) => ids.hud.all(e => e.className === 'hud-tabstrip hud-w
 // ---- the Radius slider: per-mode memory, defaults, keeping, the benchmark lock ----
 { const { ui, ids } = build(false);
   const slider = ids.hud.all(e => e.className === 'hud-radius-input')[0], label = ids.hud.all(e => e.className === 'hud-radius-label')[0];
-  const by = l => ids.hud.all(e => e.textContent === l && e.className.includes('hud-bench'))[0];
+  const by = l => ids.hud.all(e => e.textContent === l && e.className.includes('hud-control'))[0];
   assert(slider && slider.disabled && label.textContent === 'Radius –'); ok('the Radius slider is off until a mode is armed');
   const MAXR = 75;
   ui.setRadiusDefaults(75, 0);

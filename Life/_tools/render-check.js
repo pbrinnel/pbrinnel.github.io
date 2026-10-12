@@ -1,4 +1,4 @@
-// Node check of glyphs.js (no DOM): ids, colors, glyphFor, animalGlyph, stageOf.
+// Node check of glyphs.js (no DOM): ids, colors, grassGlyph, animalGlyph, stageOf; and render.js's pure parts.
 'use strict';
 const { load } = require('./harness.js');
 const { AS, texts, ctx } = load({}, ['sprites', 'render']);
@@ -10,9 +10,8 @@ const GLYPHS = 4 + 6 * AS.SPECIES_COUNT;   // three grass thirds, the corpse, th
 check(ids.length === GLYPHS, `${GLYPHS} glyph ids, got ${ids.length}`);
 check(new Set(ids.map(e => e[1])).size === GLYPHS, 'ids distinct');
 for (const [name, id] of ids) {
-  check(Number.isInteger(id) && id >= 0 && id < AS.CELL_COLOR.length, `${name} id range`);
+  check(Number.isInteger(id) && id >= 0 && id < AS.GLYPH_COUNT, `${name} id range`);
   check(/^#[0-9a-f]{6}$/.test(AS.COLORS[id]), `${name} has COLORS entry`);
-  check(AS.CELL_COLOR[id] >>> 24 === 255, `${name} has CELL_COLOR`);
 }
 const seen = new Set();
 for (let sp = 0; sp < AS.SPECIES_COUNT; sp++) for (const sx of [0, 1]) for (const st of [0, 1, 2]) {
@@ -26,20 +25,10 @@ check(AS.animalGlyph(1, 1, 2) === AS.GLYPH.WOLF_FEMALE_ELDER, 'WOLF_FEMALE_ELDER
 check(AS.COLORS[AS.GLYPH.BUNNY_MALE_BABY] === AS.COLORS[AS.GLYPH.BUNNY_MALE_ADULT], 'baby color = adult');
 check(AS.COLORS[AS.GLYPH.WOLF_MALE_ELDER] !== AS.COLORS[AS.GLYPH.WOLF_MALE_ADULT], 'elder dimmer');
 
-// glyphFor on a real world
+// grassGlyph: a blade's third by its Size
 const { T } = AS.parseTables(texts);
-const sim = AS.Sim(T, 1), W = sim.W;
-const empties = [];
-for (let t = 0; t < W.n && empties.length < 8; t++) if (W.kind[t] === AS.KIND.EMPTY) empties.push(t);
 const cases = [[0, 'GRASS_0'], [0.34, 'GRASS_1'], [0.5, 'GRASS_1'], [0.67, 'GRASS_2'], [1.0, 'GRASS_2'], [1 / 3, 'GRASS_1'], [0.3333, 'GRASS_0']];
-empties.slice(0, cases.length).forEach((t, i) => {
-  W.addGrass(t, cases[i][0], 0);
-  check(AS.glyphFor(sim, t) === AS.GLYPH[cases[i][1]], `size ${cases[i][0]} -> ${cases[i][1]}`);
-});
-const ec = empties[cases.length];
-check(ec === undefined || AS.glyphFor(sim, ec) === -1, 'empty -> -1');
-const e0 = empties[7];
-if (e0 !== undefined) { W.addCorpse(e0, AS.SPECIES.WOLF); check(AS.glyphFor(sim, e0) === AS.GLYPH.CORPSE, 'corpse'); }
+for (const [size, name] of cases) check(AS.grassGlyph(size) === AS.GLYPH[name], `size ${size} -> ${name}`);
 check(!AS.GLYPH_NAMES.includes(undefined) && AS.GLYPH_NAMES.length === GLYPHS, 'names');
 
 // stageOf
