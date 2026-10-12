@@ -89,6 +89,7 @@
     // benchmark, which needs evenly spread load), scatters everything evenly at random.
     const layout = opts.layout || T.world.StartLayout;
     if (layout === 'Meadows' || layout === 'meadows') { AS.startMeadows(sim, opts); return; }
+    AS.layTerrain(sim, false);   // the ground's height; Scatter has no water
     const order = new Int32Array(W.n);
     for (let i = 0; i < W.n; i++) order[i] = i;
     let k = 0;

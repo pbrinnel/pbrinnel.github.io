@@ -1,7 +1,8 @@
 'use strict';
-// Lakes and rivers (world.js KIND.WATER, start.js layWater): water is impassable ground that holds
-// nothing, never blocks sight, survives a nuke, and grass grows and seeds faster along it;
-// the land is always one connected piece; Scatter has no lakes.
+// The ground and its water (terrain.js; world.js KIND.WATER): every world has an elevation;
+// water settles in its low places and runs down it, more with more Rain; water is impassable
+// ground that holds nothing, never blocks sight, survives a nuke, and grass grows and seeds
+// faster along it; the land is always one connected piece; Scatter has no water.
 const { load, audit, editCSV, failures } = require('./harness.js');
 let bad = 0;
 function ok(c, m) { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) bad++; }
@@ -9,7 +10,7 @@ function ok(c, m) { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) bad++; }
 // A world from the real tables with some cells changed: [[file, row, col, value]...].
 function make(seed, edits = []) {
   const { AS, texts } = load();
-  texts.settings = editCSV(texts.settings, 'Water', 'Value', 'on');   // the shipped default is off; these are the water checks
+  texts.settings = editCSV(texts.settings, 'Water', 'Value', 'on');   // these are the water checks, whatever the shipped default
   for (const [file, row, col, v] of edits) texts[file] = editCSV(texts[file], row, col, v);
   const { T, errors } = AS.parseTables(texts);
   if (errors.length) { console.log(errors.join('\n')); process.exit(1); }
@@ -42,56 +43,77 @@ function landPieces(AS, W) {
   ok(AS.TICK_HZ * AS.DAY_SECONDS === DAY, 'a day is the length this check assumes');
 }
 
-// ---- Meadows: lakes exist, the land is one piece, lakes keep off the wall ----
+// ---- Meadows: the ground has height, water sits low on it, the land is one piece ----
 {
-  let seedsWithLakes = 0, worst = 0, nearWall = 0, total = 40, someWater = 0;
+  let withWater = 0, worst = 0, lowWater = 0, inRelief = 0, total = 20, someWater = 0;
   for (let seed = 1; seed <= total; seed++) {
-    // Lakes keep off the wall; a river starts on it, so the wall test is on lakes alone.
-    const { AS, W, T } = make(seed, [set('Rivers', 0)]);
+    const { AS, W, T, sim } = make(seed);
     const { pieces, water } = landPieces(AS, W);
     worst = Math.max(worst, pieces);
-    if (water > 0) seedsWithLakes++;
+    if (water > 0) withWater++;
     someWater += water;
+    let lo = Infinity, hi = -Infinity, wSum = 0, lSum = 0, lN = 0;
     for (let t = 0; t < W.n; t++) {
-      if (W.kind[t] !== AS.KIND.WATER) continue;
-      const x = t % W.w, y = (t / W.w) | 0;
-      if (x < 3 || y < 3 || x >= W.w - 3 || y >= W.h - 3) nearWall++;
+      const e = W.elev[t];
+      lo = Math.min(lo, e); hi = Math.max(hi, e);
+      if (W.kind[t] === AS.KIND.WATER) wSum += e; else { lSum += e; lN++; }
     }
-    if (seed === 1) ok(T.world.Lakes > 0, 'the default tables ask for lakes');
+    // Relief is drawn per world from its span (AS.terrainOf), so the top is that world's own.
+    const R = sim.terrain.Relief, span = T.world.Relief;
+    if (lo === 0 && Math.abs(hi - R) < 1e-3 && R >= span.min && R <= span.max) inRelief++;
+    if (water > 0 && wSum / water < lSum / lN) lowWater++;
   }
+  ok(inRelief === total, `${total} seeds: the ground runs from 0 to the world's own Relief, drawn from the setting's range`);
   ok(worst === 1, `${total} seeds: every land tile is reachable from every other (most pieces seen: ${worst})`);
-  ok(seedsWithLakes === total, `${total} seeds: every one has lakes (${(someWater / total) | 0} water tiles on average)`);
-  ok(nearWall === 0, 'no lake touches the wall');
+  ok(withWater === total, `${total} seeds: every one has water (${(someWater / total) | 0} water tiles on average)`);
+  ok(lowWater === total, 'water sits on low ground: in every seed it is lower on average than the land');
 }
 
-// ---- A stress world: many big lakes in a small map still leave the land connected ----
+// ---- Each world draws its own terrain values, the same for the same seed ----
+{
+  const a = make(21), b = make(21), c = make(22);
+  const keys = ['Relief', 'Hilliness', 'Roughness', 'Bowls', 'LakeDepth', 'Rain', 'RiverDrain'];
+  const same = keys.every(k => a.sim.terrain[k] === b.sim.terrain[k]);
+  const differ = keys.some(k => a.sim.terrain[k] !== c.sim.terrain[k]);
+  const inside = keys.every(k => a.sim.terrain[k] >= a.T.world[k].min && a.sim.terrain[k] <= a.T.world[k].max);
+  ok(same && differ && inside, 'terrain values: inside each range, the same for a seed, different for another');
+}
+
+// ---- More rain, more water ----
+{
+  const dry = make(5, [set('Rain', '30%'), set('RiverDrain', 0)]), wet = make(5, [set('Rain', '80%'), set('RiverDrain', 0)]);
+  const d = landPieces(dry.AS, dry.W).water, w = landPieces(wet.AS, wet.W).water;
+  ok(w > d && d > 0, `the same ground holds more lake with more Rain (${d} tiles at 30%, ${w} at 80%)`);
+}
+
+// ---- A stress world: many deep bowls, lots of rain, a small map: the land stays connected ----
 {
   let worst = 0, filled = 0, runs = 0;
   for (let seed = 1; seed <= 25; seed++) {
-    const { AS, W } = make(seed, [set('WorldWidth', 120), set('WorldHeight', 90), set('Lakes', 14), set('LakeSize', 24), set('StartBunnies', 20), set('StartWolves', 6)]);
+    const { AS, W } = make(seed, [set('WorldWidth', 120), set('WorldHeight', 90), set('Bowls', 14), set('Rain', '95%'), set('LakeDepth', 0), set('RiverDrain', 150), set('StartBunnies', 20), set('StartWolves', 6)]);
     const { pieces, water } = landPieces(AS, W);
     worst = Math.max(worst, pieces); filled += water > 0 ? 1 : 0; runs++;
   }
-  ok(worst === 1 && filled > 0, `crowded worlds (${runs} seeds, big lakes, small map): land stays one piece`);
+  ok(worst === 1 && filled > 0, `crowded worlds (${runs} seeds, full bowls and many rivers, small map): land stays one piece`);
 }
 
-// ---- Lakes = 0, and Scatter, have none ----
+// ---- Rain 0% and RiverDrain 0, and Scatter, have no water (but still have ground) ----
 {
-  const a = make(3, [set('Lakes', 0), set('Rivers', 0)]);
-  ok(landPieces(a.AS, a.W).water === 0 && a.W.shore.every(v => v === 1), 'Lakes 0: no water and no shore boost');
+  const a = make(3, [set('Rain', '0%'), set('RiverDrain', 0)]);
+  ok(landPieces(a.AS, a.W).water === 0 && a.W.shore.every(v => v === 1), 'Rain 0% and RiverDrain 0: no water and no shore boost');
   const b = make(3, [set('StartLayout', 'Scatter')]);
-  ok(landPieces(b.AS, b.W).water === 0 && b.W.shore.every(v => v === 1), 'Scatter: no lakes');
+  ok(landPieces(b.AS, b.W).water === 0 && b.W.shore.every(v => v === 1) && b.W.elev.some(e => e > 0), 'Scatter: no water, but the ground has height');
 }
 
-// ---- Same seed, same lakes ----
+// ---- Same seed, same ground and water ----
 {
   const a = make(9), b = make(9), c = make(10);
   let same = true, other = false;
   for (let t = 0; t < a.W.n; t++) {
-    if (a.W.kind[t] !== b.W.kind[t]) same = false;
+    if (a.W.kind[t] !== b.W.kind[t] || a.W.elev[t] !== b.W.elev[t]) same = false;
     if ((a.W.kind[t] === a.K.WATER) !== (c.W.kind[t] === c.K.WATER)) other = true;
   }
-  ok(same && other, 'the same seed lays the same lakes; another seed lays others');
+  ok(same && other, 'the same seed makes the same ground and water; another seed makes others');
 }
 
 // ---- Several days of a Meadows world: nothing ever stands on water, and the audit holds ----
@@ -126,56 +148,56 @@ function landPieces(AS, W) {
   ok(onWater === 0, `no animal ever stood on water (${nearWater} sightings were on a lakeshore)`);
 }
 
-// ---- Rivers: they exist, are the width asked, have fords, and the land stays whole ----
+// ---- Rivers: they exist, are narrow, have fords, and the land stays whole ----
 {
-  const seeds = 30;
-  let worst = 0, withRiver = 0, narrow = 0, sampled = 0, fords = 0, rivers = 0;
+  const seeds = 20;
+  let worst = 0, withRiver = 0, wide = 0, sampled = 0, fords = 0;
   for (let seed = 1; seed <= seeds; seed++) {
     // Rivers alone (no lakes), so every water tile is river.
-    const { AS, W, T } = make(seed, [set('Lakes', 0), set('Rivers', 3), set('RiverWidth', '2-3'), set('BridgeEvery', 25), set('StartBunnies', 0), set('StartWolves', 0)]);
+    const { AS, W } = make(seed, [set('Rain', '0%'), set('RiverDrain', 800), set('BridgeEvery', 25), set('StartBunnies', 0), set('StartWolves', 0)]);
     const { pieces, water } = landPieces(AS, W);
     worst = Math.max(worst, pieces);
     if (water > 0) withRiver++;
-    // A ford shows as a row or column crossing the river's course where water is missing for
-    // a few tiles; the cheapest sign of one is that the land is whole although rivers run
-    // from wall to wall (a 450 wide river from edge to edge would split it otherwise).
-    rivers += T.world.Rivers;
-    // Width: no water tile may be farther from land than half the widest river.
-    for (let t = 0; t < W.n; t += 7) {
+    // Width: a river is one or two tiles across, so no water tile has a 3-tile run both across and down.
+    for (let t = 0; t < W.n; t += 3) {
       if (W.kind[t] !== AS.KIND.WATER) continue;
       sampled++;
       let d = 0, e = 0; const x0 = W.tx(t), y0 = W.ty(t);
-      for (; d < 6; d++) if (!W.inside(x0 + d, y0) || W.kind[W.tile(x0 + d, y0)] !== AS.KIND.WATER) break;
-      for (; e < 6; e++) if (!W.inside(x0, y0 + e) || W.kind[W.tile(x0, y0 + e)] !== AS.KIND.WATER) break;
-      if (d >= 6 && e >= 6) narrow++;
+      for (; d < 4; d++) if (!W.inside(x0 + d, y0) || W.kind[W.tile(x0 + d, y0)] !== AS.KIND.WATER) break;
+      for (; e < 4; e++) if (!W.inside(x0, y0 + e) || W.kind[W.tile(x0, y0 + e)] !== AS.KIND.WATER) break;
+      if (d >= 4 && e >= 4) wide++;
     }
-    // Fords: along the river rows, water runs are broken. Count land gaps between water on the
-    // same row near the river's path: any water row with a land tile between two water tiles.
-    let gaps = 0;
-    for (let y = 0; y < W.h; y += 3) for (let x = 1; x < W.w - 1; x++) {
-      const t = W.tile(x, y);
-      if (W.kind[t] !== AS.KIND.WATER && W.kind[t - 1] === AS.KIND.WATER) { let k = x; while (k < W.w && W.kind[W.tile(k, y)] !== AS.KIND.WATER && k - x < 5) k++; if (k < W.w && W.kind[W.tile(k, y)] === AS.KIND.WATER) gaps++; }
+    // Fords: a river tile's course is broken by a few tiles of land. Count land tiles with
+    // water on both sides along a row or a column, within a few tiles.
+    for (let t = 0; t < W.n; t++) {
+      if (W.kind[t] === AS.KIND.WATER) continue;
+      const x = W.tx(t), y = W.ty(t);
+      for (const [dx, dy] of [[1, 0], [0, 1]]) {
+        let a = 0, b = 0;
+        for (let k = 1; k <= 3 && !a; k++) if (W.inside(x - dx * k, y - dy * k) && W.kind[W.tile(x - dx * k, y - dy * k)] === AS.KIND.WATER) a = 1;
+        for (let k = 1; k <= 3 && !b; k++) if (W.inside(x + dx * k, y + dy * k) && W.kind[W.tile(x + dx * k, y + dy * k)] === AS.KIND.WATER) b = 1;
+        if (a && b) { fords++; break; }
+      }
     }
-    fords += gaps;
   }
-  ok(withRiver === seeds, `${seeds} seeds: every default-ish world has river water`);
+  ok(withRiver === seeds, `${seeds} seeds: every world has river water`);
   ok(worst === 1, `${seeds} seeds with rivers: the land stays one piece (most pieces ${worst})`);
-  // Crossings of two rivers and a filled-in pocket can be broader, so allow a sliver.
-  ok(narrow < sampled * 0.02, `rivers are narrow: ${narrow} of ${sampled} sampled water tiles have six tiles of water both across and down`);
-  ok(fords > 0, `rivers are broken into fords (${fords} land gaps between water along rows)`);
-  // Default world (lakes and rivers together) over more seeds.
+  // Where two rivers join the water can be broader, so allow a sliver.
+  ok(wide < sampled * 0.02, `rivers are narrow: ${wide} of ${sampled} sampled river tiles have four tiles of water both across and down`);
+  ok(fords > 0, `rivers are broken by fords (${fords} land tiles with river close on both sides)`);
+  // The default world over more seeds.
   let bad = 0;
   for (let seed = 100; seed < 130; seed++) { const m = make(seed); if (landPieces(m.AS, m.W).pieces !== 1) bad++; }
-  ok(bad === 0, 'the default world (12 lakes, 3 rivers): land is one piece over 30 more seeds');
-  // A river wider than the map's room, in a small map, still leaves the land whole or is dropped.
+  ok(bad === 0, 'the default world: land is one piece over 30 more seeds');
+  // Many rivers with close fords in a small map still leave the land whole.
   let worstSmall = 0;
   for (let seed = 1; seed <= 20; seed++) {
-    const m = make(seed, [set('WorldWidth', 100), set('WorldHeight', 70), set('Rivers', 5), set('RiverWidth', 4), set('BridgeEvery', 12), set('StartBunnies', 10), set('StartWolves', 3)]);
+    const m = make(seed, [set('WorldWidth', 100), set('WorldHeight', 70), set('RiverDrain', 60), set('BridgeEvery', 12), set('StartBunnies', 10), set('StartWolves', 3)]);
     worstSmall = Math.max(worstSmall, landPieces(m.AS, m.W).pieces);
   }
   ok(worstSmall === 1, `crowded rivers in a small map: land stays one piece (${worstSmall})`);
   // A river counts as water for shore and beach.
-  const m = make(2, [set('Lakes', 0), set('Rivers', 2)]);
+  const m = make(2, [set('Rain', '0%'), set('RiverDrain', 800)]);
   let wet = 0, beachBad = 0;
   for (let t = 0; t < m.W.n; t++) if (m.W.kind[t] === m.AS.KIND.WATER) wet++;
   for (let t = 0; t < m.W.n; t++) {
@@ -250,7 +272,7 @@ function landPieces(AS, W) {
 // ---- Sight crosses water, and paths go around it ----
 {
   // A bare 40 x 20 world with a wall of water at x = 20 except a gap at the bottom.
-  const { AS, sim, W, K } = make(1, [set('WorldWidth', 40), set('WorldHeight', 20), set('StartGrass', 0), set('StartBunnies', 0), set('StartWolves', 0), set('Lakes', 0), set('Rivers', 0)]);
+  const { AS, sim, W, K } = make(1, [set('WorldWidth', 40), set('WorldHeight', 20), set('StartGrass', 0), set('StartBunnies', 0), set('StartWolves', 0), set('Rain', '0%'), set('RiverDrain', 0)]);
   for (let y = 0; y < 15; y++) W.addWater(W.tile(20, y));
   const a = W.tile(12, 5), b = W.tile(28, 5);
   ok(AS.lineOfSight(W, a, b) && AS.lineOfSight(W, b, a), 'line of sight crosses water, both ways');
@@ -299,7 +321,7 @@ function landPieces(AS, W) {
   // A bare 120 x 70 world: water in the top rows, so rows within WaterRadius of it are shore
   // and rows far below are not. WaterRadius is raised to give both regions room.
   const R = 25;
-  const edits = [set('WorldWidth', 120), set('WorldHeight', 70), set('StartGrass', 0), set('StartBunnies', 0), set('StartWolves', 0), set('Lakes', 0), set('Rivers', 0),
+  const edits = [set('WorldWidth', 120), set('WorldHeight', 70), set('StartGrass', 0), set('StartBunnies', 0), set('StartWolves', 0), set('Rain', '0%'), set('RiverDrain', 0),
     ['species', 'WaterBoost', 'Grass', '2'],   // pinned: the shipped value may be 1 (no boost), but the rule is tested at 2
     ['species', 'WaterRadius', 'Grass', String(R)], ['species', 'SproutChance', 'Grass', '0%'], ['species', 'SeedChance', 'Grass', '10%']];
   const build = extra => {

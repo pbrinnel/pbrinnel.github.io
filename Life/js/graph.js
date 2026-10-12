@@ -1,5 +1,5 @@
 // The population graph: grass, bunnies, wolves and humans over the whole run on one logarithmic
-// chart, in a floating window the Info tab's Graph button shows and hides. Drag it by its
+// chart, in a floating window the Show/Hide tab's Graph button shows and hides. Drag it by its
 // title bar (mouse or touch); it stays inside the viewport and its place is remembered. Its
 // +/− button switches it between big and small (style.css, .graph-small), remembered too.
 //

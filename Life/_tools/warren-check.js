@@ -27,8 +27,8 @@ function make(size, edit, layout = 'Scatter') {
   s = editCSV(s, 'WorldHeight', 'Value', String(size));
   s = editCSV(s, 'StartGrass', 'Value', '0%');
   s = editCSV(s, 'StartBunnies', 'Value', '0');
-  s = editCSV(s, 'Lakes', 'Value', '0');   // these hand-place things on tiles; water is water-check.js's and thirst-check.js's
-  s = editCSV(s, 'Rivers', 'Value', '0');
+  s = editCSV(s, 'Rain', 'Value', '0%');   // these hand-place things on tiles; water is water-check.js's and thirst-check.js's
+  s = editCSV(s, 'RiverDrain', 'Value', '0');
   s = editCSV(s, 'StartWolves', 'Value', '0');
   s = editCSV(s, 'StartLayout', 'Value', layout);
   texts.settings = s;
@@ -327,7 +327,7 @@ const dig = (tx, extra) => {
 {
   // The colonies' own holes sit by the colony: each colony center has HolesPerColony within a few spreads.
   const { AS, texts } = loadAS();
-  const dry = x => editCSV(editCSV(x, 'Lakes', 'Value', '0'), 'Rivers', 'Value', '0');   // startMeadows is run twice on one world here: no water to lay twice
+  const dry = x => editCSV(editCSV(x, 'Rain', 'Value', '0%'), 'RiverDrain', 'Value', '0');   // startMeadows is run twice on one world here: no water to lay twice
   const t0 = { ...texts };
   t0.settings = dry(editCSV(editCSV(editCSV(t0.settings, 'StartBunnies', 'Value', '0'), 'StartWolves', 'Value', '0'), 'StartGrass', 'Value', '0%'));
   const t1 = { ...texts };

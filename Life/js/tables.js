@@ -115,10 +115,15 @@
     ['StartGrassAge', 'num'],
     ['StartLayout', 'layout'],
     ['Water', 'onoff'],
-    ['Lakes', 'count'],
-    ['LakeSize', 'pos'],
-    ['Rivers', 'count'],
-    ['RiverWidth', 'range'],
+    // Spans: one value, or a range ("70-160", "0.4-0.6", "40%-70%") each world draws its
+    // own value from, by its seed (terrain.js), so every world is different under the same rules.
+    ['Relief', 'span', 'pos'],
+    ['Hilliness', 'span', 'pos'],
+    ['Roughness', 'span', 'unit'],
+    ['Bowls', 'span', 'count'],
+    ['LakeDepth', 'span', 'num'],
+    ['Rain', 'span', 'frac'],
+    ['RiverDrain', 'span', 'num'],
     ['BridgeEvery', 'pos'],
     ['MeadowSize', 'pos'],
     ['BunnyColonies', 'count'],
@@ -309,11 +314,29 @@
       by.set(r.Setting, r);
     }
     const out = {};
-    for (const [name, type] of SETTINGS_SCHEMA) {
+    for (const [name, type, base] of SETTINGS_SCHEMA) {
       const r = by.get(name);
       if (!r) { errors.push(`settings.csv has no "${name}" row.${didYouMean(name, by.keys())}`); continue; }
       const raw = r.Value.replace(DASHES, '-').trim();
       const where = `settings.csv, ${name}`;
+      if (type === 'span') {
+        const m = raw.match(/^([^-]+?)\s*(?:-\s*([^-]+))?$/);
+        if (!m) { errors.push(`${where}: "${raw}" should be a value or a range like 2-4.`); continue; }
+        const ends = [];
+        for (const part of [m[1], m[2] === undefined ? m[1] : m[2]]) {
+          const c = convert(part, base === 'frac' ? 'frac' : 'num', '');
+          if (c.error) { errors.push(`${where}: ${c.error}.`); break; }
+          const v = c.value;
+          if (base === 'count' && !Number.isInteger(v)) { errors.push(`${where}: "${part}" should be a whole number.`); break; }
+          if (base === 'pos' && v === 0) { errors.push(`${where}: must be more than 0.`); break; }
+          if (base === 'unit' && v > 1) { errors.push(`${where}: "${part}" should be from 0 to 1.`); break; }
+          ends.push(v);
+        }
+        if (ends.length < 2) continue;
+        if (ends[0] > ends[1]) { errors.push(`${where}: range "${raw}" runs backwards.`); continue; }
+        out[name] = Object.freeze({ min: ends[0], max: ends[1] });
+        continue;
+      }
       if (type === 'seed') {
         if (raw === '') { out[name] = null; continue; }
         const n = toNumber(raw);

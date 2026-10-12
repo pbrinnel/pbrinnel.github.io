@@ -28,7 +28,7 @@ function make(w, h, o = {}) {
   const { AS, texts } = loadAS();
   let s = editCSV(texts.settings, 'WorldWidth', 'Value', String(w));
   s = editCSV(s, 'WorldHeight', 'Value', String(h));
-  for (const [k, v] of [['StartGrass', '0%'], ['StartBunnies', '0'], ['StartWolves', '0'], ['Lakes', '0'], ['Rivers', '0'], ['Water', o.water || 'on']]) s = editCSV(s, k, 'Value', v);
+  for (const [k, v] of [['StartGrass', '0%'], ['StartBunnies', '0'], ['StartWolves', '0'], ['Rain', '0%'], ['RiverDrain', '0'], ['Water', o.water || 'on']]) s = editCSV(s, k, 'Value', v);
   texts.settings = s;
   if (!o.hunger) for (const sp of ['Bunny', 'Wolf', 'Human']) texts.species = editCSV(texts.species, 'HungerRate', sp, '0');
   texts.species = editCSV(texts.species, 'SeedChance', 'Grass', '0%');
@@ -201,7 +201,7 @@ for (const [sp, name] of [[0, 'bunny'], [1, 'wolf'], [2, 'human']]) {
     tick(sim, secs(AS, 30));
     ok(W.aWater[s] === T.bunny.WaterMax && W.aWater[w] === T.wolf.WaterMax && W.waterCount === 0, `${label}: nothing is thirsty, the meter stays full`);
   }
-  // A Meadows world with Water off is the same world as Lakes 0 / Rivers 0.
+  // A Meadows world with Water off is the same world as Rain 0% / RiverDrain 0.
   const sig = sim => {
     const W = sim.W; let h = 0;
     for (let t = 0; t < W.n; t++) h = (h * 31 + W.kind[t] + (W.hole[t] ? 7 : 0)) >>> 0;
@@ -216,11 +216,11 @@ for (const [sp, name] of [[0, 'bunny'], [1, 'wolf'], [2, 'human']]) {
     const { T, errors } = AS.parseTables(texts); if (errors.length) throw new Error(errors.join('\n'));
     return { AS, T };
   };
-  const off = build([['settings', 'Water', 'Value', 'off']]), dry = build([['settings', 'Water', 'Value', 'on'], ['settings', 'Lakes', 'Value', '0'], ['settings', 'Rivers', 'Value', '0']]);
+  const off = build([['settings', 'Water', 'Value', 'off']]), dry = build([['settings', 'Water', 'Value', 'on'], ['settings', 'Rain', 'Value', '0%'], ['settings', 'RiverDrain', 'Value', '0']]);
   const a = off.AS.Sim(off.T, 4), b = dry.AS.Sim(dry.T, 4);
   const toggled = off.AS.Sim(off.T, 4, { water: true }), toggledOff = dry.AS.Sim(dry.T, 4, { water: false });
   for (let i = 0; i < 4 * 600; i++) { a.tick(); b.tick(); toggledOff.tick(); }
-  ok(sig(a) === sig(b) && sig(b) === sig(toggledOff) && a.W.waterCount === 0, `Water off is byte-for-byte the Lakes 0 / Rivers 0 world after 4 days (${sig(a)})`);
+  ok(sig(a) === sig(b) && sig(b) === sig(toggledOff) && a.W.waterCount === 0, `Water off is byte-for-byte the Rain 0% / RiverDrain 0 world after 4 days (${sig(a)})`);
   ok(toggled.W.waterCount > 0 && sig(toggled) !== sig(off.AS.Sim(off.T, 4)), 'the Sim option water: true lays water over a table that says off');
 }
 

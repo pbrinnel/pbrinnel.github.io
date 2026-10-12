@@ -3,7 +3,7 @@
 // ui.js, main.js and render.js.
 //
 // AS.nuke(sim, tile, radius) → { tiles, animals, blades, corpses, holes }
-//   Destroys everything within `radius` tiles (a circle; the God tab's Radius slider, whose
+//   Destroys everything within `radius` tiles (a circle; the Create/Destroy tab's Radius slider, whose
 //   default is NukeRadius in settings.csv; 0 = just that tile) of `tile`: animals
 //   vanish with no corpse and no DEATH event (nothing is left to act out), blades, corpses
 //   and warren holes go, and the ground is scorched (W.scorch, days left): ScorchDays at the

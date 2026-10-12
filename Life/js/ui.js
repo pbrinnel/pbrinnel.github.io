@@ -5,8 +5,10 @@
 // closes it again, and one tab is open at a time. Hide UI hides the bar, strip, graph window
 // and inspector (CSS, `ui-off` on <body>) and leaves a faint button in the corner.
 //
-// AS.UI({ debug, speeds, onSpeed(i), onDebugTool(mode), onBench(), onGraph(),
+// AS.UI({ debug, speeds, onSpeed(i), onDebugTool(mode), onBench(), onGraph(), onMinimap(),
 //         lines (initial on/off), onLines(on), water (initial on/off), onWater(on),
+//         elevation (initial on/off), onElevation(on): the topo lines,
+//         inspect ('off' | 'click' | 'hover'), onInspect(mode): the properties window,
 //         tab (initial: 'info' | 'debug' | 'god' | null for closed; default 'info'), onTab(name | null),
 //         onNuke(on), onLocate(key, on): a count's ring toggle ('bunnies', 'wolves', 'humans', 'blades', 'corpses') }) → ui
 //   ui.hud({ speedIndex, achieved, day, seed, humansSeen, counts: { bunnies, wolves, humans, total, blades, corpses } })
@@ -14,7 +16,7 @@
 //   ui.tab, ui.setTab(name | null)   the open tab
 //   ui.hidden, ui.setHidden(on)      Hide UI (the H key toggles it; never remembered across loads)
 //   ui.nuke, ui.setNuke(on)          NUKE MODE armed (main.js reads it through onNuke)
-//   ui.mode, ui.setMode(name)        the God tab's one armed mode: 'nuke', 'grass', 'bunny', 'wolf', 'human' or ''
+//   ui.mode, ui.setMode(name)        the Create/Destroy tab's one armed mode: 'nuke', 'grass', 'bunny', 'wolf', 'human' or ''
 //                                    (onMode(name) on every change; onNuke(on) when nuke flips)
 //   ui.setRadiusDefaults(nuke, brush)  the Radius slider's starting values (settings.csv); a radius the
 //                                    viewer chose earlier (kept per mode in localStorage) wins. Called once the tables load.
@@ -51,9 +53,9 @@
   // setIcons; the total keeps its word), key in the counts object, tooltip.
   // The tabs, in bar order: key, label, tooltip.
   const TABS = [
-    ['info', 'Info', 'Live counts and the population graph'],
+    ['info', 'Show/Hide', 'Counts, rings on the map, the graph, the minimap, topo lines and the properties window'],
     ['debug', 'Debug', 'Lines, Water, Benchmark and the seed'],
-    ['god', 'God', 'Powers over the world'],
+    ['god', 'Create/Destroy', 'Powers over the world'],
   ];
   const COUNTS = [
     ['', 'bunnies', 'bunnies'],
@@ -81,7 +83,7 @@
   }
 
   AS.UI = function (opts) {
-    const { debug, speeds, onSpeed, onDebugTool, onCloseInspector, onBench, onGraph, onLines, onWater, onTab, onNuke, onMode, onLocate } = opts;
+    const { debug, speeds, onSpeed, onDebugTool, onCloseInspector, onBench, onGraph, onLines, onWater, onTab, onNuke, onMode, onLocate, onElevation, onInspect, onMinimap } = opts;
     const hudEl = document.getElementById('hud');
     const errorsEl = document.getElementById('errors');
     const inspEl = document.getElementById('inspector');
@@ -136,7 +138,7 @@
     showBtn.addEventListener('click', () => { setHidden(false); showBtn.blur(); });
     if (document.body) document.body.appendChild(showBtn);
 
-    // ---- Info tab ----
+    // ---- Show/Hide tab (key 'info') ----
     const countsBox = el('span', 'hud-counts');
     const countEls = {}, glyphEls = {}, countBoxes = {};
     for (const [glyph, key, tip] of COUNTS) {
@@ -178,6 +180,17 @@
       tabPanels.info.appendChild(graphBtn);
     }
 
+    // Likewise the minimap: its × closes it too, so hud() reads the window's state.
+    let miniBtn = null;
+    const miniEl = document.getElementById('minimap');
+    if (onMinimap) {
+      miniBtn = el('button', 'hud-bench hud-minimap', 'Minimap');
+      miniBtn.type = 'button';
+      miniBtn.title = 'The whole world, with a box on what you see: click it to go there';
+      miniBtn.addEventListener('click', () => { if (!locked) onMinimap(); miniBtn.blur(); });
+      tabPanels.info.appendChild(miniBtn);
+    }
+
     // ---- Debug tab ----
     // Unlike Graph, the Lines button owns its state: nothing else changes it.
     let linesBtn = null;
@@ -192,6 +205,45 @@
         linesBtn.blur();
       });
       tabPanels.debug.appendChild(linesBtn);
+    }
+    // Topo lines (render.js): every few meters of the ground's height. Kept per viewer.
+    let elevBtn = null;
+    if (onElevation) {
+      let elevOn = !!opts.elevation;
+      elevBtn = el('button', 'hud-bench hud-elev', 'Elevation');
+      elevBtn.type = 'button';
+      elevBtn.title = 'Show topo lines: how high the ground is';
+      elevBtn.classList.toggle('on', elevOn);
+      elevBtn.addEventListener('click', () => {
+        if (!locked) { elevOn = !elevOn; elevBtn.classList.toggle('on', elevOn); onElevation(elevOn); }
+        elevBtn.blur();
+      });
+      tabPanels.info.appendChild(elevBtn);
+    }
+    // The properties window: Off, Click (select to inspect) or Hover (what is under the
+    // mouse). One of three, kept per viewer by main.js.
+    const inspBtns = [];
+    if (onInspect) {
+      const box = el('span', 'hud-insp');
+      box.appendChild(el('span', 'hud-insp-label', 'Properties'));
+      let mode = opts.inspect || 'click';
+      for (const [key, label, tip] of [['off', 'Off', 'No properties window'], ['click', 'Click', 'Click or tap something to see its properties'], ['hover', 'Hover', 'See the properties of what the mouse is over (a tap still picks on a touch screen)']]) {
+        const b = el('button', 'hud-bench hud-insp-btn', label);
+        b.type = 'button';
+        b.title = tip;
+        b.classList.toggle('on', key === mode);
+        b.addEventListener('click', () => {
+          if (!locked && key !== mode) {
+            mode = key;
+            for (const o of inspBtns) o.classList.toggle('on', o === b);
+            onInspect(key);
+          }
+          b.blur();
+        });
+        inspBtns.push(b);
+        box.appendChild(b);
+      }
+      tabPanels.info.appendChild(box);
     }
     // Water is laid when a world is built, so a flip starts a new world (main.js's onWater).
     let waterBtn = null;
@@ -249,7 +301,7 @@
       tabPanels.debug.appendChild(tools);
     }
 
-    // ---- God tab ----
+    // ---- Create/Destroy tab (key 'god') ----
     // One mode at a time: 'nuke', or a brush ('grass', 'bunny', 'wolf', 'human'), or '' for none.
     // Armed until toggled off, so repeated nukes and strokes work; main.js turns a tap (or a
     // drag, for a brush) on the world into that mode's action while it is on.
@@ -409,11 +461,15 @@
     const setCount = {};
     for (const [, key] of COUNTS) setCount[key] = cachedText(countEls[key]);
 
-    let graphOn = false;
+    let graphOn = false, miniOn = false;
     function hud(s) {
       if (graphBtn && graphEl) {
         const on = !graphEl.hidden;
         if (on !== graphOn) { graphOn = on; graphBtn.classList.toggle('on', on); }
+      }
+      if (miniBtn && miniEl) {
+        const on = !miniEl.hidden;
+        if (on !== miniOn) { miniOn = on; miniBtn.classList.toggle('on', on); }
       }
       if (s.speedIndex !== shown) {
         buttons.forEach((b, i) => b.classList.toggle('on', i === s.speedIndex));
@@ -523,7 +579,7 @@
     // Disabling the buttons also dims them; the handlers check `locked` as well.
     function lock(on) {
       locked = !!on;
-      for (const b of [...buttons, benchBtn, graphBtn, linesBtn, waterBtn, ...Object.values(modeBtns), ...toolButtons]) {
+      for (const b of [...buttons, benchBtn, graphBtn, miniBtn, linesBtn, elevBtn, ...inspBtns, waterBtn, ...Object.values(modeBtns), ...toolButtons]) {
         if (b) b.disabled = locked;
       }
       showRadius();

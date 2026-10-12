@@ -189,7 +189,7 @@ const stripOf = ids => ids.hud.all(e => e.className === 'hud-tabstrip')[0];
   const barText = bar.children.map(c => c.className).join('|');
   for (const c of ['hud-speeds', 'hud-status', 'hud-day', 'hud-tabs', 'hud-hide']) assert(barText.includes(c), c);
   assert(!bar.all(e => e.className.includes('hud-count') || e.className.includes('hud-lines') || e.className.includes('hud-nuke')).length); ok('the bar holds speeds, day, tabs and Hide UI, none of the tab contents');
-  assert.deepStrictEqual(ids.hud.all(e => e.className.split(' ').includes('hud-tab')).map(b => b.textContent), ['Info', 'Debug', 'God']); ok('three tabs: Info, Debug, God');
+  assert.deepStrictEqual(ids.hud.all(e => e.className.split(' ').includes('hud-tab')).map(b => b.textContent), ['Show/Hide', 'Debug', 'Create/Destroy']); ok('three tabs: Show/Hide, Debug, Create/Destroy');
   assert.strictEqual(ids.hud.all(e => e.className.includes('hud-hide'))[0].textContent, 'Hide UI'); ok('a Hide UI button');
 }
 { const { ui, ids } = build(false, { onLines() {} });
@@ -203,10 +203,10 @@ const stripOf = ids => ids.hud.all(e => e.className === 'hud-tabstrip')[0];
   assert(stripOf(ids).hidden && ui.tab === null && tabs.length === 0); ok('tab: null starts closed, and the starting tab is not reported');
   tabBtn(ids, 'Debug').fire('click');
   assert(!stripOf(ids).hidden && !panelOf(ids, 'debug').hidden && panelOf(ids, 'info').hidden && tabBtn(ids, 'Debug').classList.contains('on')); ok('clicking a tab opens its strip');
-  tabBtn(ids, 'God').fire('click');
-  assert(panelOf(ids, 'debug').hidden && !panelOf(ids, 'god').hidden && !tabBtn(ids, 'Debug').classList.contains('on') && tabBtn(ids, 'God').classList.contains('on')); ok('only one tab is open at a time');
-  tabBtn(ids, 'God').fire('click');
-  assert(stripOf(ids).hidden && ui.tab === null && !tabBtn(ids, 'God').classList.contains('on')); ok('clicking the open tab closes the strip');
+  tabBtn(ids, 'Create/Destroy').fire('click');
+  assert(panelOf(ids, 'debug').hidden && !panelOf(ids, 'god').hidden && !tabBtn(ids, 'Debug').classList.contains('on') && tabBtn(ids, 'Create/Destroy').classList.contains('on')); ok('only one tab is open at a time');
+  tabBtn(ids, 'Create/Destroy').fire('click');
+  assert(stripOf(ids).hidden && ui.tab === null && !tabBtn(ids, 'Create/Destroy').classList.contains('on')); ok('clicking the open tab closes the strip');
   assert.deepStrictEqual(tabs, ['debug', 'god', null]); ok('onTab reports each change (for remembering it)');
 }
 { const { ui, ids } = build(false, { tab: 'god' });

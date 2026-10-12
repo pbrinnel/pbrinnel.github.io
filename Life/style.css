@@ -85,6 +85,10 @@ html, body {
 .hud-locate:hover .hud-icon, .hud-locate:focus-visible .hud-icon { filter: brightness(1.3); }
 .hud-locate:focus-visible { outline: 1px solid var(--hud-on); outline-offset: 2px; }
 .hud-locate.on { border-color: var(--loc, var(--hud-on)); }
+/* The properties window's Off / Click / Hover: three buttons read as one control. */
+.hud-insp { display: inline-flex; align-items: center; gap: 0; }
+.hud-insp-label { color: var(--hud-dim); margin-right: 6px; }
+.hud-insp-btn + .hud-insp-btn { margin-left: -1px; }
 /* The corner button that brings the UI back: small and faint, only while it is hidden. */
 .hud-show {
   display: none;
@@ -104,7 +108,7 @@ html, body {
 }
 .hud-show:hover, .hud-show:focus-visible { opacity: 0.9; }
 body.ui-off .hud-show { display: block; }
-body.ui-off #hud, body.ui-off #inspector, body.ui-off #graph { display: none; }
+body.ui-off #hud, body.ui-off #inspector, body.ui-off #graph, body.ui-off #minimap { display: none; }
 body.nuke-armed #map, body.paint-armed #map { cursor: crosshair; }
 .hud-glyph { color: var(--hud-dim); margin-right: 5px; }
 .hud-icon { width: 16px; height: 16px; margin-right: 5px; vertical-align: -3px; image-rendering: pixelated; }
@@ -325,6 +329,29 @@ body.nuke-armed #map, body.paint-armed #map { cursor: crosshair; }
   #graph { width: calc(100vw - 16px); height: min(300px, 45vh); }
   #graph.graph-small { width: calc(100vw - 16px); height: min(200px, 28vh); }
   .graph-whole { padding: 0 6px; }
+}
+
+/* The minimap: bottom-left (the inspector is on the right), see-through like the graph. On a
+   phone the inspector is a bottom sheet, so it sits under the bar on the right instead. */
+#minimap {
+  position: fixed;
+  z-index: 9;
+  box-sizing: border-box;
+  background: rgba(10, 12, 10, 0.7);
+  border: 1px solid var(--hud-line);
+  color: var(--fg);
+  font-size: 13px;
+  left: calc(env(safe-area-inset-left) + 8px);
+  bottom: calc(env(safe-area-inset-bottom) + 8px);
+  padding: 4px 6px 6px;
+}
+#minimap[hidden] { display: none; }
+.mini-head { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.mini-title { color: var(--hud-on); flex: 1; }
+.mini-size, .mini-close { min-width: var(--hud-h); padding: 0; font-size: 18px; }
+.mini-canvas { display: block; touch-action: none; cursor: pointer; image-rendering: pixelated; }
+@media (max-width: 600px) {
+  #minimap { left: auto; bottom: auto; right: calc(env(safe-area-inset-right) + 8px); top: calc(var(--hud-bottom, 40px) + 8px); }
 }
 
 /* The Radius slider in the God tab: a native range input, so touch works as it does anywhere;

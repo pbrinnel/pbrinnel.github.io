@@ -64,7 +64,7 @@
   const BLAST_GLOW_STOPS = [1, 0.5, 0];
   const MAX_BLASTS = 8;   // a hammered tap can't pile up work
 
-  // A count in the Info tab, tapped, toggles rings around every one of that kind on the map,
+  // A count in the Show/Hide tab, tapped, toggles rings around every one of that kind on the map,
   // steady (no pulsing: DESIGN.md Photosensitivity), drawn every frame so they follow the
   // animals and show paused. A ring is at least LOCATE_MIN_CSS_PX across, so it shows zoomed
   // far out where a tile is a dot. An animal off the screen gets a pip on the map's edge in
@@ -78,6 +78,18 @@
   // The graph's colors (graph.js), so a ring matches the kind's line; ui.js marks a toggled
   // count with the same color.
   const LOCATE_COLORS = AS.LOCATE_COLORS = Object.freeze({ blades: '25,158,112', bunnies: '217,89,38', wolves: '57,135,229', humans: '199,99,179', corpses: '200,200,190' });
+
+  // Topo lines (Paul, 11 Oct 2026, over shading): a thin line every CONTOUR_M meters of
+  // W.elev, every CONTOUR_BOLD_EVERY-th one bolder, under the grass and animals and never
+  // over water. Worked out once per world by marching squares over tile centers, kept in
+  // CONTOUR_CHUNK-tile squares so a frame strokes only what is on screen.
+  const CONTOUR_M = 5;
+  const CONTOUR_BOLD_EVERY = 5;
+  const CONTOUR_RGB = '176,186,150';
+  const CONTOUR_ALPHA = 0.3, CONTOUR_BOLD_ALPHA = 0.54;
+  const CONTOUR_CSS_PX = [1, 1.6];        // thin, bold: zoomed out
+  const CONTOUR_NEAR_CSS_PX = [1.5, 2.5]; // thin, bold: at play zoom (sprites)
+  const CONTOUR_CHUNK = 32;
 
   // Real time an event holds a pose, whatever the speed, so nothing flickers (DESIGN.md,
   // Photosensitivity): a meatless death's fallen sprite, a bite's flinch, a mouthful or bite, a birth's hop.
@@ -260,6 +272,7 @@
       // blur or pull in the neighboring sprite's edge.
       ctx.imageSmoothingEnabled = false;
       const ox = cam.x * s, oy = cam.y * s;
+      if (contoursOn) drawContours(sim, cam, dpr, true);
       for (let ty = v.y0; ty <= v.y1; ty++) {
         const dy = Math.round(ty * s - oy), dh = Math.round((ty + 1) * s - oy) - dy;
         const row = ty * W.w;
@@ -383,6 +396,62 @@
       }
     }
 
+    // ---- topo lines ----
+    let contoursOn = false;
+    const contourCache = new WeakMap();   // world → { cw, chunks: [{ thin, bold } | null] }
+    function contoursFor(W) {
+      let c = contourCache.get(W);
+      if (c) return c;
+      const cw = Math.ceil(W.w / CONTOUR_CHUNK), ch = Math.ceil(W.h / CONTOUR_CHUNK);
+      const thin = [], bold = [];
+      for (let i = 0; i < cw * ch; i++) { thin.push([]); bold.push([]); }
+      const E = W.elev, kind = W.kind, w = W.w;
+      // Corners a, b, c, d: the centers of tiles (x, y), (x+1, y), (x+1, y+1), (x, y+1).
+      const P = [null, [3, 0], [0, 1], [3, 1], [1, 2], [3, 0, 1, 2], [0, 2], [3, 2], [2, 3], [0, 2], [0, 1, 2, 3], [1, 2], [1, 3], [0, 1], [3, 0], null];
+      const ex = new Float64Array(4), ey = new Float64Array(4);
+      for (let y = 0; y + 1 < W.h; y++) for (let x = 0; x + 1 < w; x++) {
+        const i0 = y * w + x;
+        if (kind[i0] === KIND.WATER || kind[i0 + 1] === KIND.WATER || kind[i0 + w] === KIND.WATER || kind[i0 + w + 1] === KIND.WATER) continue;
+        const a = E[i0], b = E[i0 + 1], c2 = E[i0 + w + 1], d = E[i0 + w];
+        const lo = Math.min(a, b, c2, d), hi = Math.max(a, b, c2, d);
+        const chunk = ((y / CONTOUR_CHUNK) | 0) * cw + ((x / CONTOUR_CHUNK) | 0);
+        for (let n = Math.max(1, Math.ceil(lo / CONTOUR_M)); n * CONTOUR_M < hi; n++) {
+          const L = n * CONTOUR_M;
+          const k = (a > L) | (b > L) << 1 | (c2 > L) << 2 | (d > L) << 3, p = P[k];
+          if (!p) continue;
+          // Edge crossings: 0 top (a-b), 1 right (b-c), 2 bottom (d-c), 3 left (a-d).
+          ex[0] = x + (L - a) / (b - a); ey[0] = y;
+          ex[1] = x + 1; ey[1] = y + (L - b) / (c2 - b);
+          ex[2] = x + (L - d) / (c2 - d); ey[2] = y + 1;
+          ex[3] = x; ey[3] = y + (L - a) / (d - a);
+          const out = n % CONTOUR_BOLD_EVERY === 0 ? bold[chunk] : thin[chunk];
+          for (let j = 0; j < p.length; j += 2) out.push(ex[p[j]] + 0.5, ey[p[j]] + 0.5, ex[p[j + 1]] + 0.5, ey[p[j + 1]] + 0.5);
+        }
+      }
+      c = { cw, ch, thin: thin.map(a => Float32Array.from(a)), bold: bold.map(a => Float32Array.from(a)) };
+      contourCache.set(W, c);
+      return c;
+    }
+    function drawContours(sim, cam, dpr, near) {
+      const W = sim.W, c = contoursFor(W), s = cam.scale * dpr, ox = cam.x * s, oy = cam.y * s;
+      const cx0 = Math.max(0, Math.floor(cam.x / CONTOUR_CHUNK)), cy0 = Math.max(0, Math.floor(cam.y / CONTOUR_CHUNK));
+      const cx1 = Math.min(c.cw - 1, Math.floor((cam.x + canvas.width / s) / CONTOUR_CHUNK)), cy1 = Math.min(c.ch - 1, Math.floor((cam.y + canvas.height / s) / CONTOUR_CHUNK));
+      const widths = near ? CONTOUR_NEAR_CSS_PX : CONTOUR_CSS_PX;
+      for (const [list, alpha, width] of [[c.thin, CONTOUR_ALPHA, widths[0]], [c.bold, CONTOUR_BOLD_ALPHA, widths[1]]]) {
+        ctx.beginPath();
+        for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) {
+          const seg = list[cy * c.cw + cx];
+          for (let i = 0; i < seg.length; i += 4) {
+            ctx.moveTo(seg[i] * s - ox, seg[i + 1] * s - oy);
+            ctx.lineTo(seg[i + 2] * s - ox, seg[i + 3] * s - oy);
+          }
+        }
+        ctx.lineWidth = width * dpr;
+        ctx.strokeStyle = `rgba(${CONTOUR_RGB},${alpha})`;
+        ctx.stroke();
+      }
+    }
+
     // The rings (see LOCATE_ALPHA), one kind at a time: one path each, as there may be
     // thousands of blades.
     let located = null, locTop = 0;   // a Set of kinds, and the CSS px the HUD covers at the top
@@ -498,6 +567,10 @@
 
     return {
       setIntentLines(on) { intentLines = !!on; },
+      setContours(on) { contoursOn = !!on; },
+      // The far view's one-pixel-per-tile picture of the world, brought up to date (the minimap draws it).
+      farCanvas(sim) { fillCells(sim); return cell.canvas; },
+      get contours() { return contoursOn; },
       get intentLines() { return intentLines; },
       // sel: null or { tile, serial, slot }; alpha: 0–1 through the current tick; nowMs: real
       // time (performance.now()), which the event holds run on; speed: the sim speed asked
@@ -523,6 +596,7 @@
           ctx.imageSmoothingEnabled = false;
           ctx.drawImage(cell.canvas, 0, 0, W.w, W.h, -cam.x * s, -cam.y * s, W.w * s, W.h * s);
           ctx.imageSmoothingEnabled = true;
+          if (contoursOn) drawContours(sim, cam, dpr, false);
         }
         if (blasts.length) drawBlasts(cam, dpr, nowMs);
         if (located) for (const key of located) if (LOCATE_COLORS[key]) drawLocate(sim, cam, dpr, key);

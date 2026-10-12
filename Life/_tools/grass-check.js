@@ -9,8 +9,8 @@ function make(size, seed = 1, edit) {
   s = editCSV(s, 'WorldHeight', 'Value', String(size));
   s = editCSV(s, 'StartGrass', 'Value', '0%');
   s = editCSV(s, 'StartBunnies', 'Value', '0');
-  s = editCSV(s, 'Lakes', 'Value', '0');   // these hand-place things on tiles; water is water-check.js's and thirst-check.js's
-  s = editCSV(s, 'Rivers', 'Value', '0');
+  s = editCSV(s, 'Rain', 'Value', '0%');   // these hand-place things on tiles; water is water-check.js's and thirst-check.js's
+  s = editCSV(s, 'RiverDrain', 'Value', '0');
   s = editCSV(s, 'StartWolves', 'Value', '0');
   texts.settings = s;
   // Sprouting off unless a test turns it on, so seeding counts only seeding.

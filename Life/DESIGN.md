@@ -63,9 +63,20 @@ watching the sim run. Everything else in this doc is decided.
   partly filled with blades of every age, as a meadow that has been growing a while is,
   with a few lone seedlings in the open, so the start doesn't die back as one wave.
   **Water** (Paul, 4–5 Oct 2026), on by default since 5 Oct (`Water` in settings.csv; the Debug tab's
-  Water button switches it and starts a new world): `Lakes` irregular lakes about
-  `LakeSize` tiles across and `Rivers` winding rivers with land-bridge fords every
-  `BridgeEvery` tiles are laid first. Water is impassable to everything (but animals see
+  Water button switches it and starts a new world). **Water comes from the ground** (Paul,
+  11 Oct 2026): every tile has an elevation (`Relief` meters of rolling `Hilliness`-wide
+  hills with `Roughness`, and `Bowls` broad hollows pressed in), and water settles where the
+  ground holds it instead of being placed. Each hollow fills from its floor by how much rain
+  reaches it (`Rain` times the square root of its catchment per tile of its own); a full one
+  spills over its rim and its water runs on, so rivers chain lake to lake; one too shallow
+  (`LakeDepth`) stays dry. Ground that `RiverDrain` tiles or more drain through is river, with
+  a land-bridge ford every `BridgeEvery` tiles. The first frame is the settled world. The
+  seven terrain settings are ranges, and each world draws its own values from them by its
+  seed (Paul: every world feels different under the same rules; the ranges get dialed in
+  later). Tuned so water covers about 4-10% of the map, as the hand-laid lakes did. Topo
+  lines show the height (Paul chose them over shaded ground in a mockup): a thin line every
+  5 m, every fifth bolder, under grass and animals, off water; the Elevation toggle (Show/Hide tab,
+  kept per viewer, on at first) shows or hides them. Water is impassable to everything (but animals see
   across it), nothing is ever placed on it, and nukes leave it. All land always stays one
   connected piece: a lake or river that would cut off land is bridged or dropped, a tiny
   cut-off pocket becomes water. A one-tile bare beach rings all water: grass never grows
@@ -292,9 +303,21 @@ watching the sim run. Everything else in this doc is decided.
   `variables.csv`, live, and the selection follows the agent as it moves. Clicking empty
   ground clears it. Live values only, no life history.
 - **Controls in tabs** (Paul, 4 Oct 2026): the top bar always shows Pause, the speeds and
-  the day, then three tabs and Hide UI. **Info:** live counts of bunnies, wolves, humans, the
-  total, blades and corpses, and the Graph button. **Debug:** Lines, Benchmark, the seed. **God:** tools
-  for interfering with the sim. One tab's strip is open at a time.
+  the day, then three tabs and Hide UI. One tab's strip is open at a time. Named by what
+  they hold (Paul, 11 Oct 2026; they were Info, Debug, God):
+  - **Show/Hide:** everything in it toggles what you see. Live counts of bunnies, wolves,
+    humans, the total, blades and corpses (each count also rings its kind on the map), the
+    Graph, the Minimap, Elevation (topo lines), and **Properties: Off, Click or Hover**: no
+    properties window; click or tap something to see it (as before); or the window shows
+    whatever the mouse is over (a tap still picks, so a phone works as with Click). Kept per
+    viewer.
+  - **Debug:** Lines, Water, Benchmark, the seed.
+  - **Create/Destroy:** tools for interfering with the sim.
+- **Minimap** (Paul, 11 Oct 2026): the whole world, always zoomed all the way out, in a small
+  window with a box on what the screen shows; click or drag on it to go there. Animals of
+  the kinds whose rings are on show as dots. Small (2 tiles a pixel) or big (1), by its +/−
+  button; open or closed is kept per viewer. Bottom-left on a computer; on a phone, where
+  the properties window is a bottom sheet, just under the bar on the right.
 - **A run ends when a species dies out** (Paul, 4 Oct 2026): the sim pauses and a card
   says which (WOLVES EXTINCT, BUNNIES EXTINCT, GRASS EXTINCT) and on what day, with **New
   world** and **Keep watching** (which resumes and won't ask again about a species already
@@ -304,22 +327,22 @@ watching the sim run. Everything else in this doc is decided.
   left it, plotting grass, bunnies and wolves over the whole run on one chart with a
   logarithmic scale. Scroll and zoom along it to see any part of the run's history; hover
   or tap for the exact counts.
-- **NUKE MODE** (God tab; Paul's first "god" feature): while armed, a tap on the world
+- **NUKE MODE** (Create/Destroy tab; Paul's first "god" feature): while armed, a tap on the world
   drops a nuke there. Everything within `NukeRadius` tiles is destroyed outright: animals
   (no corpses), grass, corpses, warren holes. The ground stays scorched, with nothing
   growing or dug, for up to `ScorchDays` at the center and less toward the rim, so the
   crater greens from its edges. The blast shows as an expanding ring and a fading orange
   glow within its circle, never a flash.
-- **GRASS MODE, RABBIT MODE, WOLF MODE** (God tab, Paul: keeping the balance becomes the
+- **GRASS MODE, RABBIT MODE, WOLF MODE** (Create/Destroy tab, Paul: keeping the balance becomes the
   game). Tap to fill a circle of `BrushRadius` tiles, or drag to paint a stroke; every
   empty tile that can hold it gets a blade or an animal of a random age (animals of
   random sex, from newborn to elder, full and rested). Grass skips warren holes and
   scorch; wolves skip holes. One God mode is on at a time; while a paint mode is on,
   dragging paints instead of panning (pan with the keys).
-- **Radius slider** (God tab): sets the size for whichever mode is on, 0 (a single tile,
+- **Radius slider** (Create/Destroy tab): sets the size for whichever mode is on, 0 (a single tile,
   one agent per tap) to 75 tiles (Paul), a circle smaller than the crowd limit; each mode remembers its own (paint modes start at
   `BrushRadius`, the nuke at `NukeRadius`).
-- **Too many animals, asked first** (Paul): the Info tab shows the total of all animals.
+- **Too many animals, asked first** (Paul): the Show/Hide tab shows the total of all animals.
   Painting past `AnimalWarnAt` animals stops at the limit and asks, in plain words, whether
   to keep adding, since big crowds slow the sim down on many devices; Keep adding doubles
   the limit for that world. Births never ask.
@@ -384,7 +407,7 @@ mouthful, a flinch, a death) holds for at least a quarter of a second of real ti
 whatever the speed, and when the sim runs so fast that steps would flicker, animals
 glide in their standing pose instead of cycling their legs.
 
-**Finding things** (Paul, 5 Oct 2026). Each count in the Info tab (bunnies, wolves,
+**Finding things** (Paul, 5 Oct 2026). Each count in the Show/Hide tab (bunnies, wolves,
 humans, grass, corpses) is a toggle: on, every one of that kind on the map is ringed in its
 graph color, and the count wears a border of that color. Rings are steady (a first try was a
 one-off fade, which Paul swapped for a toggle) and follow the animals, paused or running. They

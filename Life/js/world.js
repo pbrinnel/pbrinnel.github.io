@@ -118,6 +118,10 @@
       // of a lake grows grass faster. Static, so grass.js only reads it.
       shore: new Float32Array(n).fill(1),
 
+      // Height of the ground in meters (0 to settings.csv Relief), laid once at world build
+      // by terrain.js. Lakes and rivers are where it holds and drains water.
+      elev: new Float32Array(n),
+
       // The beach: land tiles 4-adjacent to water (1 = beach), kept up to date by addWater. An
       // animal drinks from one, so no blade may stand on one (addGrass refuses; grass.js, god.js
       // and start.js skip them), or a lakeshore of grass would wall the animals off the water.
@@ -202,7 +206,7 @@
       W.gAge[t] = 0;
     };
 
-    // Lakes, laid at world build only (start.js). Water is a tile kind of its own: nothing
+    // Lakes and rivers, laid at world build only (terrain.js). Water is a tile kind of its own: nothing
     // enters, stands on, is born on, grows on or is dug into it, and it never changes.
     W.addWater = function (t) {
       if (W.hole[t] || W.scorch[t] > 0) throw new Error(`tile ${t} can't take water`);

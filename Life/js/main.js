@@ -22,6 +22,9 @@
   // The inspector refreshes this often; a new selection shows at once.
   const INSPECT_EVERY_MS = 100;
   const LINES_KEY = 'life-intent-lines';
+  const ELEV_KEY = 'life-elevation';
+  const INSPECT_KEY = 'life-inspect';
+  const INSPECT_MODES = ['off', 'click', 'hover'];
   const WATER_KEY = 'life-water';
   // The open tab ('info', 'debug', 'god', or '' for closed), remembered per browser.
   const TAB_KEY = 'life-ui-tab';
@@ -43,6 +46,12 @@
   const located = new Set();   // kinds whose rings are on (ui onLocate)
   let waterOn = true;
   try { waterOn = localStorage.getItem(WATER_KEY) !== '0'; } catch (e) { /* stays on */ }
+  // The properties window: Off, Click (select to inspect) or Hover. Click unless chosen.
+  let inspectMode = 'click';
+  try { const v = localStorage.getItem(INSPECT_KEY); if (INSPECT_MODES.includes(v)) inspectMode = v; } catch (e) { /* click */ }
+  // Topo lines: on unless the viewer turned them off.
+  let elevOn = true;
+  try { elevOn = localStorage.getItem(ELEV_KEY) !== '0'; } catch (e) { /* stays on */ }
   let linesOn = false;
   try { linesOn = localStorage.getItem(LINES_KEY) === '1'; } catch (e) { /* stays off */ }
   // The open HUD tab is also the viewer's choice. Nothing stored (or storage blocked): Info.
@@ -52,6 +61,7 @@
   let brush = '';   // GRASS / RABBIT / WOLF / HUMAN MODE: the kind a tap or drag paints, or ''
   let radiusOf = () => 0;   // the Radius slider's value for a mode; the real one exists once the UI does
   let graph = null;   // made once the tables load; the HUD button may exist before that
+  let minimap = null;   // likewise
 
   const ui = AS.UI({
     debug,
@@ -61,6 +71,7 @@
     onCloseInspector: () => { sel = null; },
     onBench: () => AS.runBench(AS.app),
     onGraph: () => { if (graph) graph.toggle(); },
+    onMinimap: () => { if (minimap) minimap.toggle(); },
     tab: savedTab,
     onTab: name => { try { localStorage.setItem(TAB_KEY, name || ''); } catch (e) { /* not kept */ } },
     onNuke: on => { nukeOn = on; },
@@ -73,6 +84,17 @@
       try { localStorage.setItem(WATER_KEY, on ? '1' : '0'); } catch (e) { /* the choice just isn't kept */ }
       // Water is laid when a world is built, so the switch starts a new world.
       if (sim) { ui.ended(null); app.load(AS.Sim(T, T.world.Seed ?? AS.newSeed(), { water: waterOn })); setSpeed(runSpeed); }
+    },
+    inspect: inspectMode,
+    onInspect: m => {
+      inspectMode = m;
+      sel = null;   // a new mode starts with nothing picked
+      try { localStorage.setItem(INSPECT_KEY, m); } catch (e) { /* the choice just isn't kept */ }
+    },
+    elevation: elevOn,
+    onElevation: on => {
+      elevOn = on;
+      try { localStorage.setItem(ELEV_KEY, on ? '1' : '0'); } catch (e) { /* the choice just isn't kept */ }
     },
     lines: linesOn,
     onLines: on => {
@@ -111,7 +133,7 @@
   const canvas = document.getElementById('map');
   const cam = AS.Camera(canvas, sim.W);
   const sheet = AS.SpriteSheet(T);
-  // The Info tab's counts show the world's own sprites: a bunny, a wolf, a human, a full tuft, a skull.
+  // The Show/Hide tab's counts show the world's own sprites: a bunny, a wolf, a human, a full tuft, a skull.
   const ICON_CSS_PX = 16;
   const ICON_SPRITE = {
     bunnies: AS.spriteIndex(AS.SPECIES.BUNNY, AS.SEX.MALE, AS.STAGE.ADULT, 0, AS.SPRITE_FRAME.STAND),
@@ -133,6 +155,7 @@
   ui.setIcons(drawIcon);
   const renderer = AS.Renderer(canvas);
   graph = AS.Graph(T);
+  minimap = AS.Minimap(cam, canvas, renderer);
   graph.setIcons({ grass: drawIcon('blades', document.createElement('canvas')),
     bunnies: drawIcon('bunnies', document.createElement('canvas')),
     wolves: drawIcon('wolves', document.createElement('canvas')),
@@ -149,15 +172,42 @@
       AS.debugDropCorpse(sim, W.tile(tx, ty), AS.SPECIES_KEY.indexOf(tool.slice('corpse-'.length)));
       return;
     }
+    // Off: nothing is picked. Hover still picks on a tap, so a touch screen (no hover) works.
+    sel = inspectMode === 'off' ? null : pickAt(W, tx, ty, fx, fy);
+  }, (x0, y0, x1, y1) => { if (brush) app.paintLine(x0, y0, x1, y1); });
+
+  // What a tap or the pointer at (tx, ty) picks: the animal drawn nearest (fx, fy) in tiles,
+  // else the blade, corpse, water or bare hole on the tile; null for nothing.
+  function pickAt(W, tx, ty, fx, fy) {
     const s = animalDrawnNear(W, fx, fy);
-    if (s >= 0) { sel = { tile: W.aTile[s], serial: W.aSerial[s], slot: s }; return; }
-    if (tx < 0) { sel = null; return; }
+    if (s >= 0) return { tile: W.aTile[s], serial: W.aSerial[s], slot: s };
+    if (tx < 0) return null;
     const t = W.tile(tx, ty), k = W.kind[t];
     // A hole with nothing on it is selectable too (it has no serial, so `hole` marks it).
     const bareHole = k === AS.KIND.EMPTY && W.hole[t] === 1;
     // Water has no serial (0) and never changes, so its selection simply stays.
-    sel = k === AS.KIND.GRASS || k === AS.KIND.CORPSE || k === AS.KIND.WATER || bareHole ? { tile: t, serial: W.serial[t], slot: -1, hole: bareHole } : null;
-  }, (x0, y0, x1, y1) => { if (brush) app.paintLine(x0, y0, x1, y1); });
+    return k === AS.KIND.GRASS || k === AS.KIND.CORPSE || k === AS.KIND.WATER || bareHole ? { tile: t, serial: W.serial[t], slot: -1, hole: bareHole } : null;
+  }
+
+  // Hover mode: a mouse over the map (no button held) picks what is under it. The pick runs
+  // in the frame, at most once per frame, and only after the mouse has moved; what it picked
+  // stays picked (and followed) until the mouse moves again or leaves the map.
+  let hoverAt = null;
+  canvas.addEventListener('pointermove', e => {
+    if (inspectMode !== 'hover' || e.pointerType !== 'mouse' || e.buttons) return;
+    const r = canvas.getBoundingClientRect();
+    hoverAt = cam.screenToTile(e.clientX - r.left, e.clientY - r.top);
+  });
+  canvas.addEventListener('pointerleave', e => {
+    if (inspectMode === 'hover' && e.pointerType === 'mouse') { hoverAt = null; sel = null; }
+  });
+  function applyHover() {
+    if (!hoverAt || inspectMode !== 'hover' || nukeOn || brush) return;
+    const W = sim.W, tx = Math.floor(hoverAt.x), ty = Math.floor(hoverAt.y);
+    const inside = tx >= 0 && ty >= 0 && tx < W.w && ty < W.h;
+    sel = pickAt(W, inside ? tx : -1, inside ? ty : -1, hoverAt.x, hoverAt.y);
+    hoverAt = null;
+  }
 
   // The animal whose drawn center is nearest (fx, fy), in tiles, within PICK_RADIUS; or -1.
   function animalDrawnNear(W, fx, fy) {
@@ -230,8 +280,10 @@
 
     const alpha = speed === Infinity ? 1 : acc / AS.DT;
     const t1 = performance.now();
+    applyHover();
     const live = liveSelection();
     renderer.setIntentLines(linesOn);
+    renderer.setContours(elevOn);
     // Pips stay below the HUD bar, which covers the canvas's top.
     let top = 0;
     if (located.size && !document.body.classList.contains('ui-off')) { const hud = document.getElementById('hud'); if (hud) top = hud.getBoundingClientRect().bottom; }
@@ -244,6 +296,7 @@
       inspectedAt = now;
     }
     graph.draw(sim, now);
+    minimap.draw(sim, located, now);
     const W = sim.W;
     ui.hud({
       speedIndex, achieved, day: sim.day, seed: sim.seed,
