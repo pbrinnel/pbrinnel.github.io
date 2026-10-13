@@ -51,9 +51,10 @@ const turn = (a, b) => { const d = Math.abs(a - b) % (2 * Math.PI); return Math.
 }
 
 // ---- a world plays out the same with or without the wind running
+// (a dry world: the wind carries the showers, so with water and rain, no weather means no rain)
 {
   const run = (wind) => {
-    const { AS: A, sim: s } = stage({ seed: 3, size: [60, 45], bare: false, settings: { StartLayout: 'Meadows' } });
+    const { AS: A, sim: s } = stage({ seed: 3, size: [60, 45], bare: false, settings: { StartLayout: 'Meadows', Rain: 0 } });
     if (!wind) A.weatherTick = () => {};
     const n = days(A, 3);
     for (let i = 0; i < n; i++) s.tick();

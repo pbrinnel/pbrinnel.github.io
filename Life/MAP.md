@@ -41,7 +41,7 @@ load time: every file reads other files' `AS.*` inside functions, at call time.
 | `grass.js` | growth (an hour's worth), age, seeding, sprouting on empty tiles, old age, all in hourly slices; scorch cooling; ash: weathering (`AshHalfLife`) and the `AshBoost` it gives, the larger of it and a corpse's, spent like Nutrient; roots: aging and resprouting; bites | `grassTick`, `grassBite`, `grassStage` |
 | `corpse.js` | decay, and the boost field grass drinks from | `corpseTick`, `corpseAdded`, `corpseBoost` |
 | `warren.js` | warren holes' clocks: marks a hole used while a bunny stands on it, collapses holes unused for `CollapseDays` (hourly) | `warrenTick`, `holeWithin` |
-| `weather.js` | the world's wind (`sim.wind = { from, kmh, toX, toY }`, `sim.weather`): three mean-reverting walks per in-world hour around the world's typical wind (`Wind`, a range) and a prevailing direction from the seed, capped at typical × `WindSpells`, changing over `WindChangeHours`; its own generator (never `sim.rng`, so worlds play out the same whatever the wind does); `windWords`, `windFromName` for the UI | `Wind`, `weatherTick`, `windWords`, `windFromName`, `WIND` |
+| `weather.js` | the world's wind (`sim.wind = { from, kmh, toX, toY }`, `sim.weather`): three mean-reverting walks per in-world hour around the world's typical wind (`Wind`, a range) and a prevailing direction from the seed, capped at typical × `WindSpells`, changing over `WindChangeHours`; its own generator (never `sim.rng`, so worlds play out the same whatever the wind does); `windWords`, `windFromName` for the UI. Rain, on a generator of its own: showers (`sim.weather.showers`, columns x, y, r in tiles, mmh, hours left), disks born over the map and a margin upwind, moving at the wind's speed, each tile getting intensity × the time its center is under one (exact chords) into `water.local`; births follow a spell walk (`RainSpellDays`, `RainSpread`), calibrated so the long-run mean is the world's `Rain`; `dryDays`, `rainToday` | `Wind`, `weatherTick`, `windWords`, `windFromName`, `WIND` |
 | `sim.js` | the fixed tick, populate, events ring, population history | `Sim`, `TICK_HZ`, `DT`, `DAY_SECONDS`, `TICKS_PER_HOUR`, `EV`, `debugDropCorpse` |
 | `fire.js` | fire, a Flow-layer agent: `ignite(sim, t)` (the one way a fire starts), `fireTick` (every `FIRE_EVERY` ticks: each burning tile ages and may light its 8 neighbors at `FireSpread` × fuel × soil dryness × wind ÷ distance per hour, then burns out to `FireScorchDays` of scorch and its `Ash` added to `W.ash`, a blade's roots kept with chance `RootSurvive`, its blade or corpse gone), `fireStage` (0..1 through its burn, for the drawing); rolls `sim.rng` only while something burns | `ignite`, `fireTick`, `fireStep`, `fireStage`, `FIRE` |
 | `paint.js` | PAINT's powers: the brushes and the nuke ([The page](#the-page)) | `nuke`, `paintCircle` |
@@ -113,6 +113,9 @@ load time: every file reads other files' `AS.*` inside functions, at call time.
   `wNext`, `wShore`); see [Water](#water).
 - **Scorch**, by tile: `scorch` (Float32, days left); set by `nuke`, counted down by the
   hourly grass pass; `addGrass` and `addHole` refuse a scorched tile.
+- **Sunk blades**, by tile: `sunk`, `sunkSize`, `sunkAge`, `sunkCount`, `soak` (hours wet or
+  beach): a blade the water or beach reaches is taken off the tile and kept here, and comes
+  back as it was if the tile dries within `DrownHours`; world.js, water.js.
 - **Ash**, by tile: `ash` (Float32, grass Size units); added by fire.js `burnOut`, weathered
   and spent on boosted growth by the hourly grass pass, cleared by water (`setDepth`,
   `addWater`) and by a nuke.

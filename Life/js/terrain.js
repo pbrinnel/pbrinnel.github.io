@@ -412,6 +412,9 @@
       W.addWater(t, wat.H[t]);
     }
     W.water = wat;   // after laying it, which would otherwise copy each tile back into it
+    // Play's rain comes from showers; the pre-run above settled the land under the long-run mean.
+    sim.weather.startRain(S, W.w, W.h);
+    wat.local = sim.weather.field;
     // The lakes' centers: bodies of water LAKE_MIN tiles or more.
     const { label, sizes } = landPieces(W, wet.map(v => (v ? 0 : 1)));
     const sx = new Float64Array(sizes.length), sy = new Float64Array(sizes.length);

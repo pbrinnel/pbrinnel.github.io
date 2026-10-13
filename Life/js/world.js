@@ -183,6 +183,20 @@
       // and start.js skip them), or a lakeshore of grass would wall the animals off the water.
       beach: new Uint8Array(n),
 
+      // Drowning grass (Paul, 12 Oct 2026: water that runs over grass and drains off leaves it
+      // alive). A blade the water or the beach reaches is not on the tile any more: it is kept
+      // here, sunk, with its size and age, until the tile has been wet or beach for DrownHours
+      // (it dies) or has been dry and clear of the shore again (it comes back, same size and
+      // age). While sunk it is nothing to animals, fire, seeding or growth, so a wet tile
+      // never holds a blade and the layers above stay as they were. soak: in-world hours the
+      // tile has been wet or beach without a break (0 once it is neither), advanced by
+      // syncWater (water.js), which is also what ends a sinking.
+      sunk: new Uint8Array(n),
+      sunkSize: new Float32Array(n),
+      sunkAge: new Float32Array(n),
+      sunkCount: 0,
+      soak: new Float32Array(n),
+
       // Water, by tile, found once by buildWaterField (below) and read by DRINK: the walking
       // distance to the nearest shore tile (a land tile touching water; 0 on one,
       // WATER_NONE where no water can be reached), the next tile of the way there (-1 on a
@@ -327,11 +341,35 @@
       W.gAge[t] = 0;
     };
 
+    // The blade on tile t goes under (water or beach reached it): off the tile, size and age kept.
+    W.sinkGrass = function (t) {
+      W.sunkSize[t] = W.gSize[t]; W.sunkAge[t] = W.gAge[t];
+      W.removeGrass(t);
+      W.sunk[t] = 1; W.sunkCount++;
+    };
+    // The sunk blade is gone for good (drowned, or its tile was taken or blasted).
+    W.dropSunk = function (t) {
+      if (!W.sunk[t]) return;
+      W.sunk[t] = 0; W.sunkCount--;
+      W.sunkSize[t] = 0; W.sunkAge[t] = 0;
+    };
+    // Tile t is dry and off the shore again: the blade comes back if the ground is clear.
+    // Something standing on it (an animal) makes it wait; a corpse, hole, scorch or fire
+    // took the ground, so the blade is gone. Returns whether the sinking is over.
+    W.surfaceGrass = function (t) {
+      if (W.kind[t] >= KIND.BUNNY) return false;
+      if (W.kind[t] !== KIND.EMPTY || W.flow[t] !== FLOW.NONE || W.hole[t] || W.scorch[t] > 0) { W.dropSunk(t); return true; }
+      const size = W.sunkSize[t], age = W.sunkAge[t];
+      W.dropSunk(t);
+      W.addGrass(t, size, age);
+      return true;
+    };
+
     // Water's depth on a tile, as the water rules (water.js) move it during play. Getting
-    // wet drowns a blade, floods a warren hole and puts out scorched ground; a corpse must
+    // wet sinks a blade (W.sinkGrass), floods a warren hole and puts out scorched ground; a corpse must
     // already be gone (corpse.js lets its grass boost go first); an animal stays (it wades, or
     // moving.js walks it out if the water is too deep for it). The bare beach follows the
-    // shore: a blade on land that comes to touch water dies. wetFlips counts shores moved, for whatever caches a picture
+    // shore: a blade on land that comes to touch water sinks too. wetFlips counts shores moved, for whatever caches a picture
     // of them (render.js's topo lines); wetMoved tells water.js to rebuild the way-to-water
     // field.
     const nbs4 = new Int32Array(4), nbs4b = new Int32Array(4);
@@ -344,7 +382,7 @@
       if (now) {
         if (W.kind[t] === KIND.CORPSE) throw new Error(`tile ${t}: remove the corpse before the water comes`);
         W.waterCount++;
-        if (W.kind[t] === KIND.GRASS) W.removeGrass(t);
+        if (W.kind[t] === KIND.GRASS) W.sinkGrass(t);
         if (W.hole[t]) W.removeHole(t);
         W.scorch[t] = 0;   // ground under water isn't burning
         W.ash[t] = 0;      // and water washes the ash off
@@ -361,7 +399,7 @@
       let beach = 0;
       if (!(W.wDepth[u] > 0)) for (let i = 0, k = W.neighbors4(u, nbs4b); i < k; i++) if (W.wDepth[nbs4b[i]] > 0) { beach = 1; break; }
       W.beach[u] = beach;
-      if (beach && W.kind[u] === KIND.GRASS) W.removeGrass(u);
+      if (beach && W.kind[u] === KIND.GRASS) W.sinkGrass(u);
     }
 
     // Sets the blade or corpse on tile t, or bare ground (a painted ember), burning for

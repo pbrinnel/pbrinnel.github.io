@@ -44,6 +44,7 @@
         const k = W.kind[t];
         if (k >= AS.KIND.BUNNY) { W.removeAnimal(W.aSlot[t]); out.animals++; }
         if (W.wDepth[t] > 0) continue;   // water is not the nuke's to touch, and it can't scorch
+        if (W.sunk[t]) { W.dropSunk(t); out.blades++; }   // a blade under the shore is vaporized too
         if (W.flow[t] === AS.FLOW.FIRE && k === AS.KIND.EMPTY) W.removeFire(t);   // an ember has nothing left to burn on
         else if (k === AS.KIND.GRASS) { W.removeGrass(t); out.blades++; }
         else if (k === AS.KIND.CORPSE) { AS.corpseRemove(sim, t); out.corpses++; }

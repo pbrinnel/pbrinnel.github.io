@@ -1,7 +1,7 @@
 // Water, as physics (Paul, 11 Oct 2026: consistent rules, nothing faked). Every tile holds
 // two kinds of water, moved by one set of rules, the same on every tile every step:
 //
-//   Rain falls on every tile. Surface water flows toward lower water surfaces, faster the
+//   Rain falls (evenly, or from showers: see local below). Surface water flows toward lower water surfaces, faster the
 //   deeper and steeper it is (Manning: speed = SurfaceFlow · depth^(2/3) · √slope, m/s); it
 //   soaks into the soil as fast as Infiltration and as far as the soil has room, and
 //   evaporates (Evaporation). Soil water flows toward a lower water table through the soil
@@ -9,7 +9,7 @@
 //   (Transpiration, less as the soil dries). A soil fuller than its room pushes the extra up
 //   as surface water: springs and seeps. Both leave the map only at its river mouths.
 //
-// Stability limits, the same on every tile: a tile never gives more than it has, nor more to
+// Stability limits, the same on every tile: a tile never gives more than GIVE_MAX of what it has, nor more to
 // one neighbor than a fifth of the difference in their levels (it trades with four at once).
 // Depths under TINY are float rounding and count as none.
 //
@@ -28,6 +28,8 @@
 //     water.preRun(days)     `days` before day 0, ending at rest under play's steps
 //     water.listWet()        after H is changed from outside (pouring, drinking)
 //     water.totals           m of water since made: { rain, evap, et, out } (per tile area)
+//     water.local            null, or a Float32Array of mm per tile given since the last step, used
+//                            in place of the even Rain (weather.js fills it, waterTick clears it)
 //
 //   AS.waterTick(sim)        the sim's tick: a step when one is due, then the world told (syncWater)
 //   AS.syncWater(sim)        W.wDepth and the tiles' flow made to match water.H
@@ -42,7 +44,10 @@
   const TILE_M = AS.TILE_M = 10;   // m across a tile: the map is 4.5 × 3 km
   const POROSITY = 0.3;            // share of the soil that is room for water
   const SEC_PER_DAY = 86400;
+  const HOURS_PER_DAY = 24;
   const TINY = 1e-6;               // m: below this a depth is float rounding, counted as none
+  const GIVE_MAX = 0.5;            // a tile gives at most this share of its surface water in one step: giving all of a thin film
+                                   // sent it past its neighbors and back, so shower puddles blinked wet and dry every other step
   const STEP_TICKS = 15;           // ticks between steps during play
   const STEP_DAYS = STEP_TICKS / (AS.DAY_SECONDS * AS.TICK_HZ);   // sim.js sets the clock first
   const SPINUP_STEP_DAYS = 1 / 8;  // the pre-run's coarse steps
@@ -74,12 +79,19 @@
     // Rain, soaking in, springs, evaporation and transpiration on every tile, for dt days.
     // The surface move after it leaves the soil alone, so this pass also readies the soil
     // move: each tile's water table (L) from its final soil water, and dG cleared.
+    //
+    // Rain is the same everywhere (Rain mm a day) unless the water has `local`: a per-tile
+    // field of the mm each tile was given since the last step (weather.js showers fill it;
+    // play sets it, the pre-run leaves it off to settle the land under the long-run mean).
     function exchange(dt) {
       wetN = 0;
       const perM = 1 / POROSITY, r = rain * dt, soakMax = inf * dt, evMax = evap * dt, etDt = et * dt;
-      let evapSum = 0, etSum = 0;
+      const loc = water.local;
+      let evapSum = 0, etSum = 0, rainSum = 0;
       for (let i = 0; i < n; i++) {
-        let d = H[i] + r, g = G[i];
+        const ri = loc ? loc[i] * 0.001 : r;
+        rainSum += ri;
+        let d = H[i] + ri, g = G[i];
         const soak = min(d, soakMax, max(0, room - g));
         d -= soak; g += soak;
         if (g > room) { d += g - room; g = room; }
@@ -89,7 +101,7 @@
         if (d >= TINY) wet[wetN++] = i;
         L[i] = floor[i] + g * perM; dG[i] = 0;
       }
-      totals.rain += r * n; totals.evap += evapSum; totals.et += etSum;
+      totals.rain += rainSum; totals.evap += evapSum; totals.et += etSum;
     }
 
     // Surface water, one move of dt days. Only tiles holding water do any work, and only the
@@ -119,7 +131,7 @@
           total += off;
         }
         if (total <= 0) continue;
-        if (total * scale > d) scale = d / total;
+        if (total * scale > d * GIVE_MAX) scale = d * GIVE_MAX / total;
         for (let k = 0; k < 4; k++) {
           if (!(want[k] > 0)) continue;
           const u = nb[k];
@@ -176,20 +188,23 @@
       run(settle, STEP_DAYS);
     }
 
-    return { H, G, room, totals, step, preRun, listWet };
+    const water = { H, G, room, totals, step, preRun, listWet, local: null };
+    return water;
   };
 
   AS.waterTick = function (sim) {
     const wat = sim.W.water;
     if (!wat || sim.tickCount % STEP_TICKS !== 0) return;
     wat.step(STEP_DAYS);
+    if (wat.local) sim.weather.clearRain();
     AS.syncWater(sim);
+    AS.soakTick(sim);
     // The way-to-water field is a guide: rebuilt every FIELD_STEPS steps when shores have
     // moved, not at every one.
     if (sim.W.wetMoved && (sim.tickCount / STEP_TICKS) % FIELD_STEPS === 0) { sim.W.wetMoved = false; sim.W.waterStale = true; }
   };
 
-  // Water reaching a tile drowns its blade, floods its hole and washes its corpse away
+  // Water reaching a tile sinks its blade (soakTick below drowns it in time), floods its hole and washes its corpse away
   // (world.js setDepth, after corpse.js lets the corpse's grass boost go); an animal stays
   // and wades or steps out (moving.js).
   AS.syncWater = function (sim) {
@@ -201,6 +216,26 @@
         if (W.kind[t] === AS.KIND.CORPSE) AS.corpseRemove(sim, t);
         W.setDepth(t, h);
       } else if (D[t] > 0) W.setDepth(t, 0);
+    }
+  };
+
+  // Once per water step, after syncWater: how long each tile has been wet or beach, in
+  // in-world hours (so the step's length doesn't matter), and what that does to sunk blades.
+  // One that has been under for DrownHours drowns; one whose tile is dry and off the shore
+  // again comes back (Paul, 12 Oct 2026: water that drains off sooner leaves grass alive).
+  // Not part of syncWater, which painting also calls between steps.
+  AS.soakTick = function (sim) {
+    const W = sim.W, H = W.water.H, n = W.n;
+    const stepHours = STEP_DAYS * HOURS_PER_DAY, soak = W.soak, beach = W.beach, sunk = W.sunk;
+    const drown = sim.T.world.DrownHours;
+    for (let t = 0; t < n; t++) {
+      if (H[t] > 0 || beach[t]) soak[t] += stepHours;
+      else {
+        soak[t] = 0;
+        if (sunk[t]) W.surfaceGrass(t);
+        continue;
+      }
+      if (sunk[t] && soak[t] >= drown) W.dropSunk(t);
     }
   };
 })(globalThis.AS);

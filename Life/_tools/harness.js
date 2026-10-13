@@ -48,7 +48,7 @@ function check(cond, msg) { if (!cond) failures.push(msg); return cond; }
 function audit(AS, sim, label) {
   const W = sim.W, K = AS.KIND;
   let grass = 0, corpses = 0, animals = 0, holes = 0;
-  let wet = 0, fires = 0;
+  let wet = 0, fires = 0, sunkN = 0;
   const nb = new Int32Array(4);
   for (let t = 0; t < W.n; t++) {
     const k = W.kind[t];
@@ -66,6 +66,14 @@ function audit(AS, sim, label) {
       check(W.fireTime[t] > 0 && W.fireAge[t] >= 0 && W.fireAge[t] <= W.fireTime[t] + 1e-3, `${label}: burning tile ${t} age ${W.fireAge[t]} of ${W.fireTime[t]}`);
     } else {
       check(W.fSlot[t] === -1, `${label}: tile ${t} has fSlot but no fire`);
+    }
+    // A sunk blade (Paul, 12 Oct 2026: grass drowns only under standing water) is on no tile:
+    // its tile is wet or beach, or it is dry and off the shore with the blade not yet back (an animal
+    // stood on it when the shore left; soakTick brings it back at the next step).
+    if (W.sunk[t]) {
+      sunkN++;
+      check(k === K.EMPTY || k >= K.BUNNY, `${label}: sunk blade on tile ${t} holding kind ${k}`);
+      check(W.wDepth[t] > 0 || W.beach[t] || k >= K.BUNNY || W.soak[t] === 0, `${label}: sunk blade on dry open tile ${t}`);
     }
     if (W.wDepth[t] > 0) {
       wet++;
@@ -133,6 +141,7 @@ function audit(AS, sim, label) {
   check(holes === W.hCount, `${label}: ${holes} holes on grid, hCount ${W.hCount}`);
   check(fires === W.fCount, `${label}: ${fires} burning tiles on grid, fCount ${W.fCount}`);
   check(wet === W.waterCount, `${label}: ${wet} wet tiles, waterCount ${W.waterCount}`);
+  check(sunkN === W.sunkCount, `${label}: ${sunkN} sunk blades, sunkCount ${W.sunkCount}`);
   check(corpses === W.cCount, `${label}: ${corpses} corpses on grid, cCount ${W.cCount}`);
   check(animals === W.bunnies + W.wolves + W.humans, `${label}: animal counts`);
   let h = 2166136261;

@@ -124,11 +124,11 @@ and nothing settling to watch on day 1).
   view (under a wading animal too), and the properties window gives it (Depth).
 - **Rising water** drowns grass, floods warren holes, puts out scorched ground and washes
   corpses away; an animal that dies in water leaves no body. Nukes leave water.
-  - **Grass drowns only under standing water** (Paul, 12 Oct 2026, not built yet): water that
-    runs over grass and drains off leaves it alive; a blade dies once water has stood on its
-    tile for a while (a setting, about a day to start). My calls, to confirm: the beach ring
-    likewise takes a blade only after it has stood that long, and a blade under water
-    doesn't grow, seed, or burn.
+  - **Grass drowns only under standing water** (Paul, 12 Oct 2026; built 13 Oct): a blade
+    that water or the beach ring reaches sinks out of sight with its size and age kept; it
+    neither grows, seeds, burns nor feeds anyone there. If the tile dries (and leaves the
+    beach) within `DrownHours` it comes back as it was; after that it is dead. So water
+    that runs over grass and drains off leaves it alive.
 - **The beach:** a one-tile bare beach rings all water and moves with the shore. Grass never
   grows there, so animals can always reach water to drink.
 - **Wading:** animals wade water up to their `WadeDepth`, at `WadeSpeed`.
@@ -370,7 +370,7 @@ weather's next part comes next. Fire comes first of the weather systems, and win
 - **Order:** mockups of the fire and the wind's look; wind; fire; animals and fire; after
   the fire; later, weather's next part (rain that varies, droughts, lightning) and humans
   lighting fires.
-- **Rain is local** (Paul, 12 Oct 2026): it falls from showers that move with the wind, only
+- **Rain is local** (Paul, 12 Oct 2026; built 13 Oct): it falls from showers that move with the wind, only
   under them, so the land has wet and dry patches instead of the even rain every tile gets
   now. At the map's size (4.5 × 3 km) a real shower, a few km across at the wind's speed,
   crosses it in well under an in-world hour, so showers are physical and leave wet swaths

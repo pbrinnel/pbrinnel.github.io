@@ -11,10 +11,16 @@ Relief,60-140,Meters from the lowest ground to the highest (a range: each world 
 Hilliness,70-160,Tiles; how broad the ranges are that rise fastest while the ground grows (a range: each world draws its own)
 Roughness,0.4-0.6,0-1; how much smaller bumps ride on those ranges (a range: each world draws its own)
 Bowls,5-13,Lake basins pressed into the grown ground (as glaciers scoop them); water settles in them by the water rules (a range: each world draws its own)
-Rain,1-2,"Water on: mm of rain a day, on every tile (a range: each world draws its own); 0 = no water at all"
+Rain,1-2,"Water on: mean mm of rain a day over the long run, on every tile (a range: each world draws its own); it falls from showers, so any one day is patchy; 0 = no water at all"
 Wind,6-14,"km/h of the world's typical wind (a range: each world draws its own); it drifts around this, with a prevailing direction its seed picks"
 WindSpells,2.5,How many times the typical wind its strongest spells can reach; it never goes beyond
 WindChangeHours,6,Roughly how many in-world hours the wind takes to change noticeably; its stronger spells and wandering direction are slower
+ShowerKm,1-4,"Rain falls from showers: how many km across one is (each shower draws its own from the range); the wind carries it over the map"
+ShowerMmPerHour,4-15,"... how hard it rains under a shower, mm an hour (each shower draws its own)"
+ShowerHours,0.5-2,"... how many in-world hours a shower lasts before it is gone (each shower draws its own)"
+RainSpellDays,5,"Roughly how many in-world days a wet or a dry spell lasts: the rate showers are born at wanders around its mean, slowly"
+RainSpread,1,"How much that rate swings between wet and dry spells (the spread of its logarithm; 0 = showers come at a steady rate). Whatever it is, the long-run rain is still Rain"
+DrownHours,24,"Water: in-world hours water must stand on a blade (or its tile be shore) before it drowns; water that drains off sooner leaves it alive"
 Evaporation,6,mm a day from standing water
 Transpiration,3,"mm a day plants draw from full soil, less as it dries"
 SoilDepth,2,Meters of soil over the bedrock; 30% of it is room for water
