@@ -29,6 +29,7 @@ const CHECKS = [
   { file: path.join(TOOLS, 'warren-check.js') },
   { file: path.join(TOOLS, 'weather-check.js') },
   { file: path.join(TOOLS, 'rain-check.js') },
+  { file: path.join(TOOLS, 'lightning-check.js') },
   { file: path.join(TOOLS, 'paint-check.js') },
   { file: path.join(TOOLS, 'fire-check.js') },
   { file: path.join(TOOLS, 'escape-check.js') },

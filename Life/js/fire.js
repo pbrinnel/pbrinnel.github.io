@@ -91,6 +91,14 @@
     return true;
   };
 
+  // The soil's dryness under tile t, 0..1: what scales a blade's catching from a neighbor's fire
+  // (fireStep inlines the same formula in its hot loop) and a lightning strike's (weather.js).
+  AS.fireDryness = function (sim, t) {
+    const soil = sim.W.water;
+    const dry = soil ? 1 - soil.G[t] / soil.room : sim.T.world.FireDryness;
+    return dry < 0 ? 0 : dry > 1 ? 1 : dry;
+  };
+
   AS.fireStage = function (W, t) {
     if (W.flow[t] !== FLOW.FIRE) return 0;
     const p = W.fireAge[t] / W.fireTime[t];
@@ -160,7 +168,7 @@
           }
           const fuel = ku === KIND.GRASS ? gSize[u] : ku === KIND.CORPSE ? 1 : 0;
           if (fuel <= 0) continue;
-          const dry = G ? 1 - G[u] / room : drySet;
+          const dry = G ? 1 - G[u] / room : drySet;   // AS.fireDryness, inlined
           const rate = spread * fuel * (dry < 0 ? 0 : dry > 1 ? 1 : dry) * dirRate[d];
           if (!(rate > 0)) continue;
           if (rng.chance(1 - Math.exp(-rate * live))) {

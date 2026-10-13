@@ -32,6 +32,17 @@
 // (terrain.js layTerrain calls startRain); every other world has none, draws nothing, and
 // everything below stays empty.
 //
+// LIGHTNING (Paul, 12 Oct 2026: a storm's own rain mustn't drown the fire it starts). Some
+// showers are thunderstorms, decided at birth: StormShare of them, up to DryStormBoost times
+// that in the driest spells. A spell is as dry as its birth rate is below the mean (dryness());
+// a storm born then keeps only DryStormRain of its intensity at the driest, scaling linearly
+// to all of it at a mean-or-wetter spell: dry lightning. Because dry storms rain less and dry
+// spells are where showers are rarest, startRain scales the births up by the exact long-run
+// share of rain they keep, so the mean stays Rain. Each live storm strikes at StrikesPerHour,
+// in a ring outside its rain, thicker downwind, and a strike lights fuel with the soil's
+// dryness through AS.ignite (strike below). Strikes have a generator of their own, so they
+// never change which showers there are, and never touch sim.rng.
+//
 //   sim.weather.showers  the live showers, struct of arrays (read the arrays off `showers`
 //                        each time: they are replaced when they grow). Only [0, n) is live,
 //                        and the order changes as showers end.
@@ -41,6 +52,16 @@
 //       r         radius in tiles
 //       mmh       rain under it, mm an hour
 //       left      in-world hours of its life left
+//       storm     Uint8, 1 if it is a thunderstorm (decided at birth), else 0
+//   sim.weather.strikes    lightning, a ring of the last STRIKE_CAP strikes on the map:
+//       n         strikes ever (the newest is at index (n - 1) % STRIKE_CAP; the ring holds
+//                 the last min(n, STRIKE_CAP))
+//       tile      Int32Array(STRIKE_CAP): the tile it hit
+//       atSec     Float64Array(STRIKE_CAP): sim.simSeconds when it struck
+//       lit       Uint8Array(STRIKE_CAP): 1 if it started a fire, 0 if it fell on water, bare
+//                 ground, or fuel that did not catch (a bare or wet strike is still drawn)
+//     Strikes are made by weather.strike(sim), which AS.weatherTick calls after each step
+//     (weather.strikeAt(sim, t) strikes one chosen tile: the checks' hook).
 //   sim.weather.dryDays    in-world days since any rain fell on the map (counted from day 0)
 //   sim.weather.rainToday  mean mm over the map in the last in-world day
 //   sim.weather.spellRate  the wet/dry spell now: the birth rate as a multiple of its mean
@@ -59,6 +80,10 @@
   const VEER_SLOWER = 2;              // the direction takes this many times WindChangeHours
   const MAX_DRAW = 3;                 // a walk's random push is cut off at this many deviations, so no step jumps
   const RAIN_SALT = 0x3c9e5a1d;       // keeps the showers' generator apart from the wind's
+  const STRIKE_SALT = 0x5b2f7e91;     // ... and the strikes' from the showers', so StrikesPerHour never changes which showers are born
+  const STRIKE_CAP = 32;              // strikes the ring remembers (sim.weather.strikes)
+  const STORM_QUAD = 4001;            // points of the quadrature startRain calibrates the births with
+  const STORM_QUAD_SD = 8;            // ... spread over this many deviations either side
   const PIECE_RADII = 1;              // a shower's path is cut into pieces no longer than this many radii, so each piece's box of tiles stays small
   const POISSON_CHUNK = 30;           // births are drawn in chunks of at most this mean (Knuth's method underflows for large ones)
   const SHOWERS_START = 64;           // room for this many live showers; the arrays double when full
@@ -101,6 +126,31 @@
     return k;
   }
 
+  // How dry a spell is, 0..1, from the birth rate it runs at (spellRate, 1 = the mean): a
+  // spell at or above the mean rate is not dry at all, and one with no showers is fully so.
+  const dryness = (spellRate) => Math.max(0, Math.min(1, 1 - spellRate));
+
+  // The chance a new shower is a thunderstorm: StormShare, up to `boost` times that in the
+  // driest spells (dry lightning is common when the air is dry), never above 1.
+  const stormChance = (spellRate, share, boost) =>
+    Math.max(0, Math.min(1, share * (1 + (boost - 1) * dryness(spellRate))));
+
+  // E[spellRate x (a shower's rain factor)] over the spell walk's settled distribution: the
+  // factor a storm shower's intensity is cut by, averaged over all showers born at that rate.
+  function stormLoad(spread, share, boost, dryRain) {
+    if (!(spread > 0)) return 1;
+    let sum = 0, mass = 0;
+    for (let k = 0; k < STORM_QUAD; k++) {
+      const z = (k / (STORM_QUAD - 1) * 2 - 1) * STORM_QUAD_SD;
+      const p = Math.exp(-z * z / 2);
+      const rate = Math.exp(spread * z - spread * spread / 2);
+      const dry = dryness(rate);
+      const factor = 1 - stormChance(rate, share, boost) * dry * (1 - dryRain);
+      sum += p * rate * factor; mass += p;
+    }
+    return sum / mass;
+  }
+
   // The wind model for a world: { wind, step() }. `every` is the update interval in ticks;
   // the check builds it at other values to prove the statistics don't depend on it.
   AS.Wind = function (T, seed, every = WEATHER_EVERY_TICKS) {
@@ -128,23 +178,26 @@
 
     // ---- showers ----
     const rrng = AS.makeRng((seed ^ SEED_SALT ^ RAIN_SALT) >>> 0);
-    const showers = { n: 0, x: null, y: null, r: null, mmh: null, left: null };
+    const showers = { n: 0, x: null, y: null, r: null, mmh: null, left: null, storm: null };
+    const COLUMNS = ['x', 'y', 'r', 'mmh', 'left', 'storm'];
     const grow = (cap) => {
-      for (const k of ['x', 'y', 'r', 'mmh', 'left']) {
-        const a = new Float64Array(cap);
+      for (const k of COLUMNS) {
+        const a = k === 'storm' ? new Uint8Array(cap) : new Float64Array(cap);
         if (showers[k]) a.set(showers[k]);
         showers[k] = a;
       }
     };
     grow(SHOWERS_START);
-    const weather = { wind, every, showers, field: null, dryDays: 0, rainToday: 0, spellRate: 1 };
+    const strikes = { n: 0, tile: new Int32Array(STRIKE_CAP), atSec: new Float64Array(STRIKE_CAP), lit: new Uint8Array(STRIKE_CAP) };
+    const srng = AS.makeRng((seed ^ SEED_SALT ^ STRIKE_SALT) >>> 0);
+    const weather = { wind, every, showers, strikes, field: null, dryDays: 0, rainToday: 0, spellRate: 1 };
     let rain = null;   // set by startRain: the world's grid and shower numbers
     let wet = 0;       // the rain's spell walk: wet above 0, dry below (startRain draws it)
 
     // The shower ending at slot i leaves; the last takes its place.
     function remove(i) {
       const last = --showers.n;
-      for (const k of ['x', 'y', 'r', 'mmh', 'left']) showers[k][i] = showers[k][last];
+      for (const k of COLUMNS) showers[k][i] = showers[k][last];
     }
 
     // Rain onto the field from one shower for `act` hours of straight travel at (vx, vy)
@@ -217,6 +270,11 @@
         S.r[i] = rain.radius.min + rrng.next() * (rain.radius.max - rain.radius.min);
         S.mmh[i] = rain.mmh.min + rrng.next() * (rain.mmh.max - rain.mmh.min);
         S.left[i] = rain.hours.min + rrng.next() * (rain.hours.max - rain.hours.min);
+        // The storm roll is drawn for every shower, so StormShare never changes which showers
+        // are born, only which are storms.
+        const dry = dryness(weather.spellRate);
+        S.storm[i] = rrng.next() < stormChance(weather.spellRate, rain.stormShare, rain.dryBoost) ? 1 : 0;
+        if (S.storm[i]) S.mmh[i] *= 1 - dry * (1 - rain.dryRain);
         if (!advance(i, rrng.next() * dtH)) remove(i);
       }
     }
@@ -250,12 +308,21 @@
       const marginKm = typical * spells * l.max + d.max / 2;
       const margin = marginKm / tileKm;
       const areaKm2 = (w + 2 * margin) * (h + 2 * margin) * tileKm * tileKm;
-      const birthsPerDay = S.Rain / perShower * areaKm2;
+      // A dry storm rains less (DryStormRain, more so the drier the spell), and the dry spells
+      // are also where showers are rarest, so the rain a birth brings is correlated with the
+      // rate it is born at. The long-run rain is E[rate x rain factor] over the spell's settled
+      // distribution (its log is normal, exactly: the spell walk is not cut), worked out here
+      // by quadrature so the mean stays Rain exactly in expectation: births are scaled by
+      // 1 / that. With no storms, or no spread, it is 1.
+      const load = stormLoad(S.RainSpread, S.StormShare, S.DryStormBoost, S.DryStormRain);
+      const birthsPerDay = S.Rain / (perShower * load) * areaKm2;
       const dtH = every / AS.TICKS_PER_HOUR;
       rain = {
         w, h, n, margin, birthsPerDay,
         radius: { min: d.min / 2 / tileKm, max: d.max / 2 / tileKm },
         mmh: i, hours: l,
+        stormShare: S.StormShare, dryBoost: S.DryStormBoost, dryRain: S.DryStormRain,
+        strikesPerHour: S.StrikesPerHour, reach: S.StrikeReach, ahead: S.StrikeAhead,
         spread: S.RainSpread, tau: S.RainSpellDays * HOURS_PER_DAY,
         field: new Float32Array(n), stepMm: 0, dirtyLo: h, dirtyHi: -1, depositing: false,
         ring: new Float64Array(Math.max(1, Math.round(HOURS_PER_DAY / dtH))), ringAt: 0, ringSum: 0,
@@ -276,13 +343,13 @@
       weather.spellRate = Math.exp(rain.spread * wet - rain.spread * rain.spread / 2);
     }
 
-    // Puts one shower out at once, from the next step on (center and radius in tiles). The
-    // checks use it to follow a single shower; nothing in the game does.
-    weather.release = function (x, y, radius, mmh, hours) {
+    // Puts one shower out at once, from the next step on (center and radius in tiles; `storm`
+    // 1 for a thunderstorm). The checks use it to follow a single shower; nothing in the game does.
+    weather.release = function (x, y, radius, mmh, hours, storm = 0) {
       const S = showers;
       if (S.n === S.x.length) grow(S.x.length * 2);
       const i = S.n++;
-      S.x[i] = x; S.y[i] = y; S.r[i] = radius; S.mmh[i] = mmh; S.left[i] = hours;
+      S.x[i] = x; S.y[i] = y; S.r[i] = radius; S.mmh[i] = mmh; S.left[i] = hours; S.storm[i] = storm ? 1 : 0;
     };
 
     // Zeroes what rain wrote since the last call: only the rows it touched.
@@ -304,6 +371,50 @@
       rain.ringAt = (rain.ringAt + 1) % rain.ring.length;
       weather.rainToday = Math.max(0, rain.ringSum);
     }
+    // Lightning for the step just taken. Each live storm strikes at StrikesPerHour, at a
+    // point in a ring around it, area-uniform from its radius out to StrikeReach x its radius,
+    // so its own rain (which falls inside the radius) mostly misses where it strikes. The
+    // ring is thicker ahead of the storm, downwind (density 1 + StrikeAhead x cos of the angle
+    // from the way it is heading), as real strikes often fall ahead of the rain. A strike off
+    // the map is not seen and not recorded. Its own generator, never sim.rng.
+    weather.strike = function (sim) {
+      if (!rain || !rain.depositing) return;
+      const S = showers, w = rain.w, h = rain.h;
+      const heading = Math.atan2(wind.toY, wind.toX), a = rain.ahead;
+      const mean = rain.strikesPerHour * rain.dtH;
+      for (let i = S.n - 1; i >= 0; i--) {
+        if (!S.storm[i]) continue;
+        const cx = S.x[i], cy = S.y[i], r = S.r[i], far = r * Math.max(1, rain.reach);
+        // A storm whose ring cannot touch the map has nothing to show.
+        const gx = Math.max(-cx, 0, cx - w), gy = Math.max(-cy, 0, cy - h);
+        if (gx * gx + gy * gy > far * far) continue;
+        for (let k = poisson(mean, srng); k > 0; k--) {
+          const d = Math.sqrt(r * r + srng.next() * (far * far - r * r));
+          let theta;
+          do theta = srng.next() * TAU; while (srng.next() * (1 + a) > 1 + a * Math.cos(theta));
+          const x = cx + d * Math.cos(heading + theta), y = cy + d * Math.sin(heading + theta);
+          if (x < 0 || y < 0 || x >= w || y >= h) continue;
+          strikeAt(sim, (y | 0) * w + (x | 0));
+        }
+      }
+    };
+
+    // A strike on tile t: records it, and lights the fuel there with the chance fire.js gives
+    // that tile's fuel to catch from a neighbor's fire, its soil dryness (AS.fireDryness).
+    // Water and bare ground never burn.
+    function strikeAt(sim, t) {
+      const W = sim.W;
+      let lit = 0;
+      if (!(W.wDepth[t] > 0) && W.kind[t] !== AS.KIND.EMPTY) {
+        if (srng.chance(AS.fireDryness(sim, t)) && AS.ignite(sim, t)) lit = 1;
+      }
+      const j = strikes.n % STRIKE_CAP;
+      strikes.tile[j] = t; strikes.atSec[j] = sim.simSeconds; strikes.lit[j] = lit;
+      strikes.n++;
+    }
+
+    weather.strikeAt = strikeAt;   // the checks strike chosen tiles; nothing in the game does
+
     weather.step = function () {
       gust = walk(gust, dt, hours, rng);
       spell = walk(spell, dt, hours * SPELL_SLOWER, rng);
@@ -317,7 +428,7 @@
   // Called first in sim.tick.
   AS.weatherTick = function (sim) {
     const m = sim.weather;
-    if (sim.tickCount % m.every === 0) m.step();
+    if (sim.tickCount % m.every === 0) { m.step(); m.strike(sim); }
   };
 
   // The words the Info window uses.
@@ -331,5 +442,5 @@
     return COMPASS[i];
   };
 
-  AS.WIND = Object.freeze({ CALM_BELOW_KMH, WINDY_FROM_KMH, WEATHER_EVERY_TICKS, GUST_SD, SPELL_SD, SPELL_SLOWER, VEER_SD, VEER_SLOWER, MAX_DRAW });
+  AS.WIND = Object.freeze({ CALM_BELOW_KMH, WINDY_FROM_KMH, WEATHER_EVERY_TICKS, GUST_SD, SPELL_SD, SPELL_SLOWER, VEER_SD, VEER_SLOWER, MAX_DRAW, STRIKE_CAP });
 })(globalThis.AS);

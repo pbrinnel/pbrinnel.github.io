@@ -20,6 +20,12 @@ ShowerMmPerHour,4-15,"... how hard it rains under a shower, mm an hour (each sho
 ShowerHours,0.5-2,"... how many in-world hours a shower lasts before it is gone (each shower draws its own)"
 RainSpellDays,5,"Roughly how many in-world days a wet or a dry spell lasts: the rate showers are born at wanders around its mean, slowly"
 RainSpread,1,"How much that rate swings between wet and dry spells (the spread of its logarithm; 0 = showers come at a steady rate). Whatever it is, the long-run rain is still Rain"
+StormShare,20%,"Lightning: share of showers that are thunderstorms (decided when a shower is born); in dry spells more of them are, up to DryStormBoost times this"
+DryStormBoost,2,"Lightning: how many times StormShare the share of storms is in the driest spell (1 = dry spells make no difference)"
+DryStormRain,25%,"Lightning: share of its intensity a storm's rain keeps in the driest spell (dry lightning); a wetter spell cuts it less. The world's long-run Rain is unchanged"
+StrikesPerHour,12,"Lightning: strikes an in-world hour from each live storm (those landing off the map are not seen)"
+StrikeReach,2.5,"Lightning: strikes land outside the storm's rain, in a ring from its radius out to this many times its radius"
+StrikeAhead,60%,"Lightning: how much more of that ring lies ahead of the storm, downwind, than behind it (0 = all round alike)"
 DrownHours,24,"Water: in-world hours water must stand on a blade (or its tile be shore) before it drowns; water that drains off sooner leaves it alive"
 Evaporation,6,mm a day from standing water
 Transpiration,3,"mm a day plants draw from full soil, less as it dries"

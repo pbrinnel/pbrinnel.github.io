@@ -384,8 +384,11 @@ weather's next part comes next. Fire comes first of the weather systems, and win
   From the second mockup (Paul): the wet darkening should be stronger, and a passing
   shower's rain streaks stay on screen longer than its true crossing (about a second at
   least), so they don't read as a twitch.
-- **Lightning shouldn't be drowned out** (Paul, 12 Oct 2026): a storm's own rain mustn't stop
-  the fire it starts from spreading much. As in real storms, strikes can land outside the
+- **Lightning shouldn't be drowned out** (Paul, 12 Oct 2026; built 13 Oct): a storm's own rain mustn't stop
+  the fire it starts from spreading much. Measured: removing a storm's rain changed its
+  fires' size by 0.4%. A share of showers are storms (`StormShare`, more in dry spells);
+  strikes land in a ring around and ahead of the storm and light fuel with the soil's
+  dryness as the chance, a few lightning fires a month on a typical world. As in real storms, strikes can land outside the
   rain core, around and ahead of the shower, and in dry spells storms are mostly dry
   lightning (little rain reaching the ground); a passing shower is brief anyway.
 - **Order:** showers and spells; drought you can see; lightning.
