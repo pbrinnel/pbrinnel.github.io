@@ -57,6 +57,8 @@
   // they burn (catching, then mid flames to the last part), a tile that burnt out recently
   // glowing as embers, then the scorch above. The close-up palette is AS.FIRE_PALETTE.
   const FAR_FIRE_MID = abgr('#b8461e'), FAR_FIRE_HIGH = abgr('#e07a34'), FAR_EMBER = abgr('#6a2a14');
+  // A burning animal, far out: a red that no species' color is near (orange read as a tan bunny).
+  const FAR_ALIGHT = abgr('#e8402a');
   // A tile that burnt out within the last FIRE_EMBER_HOURS of in-world time still glows: its
   // scorch is within that long of FireScorchDays (the most a fire leaves). Up close, the glow
   // is EMBER_PIXELS pixels that go out one by one as the hours pass; each is lit about a third
@@ -305,7 +307,8 @@
         else px[t] = holeAt[t] ? FAR_HOLE : bg;   // empty ground (or a hole), or an animal that the loop below paints
       }
       for (let s = 0, hiSlot = W.aHigh; s < hiSlot; s++) {
-        if (W.aAlive[s]) px[W.aTile[s]] = FAR_ANIMAL[W.aSpecies[s]][W.aSex[s]];
+        // Alight, an animal takes the fire's bright color in place of its species', steady (no alternating).
+        if (W.aAlive[s]) px[W.aTile[s]] = W.aAlight[s] > 0 ? FAR_ALIGHT : FAR_ANIMAL[W.aSpecies[s]][W.aSex[s]];
       }
       cell.ctx.putImageData(cell.img, 0, 0);
     }
@@ -321,6 +324,9 @@
       // blur or pull in the neighboring sprite's edge.
       ctx.imageSmoothingEnabled = false;
       const ox = cam.x * s, oy = cam.y * s;
+      // Burnt ground is ground, not height: the topo lines go over it (water and grass go over them).
+      drawScorch(sim, v, s, ox, oy);
+      drawAshAndEmbers(sim, v, s, ox, oy, nowMs);
       if (contoursOn) drawContours(sim, cam, dpr, true);
       for (let ty = v.y0; ty <= v.y1; ty++) {
         const dy = Math.round(ty * s - oy), dh = Math.round((ty + 1) * s - oy) - dy;
@@ -357,8 +363,6 @@
           ctx.drawImage(img, sh.sx(id), sh.sy(id), px, px, dx, dy, dw, dh);
         }
       }
-      drawScorch(sim, v, s, ox, oy);
-      drawAshAndEmbers(sim, v, s, ox, oy, nowMs);
       if (intentLines) drawIntent(sim, v, s, ox, oy, dpr, -1);
       else if (sel && sel.slot >= 0 && W.aAlive[sel.slot]) drawIntent(sim, v, s, ox, oy, dpr, sel.slot);
       // Animals, over the ground. Slots are stable, so this is one pass over the used range.
@@ -405,6 +409,7 @@
             const id = AS.spriteIndex(sp, W.aSex[a], stage, left, AS.SPRITE_FRAME.STAND);
             const cutY = AS.spriteRowPx(px, stage, AS.SWIM_CUT), shownH = AS.spriteRowPx(px, stage, firstHidden);
             ctx.drawImage(img, sh.sx(id), sh.sy(id), px, shownH, dx, dy + cutY - shownH, px, shownH);
+            if (W.aAlight[a] > 0) drawAlight(sim, a, img, sh, px, stage, dx, dy + cutY - AS.spriteRowPx(px, stage, AS.SPRITE_SIZE), nowMs);
             const lineH = Math.max(1, AS.spriteRowPx(px, stage, firstHidden + 1) - shownH);
             const span = AS.spriteRowSpan(sp, AS.SPRITE_FRAME.STAND, firstHidden, left);
             if (span) waterline(dx, dy + cutY, px, stage, span, lineH, moving && !drowning && W.aTile[a] % W.w !== W.aFrom[a] % W.w ? (left ? 1 : -1) : 0);
@@ -412,6 +417,7 @@
             const id = AS.spriteIndex(sp, W.aSex[a], stage, left, posed[0]);
             const feetY = AS.spriteRowPx(px, stage, AS.SPRITE_SIZE - 1), lift = Math.round(posed[1] * unit);
             ctx.drawImage(img, sh.sx(id), sh.sy(id), px, feetY, dx, dy - lift, px, feetY);
+            if (W.aAlight[a] > 0) drawAlight(sim, a, img, sh, px, stage, dx, dy - lift, nowMs);
             const span = AS.spriteRowSpan(sp, posed[0], AS.SPRITE_SIZE - 1, left);
             if (span) waterline(dx, dy + feetY, px, stage, span, Math.max(1, px - feetY), 0);
           }
@@ -420,14 +426,34 @@
         // A bunny that has reached a hole shows only its ears and eyes (arriving or leaving, it
         // is drawn whole, gliding over the hole).
         const peeking = sp === 0 && !moving && W.hole[W.aTile[a]] === 1;
+        const stage = stageOf(sim, a, W);
         const id = peeking
           ? AS.spritePeek(W.aSex[a])
-          : AS.spriteIndex(sp, W.aSex[a], stageOf(sim, a, W), facing.left(a), posed[0]);
+          : AS.spriteIndex(sp, W.aSex[a], stage, facing.left(a), posed[0]);
         // Lift in whole sprite pixels, so the body hops in the art's own grid.
-        ctx.drawImage(img, sh.sx(id), sh.sy(id), px, px,
-          Math.round(ax * s - ox), Math.round(ay * s - oy) - Math.round((peeking ? 0 : posed[1]) * unit), px, px);
+        const bx = Math.round(ax * s - ox), by = Math.round(ay * s - oy) - Math.round((peeking ? 0 : posed[1]) * unit);
+        ctx.drawImage(img, sh.sx(id), sh.sy(id), px, px, bx, by, px, px);
+        if (W.aAlight[a] > 0 && !peeking) drawAlight(sim, a, img, sh, px, stage, bx, by, nowMs);
       }
       ctx.imageSmoothingEnabled = true;
+    }
+
+    // Flames on a burning animal (W.aAlight > 0), drawn over its sprite at (dx, dy) in device px,
+    // so it stays fully in view: it is alive and moving, never engulfed. Tall tongues for the
+    // first ALIGHT_TALL_SHARE of its fire, the lower mid flames after, so it reads as burning
+    // from the first moment and settles as the fire does. A baby gets the flame at its own
+    // (smaller) size, bottom-centered like its sprite. The sway is the tiles' rule, on a clock
+    // of its own per animal (its serial).
+    // The flames ride ALIGHT_RAISE sprite rows above the body's own rows, licking up from its
+    // back, so the body shows under them instead of being swallowed.
+    const ALIGHT_TALL_SHARE = 0.5, ALIGHT_RAISE = 2;
+    function drawAlight(sim, a, img, sh, px, stage, dx, dy, nowMs) {
+      const W = sim.W, hours = sim.T[AS.SPECIES_KEY[W.aSpecies[a]]].AlightHours;
+      const burned = hours > 0 ? 1 - W.aAlight[a] / hours : 0;
+      const flame = burned < ALIGHT_TALL_SHARE ? AS.FLAME.TONGUES_TALL : AS.FLAME.MID;
+      const fid = AS.spriteFire(flame, AS.flameFrame(nowMs, W.aSerial[a], 0));
+      const b = AS.spriteRowPx(px, stage, AS.SPRITE_SIZE) - AS.spriteRowPx(px, stage, 0);
+      ctx.drawImage(img, sh.sx(fid), sh.sy(fid), px, px, dx + AS.spriteColPx(px, stage, 0), dy + AS.spriteRowPx(px, stage, 0) - Math.round(ALIGHT_RAISE * b / AS.SPRITE_SIZE), b, b);
     }
 
     // Where the water meets an animal: a lighter line under the columns its body covers in the
@@ -454,7 +480,8 @@
     // (AS.fireLook); the sway is real time, per tile (AS.flameFrame).
     function drawBurning(W, t, tx, ty, img, sh, px, dx, dy, dw, dh, nowMs) {
       const look = AS.fireLook(AS.fireStage(W, t));
-      if (look.char >= 0) {
+      // A painted ember on bare ground has nothing to char: the flames stand on the ground.
+      if (look.char >= 0 && W.kind[t] !== KIND.EMPTY) {
         let id;
         if (W.kind[t] === KIND.GRASS) id = AS.spriteCharGrass(AS.grassGlyph(W.gSize[t]) - AS.GLYPH.GRASS_0, look.char);
         else if (W.cMeat[t] > 0 || nowMs < deathUntil[t]) id = AS.spriteCharCarcass(W.cSpecies[t], look.char);
@@ -515,8 +542,8 @@
       }
     }
 
-    // Scorched tiles under everything else, fully dark until the last scorchFadeDays, then
-    // fading out in steps.
+    // Scorched tiles, first of all (under the topo lines), fully dark until the last
+    // scorchFadeDays, then fading out in steps.
     function drawScorch(sim, v, s, ox, oy) {
       const W = sim.W, scorch = W.scorch, fullDays = scorchFadeDays(sim);
       let lastQ = 0;
@@ -698,6 +725,12 @@
         for (let ty = y0; ty <= y1; ty++) {
           const row = ty * W.w;
           for (let tx = x0; tx <= x1; tx++) if (W.flow[row + tx] === FLOW.FIRE) ring(tx, ty);
+        }
+        // Burning animals are fires too, ringed where they are drawn.
+        for (let a = 0, hi = W.aHigh; a < hi; a++) {
+          if (!W.aAlive[a] || !(W.aAlight[a] > 0)) continue;
+          animalPos(W, a, curAlpha, pos);
+          if (pos[0] >= x0 && pos[0] <= x1 && pos[1] >= y0 && pos[1] <= y1) ring(pos[0], pos[1]);
         }
       } else {
         const kind = key === 'blades' ? KIND.GRASS : KIND.CORPSE;

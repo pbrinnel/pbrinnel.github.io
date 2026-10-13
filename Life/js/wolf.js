@@ -304,6 +304,9 @@
   // ---- the states --------------------------------------------------------------------------
 
   const STATES = {
+    // Fire outranks everything (escape.js); humans get it too, through hunterStates.
+    ESCAPE: AS.escapeState,
+
     DRINK: AS.drinkState,
 
     // "Walk to the carcass; eat BiteFood from it every BiteCooldown until full or the meat is

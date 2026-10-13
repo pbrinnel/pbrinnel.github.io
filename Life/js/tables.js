@@ -114,6 +114,7 @@
     ['CatchFire', 'frac', ANIMALS],
     ['AlightHours', 'pos', ANIMALS],
     ['BurnDamage', 'num', ANIMALS],
+    ['FireSense', 'num', ANIMALS],
   ];
 
   // Kept small enough that one grid's typed arrays stay well inside a phone's memory.

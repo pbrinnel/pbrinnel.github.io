@@ -304,7 +304,7 @@ last only as long as their lives.
   `CorpseDecay` ends, whichever comes first, so a bigger body feeds more grass.
 
 ## Fire and wind (planned)
-Decided by Paul, 12 Oct 2026. Wind and fire are built; animals and fire, and the ash, are
+Decided by Paul, 12 Oct 2026. Wind, fire, and animals and fire are built; the ash is
 next. Fire comes first of the weather systems, and wind is real weather, not an animation.
 
 - **Wind is in the sim** (built). The world has a wind, a direction and a strength that drift
@@ -335,8 +335,14 @@ next. Fire comes first of the weather systems, and wind is real weather, not an 
   it loses HP every second until its fire burns out or it reaches water, which puts it out;
   if it dies, its body burns on as a corpse (cause: Burned). A burning animal doesn't spread
   fire, for now.
-- **Animals sense fire and flee it.** A bunny makes for its hole, which never burns, and is
-  safe in it as a fire passes over; a burning animal makes for water when there is some near.
+- **Animals sense fire and flee it** (built 12 Oct 2026, the ESCAPE state, first for every
+  species). Smoke needs no line of sight: a burning tile within `FireSense` is enough, and
+  one escaping keeps at it until the fire is a little farther than that. A bunny makes for a
+  free hole within `HoleRange` nearer than the fire and sits in it while the fire is near,
+  as a hole never burns; the rest sprint straight away from the nearest burning tile, bending
+  along a wall. A burning animal makes for water within its `WaterSense`, which puts it out,
+  and otherwise runs from the fire (a hole is no help to a bunny already alight). The
+  properties window shows Alight: the hours of fire left.
 - **Painted fire on bare ground** (Paul, 12 Oct 2026: FIRE MODE should work anywhere but
   water) burns briefly, like a dropped ember, and can light the fuel beside it. Fire never
   spreads onto bare ground by itself, so bare ground is still a firebreak.
@@ -444,7 +450,8 @@ and **Size** (the Radius slider).
   animal of a random age (animals of random sex, from newborn to elder, full and rested;
   humans always adult). Grass skips warren holes, scorch and the beach; wolves and humans
   skip holes. While a paint mode is on, dragging paints instead of panning (pan with the
-  keys).
+  keys). Closing the PAINT window turns its mode off, so nothing paints while it's closed
+  (Paul, 12 Oct 2026).
 - **FIRE MODE** (12 Oct 2026): tap or drag to set everything in the brush's circle alight but
   water and warren holes: grass, bodies and animals catch, and bare ground gets a brief fire
   of its own; it spreads from there by itself.

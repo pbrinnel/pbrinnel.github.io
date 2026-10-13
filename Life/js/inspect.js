@@ -14,6 +14,7 @@
 
   const NONE = '—';
   const DAYS_DECIMALS = 2;
+  const ALIGHT_DECIMALS = 1;   // hours of fire left
   const SIZE_DECIMALS = 2;
   const POINT_DECIMALS = 1;   // Fullness, Stamina, HP, Nutrient
   const ELEV_DECIMALS = 1;    // meters
@@ -101,6 +102,8 @@
       return (c.Tsp.LeaveStress > 0 ? outOf(b.stress, c.Tsp.LeaveStress) : b.stress.toFixed(1)) + (b.leavingHome ? ', leaving home' : b.away ? ', emigrating' : '');
     },
     HP: (sim, c) => outOf(sim.W.aHP[c.s], c.Tsp.HPMax),
+    // In-world hours left on fire, as Pregnant shows what is left rather than a share of AlightHours.
+    Alight: (sim, c) => sim.W.aAlight[c.s] > 0 ? num(sim.W.aAlight[c.s], ALIGHT_DECIMALS) + ' hours left' : 'No',
     // A corpse's age is the time since it died, which is its own clock (cAge).
     Age: (sim, c) => {
       const W = sim.W;

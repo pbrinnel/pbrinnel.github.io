@@ -130,7 +130,7 @@ for (const [sp, name] of [[0, 'bunny'], [1, 'wolf'], [2, 'human']]) {
   ok(sname(sim, hide) === 'HIDE', 'a thirsty bunny in a hole with a wolf in sight hides');
   ok(sname(sim, dying) === 'DRINK', 'one about to die of thirst drinks with a wolf in sight (DesperateAt)');
   const order = names => names.indexOf('DRINK');
-  ok(order(T.states.bunny.map(s => s.name)) === 2 && order(T.states.wolf.map(s => s.name)) === 0 && order(T.states.human.map(s => s.name)) === 0, 'states.csv: DRINK after HIDE and FLEE for bunnies, first for wolves and humans');
+  ok(order(T.states.bunny.map(s => s.name)) === 3 && order(T.states.wolf.map(s => s.name)) === 1 && order(T.states.human.map(s => s.name)) === 1, 'states.csv: DRINK after ESCAPE, HIDE and FLEE for bunnies, right after ESCAPE for wolves and humans');
 }
 
 // ---- a crowd of thirsty bunnies at one small lake: they all drink and live ----

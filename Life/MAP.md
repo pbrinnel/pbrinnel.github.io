@@ -53,6 +53,7 @@ load time: every file reads other files' `AS.*` inside functions, at call time.
 | `animals.js` | every animal's body (hunger, thirst, healing, stamina, swimming's cost, age), the decide loop, bites, death, spawning; `relations(T)` (who hunts and eats whom); the shared grass bite `grazeBite` | `animalsTick`, `registerStates`, `checkStates`, `speciesStats`, `speedOf`, `setSprint`, `biteAnimal`, `killAnimal`, `spawnStarting`, `relations`, `grazeBite`, `bestAdjacentBlade`, … |
 | `moving.js` | how animals get from tile to tile: steps and their time, wading and swimming, chewing through grass, going around, walking out of deep water | `stepTo`, `chewOrStep`, `chewSeconds`, `canStand`, `canEnter`, `wadeOf`, `swimsNow`, `edgeStep`, `edgeReset`, `wadeOut` |
 | `drink.js` | the DRINK state every species shares | `drinkState` |
+| `escape.js` | the ESCAPE state every species shares (fire within `FireSense`, or alight: a bunny makes for a free hole nearer than the fire and sits in it, one alight for water it knows, the rest run straight away), the nearest burning tile, and the run-away step FLEE shares; draws nothing and costs nothing while no tile burns and nobody is alight | `escapeState`, `nearestFire`, `runFrom` |
 | `breed.js` | mating and births, shared by the species that breed (a species with no `LitterSize`, humans, never mates); the female's territory rule (`PackLimit`/`TerritoryRange`) in `canMate` | `canMate`, `mate`, `tryBirth` |
 | `bunny.js`, `wolf.js`, `human.js` | each species' states, by the names in `states.csv` ([Behavior](#behavior)). wolf.js's FEED, HUNT, GIVE_UP, REST and PROWL are the hunter states (`AS.hunterStates`), so human.js registers them too and adds FORAGE | (register via `AS.registerStates`) |
 | `glyphs.js` | ids (named for the font glyphs the map was first drawn with), the palette, and life stage (`stageOf`), shared by the sprites, the far view and the HUD | `GLYPH`, `COLORS`, `animalGlyph`, `grassGlyph`, `STAGE`, `stageOf` |
@@ -137,7 +138,7 @@ load time: every file reads other files' `AS.*` inside functions, at call time.
 the dense lists. Grass fields: grass.js. Hole fields: world.js (`addHole`/`removeHole`),
 `holeUsedAt` also warren.js. Corpse fields and `boostSrc`: corpse.js (`cMeat` also
 wolf.js, FEED). Water: water.js through world.js `setDepth`/`addWater`. Animal fields:
-animals.js, moving.js, drink.js, breed.js, bunny.js, wolf.js, human.js. Everything else (render, inspect,
+animals.js, moving.js, drink.js, escape.js, breed.js, bunny.js, wolf.js, human.js. Everything else (render, inspect,
 graph, ui, bench) only reads.
 
 ## Time
@@ -227,7 +228,7 @@ graph, ui, bench) only reads.
   else the water field's next tile), drinks `DrinkRate` per s from its own tile if wading,
   else a wet neighbor (`waterAt`), takes the water from `W.water` (`drinkFrom`:
   `WaterLiters` a meter) and sets `aBiteLeft` per sip for the head-down pose. Priority:
-  below HIDE and FLEE for bunnies, first for wolves and humans.
+  below ESCAPE, HIDE and FLEE for bunnies, below ESCAPE for wolves and humans.
 - The harness audit checks all of this by layer: flow WATER exactly where `wDepth > 0`, a wet tile's solid empty or an animal, no blade, corpse, hole, scorch or beach on it.
 
 ## Behavior
@@ -268,7 +269,8 @@ graph, ui, bench) only reads.
   `exp(-RoomPreference * c / (L/2))`, `c` = same-species animals in a box `L` =
   `VisionRange` tiles long reaching out that way; 0 = uniform random. Bunny FLEE's escape
   point is the best of straight-away and ±45°/±90° turns, scored by distance from the wolf
-  minus a cost for path tiles at the world's edge (`FLEE_*` in bunny.js).
+  minus a cost for path tiles at the world's edge (`AS.runFrom`, `RUN_*` in escape.js, which
+  ESCAPE also uses to run from a fire).
 - **Home and hiding** (bunny.js): `W.holeNear` says a tile is home (`atHome`); SEEK_FOOD
   looks at home only while at home, fed above `StrayAt` and not travelling (`mHomeOnly`);
   `wanderStep` remembers `home` and walks back (`edgeStep`) when strayed; a trip forgets
@@ -367,7 +369,10 @@ never flash: see DESIGN.md, Photosensitivity.
   only in its last `min(ScorchDays, FireScorchDays)` days; recently burnt tiles glow with
   embers (`FIRE_EMBER_HOURS`), and every scorched tile has ash pixels placed by a tile hash.
   The far view colors burning tiles by stage and embers fading to scorch. `AS.spriteFlame()`
-  is the PAINT and Info icon; 'fires' is a locate kind.
+  is the PAINT and Info icon; 'fires' is a locate kind. A burning animal (`aAlight`) carries
+  flames on its back (`drawAlight`, raised `ALIGHT_RAISE` rows) and is `FAR_ALIGHT` red far
+  out; 'fires' rings it too. Scorch, ash and embers draw first, under the topo lines, since
+  burnt ground is no higher; water and grass draw over the lines.
 - **Overlays** (render.js): scorched ground; the Radius slider's fading preview
   (`radiusPreview`, `RADIUS_*`); topo lines from `W.elev` when on (`setContours`, spacing
   `setContourStep`, each spacing cached per world, `CONTOUR_*`: marching squares in

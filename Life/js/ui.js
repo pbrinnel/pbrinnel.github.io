@@ -21,10 +21,11 @@
 //                                 (humansSeen: this world has had a human, so their count shows; firesSeen: likewise a fire)
 //     optional wind: { from (radians, the bearing it blows from), kmh }: the Info window's Wind row, an arrow
 //     the way it blows and words ("breeze, 14 km/h from the west"); without it the row stays hidden
-//   ui.windows, ui.setWindow(key, on)  the tab windows open (each tab button toggles its own)
+//   ui.windows, ui.setWindow(key, on)  the tab windows open (each tab button toggles its own;
+//                                    closing PAINT disarms its mode)
 //   ui.hidden, ui.setHidden(on)      Hide UI (the H key toggles it; never remembered across loads)
 //   ui.nuke, ui.setNuke(on)          NUKE MODE armed (main.js reads it through onNuke)
-//   ui.mode, ui.setMode(name)        the PAINT tab's one armed mode: 'nuke', 'grass', 'bunny', 'wolf', 'human', 'water' or ''
+//   ui.mode, ui.setMode(name)        the PAINT tab's one armed mode: 'nuke', 'grass', 'bunny', 'wolf', 'human', 'water', 'fire' or ''
 //                                    (onMode(name) on every change; onNuke(on) when nuke flips)
 //   ui.setRadiusDefaults(nuke, brush)  the Radius slider's starting values (settings.csv); a radius the
 //                                    viewer chose earlier (kept per mode in localStorage) wins. Called once the tables load.
@@ -417,6 +418,8 @@
       // On a computer Info sits down the left; the graph and minimap step aside (CSS) unless
       // it has been dragged somewhere else.
       if (key === 'info' && document.body) document.body.classList.toggle('side-open', on);
+      // A mode works only while its window is open, so a closed PAINT can't paint behind your back.
+      if (key === 'paint' && !on) paint.setMode('');
       if (onWindows && !quiet) onWindows([...openWins]);
     }
     // The first windows open quietly: onWindows is for the viewer's changes (main.js keeps them).

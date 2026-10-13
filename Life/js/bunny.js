@@ -6,16 +6,6 @@
 
   const K = AS.KIND, EV = AS.EV;
 
-  // How far ahead, in tiles, the flee intent line points from the bunny.
-  const FLEE_LOOKAHEAD = 4;
-  // The escape directions FLEE weighs, as [cos, sin] of the turn from straight away from the
-  // hunter: straight first (it wins ties), then 45 and 90 degrees to either side.
-  const FLEE_TURNS = [[1, 0], [Math.SQRT1_2, Math.SQRT1_2], [Math.SQRT1_2, -Math.SQRT1_2], [0, 1], [0, -1]];
-  // A tile of the escape path this near the edge of the world, or off it, counts as wall...
-  const FLEE_WALL_MARGIN = 2;
-  // ...and costs this many tiles of distance gained from the wolf, so a bunny turns along
-  // a wall once running on would put several path tiles against it.
-  const FLEE_WALL_COST = 1.5;
   // A blade a bunny couldn't path to is left out of its choices for this long (sim
   // seconds), so it tries a different blade instead of re-picking the same one every
   // decision. BAD_N such blades are remembered per bunny.
@@ -491,6 +481,10 @@
   // ---- the states -------------------------------------------------------------------------
 
   AS.registerStates('bunny', {
+    // Fire outranks everything, even a hunter in sight (escape.js, AS.escapeState): a bunny
+    // makes for a hole, which never burns, and sits in it while the fire is near.
+    ESCAPE: AS.escapeState,
+
     // "Stay still in the hole." Hunters can't bite a bunny on a hole or hunt it (wolf.js), so the
     // bunny simply waits, until no hunter has been in sight for HideSeconds (or it is desperate).
     HIDE: {
@@ -523,8 +517,7 @@
       },
       start(sim, s) { sim.W.aRunLeft[s] = 0; scared(sim, s); },
       act(sim, s) {
-        const W = sim.W, w = W.w, t = W.aTile[s], wolf = mem(W).wolf[s];
-        const tx = t % w, ty = (t / w) | 0, wx = wolf % w, wy = (wolf / w) | 0;
+        const W = sim.W, t = W.aTile[s], wolf = mem(W).wolf[s];
         AS.setSprint(sim, s, true);   // refuses at 0 Stamina, so it walks then
 
         // A hole in reach beats running away: head for it. If it was taken or the way is
@@ -539,61 +532,8 @@
           if (step >= 0) { AS.stepTo(sim, s, step); return; }
         }
 
-        // The escape point is FLEE_LOOKAHEAD tiles out along the best of a few directions:
-        // straight away from the wolf, or turned by FLEE_TURNS, scored by how far it ends
-        // from the wolf minus FLEE_WALL_COST for each tile of the way that is off the world or
-        // within FLEE_WALL_MARGIN of its edge. Straight away is tried first and a turn must
-        // score strictly higher, so with no wall near the bunny runs straight as it always has.
-        // A turn must also start on an open tile. The intent line points at the chosen point.
-        let ax = tx - wx, ay = ty - wy;
-        const len = Math.sqrt(ax * ax + ay * ay) || 1;
-        ax /= len; ay /= len;
-        let bestC = -1, bestScore = -Infinity, bex = 0, bey = 0;
-        // Far enough from every edge that no tile of any path can count as wall: straight away.
-        const far = FLEE_WALL_MARGIN + FLEE_LOOKAHEAD + 1;
-        const clear = tx >= far && ty >= far && tx < w - far && ty < W.h - far;
-        for (let c = 0; c < (clear ? 1 : FLEE_TURNS.length); c++) {
-          const cs = FLEE_TURNS[c][0], sn = FLEE_TURNS[c][1];
-          const cx = ax * cs - ay * sn, cy = ax * sn + ay * cs;
-          let near = 0;
-          for (let i = 1; i <= FLEE_LOOKAHEAD && !clear; i++) {
-            const px = Math.round(tx + cx * i), py = Math.round(ty + cy * i);
-            if (px < FLEE_WALL_MARGIN || py < FLEE_WALL_MARGIN || px >= w - FLEE_WALL_MARGIN || py >= W.h - FLEE_WALL_MARGIN) near++;
-          }
-          let ex = Math.round(tx + cx * FLEE_LOOKAHEAD), ey = Math.round(ty + cy * FLEE_LOOKAHEAD);
-          ex = ex < 0 ? 0 : ex >= w ? w - 1 : ex;
-          ey = ey < 0 ? 0 : ey >= W.h ? W.h - 1 : ey;
-          if (c > 0) {
-            const fx = Math.round(tx + cx), fy = Math.round(ty + cy);
-            if (!W.inside(fx, fy) || !AS.canEnter(sim, s, fy * w + fx)) continue;
-          }
-          const score = Math.sqrt((ex - wx) * (ex - wx) + (ey - wy) * (ey - wy)) - FLEE_WALL_COST * near;
-          if (score > bestScore) { bestScore = score; bestC = c; bex = ex; bey = ey; }
-          // Nothing near a wall on the straight path: no turn can beat it, so skip them.
-          if (c === 0 && near === 0) break;
-        }
-        W.aTargetTile[s] = bey * w + bex;
-        W.aTargetSlot[s] = -1;
-
-        if (W.aStepLeft[s] > 0) return;
-        // Straight away: the open neighbor that gets farthest from the wolf. A turn: the open
-        // neighbor nearest the escape point. Either way it must get farther from the wolf than
-        // where it is, or it stands (cornered).
-        const k = W.neighbors4(t, nb);
-        const d0 = (tx - wx) * (tx - wx) + (ty - wy) * (ty - wy);
-        let best = -1, bestD = bestC === 0 ? d0 : Infinity;
-        for (let i = 0; i < k; i++) {
-          const n = nb[i];
-          if (!AS.canEnter(sim, s, n)) continue;
-          const dx = (n % w) - wx, dy = ((n / w) | 0) - wy, d2 = dx * dx + dy * dy;
-          if (bestC === 0) {
-            if (d2 > bestD) { bestD = d2; best = n; }
-          } else if (d2 > d0) {
-            const ex = (n % w) - bex, ey = ((n / w) | 0) - bey, e2 = ex * ex + ey * ey;
-            if (e2 < bestD) { bestD = e2; best = n; }
-          }
-        }
-        if (best >= 0) AS.stepTo(sim, s, best);
+        // Straight away from the wolf, bending along a wall instead of into it (escape.js).
+        AS.runFrom(sim, s, wolf);
       },
     },
 

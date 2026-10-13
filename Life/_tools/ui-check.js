@@ -263,6 +263,8 @@ const winOf = (ids, key) => ids.hud.all(e => e.className === 'hud-tabstrip hud-w
   ui.lock(true); b[1].fire('click'); assert(ui.mode === 'human' && b.every(x => x.disabled)); ui.lock(false); ok('locked during the benchmark');
   b[4].fire('click');
   assert(ui.mode === '' && !b.some(x => x.classList.contains('on')) && !body.classList.contains('paint-armed') && modes.join() === 'grass,nuke,bunny,wolf,human,'); ok('clicking the active mode turns it off');
+  b[1].fire('click'); ui.setWindow('paint', true); ui.setWindow('paint', false);
+  assert(ui.mode === '' && !b[1].classList.contains('on') && !body.classList.contains('paint-armed')); ok('closing PAINT disarms its mode');
 }
 
 // ---- counts: a Total beside the species, humans with their own count ----

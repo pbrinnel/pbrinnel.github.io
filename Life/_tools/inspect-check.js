@@ -82,9 +82,9 @@ const mk = (t, sp, sx) => {
 };
 const selA = s => ({ tile: W.aTile[s], serial: W.aSerial[s], slot: s });
 const bm = mk(empties[2], 0, 0), bf = mk(empties[3], 0, 1), wm = mk(empties[4], 1, 0), wf = mk(empties[5], 1, 1);
-const R = 'Fullness,Water,Stamina,HP,Age,Lifestage,Dead,State,Target,Sex,';
+const R = 'Fullness,Water,Stamina,HP,Alight,Age,Lifestage,Dead,State,Target,Sex,';
 const TILE = ',Tile,Position,Elevation,Ground';   // every selection ends with the tile under it
-const RB = 'Fullness,Water,Stress,Stamina,HP,Age,Lifestage,Dead,State,Target,Sex,';   // bunnies also have Stress
+const RB = 'Fullness,Water,Stress,Stamina,HP,Alight,Age,Lifestage,Dead,State,Target,Sex,';   // bunnies also have Stress
 const dbm = A.describe(sim, selA(bm)), dbf = A.describe(sim, selA(bf)), dwm = A.describe(sim, selA(wm)), dwf = A.describe(sim, selA(wf));
 allValues.push(dbm, dbf, dwm, dwf);
 check(names(dbm) === RB + 'Parents,Children,InHole' + TILE, 'male bunny: ' + names(dbm));
@@ -103,6 +103,9 @@ W.aPregnant[bf] = 1.3; W.aMateCd[bf] = 0.4; W.aParentA[bf] = 5; W.aParentB[bf] =
 let d2 = A.describe(sim, selA(bf));
 check(val(d2, 'Pregnant') === '1.30 days left' && val(d2, 'MateCooldown') === '0.40 days left', 'pregnant text ' + val(d2, 'Pregnant'));
 check(val(d2, 'Parents') === '#5 and #1234' && val(dbm, 'Parents') === 'None (first generation)' && val(d2, 'Children') === '12,345', 'parents/children');
+check(val(dbm, 'Alight') === 'No', 'not alight: Alight No');
+W.aAlight[bm] = 3.25; check(val(A.describe(sim, selA(bm)), 'Alight') === '3.3 hours left' || val(A.describe(sim, selA(bm)), 'Alight') === '3.2 hours left', 'alight: hours left ' + val(A.describe(sim, selA(bm)), 'Alight'));
+W.aAlight[bm] = 0;
 W.aAge[bf] = 0.5; check(val(A.describe(sim, selA(bf)), 'Lifestage') === 'Baby', 'baby');
 W.aAge[bf] = 19; check(val(A.describe(sim, selA(bf)), 'Lifestage') === 'Elder', 'elder');
 // holes: a bare hole is selectable and shows its own rows; a bunny says whether it is in one
