@@ -153,6 +153,9 @@
   // How dark a burning thing gets while the fire on it grows (brightness, one per look that
   // still shows it): the first is a hint of char, the last nearly black.
   const CHAR_BRIGHTNESS = [0.8, 0.6, 0.42];
+  // Drought (Paul's pick, option E of the weather mockup): grass fades toward straw as its soil
+  // dries, DRY_MIX being how far toward STRAW each step goes (render.js says which step a tile is in).
+  const STRAW = '#b59a55', DRY_MIX = [0.3, 0.5, 0.66];
   const WATER_BASE = '#2b5c8c', WATER_LIGHT = '#3a6e9f', WATER_DARK = '#244f7c';
   // How each depth band is shaded from those (Paul, 11 Oct 2026: water shows its depth the way
   // grass shows its size): shallow lighter, deep darker. Below WATER_MID_M meters is shallow,
@@ -173,6 +176,12 @@
   function shade(h, f) {
     const c = hexToRgb(h).map(v => (f <= 1 ? v * f : v + (255 - v) * (f - 1)));
     return '#' + c.map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
+  }
+
+  // The color a share f of the way from hex a to hex b.
+  function mixHex(a, b, f) {
+    const x = hexToRgb(a), y = hexToRgb(b);
+    return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * f).toString(16).padStart(2, '0')).join('');
   }
 
   // ---- animation --------------------------------------------------------------------
@@ -275,13 +284,16 @@
   // the bunny peeking out of it (by sex), the water (three depths × three variants), the
   // nuke icon, the eight flames (four kinds × two sway frames), and last the charred things:
   // for each charring (CHAR_BRIGHTNESS) the three grass thirds, then each species' carcass,
-  // then each species' skull.
+  // then each species' skull; and at the very end the dried grass (see DRY0).
   const N_SPECIES = AS.SPECIES_COUNT;
   const ANIMAL_SPRITES = N_SPECIES * 2 * 3 * 2 * FRAMES;
   const SKULL0 = ANIMAL_SPRITES, GRASS0 = SKULL0 + N_SPECIES, LEAN0 = GRASS0 + 3, LEAN_LEFT0 = LEAN0 + 3, CARCASS0 = LEAN_LEFT0 + 3;
   // Water comes in WATER_DEPTHS shades (shallow, mid, deep), each in every ripple variant.
   const HOLE0 = CARCASS0 + N_SPECIES, PEEK0 = HOLE0 + 1, WATER0 = PEEK0 + 2, NUKE0 = WATER0 + WATER_DEPTHS.length * WATER_BITMAPS.length;
-  const FIRE0 = NUKE0 + 1, CHAR0 = FIRE0 + FIRE_BITMAPS.length, CHARRED_THINGS = 3 + 2 * N_SPECIES, COUNT = CHAR0 + CHAR_BRIGHTNESS.length * CHARRED_THINGS;
+  const FIRE0 = NUKE0 + 1, CHAR0 = FIRE0 + FIRE_BITMAPS.length, CHARRED_THINGS = 3 + 2 * N_SPECIES;
+  // Last, the dried grass: for each step of dryness the three thirds standing, leaning right and
+  // leaning left (nine to a step).
+  const DRY0 = CHAR0 + CHAR_BRIGHTNESS.length * CHARRED_THINGS, DRY_PER_STEP = 9, COUNT = DRY0 + DRY_MIX.length * DRY_PER_STEP;
   const SHEET_COLS = 19;
   const BY_SPECIES = [BUNNY, WOLF, HUMAN];
   // The row of a species' standing eye, and the columns a frame's row covers ([first, last],
@@ -313,6 +325,11 @@
   AS.spriteCharCarcass = (species, level) => CHAR0 + level * CHARRED_THINGS + 3 + species;
   AS.spriteCharSkull = (species, level) => CHAR0 + level * CHARRED_THINGS + 3 + N_SPECIES + species;
   AS.CHAR_LEVELS = CHAR_BRIGHTNESS.length;
+  // A blade dried to `step` (1..DRY_STEPS), standing (lean 0), leaning right (1) or left (-1).
+  AS.DRY_STEPS = DRY_MIX.length;
+  AS.spriteGrassDry = (third, lean, step) => DRY0 + (step - 1) * DRY_PER_STEP + (lean > 0 ? 3 : lean < 0 ? 6 : 0) + third;
+  AS.STRAW = STRAW;
+  AS.DRY_MIX = DRY_MIX;
   AS.spritePeek = sex => PEEK0 + sex;   // a bunny in a hole, by sex
   // A water tile's sprite: its depth band (AS.waterBand: 0 shallow, 1 mid, 2 deep) and a ripple
   // variant from its position, a fixed scramble of x and y, never random.
@@ -521,6 +538,12 @@
           at(AS.spriteCharCarcass(sp, lv), (x, y) => paint(g, x, y, px, CARCASS_BITMAPS[sp], AS.COLORS[AS.animalGlyph(sp, 0, AS.STAGE.ADULT)], false, 1, CARCASS_BRIGHTNESS * dim));
           at(AS.spriteCharSkull(sp, lv), (x, y) => paint(g, x, y, px, SKULL_BITMAPS[sp], AS.COLORS[AS.GLYPH.CORPSE], false, CORPSE_SCALE, dim));
         }
+      }
+      for (let step = 1; step <= DRY_MIX.length; step++) for (let i = 0; i < 3; i++) {
+        const base = mixHex(GRASS_COLORS[i], STRAW, DRY_MIX[step - 1]);
+        at(AS.spriteGrassDry(i, 0, step), (x, y) => paint(g, x, y, px, GRASS_BITMAPS[i], base, false, 1));
+        at(AS.spriteGrassDry(i, 1, step), (x, y) => paint(g, x, y, px, GRASS_LEAN[i], base, false, 1));
+        at(AS.spriteGrassDry(i, -1, step), (x, y) => paint(g, x, y, px, GRASS_LEAN_LEFT[i], base, false, 1));
       }
       for (let i = 0; i < 3; i++) {
         at(GRASS0 + i, (x, y) => paint(g, x, y, px, GRASS_BITMAPS[i], GRASS_COLORS[i], false, 1));

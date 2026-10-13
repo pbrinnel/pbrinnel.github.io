@@ -435,7 +435,7 @@ const winOf = (ids, key) => ids.hud.all(e => e.className === 'hud-tabstrip hud-w
 { const { ui, ids, ctx } = build(false);
   const AS = ctx.AS, row = ids.hud.all(e => e.className === 'hud-sec hud-sec-wind')[0];
   const names = panelOf(ids, 'info').children.map(c => c.className);
-  assert(row && names.indexOf('hud-sec hud-sec-counts') + 1 === names.indexOf('hud-sec hud-sec-wind') && names.indexOf('hud-sec hud-sec-wind') + 1 === names.indexOf('hud-sec hud-sec-overlays') && !names.includes('hud-sec hud-sec-windows')); ok('Info has a Wind row after Counts and before Overlays; no Windows row any more');
+  assert(row && names.indexOf('hud-sec hud-sec-counts') + 1 === names.indexOf('hud-sec hud-sec-wind') && names.indexOf('hud-sec hud-sec-wind') + 1 === names.indexOf('hud-sec hud-sec-weather') && names.indexOf('hud-sec hud-sec-weather') + 1 === names.indexOf('hud-sec hud-sec-overlays') && !names.includes('hud-sec hud-sec-windows')); ok('Info has a Wind row after Counts, a Weather row after that, then Overlays; no Windows row any more');
   assert(/wind/i.test(row.children[0]._title)); ok('the Wind row has a tooltip');
   const text = () => row.all(e => e.className === 'hud-wind-text')[0].textContent;
   const arrow = row.all(e => e.className === 'hud-wind-arrow')[0];
@@ -460,5 +460,39 @@ const winOf = (ids, key) => ids.hud.all(e => e.className === 'hud-tabstrip hud-w
   assert.strictEqual(writes, w); ok('a second identical hud() with wind writes nothing (text and angle only change when what shows changes)');
   ui.hud({ ...input, wind: { from: 1, kmh: 10.2 } }); const before = arrow.style.transform;
   ui.hud({ ...input }); assert.strictEqual(text(), `breeze, 10 km/h from the east`.replace('east', AS.windFromName(1))); assert.strictEqual(arrow.style.transform, before); ok('a later hud() without wind keeps the last reading');
+}
+// ---- the Info window's Weather row ----
+{ const { ui, ids, ctx } = build(false);
+  const AS = ctx.AS, row = ids.hud.all(e => e.className === 'hud-sec hud-sec-weather')[0];
+  const text = () => row.all(e => e.className === 'hud-weather-text')[0].textContent;
+  assert(row && row.hidden && /rain|dry|storm/i.test(row.children[0]._title)); ok('the Weather row exists, hidden, with a tooltip');
+  const MAP = [450, 300];
+  const showers = list => {
+    const n = list.length, sh = { n, x: new Float64Array(n), y: new Float64Array(n), r: new Float64Array(n), storm: new Uint8Array(n) };
+    list.forEach(([x, y, r, storm], i) => { sh.x[i] = x; sh.y[i] = y; sh.r[i] = r; sh.storm[i] = storm ? 1 : 0; });
+    return sh;
+  };
+  const wx = (list, rainToday, dryDays) => ({ field: new Float32Array(1), showers: showers(list), rainToday, dryDays, spellRate: 1 });
+  const words = (w) => AS.weatherWords(w, ...MAP);
+  const on = [[200, 100, 50]], far = [[-400, 100, 50]], storm = [[200, 100, 50, 1]];
+  assert.strictEqual(words(wx([], 0, 9.7)), 'dry for 9 days'); ok('dry for N days, N whole');
+  assert.strictEqual(words(wx([], 0, 1.2)), 'dry for 1 day'); ok('"1 day" in the singular');
+  assert.strictEqual(words(wx([], 0, 0.4)), 'clear'); ok('under a day dry and nothing falling: clear');
+  assert.strictEqual(words(wx([], 5.6, 0)), 'rain, 6 mm today'); ok('rain that fell on the map today, rounded mm');
+  assert.strictEqual(words(wx([], 0.6, 0)), 'rain, 1 mm today'); ok('a light day is at least 1 mm');
+  assert.strictEqual(words(wx([], 0.2, 0.3)), 'clear'); ok('a trace of rain is not "rain"');
+  assert.strictEqual(words(wx(on, 0, 0.1)), 'showers nearby'); ok('a shower on the map now: showers nearby');
+  assert.strictEqual(words(wx(far, 0, 4)), 'dry for 4 days'); ok('a shower far off the map does not count');
+  assert.strictEqual(words(wx([[-30, 100, 50]], 0, 4)), 'showers nearby'); ok('a shower whose edge reaches the map does');
+  assert.strictEqual(words(wx(storm, 0, 0.1)), 'storm'); ok('a storm on the map now');
+  assert.strictEqual(words(wx(storm, 14.2, 0)), 'storm, 14 mm today'); ok('a storm and the day\'s rain');
+  assert.strictEqual(words(wx(on, 5.6, 0)), 'rain, 6 mm today'); ok('rain today outranks showers nearby');
+  // hud(): hidden without weather or without rain (field null), shown with it; writes only on change.
+  ui.hud(input); assert(row.hidden && text() === ''); ok('hud() without weather leaves the row hidden');
+  ui.hud({ ...input, weather: { ...wx([], 0, 3), field: null }, mapW: MAP[0], mapH: MAP[1] }); assert(row.hidden); ok('a world with no rain (no field) hides it');
+  ui.hud({ ...input, weather: wx([], 5.6, 0), mapW: MAP[0], mapH: MAP[1] }); assert(!row.hidden && text() === 'rain, 6 mm today'); ok('a world with rain shows it');
+  const w0 = writes;
+  ui.hud({ ...input, weather: wx([], 5.7, 0.2), mapW: MAP[0], mapH: MAP[1] }); assert.strictEqual(writes, w0); ok('a second hud() showing the same words writes nothing');
+  ui.hud({ ...input, weather: wx([], 0, 9.7), mapW: MAP[0], mapH: MAP[1] }); assert.strictEqual(text(), 'dry for 9 days'); ok('and it follows the weather');
 }
 console.log('all passed');

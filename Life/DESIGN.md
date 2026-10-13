@@ -391,6 +391,12 @@ weather's next part comes next. Fire comes first of the weather systems, and win
   dryness as the chance, a few lightning fires a month on a typical world. As in real storms, strikes can land outside the
   rain core, around and ahead of the shower, and in dry spells storms are mostly dry
   lightning (little rain reaching the ground); a passing shower is brief anyway.
+- **Built 13 Oct:** wet soil darkens ground and grass, dry soil turns grass toward straw in
+  three steps, both from the soil water fire reads, eased so no tile changes faster than
+  every couple of seconds; rain streaks under showers, held at least `STREAK_HOLD_MS`; the
+  L1 bolt, at most one every `BOLT_GAP_MS`; Info's Weather row ("storm", "rain, 6 mm
+  today", "showers nearby", "dry for 9 days", "clear"). A shower's swath shows plainly after
+  a dry spell and hardly at all in a wet one (the soil is already damp); Paul to judge.
 - **Order:** showers and spells; drought you can see; lightning.
 
 ## Looks

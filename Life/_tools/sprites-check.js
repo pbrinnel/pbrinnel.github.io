@@ -63,6 +63,8 @@ for (let lv = 0; lv < AS.CHAR_LEVELS; lv++) {
   for (let t = 0; t < 3; t++) add(AS.spriteCharGrass(t, lv), `charred grass ${t} level ${lv}`);
   for (let sp = 0; sp < AS.SPECIES_COUNT; sp++) { add(AS.spriteCharCarcass(sp, lv), `charred carcass ${sp} level ${lv}`); add(AS.spriteCharSkull(sp, lv), `charred skull ${sp} level ${lv}`); }
 }
+// Dried grass: each step of dryness in all three poses and thirds.
+for (let st = 1; st <= AS.DRY_STEPS; st++) for (const lean of [0, 1, -1]) for (let t = 0; t < 3; t++) add(AS.spriteGrassDry(t, lean, st), `dry grass step ${st} lean ${lean} third ${t}`);
 // Water: in each depth band (AS.waterBand) every variant turns up somewhere, by position alone.
 const waterSeen = new Set(), bands = AS.WATER_DEPTH_SHADES.length;
 for (let b = 0; b < bands; b++) for (let y = 0; y < 40; y++) for (let x = 0; x < 40; x++) waterSeen.add(AS.spriteWater(x, y, b));

@@ -21,6 +21,8 @@
 //                                 (humansSeen: this world has had a human, so their count shows; firesSeen: likewise a fire)
 //     optional wind: { from (radians, the bearing it blows from), kmh }: the Info window's Wind row, an arrow
 //     the way it blows and words ("breeze, 14 km/h from the west"); without it the row stays hidden
+//     optional weather: sim.weather, with mapW, mapH (tiles): the Weather row, in words (AS.weatherWords);
+//     hidden without it, and in a world with no rain (weather.field is null there)
 //   ui.windows, ui.setWindow(key, on)  the tab windows open (each tab button toggles its own;
 //                                    closing PAINT disarms its mode)
 //   ui.hidden, ui.setHidden(on)      Hide UI (the H key toggles it; never remembered across loads)
@@ -50,6 +52,29 @@
 
   // The Wind row's arrow points up (north) at rest; CSS rotates it to the way the wind blows.
   const WIND_ARROW = '<svg width="22" height="22" viewBox="-11 -11 22 22" aria-hidden="true"><path d="M0 -8 L5 4 L0 1 L-5 4 Z" fill="currentColor"/></svg>';
+  // The Weather row's words, from sim.weather (weather.js) and the map's size in tiles: a storm
+  // on the map now, else the rain that has fallen on it today, else showers on it, else how long
+  // it has been dry. Only the map counts: a shower must overlap it (a shower far upwind isn't
+  // "nearby"). Without a size, any shower does.
+  const RAIN_SHOWN_MM = 0.5;   // the day's mean rain on the map from which it "rained today"
+  AS.weatherWords = function (weather, mapW, mapH) {
+    const sh = weather.showers;
+    let any = false, storm = false;
+    for (let i = 0; sh && i < sh.n; i++) {
+      if (mapW > 0) {
+        const dx = Math.max(0, -sh.x[i], sh.x[i] - mapW), dy = Math.max(0, -sh.y[i], sh.y[i] - mapH);
+        if (dx * dx + dy * dy > sh.r[i] * sh.r[i]) continue;
+      }
+      any = true;
+      if (sh.storm && sh.storm[i]) storm = true;
+    }
+    const mm = weather.rainToday, rained = mm >= RAIN_SHOWN_MM, today = `${Math.max(1, Math.round(mm))} mm today`;
+    if (storm) return rained ? `storm, ${today}` : 'storm';
+    if (rained) return `rain, ${today}`;
+    if (any) return 'showers nearby';
+    const days = Math.floor(weather.dryDays);
+    return days >= 1 ? `dry for ${days} ${days === 1 ? 'day' : 'days'}` : 'clear';
+  };
   // Figures below this get one decimal ("2.5×"); above it, whole numbers ("312×").
   const DECIMAL_BELOW = 10;
   const NUMBER_KEYS = '123456';
@@ -223,6 +248,7 @@
     }
     const showCounts = section('info', 'Counts', 'Tap a count to ring every one of that kind on the map');
     const showWind = section('info', 'Wind', 'The world\'s wind: where it blows from and how hard');
+    const showWeather = section('info', 'Weather', 'Rain on the map today, storms, and how long it has been dry');
     const showElev = section('info', 'Overlays', 'What is drawn over the world');
     const showProps = section('info', 'Properties', 'The properties window: what something is and how it is doing');
     const showTables = section('info', 'Tables');
@@ -274,6 +300,11 @@
     showWind.append(windArrow, windText);
     const windRow = showWind.parentNode;
     windRow.hidden = true;
+    // The Weather row, likewise: only a world with rain has any (hud() is given its weather).
+    const weatherText = el('span', 'hud-weather-text', '');
+    showWeather.append(weatherText);
+    const weatherRow = showWeather.parentNode;
+    weatherRow.hidden = true;
 
     // Unlike Graph and Map, the Lines button owns its state: nothing else changes it.
     let linesBtn = null;
@@ -501,6 +532,7 @@
     const setDay = cachedText(dayEl);
     const setSeed = cachedText(seedNum);
     const setWindText = cachedText(windText);
+    const setWeatherText = cachedText(weatherText);
     let windDeg = null;   // the arrow's whole-degree angle as last written
     const setCount = {};
     for (const [, key] of COUNTS) setCount[key] = cachedText(countEls[key]);
@@ -540,6 +572,9 @@
         const deg = (((Math.round(s.wind.from * 180 / Math.PI) + 180) % 360) + 360) % 360;
         if (deg !== windDeg) { windDeg = deg; windArrow.style.transform = `rotate(${deg}deg)`; }
       }
+      const rains = !!(s.weather && s.weather.field);
+      if (weatherRow.hidden === rains) weatherRow.hidden = !rains;
+      if (rains) setWeatherText(AS.weatherWords(s.weather, s.mapW, s.mapH));
     }
 
     function warnings(list) {

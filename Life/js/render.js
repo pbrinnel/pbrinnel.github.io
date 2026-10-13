@@ -53,6 +53,45 @@
     return (0xff000000 | (ch(16) << 16) | (ch(8) << 8) | ch(0)) >>> 0;
   }
 
+  // Soil wetness (Paul, from the weather mockup): the soil water a tile holds against its room
+  // (W.water.G over W.water.room, the quantity fire.js reads as dryness) sets a signed level,
+  // -SOIL_DRY_BELOW.length (driest) .. SOIL_WET_AT.length (wettest). Wet soil darkens and cools
+  // the tile (a WET_RGB veil, WET_ALPHA by level, stronger than the mockup's); dry soil fades
+  // the grass toward straw (sprites.js, DRY_MIX), the ground untouched. Meadow soil sits at a few
+  // hundredths of its room and a shower adds about one hundredth, so the steps are spaced by
+  // doubling from there rather than evenly: a swath shows on ground that was dry, and ground
+  // beside water, always near its room, is always the darkest.
+  const SOIL_WET_AT = [0.03, 0.08, 0.2];
+  const SOIL_DRY_BELOW = [0.008, 0.004, 0.002];
+  // A level is left only once the share is this much (relative) past its threshold, so a tile
+  // sitting on one doesn't flap as the water steps.
+  const SOIL_HYSTERESIS = 0.15;
+  const WET_RGB = '6,16,32';
+  const WET_ALPHA = [0.36, 0.5, 0.62];
+  // The far view's colors for the same levels: the grass mixed toward FAR_WET / FAR_STRAW, the
+  // bare ground toward a cool gray-blue (it cannot get darker).
+  const FAR_WET_GRASS = '#0b1c34', FAR_WET_GROUND = '#1e3048', FAR_STRAW_HEX = AS.STRAW;
+  const FAR_WET_GRASS_MIX = [0.35, 0.5, 0.62], FAR_WET_GROUND_MIX = [0.3, 0.5, 0.7], FAR_DRY_MIX = [0.25, 0.45, 0.62];
+  // Over real time, like water (DESIGN.md, Photosensitivity): the soil is swept for new levels
+  // once per SOIL_SWEEP_MS, a tile moves one level at a time, each taking SOIL_FADE_MS and the
+  // next beginning no sooner, so a tile never changes its drawn level more than once per
+  // SOIL_FADE_MS and a back-and-forth takes twice that. A swath darkening is a slow fade
+  // spread over the sweep, never a sudden change of a large area.
+  const SOIL_SWEEP_MS = 500, SOIL_FADE_MS = AS.SOIL_FADE_MS = 2000;
+
+  // The far view's tile colors by soil level (index level + SOIL_DRY_BELOW.length, see SOIL_WET_AT):
+  // FAR_GRASS_BY[third][index] and FAR_GROUND_BY[index].
+  const SOIL_LEVELS_DRY = SOIL_DRY_BELOW.length, SOIL_LEVELS_WET = SOIL_WET_AT.length;
+  const FAR_GRASS_BY = FAR_GRASS.map(c => {
+    const row = [];
+    for (let l = -SOIL_LEVELS_DRY; l <= SOIL_LEVELS_WET; l++) {
+      row.push(l < 0 ? mixAbgr(c, abgr(FAR_STRAW_HEX), FAR_DRY_MIX[-l - 1]) : l > 0 ? mixAbgr(c, abgr(FAR_WET_GRASS), FAR_WET_GRASS_MIX[l - 1]) : c);
+    }
+    return row;
+  });
+  const FAR_GROUND_BY = [];
+  for (let l = -SOIL_LEVELS_DRY; l <= SOIL_LEVELS_WET; l++) FAR_GROUND_BY.push(l > 0 ? mixAbgr(FAR_GROUND, abgr(FAR_WET_GROUND), FAR_WET_GROUND_MIX[l - 1]) : FAR_GROUND);
+
   // Fire's far-view colors (Paul's pick, option E of the fire mockup): burning tiles by how hard
   // they burn (catching, then mid flames to the last part), a tile that burnt out recently
   // glowing as embers, then the scorch above. The close-up palette is AS.FIRE_PALETTE.
@@ -136,6 +175,34 @@
   // flick the animal's feet in and out of view. At WATER_STANCE_MIN a fade has taken half its time.
   const WATER_STANCE_MIN = 0.5;
   const WADE_FLOOR_M = 1e-3;   // the depth a drying tile still counts for while its water is on screen
+
+  // Rain streaks (Paul's mockup A look): short thin slanted dashes, a few to a STREAK_CELL-tile
+  // square, under every shower in view. A shower crosses the screen in a fraction of a second,
+  // so a cell keeps its streaks STREAK_HOLD_MS of real time after the shower leaves it, easing
+  // in over STREAK_IN_MS and out over STREAK_OUT_MS; a cell's streaks cannot come and go faster
+  // than the sum of the three. Up to STREAK_MOVE_MAX_SPEED the streaks fall (STREAK_FALL_PX
+  // sprite pixels a second, a sprite pixel being one-eighth of a tile); faster, or paused, they
+  // hold still, fainter, so nothing churns. The fall is eased in and out over STREAK_MOTION_MS.
+  const STREAK_CELL = 4, STREAK_PER_CELL = 5, STREAK_LEN = 5;
+  const STREAK_HOLD_MS = AS.STREAK_HOLD_MS = 1200, STREAK_IN_MS = 300, STREAK_OUT_MS = 1000;
+  const STREAK_STALE_MS = STREAK_HOLD_MS + STREAK_IN_MS + STREAK_OUT_MS;   // a cell unseen this long is back at nothing
+  const STREAK_MOVE_MAX_SPEED = 5, STREAK_MOTION_MS = 1000, STREAK_FALL_PX = 56;
+  const STREAK_ALPHA = 0.5, STREAK_STILL_ALPHA = 0.26, STREAK_ALPHA_STEPS = 4;
+  const STREAK_RGB = AS.STREAK_RGB = '170,196,226';
+  const STREAK_SLOPE = 0.7;           // sideways sprite pixels per pixel fallen, in a wind of AS.GUSTS.FULL_KMH
+  const STREAK_STAIR_AT = 2;          // device px per sprite pixel from which a streak is drawn pixel by pixel, else as one dash
+  const SALT_STREAK_X = 41, SALT_STREAK_Y = 42;
+
+  // Lightning (Paul's L1): a thin jagged muted pale line from above the screen to the struck
+  // tile, easing in, holding, easing out, never above BOLT_PEAK and with no glow; nothing
+  // else on screen brightens. At most one bolt starts per BOLT_GAP_MS of real time (a strike
+  // in between is skipped; its fire shows anyway).
+  const BOLT_GAP_MS = AS.BOLT_GAP_MS = 5000, BOLT_IN_MS = 300, BOLT_HOLD_MS = 600, BOLT_OUT_MS = 1000;
+  const BOLT_PEAK = AS.BOLT_PEAK = 0.6, BOLT_RGB = AS.BOLT_RGB = '176,186,200';
+  const BOLT_ABOVE_TILES = 3;         // it starts this far above the top of the view when it strikes
+  const BOLT_LEAN_TILES = 3;          // ... and as far sideways at most
+  const BOLT_STEP_TILES = 0.42, BOLT_JAG_TILES = 0.22;
+  const SALT_BOLT = 51;
 
   // The Radius slider's preview (Paul, 12 Oct 2026): a circle the size the armed mode will
   // cover, in the middle of the map, held RADIUS_HOLD_MS then faded out over RADIUS_FADE_MS
@@ -397,8 +464,92 @@
       return shown ? (W.wDepth[t] > 0 ? W.wDepth[t] : WADE_FLOOR_M) : 0;
     }
 
+    // ---- soil wetness, drawn over real time ----------------------------------------------
+    // Per tile: tgt (the level its soil is at now), cur (the level on screen), nxt and prog (a
+    // tile moving from cur toward nxt, one level at a time, prog 0..1 of the way) and act (it is
+    // in `list`: moving or about to). A sweep takes tgt up to date, a slice of the world a
+    // frame, and a tile whose tgt differs from cur joins the list and leaves it when they
+    // agree; a frame touches only the tiles moving. A fade whose tgt turns back runs backwards
+    // from where it is, so a tile that flaps never completes a change. Only worlds with rain
+    // (and so soil water) have any of it.
+    let soil = null;
+    function levelOf(f, prev) {
+      // Wet from the top level down, dry likewise: a level holds while the share stays within
+      // SOIL_HYSTERESIS of its threshold, and is taken only once past it.
+      let l = 0;
+      for (let i = SOIL_WET_AT.length - 1; i >= 0; i--) {
+        if (f >= SOIL_WET_AT[i] * (prev > i ? 1 - SOIL_HYSTERESIS : 1 + SOIL_HYSTERESIS)) { l = i + 1; break; }
+      }
+      if (l === 0 && f < SOIL_DRY_BELOW[0] * (prev < 0 ? 1 + SOIL_HYSTERESIS : 1 - SOIL_HYSTERESIS)) {
+        l = -1;
+        for (let i = 1; i < SOIL_DRY_BELOW.length; i++) {
+          if (f < SOIL_DRY_BELOW[i] * (prev < -i ? 1 + SOIL_HYSTERESIS : 1 - SOIL_HYSTERESIS)) l = -(i + 1); else break;
+        }
+      }
+      return l;
+    }
+    function soilIsLive(sim) {
+      return !!(sim.W.water && sim.weather && sim.weather.field);
+    }
+    function updateSoil(sim, nowMs) {
+      if (!soilIsLive(sim)) { soil = null; return; }
+      const W = sim.W, n = W.n, G = W.water.G, room = W.water.room;
+      if (!soil || soil.W !== W || soil.n !== n) {
+        soil = { W, n, tgt: new Int8Array(n), cur: new Int8Array(n), nxt: new Int8Array(n), prog: new Float32Array(n), act: new Uint8Array(n), list: new Int32Array(n), count: 0, pos: 0, ms: nowMs };
+        for (let t = 0; t < n; t++) soil.tgt[t] = soil.cur[t] = soil.nxt[t] = levelOf(G[t] / room, 0);
+        return;
+      }
+      const dt = nowMs - soil.ms;
+      if (!(dt > 0)) return;
+      soil.ms = nowMs;
+      const tgt = soil.tgt, cur = soil.cur, nxt = soil.nxt, prog = soil.prog, act = soil.act, list = soil.list;
+      // Sweep a slice of the world, so the whole of it is looked at once per SOIL_SWEEP_MS.
+      let count = Math.min(n, Math.ceil(n * Math.min(dt, SOIL_SWEEP_MS) / SOIL_SWEEP_MS));
+      let t = soil.pos;
+      while (count-- > 0) {
+        const l = levelOf(G[t] / room, tgt[t]);
+        if (l !== tgt[t]) { tgt[t] = l; if (!act[t] && l !== cur[t]) { act[t] = 1; list[soil.count++] = t; } }
+        if (++t === n) t = 0;
+      }
+      soil.pos = t;
+      const d = dt / SOIL_FADE_MS;
+      for (let i = 0; i < soil.count; i++) {
+        const u = list[i];
+        let p = prog[u];
+        if (p === 0) {
+          // Idle: begin a step toward the target, if it is still away from the screen.
+          if (tgt[u] === cur[u]) { act[u] = 0; list[i] = list[--soil.count]; i--; continue; }
+          nxt[u] = cur[u] + (tgt[u] > cur[u] ? 1 : -1);
+        }
+        // Toward nxt while the target is that way, back toward cur when it is not.
+        const forward = (tgt[u] > cur[u]) === (nxt[u] > cur[u]) && tgt[u] !== cur[u];
+        p += forward ? d : -d;
+        if (p >= 1) { cur[u] = nxt[u]; p = 0; }
+        else if (p <= 0) p = 0;
+        prog[u] = p;
+        if (p === 0 && tgt[u] === cur[u]) { nxt[u] = cur[u]; act[u] = 0; list[i] = list[--soil.count]; i--; }
+      }
+    }
+    // The grass sprite for a blade at soil level l: dried (sprites.js) below 0, else the plain one.
+    function grassId(third, lean, l) {
+      return l < 0 ? AS.spriteGrassDry(third, lean, -l) : lean > 0 ? AS.spriteGrassLean(third) : lean < 0 ? AS.spriteGrassLeanLeft(third) : AS.spriteGrass(third);
+    }
+    // The veil's alpha on tile t as drawn: its level's, eased with the next while it moves.
+    const veil = l => (l > 0 ? WET_ALPHA[l - 1] : 0);
+    function veilOf(t) {
+      const c = soil.cur[t], p = soil.prog[t];
+      return p > 0 ? veil(c) * (1 - p) + veil(soil.nxt[t]) * p : veil(c);
+    }
+    // The far view's color of a tile (a blade of `third` when third >= 0, else bare ground).
+    function farSoil(t, third) {
+      const row = third >= 0 ? FAR_GRASS_BY[third] : FAR_GROUND_BY, c = row[soil.cur[t] + SOIL_LEVELS_DRY];
+      const p = soil.prog[t];
+      return p > 0 ? mixAbgr(c, row[soil.nxt[t] + SOIL_LEVELS_DRY], p) : c;
+    }
+
     function fillCells(sim, nowMs) {
       updateWater(sim, nowMs === undefined ? lastDrawMs : nowMs);
+      updateSoil(sim, nowMs === undefined ? lastDrawMs : nowMs);
       const W = sim.W;
       if (cell.w !== W.w || cell.h !== W.h) {
         cell.canvas = document.createElement('canvas');
@@ -409,14 +560,17 @@
         cell.px = new Uint32Array(cell.img.data.buffer);
       }
       const px = cell.px, kind = W.kind, size = W.gSize;
-      const bg = FAR_GROUND, g0 = FAR_GRASS[0], g1 = FAR_GRASS[1], g2 = FAR_GRASS[2];
+      const bg = FAR_GROUND;
       const corpse = FAR_CORPSE, waters = FAR_WATERS, wtgt = water.tgt, wfade = water.fade, holeAt = W.hole, scorch = W.scorch, fullDays = scorchFadeDays(sim);
       const lo = 1 / 3, hi = 2 / 3;
       const flow = W.flow, ash = W.ash, fireDays = sim.T.world.FireScorchDays, emberDays = FIRE_EMBER_HOURS / 24;
       for (let t = 0, n = W.n; t < n; t++) {
         const k = kind[t];
         if (flow[t] === FLOW.FIRE) px[t] = AS.fireLook(AS.fireStage(W, t)).flame >= AS.FLAME.MID ? FAR_FIRE_HIGH : FAR_FIRE_MID;
-        else if (k === KIND.GRASS) { const z = size[t]; px[t] = z < lo ? g0 : z < hi ? g1 : g2; }
+        else if (k === KIND.GRASS) {
+          const z = size[t], third = z < lo ? 0 : z < hi ? 1 : 2;
+          px[t] = soil && (soil.cur[t] !== 0 || soil.act[t]) ? farSoil(t, third) : FAR_GRASS[third];
+        }
         else if (k === KIND.CORPSE) px[t] = corpse;
         else if (wtgt[t] !== 0 && !wfade[t]) px[t] = waters[wtgt[t] - 1];   // under a wading animal too
         else {
@@ -426,7 +580,7 @@
             const ground = mixAbgr(bg, FAR_SCORCH, Math.min(1, scorch[t] / fullDays)), left = scorch[t];
             // Embers glow only where a fuel fire burnt out (it left ash), never on a nuke's crater.
             c = ash[t] > 0 && left > fireDays - emberDays && left <= fireDays ? mixAbgr(ground, FAR_EMBER, (left - (fireDays - emberDays)) / emberDays) : ground;
-          } else c = holeAt[t] ? FAR_HOLE : bg;   // empty ground (or a hole), or an animal that the loop below paints
+          } else c = holeAt[t] ? FAR_HOLE : soil && (soil.cur[t] > 0 || soil.act[t]) ? farSoil(t, -1) : bg;   // empty ground (wet, or a hole), or an animal that the loop below paints
           px[t] = wfade[t] ? farWaterMix(c, t) : c;
         }
       }
@@ -435,6 +589,43 @@
         if (W.aAlive[s]) px[W.aTile[s]] = W.aAlight[s] > 0 ? FAR_ALIGHT : FAR_ANIMAL[W.aSpecies[s]][W.aSex[s]];
       }
       cell.ctx.putImageData(cell.img, 0, 0);
+    }
+
+    // The wet veil, collected while the tiles are drawn and laid over them in a few strokes:
+    // tiles at rest by level (one path and fill each), tiles still moving one at a time at
+    // their own alpha. Over a tile whose water is coming or going the veil is the share the
+    // water has not covered, and over settled water there is none.
+    const veilRects = [[], [], []], veilMoving = [];
+    function veilReset() {
+      for (const r of veilRects) r.length = 0;
+      veilMoving.length = 0;
+    }
+    function veilAdd(t, dx, dy, dw, dh) {
+      const fading = water.fade[t];
+      if (!fading && !soil.act[t]) {
+        if (!water.tgt[t]) { const r = veilRects[soil.cur[t] - 1]; r.push(dx, dy, dw, dh); }
+        return;
+      }
+      let a = veilOf(t);
+      if (fading) a *= 1 - waterShown(t);
+      else if (water.tgt[t]) return;
+      if (a > 0) veilMoving.push(dx, dy, dw, dh, a);
+    }
+    function veilDraw() {
+      ctx.fillStyle = `rgb(${WET_RGB})`;
+      for (let l = 0; l < veilRects.length; l++) {
+        const r = veilRects[l];
+        if (!r.length) continue;
+        ctx.globalAlpha = WET_ALPHA[l];
+        ctx.beginPath();
+        for (let i = 0; i < r.length; i += 4) ctx.rect(r[i], r[i + 1], r[i + 2], r[i + 3]);
+        ctx.fill();
+      }
+      for (let i = 0; i < veilMoving.length; i += 5) {
+        ctx.globalAlpha = veilMoving[i + 4];
+        ctx.fillRect(veilMoving[i], veilMoving[i + 1], veilMoving[i + 2], veilMoving[i + 3]);
+      }
+      ctx.globalAlpha = 1;
     }
 
     function drawSprites(sim, cam, sheet, sel, dpr, nowMs) {
@@ -452,12 +643,20 @@
       drawScorch(sim, v, s, ox, oy);
       drawAshAndEmbers(sim, v, s, ox, oy, nowMs);
       if (contoursOn) drawContours(sim, cam, dpr, true);
+      const sCur = soil ? soil.cur : null, sAct = soil ? soil.act : null;
+      veilReset();
       for (let ty = v.y0; ty <= v.y1; ty++) {
         const dy = Math.round(ty * s - oy), dh = Math.round((ty + 1) * s - oy) - dy;
         const row = ty * W.w;
         for (let tx = v.x0; tx <= v.x1; tx++) {
           const k = kind[row + tx];
-          let id;
+          let id, id2 = -1;
+          // Wet soil: a veil over the tile once it is drawn (veilDraw), but not over fire, and
+          // over water only as much as the water has not yet covered it.
+          if (sCur && (sCur[row + tx] > 0 || sAct[row + tx]) && flow[row + tx] !== FLOW.FIRE) {
+            const dx = Math.round(tx * s - ox);
+            veilAdd(row + tx, dx, dy, Math.round((tx + 1) * s - ox) - dx, dh);
+          }
           if (flow[row + tx] === FLOW.FIRE) {
             const bx = Math.round(tx * s - ox);
             drawBurning(W, row + tx, tx, ty, img, sh, px, bx, dy, Math.round((tx + 1) * s - ox) - bx, dh, nowMs);
@@ -472,7 +671,11 @@
           if (k === KIND.GRASS) {
             const third = AS.grassGlyph(size[row + tx]) - AS.GLYPH.GRASS_0;
             const lean = gusts.leans(tx, ty);
-            id = lean > 0 ? AS.spriteGrassLean(third) : lean < 0 ? AS.spriteGrassLeanLeft(third) : AS.spriteGrass(third);
+            if (sCur && (sCur[row + tx] < 0 || sAct[row + tx])) {
+              // Dried grass, crossing to the next step while its level moves.
+              id = grassId(third, lean, sCur[row + tx]);
+              if (soil.prog[row + tx] > 0) { id2 = grassId(third, lean, soil.nxt[row + tx]); if (id2 === id) id2 = -1; }
+            } else id = lean > 0 ? AS.spriteGrassLean(third) : lean < 0 ? AS.spriteGrassLeanLeft(third) : AS.spriteGrass(third);
           }
           else if (k === KIND.CORPSE) {
             // A body with meat on it lies flat, eye shut; once the meat is gone, a skull. A
@@ -490,8 +693,14 @@
           }
           const dx = Math.round(tx * s - ox), dw = Math.round((tx + 1) * s - ox) - dx;
           ctx.drawImage(img, sh.sx(id), sh.sy(id), px, px, dx, dy, dw, dh);
+          if (id2 >= 0) {
+            ctx.globalAlpha = soil.prog[row + tx];
+            ctx.drawImage(img, sh.sx(id2), sh.sy(id2), px, px, dx, dy, dw, dh);
+            ctx.globalAlpha = 1;
+          }
         }
       }
+      veilDraw();
       if (intentLines) drawIntent(sim, v, s, ox, oy, dpr, -1);
       else if (sel && sel.slot >= 0 && W.aAlive[sel.slot]) drawIntent(sim, v, s, ox, oy, dpr, sel.slot);
       // Animals, over the ground. Slots are stable, so this is one pass over the used range.
@@ -720,6 +929,151 @@
           ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
         }
       }
+    }
+
+    // ---- rain streaks and lightning, over everything (sprite mode only) ----------------
+    // Streaks: per STREAK_CELL-tile cell, `a` is how much of its streaks show (0..1), eased
+    // toward 1 while `until` (real ms) is ahead of the clock and toward 0 after; `seen` is the
+    // last frame the cell was looked at, so one off screen for STREAK_STALE_MS starts again
+    // from nothing instead of popping in as the view comes back to it.
+    let rain = null;
+    const streakRects = Array.from({ length: STREAK_ALPHA_STEPS }, () => []);
+    function updateRain(sim, cam, dpr, nowMs) {
+      const sh = sim.weather && sim.weather.showers;
+      if (!sh) { rain = null; return; }
+      const W = sim.W, cw = Math.ceil(W.w / STREAK_CELL), ch = Math.ceil(W.h / STREAK_CELL);
+      if (!rain || rain.W !== W) rain = { W, cw, ch, a: new Float32Array(cw * ch), until: new Float64Array(cw * ch), seen: new Float64Array(cw * ch), ms: nowMs, motion: 0, phase: 0 };
+      const dt = Math.max(0, Math.min(nowMs - rain.ms, STREAK_STALE_MS));
+      rain.ms = nowMs;
+      const v = cam.visible();
+      const cx0 = Math.max(0, Math.floor(v.x0 / STREAK_CELL)), cx1 = Math.min(cw - 1, Math.floor(v.x1 / STREAK_CELL));
+      const cy0 = Math.max(0, Math.floor(v.y0 / STREAK_CELL)), cy1 = Math.min(ch - 1, Math.floor(v.y1 / STREAK_CELL));
+      if (cx1 < cx0 || cy1 < cy0) return;
+      // Cells under a shower in view are held for STREAK_HOLD_MS from now.
+      for (let i = 0; i < sh.n; i++) {
+        const x = sh.x[i], y = sh.y[i], r = sh.r[i];
+        if (x + r < v.x0 || x - r > v.x1 + 1 || y + r < v.y0 || y - r > v.y1 + 1) continue;
+        const r2 = r * r;
+        const ax0 = Math.max(cx0, Math.floor((x - r) / STREAK_CELL)), ax1 = Math.min(cx1, Math.floor((x + r) / STREAK_CELL));
+        const ay0 = Math.max(cy0, Math.floor((y - r) / STREAK_CELL)), ay1 = Math.min(cy1, Math.floor((y + r) / STREAK_CELL));
+        for (let cy = ay0; cy <= ay1; cy++) {
+          const dy = (cy + 0.5) * STREAK_CELL - y;
+          for (let cx = ax0; cx <= ax1; cx++) {
+            const dx = (cx + 0.5) * STREAK_CELL - x;
+            if (dx * dx + dy * dy <= r2) rain.until[cy * cw + cx] = nowMs + STREAK_HOLD_MS;
+          }
+        }
+      }
+      // They fall while the sim runs at a pace the eye can follow, and stand still otherwise.
+      const moving = stepSpeed > 0 && stepSpeed <= STREAK_MOVE_MAX_SPEED;
+      const m = rain.motion, dm = dt / STREAK_MOTION_MS;
+      rain.motion = moving ? Math.min(1, m + dm) : Math.max(0, m - dm);
+      rain.phase += STREAK_FALL_PX * rain.motion * dt / 1000;
+      for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) {
+        const c = cy * cw + cx;
+        let a = nowMs - rain.seen[c] > STREAK_STALE_MS ? 0 : rain.a[c];
+        rain.seen[c] = nowMs;
+        if (rain.until[c] > nowMs) a = Math.min(1, a + dt / STREAK_IN_MS);
+        else a = Math.max(0, a - dt / STREAK_OUT_MS);
+        rain.a[c] = a;
+      }
+    }
+    function drawRain(sim, cam, dpr) {
+      if (!rain) return;
+      const v = cam.visible(), s = cam.scale * dpr, ox = cam.x * s, oy = cam.y * s, u = s / AS.SPRITE_SIZE;
+      const cw = rain.cw;
+      const cx0 = Math.max(0, Math.floor(v.x0 / STREAK_CELL)), cx1 = Math.min(cw - 1, Math.floor(v.x1 / STREAK_CELL));
+      const cy0 = Math.max(0, Math.floor(v.y0 / STREAK_CELL)), cy1 = Math.min(rain.ch - 1, Math.floor(v.y1 / STREAK_CELL));
+      const wind = sim.wind;
+      const slope = wind ? wind.toX * Math.min(1, wind.kmh / AS.GUSTS.FULL_KMH) * STREAK_SLOPE : 0;
+      const stair = u >= STREAK_STAIR_AT, cellPx = STREAK_CELL * s, span = cellPx + STREAK_LEN * u;
+      const peak = STREAK_STILL_ALPHA + (STREAK_ALPHA - STREAK_STILL_ALPHA) * rain.motion;
+      const dash = Math.max(1, Math.round(u)), phase = rain.phase * u;
+      for (const r of streakRects) r.length = 0;
+      let any = false;
+      for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) {
+        const a = rain.a[cy * cw + cx];
+        if (a <= 0.01) continue;
+        const list = streakRects[Math.min(STREAK_ALPHA_STEPS, Math.ceil(a * STREAK_ALPHA_STEPS)) - 1];
+        const bx = cx * cellPx - ox, by = cy * cellPx - oy;
+        for (let k = 0; k < STREAK_PER_CELL; k++) {
+          const hx = AS.spriteHash(cx, cy, SALT_STREAK_X + k * 2) * cellPx;
+          // The head's place down the cell; the dash trails above it, slanted back against the way it falls.
+          const head = (AS.spriteHash(cx, cy, SALT_STREAK_Y + k * 2) * span + phase) % span;
+          if (stair) {
+            for (let j = 0; j < STREAK_LEN; j++) {
+              const yy = head - j * u;
+              if (yy < 0 || yy > cellPx) continue;
+              list.push(Math.round(bx + hx + slope * yy), Math.round(by + yy), dash, dash);
+            }
+          } else {
+            list.push(Math.round(bx + hx + slope * head), Math.round(by + head - STREAK_LEN * u), dash, Math.max(dash, Math.round(STREAK_LEN * u)));
+          }
+        }
+        any = true;
+      }
+      if (!any) return;
+      ctx.fillStyle = `rgb(${STREAK_RGB})`;
+      for (let q = 0; q < STREAK_ALPHA_STEPS; q++) {
+        const list = streakRects[q];
+        if (!list.length) continue;
+        ctx.globalAlpha = peak * (q + 1) / STREAK_ALPHA_STEPS;
+        ctx.beginPath();
+        for (let i = 0; i < list.length; i += 4) ctx.rect(list[i], list[i + 1], list[i + 2], list[i + 3]);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // Lightning: strikes the sim has logged (sim.weather.strikes) since the last frame; the
+    // newest of them on screen starts a bolt if the last began BOLT_GAP_MS ago. The bolt's
+    // path is worked out once, in tile coordinates, so it stays put as the view moves.
+    let boltSim = null, boltSeen = 0, boltLastMs = -Infinity, bolt = null;
+    // Zoomed out (`show` false) the strikes are read and let go, so zooming in doesn't replay them.
+    function consumeStrikes(sim, cam, nowMs, show) {
+      const st = sim.weather && sim.weather.strikes;
+      if (!st) { boltSim = null; bolt = null; return; }
+      if (boltSim !== sim || st.n < boltSeen) { boltSim = sim; boltSeen = st.n; bolt = null; boltLastMs = -Infinity; return; }
+      if (!show) { boltSeen = st.n; return; }
+      if (st.n === boltSeen) return;
+      const cap = st.tile.length, v = cam.visible(), W = sim.W;
+      let pick = -1;
+      for (let k = st.n - 1; k >= Math.max(boltSeen, st.n - cap); k--) {
+        const t = st.tile[k % cap], x = t % W.w, y = (t / W.w) | 0;
+        if (x >= v.x0 && x <= v.x1 && y >= v.y0 && y <= v.y1) { pick = k; break; }
+      }
+      boltSeen = st.n;
+      if (pick < 0 || nowMs - boltLastMs < BOLT_GAP_MS) return;
+      const t = st.tile[pick % cap], x = t % W.w + 0.5, y = ((t / W.w) | 0) + 0.45, k = pick;
+      const top = v.y0 - BOLT_ABOVE_TILES, x0 = x + (AS.spriteHash(k, t, SALT_BOLT) - 0.5) * 2 * BOLT_LEAN_TILES;
+      const steps = Math.max(2, Math.ceil((y - top) / BOLT_STEP_TILES)), pts = new Float64Array((steps + 1) * 2);
+      for (let i = 0; i <= steps; i++) {
+        const f = i / steps;
+        // Straight from the sky to the tile, kicked sideways at each joint, the kicks dying to nothing at the ground.
+        const jag = i === steps ? 0 : (i % 2 ? 1 : -1) * (AS.spriteHash(i, k, SALT_BOLT + 1) * 0.7 + 0.3) * BOLT_JAG_TILES * (1 - f * f);
+        pts[i * 2] = x0 + (x - x0) * f + jag;
+        pts[i * 2 + 1] = top + (y - top) * f;
+      }
+      bolt = { pts, t0: nowMs };
+      boltLastMs = nowMs;
+    }
+    function drawBolt(cam, dpr, nowMs) {
+      if (!bolt) return;
+      const age = nowMs - bolt.t0, total = BOLT_IN_MS + BOLT_HOLD_MS + BOLT_OUT_MS;
+      if (age >= total) { bolt = null; return; }
+      const e = x => x * x * (3 - 2 * x);   // eased 0..1
+      const f = age < BOLT_IN_MS ? e(age / BOLT_IN_MS) : age < BOLT_IN_MS + BOLT_HOLD_MS ? 1 : 1 - e((age - BOLT_IN_MS - BOLT_HOLD_MS) / BOLT_OUT_MS);
+      if (f <= 0.01) return;
+      const s = cam.scale * dpr, p = bolt.pts;
+      ctx.beginPath();
+      for (let i = 0; i < p.length; i += 2) {
+        const x = (p[i] - cam.x) * s, y = (p[i + 1] - cam.y) * s;
+        if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+      }
+      ctx.lineJoin = 'miter'; ctx.lineCap = 'butt';
+      ctx.lineWidth = Math.max(dpr, s / AS.SPRITE_SIZE);
+      ctx.strokeStyle = `rgba(${BOLT_RGB},${BOLT_PEAK * f})`;
+      ctx.stroke();
     }
 
     // ---- the Radius slider's preview ----
@@ -963,6 +1317,17 @@
       waterBand(t) { return water ? bandShown(t) : -1; },
       // Tiles whose water is moving between looks.
       get waterFading() { return water ? water.count : 0; },
+      // The soil level drawn on tile t (-3 driest .. 3 wettest, 0 none), after a draw or farCanvas; and the tiles moving between levels.
+      soilLevel(t) { return soil ? soil.cur[t] : 0; },
+      get soilFading() { return soil ? soil.count : 0; },
+      // How much of tile t's streaks shows now (0..1), after a draw.
+      streakLevel(t) {
+        if (!rain) return 0;
+        const W = rain.W, c = (((t / W.w) | 0) / STREAK_CELL | 0) * rain.cw + ((t % W.w) / STREAK_CELL | 0);
+        return rain.a[c];
+      },
+      // The bolt on screen: null, or { age (real ms) }.
+      get bolt() { return bolt ? { age: lastDrawMs - bolt.t0 } : null; },
       get contours() { return contoursOn; },
       get intentLines() { return intentLines; },
       // sel: null or { tile, serial, slot }; alpha: 0–1 through the current tick; nowMs: real
@@ -973,6 +1338,7 @@
         nowMs = nowMs || 0;
         lastDrawMs = nowMs;
         updateWater(sim, nowMs);
+        updateSoil(sim, nowMs);
         stepSpeed = speed === undefined ? 1 : speed;
         if (statesFor !== sim.T) buildStates(sim.T);
         frameNo++;
@@ -989,7 +1355,13 @@
         if (cam.scale >= CELL_PX) {
           gusts.update(sim, nowMs, stepSpeed, alpha);
           drawSprites(sim, cam, sheet, sel, dpr, nowMs);
+          updateRain(sim, cam, dpr, nowMs);
+          drawRain(sim, cam, dpr);
+          consumeStrikes(sim, cam, nowMs, true);
+          drawBolt(cam, dpr, nowMs);
         } else {
+          consumeStrikes(sim, cam, nowMs, false);
+          bolt = null;
           fillCells(sim, nowMs);
           const W = sim.W;
           ctx.imageSmoothingEnabled = false;
