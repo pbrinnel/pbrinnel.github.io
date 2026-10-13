@@ -115,6 +115,7 @@
     ['BurnHours', 'pos', ALL],
     ['Ash', 'pos', ALL],
     ['CatchFire', 'frac', ANIMALS],
+    ['SpreadFire', 'frac', ANIMALS],
     ['AlightHours', 'pos', ANIMALS],
     ['BurnDamage', 'num', ANIMALS],
     ['FireSense', 'num', ANIMALS],

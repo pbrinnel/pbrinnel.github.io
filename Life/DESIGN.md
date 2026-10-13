@@ -357,8 +357,10 @@ weather's next part comes next. Fire comes first of the weather systems, and win
 - **Animals catch fire** (Paul, 12 Oct 2026: anything but water can burn): from a burning
   neighbor, as a chance per hour by how readily its species catches, or when painted. Alight,
   it loses HP every second until its fire burns out or it reaches water, which puts it out;
-  if it dies, its body burns on as a corpse (cause: Burned). A burning animal doesn't spread
-  fire, for now.
+  if it dies, its body burns on as a corpse (cause: Burned). A burning animal spreads fire to
+  the fuel around it like a burning tile, at `SpreadFire` of a tile's rate (Paul, 13 Oct
+  2026), so a fleeing animal can carry fire across a firebreak; it doesn't light other
+  animals.
 - **Animals sense fire and flee it** (built 12 Oct 2026, the ESCAPE state, first for every
   species). Smoke needs no line of sight: a burning tile within `FireSense` is enough, and
   one escaping keeps at it until the fire is a little farther than that. A bunny makes for a

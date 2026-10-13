@@ -38,7 +38,8 @@
 // The hour's rate becomes the chance for a step exactly (1 - exp(-rate × hours), as grass.js
 // does), so the fire spreads at the same speed whatever FIRE_EVERY is. A tile's last step is
 // cut short at its burn time for the same reason. Rolls come from sim.rng, and only when some
-// tile is burning with a neighbor that could catch: a world without fire draws nothing.
+// tile is burning with a neighbor that could catch, or an animal is alight: a world without
+// fire draws nothing. A burning animal lights fuel beside it too (spreadFromAnimals).
 //
 // Burning out: the solid is gone (a blade removed; a corpse through corpse.js so the grass it
 // was boosting is released; an ember has none), the tile's flow is NONE, and the ground is scorched for
@@ -70,6 +71,7 @@
 
   // Sets animal s alight for its species' AlightHours.
   function setAlight(sim, s) {
+    sim.alightBound = (sim.alightBound || 0) + 1;   // see spreadFromAnimals
     sim.W.aAlight[s] = sim.T[AS.SPECIES_KEY[sim.W.aSpecies[s]]].AlightHours;
   }
 
@@ -127,16 +129,63 @@
     if (days > W.scorch[t]) W.scorch[t] = days;
   }
 
-  AS.fireStep = function (sim, hours) {
-    const W = sim.W;
-    if (W.fCount === 0) return;
-    const { rng, T } = sim, S = T.world, w = W.w, h = W.h;
-    // The wind's pull on each direction: 1 + FireWind × s × cos, never below 0, over distance.
-    const wind = sim.wind, s = Math.min(1, wind.kmh / FULL_WIND_KMH);
+  // The wind's pull on each direction: 1 + FireWind × s × cos, never below 0, over distance.
+  function setDirRates(sim) {
+    const S = sim.T.world, wind = sim.wind, s = Math.min(1, wind.kmh / FULL_WIND_KMH);
     for (let d = 0; d < 8; d++) {
       const cos = (DX[d] * wind.toX + DY[d] * wind.toY) / LEN[d];
       dirRate[d] = Math.max(0, 1 + S.FireWind * s * cos) / LEN[d];
     }
+  }
+
+  // A burning animal lights the fuel around it as a burning tile would: each of its 8 neighbors
+  // with a blade or a corpse (no flow, no hole) catches at the tile's own rate, times its
+  // species' SpreadFire, because a runner spends less time beside any one tile than a fire
+  // sitting there. It does not light other animals: they catch from tiles only (CatchFire), so a
+  // herd doesn't flash over from one runner. One in a hole is inside the burrow and lights nothing.
+  // Nothing marks which animals are alight, so sim.alightBound counts the ones set alight and
+  // not yet seen out: while it is 0 this scans nothing and draws nothing, and a scan that finds
+  // fewer alight than the bound lowers it, so it never stays high for long.
+  function spreadFromAnimals(sim, hours) {
+    const W = sim.W, { rng, T } = sim, S = T.world, w = W.w, h = W.h;
+    const soil = W.water, G = soil ? soil.G : null, room = soil ? soil.room : 1;
+    const drySet = S.FireDryness, spread = S.FireSpread;
+    const kind = W.kind, flow = W.flow, hole = W.hole, gSize = W.gSize, fireAge = W.fireAge;
+    let alight = 0;
+    for (let a = 0; a < W.aHigh; a++) {
+      if (!W.aAlive[a] || !(W.aAlight[a] > 0)) continue;
+      alight++;
+      const t = W.aTile[a];
+      if (hole[t]) continue;
+      const share = T[AS.SPECIES_KEY[W.aSpecies[a]]].SpreadFire;
+      if (!(share > 0)) continue;
+      const live = Math.min(hours, W.aAlight[a]);   // its fire may run out within the pass
+      const x = t % w, y = (t / w) | 0;
+      for (let d = 0; d < 8; d++) {
+        const nx = x + DX[d], ny = y + DY[d];
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+        const u = ny * w + nx;
+        if (flow[u] !== FLOW.NONE || hole[u]) continue;
+        const ku = kind[u];
+        const fuel = ku === KIND.GRASS ? gSize[u] : ku === KIND.CORPSE ? 1 : 0;
+        if (fuel <= 0) continue;
+        const dry = G ? 1 - G[u] / room : drySet;   // AS.fireDryness, inlined
+        const rate = spread * share * fuel * (dry < 0 ? 0 : dry > 1 ? 1 : dry) * dirRate[d];
+        if (!(rate > 0)) continue;
+        if (rng.chance(1 - Math.exp(-rate * live))) {
+          W.addFire(u, burnHours(sim, u));
+          fireAge[u] = hours / 2;   // started mid-pass, as in fireStep
+        }
+      }
+    }
+    sim.alightBound = alight;
+  }
+
+  AS.fireStep = function (sim, hours) {
+    const W = sim.W;
+    if (W.fCount === 0 && !sim.alightBound) return;
+    const { rng, T } = sim, S = T.world, w = W.w, h = W.h;
+    setDirRates(sim);
     const soil = W.water, G = soil ? soil.G : null, room = soil ? soil.room : 1;
     const drySet = S.FireDryness, spread = S.FireSpread;
     const fireAge = W.fireAge, fireTime = W.fireTime, kind = W.kind, flow = W.flow, hole = W.hole, gSize = W.gSize;
@@ -184,10 +233,12 @@
       if (age + hours >= time) burnOut(sim, t);
       else fireAge[t] = age + hours;
     }
+    // After the tiles, so a tile an animal lights this pass isn't also aged and spread from in it.
+    if (sim.alightBound) spreadFromAnimals(sim, hours);
   };
 
   AS.fireTick = function (sim) {
-    if (sim.tickCount % FIRE_EVERY !== 0 || sim.W.fCount === 0) return;
+    if (sim.tickCount % FIRE_EVERY !== 0 || (sim.W.fCount === 0 && !sim.alightBound)) return;
     AS.fireStep(sim, FIRE_EVERY / AS.TICKS_PER_HOUR);
   };
 })(globalThis.AS);

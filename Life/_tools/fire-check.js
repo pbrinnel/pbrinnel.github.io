@@ -527,6 +527,124 @@ for (const [label, width, water] of [['a bare strip 1 wide', 1, false], ['a bare
   ok(audited(s, 'embers and animals') && failures.length === 0, 'the layers audit after');
 }
 
+// ---- a burning animal lights the fuel beside it, by its species' SpreadFire
+{
+  const SQ = Math.SQRT1_2;
+  // One alight bunny at the middle of a meadow, calm; fireStep run directly (nothing else ticks)
+  // for `trials` passes of `dt` hours, putting out what it lit and refilling its fire each time.
+  // Returns how often each of the 8 neighbors caught, and the whole count.
+  const trial = (share, { trials = 4000, dt = 0.1, tweak = null } = {}) => {
+    const s = meadow({ size: 9, settings: { FireSpread: 1 }, animals: [['SpreadFire', 'Bunny', share]] });
+    const { AS, sim, W } = s;
+    const t = W.tile(4, 4);
+    W.removeGrass(t);
+    const a = AS.spawnStarting(sim, 0, t);
+    AS.ignite(sim, t);   // (counts it as alight, which the fire pass looks at)
+    if (tweak) tweak(s, t);
+    const rng0 = sim.rng.state();
+    const hits = new Array(81).fill(0);
+    for (let i = 0; i < trials; i++) {
+      W.aAlight[a] = 100;
+      AS.fireStep(sim, dt);
+      for (let k = W.fCount - 1; k >= 0; k--) { const u = W.fList[k]; hits[u]++; W.removeFire(u); }
+    }
+    return { s, a, t, hits, trials, dt, drew: sim.rng.state() !== rng0 };
+  };
+  const rateOf = (r, u) => {   // the chance per pass, turned back into a rate per hour
+    const p = r.hits[u] / r.trials;
+    return -Math.log(1 - p) / r.dt;
+  };
+  const half = trial('50%');
+  const { W: HW } = half.s;
+  const side = rateOf(half, HW.tile(4, 3)), corner = rateOf(half, HW.tile(5, 3));
+  ok(Math.abs(side - 0.5) < 0.06, `SpreadFire 50% lights a side neighbor at half a burning tile's rate (${side.toFixed(3)} per hour, want 0.5)`);
+  ok(Math.abs(corner - 0.5 * SQ) < 0.06, `and a corner at 1/sqrt 2 of that (${corner.toFixed(3)}, want ${(0.5 * SQ).toFixed(3)})`);
+  const full = trial('100%');
+  ok(Math.abs(rateOf(full, full.s.W.tile(3, 4)) - 1) < 0.08, `SpreadFire 100% lights a neighbor at a burning tile's whole rate (${rateOf(full, full.s.W.tile(3, 4)).toFixed(3)}, want 1)`);
+  // The same pass from a burning tile in the animal's place, for comparison.
+  {
+    const s = meadow({ size: 9, settings: { FireSpread: 1 } });
+    const { AS, sim, W } = s;
+    const t = W.tile(4, 4);
+    let n = 0;
+    for (let i = 0; i < 4000; i++) {
+      W.addFire(t, 1000); W.fireAge[t] = 0;
+      AS.fireStep(sim, 0.1);
+      for (let k = W.fCount - 1; k >= 0; k--) { const u = W.fList[k]; if (u === W.tile(3, 4)) n++; W.removeFire(u); }
+    }
+    ok(Math.abs(-Math.log(1 - n / 4000) / 0.1 - rateOf(full, full.s.W.tile(3, 4))) < 0.12, 'SpreadFire 100% matches a burning tile\'s own rate on the same neighbor');
+  }
+  const none = trial('0%', { trials: 600 });
+  ok(none.hits.every(n => n === 0), 'SpreadFire 0 lights nothing');
+  ok(!none.drew, 'and draws no dice');
+  ok(half.hits.every((n, u) => n === 0 || (Math.abs(u % 9 - 4) <= 1 && Math.abs(((u / 9) | 0) - 4) <= 1 && u !== half.t)), 'only the 8 neighbors ever catch');
+
+  // What it won't light: water, a hole, a burning tile, scorch, bare ground, and (by design) another animal.
+  const tweak = ({ AS, sim, W }, t) => {
+    const at = (dx, dy) => W.tile(4 + dx, 4 + dy);
+    const clear = u => { if (W.kind[u] === AS.KIND.GRASS) W.removeGrass(u); };
+    clear(at(-1, 0)); W.addWater(at(-1, 0));
+    clear(at(1, 0)); W.addHole(at(1, 0));
+    clear(at(0, -1));                       // bare
+    clear(at(0, 1)); W.scorch[at(0, 1)] = 5; // scorched
+    clear(at(-1, -1)); AS.spawnStarting(sim, 1, at(-1, -1));   // another animal
+  };
+  const r = trial('100%', { trials: 1500, tweak });
+  const W2 = r.s.W, at2 = (dx, dy) => W2.tile(4 + dx, 4 + dy);
+  ok([[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1]].every(([dx, dy]) => r.hits[at2(dx, dy)] === 0), 'it never lights water, a hole, bare ground, a scorched tile or another animal');
+  ok(r.hits[at2(1, 1)] > 0, 'while the grass beside it does catch');
+  ok(W2.aAlight[W2.aSlot[at2(-1, -1)]] === 0, 'the other animal stays unlit');
+
+  // A firebreak does not stop a runner: grass | bare strip 3 wide | grass, a bunny alight crossing it.
+  {
+    const s = meadow({ size: 15, settings: { FireSpread: 1 }, animals: [['SpreadFire', 'Bunny', '100%']] });
+    const { AS, sim, W } = s;
+    for (let y = 0; y < 15; y++) for (let x = 6; x <= 8; x++) W.removeGrass(W.tile(x, y));
+    const a = AS.spawnStarting(sim, 0, W.tile(7, 7));
+    AS.ignite(sim, W.tile(7, 7));
+    let farLit = false;
+    for (let x = 7; x <= 8 && !farLit; x++) {   // the step into the strip's last column is beside the far grass
+      if (x !== 7) W.moveAnimal(a, W.tile(x, 7));
+      W.aAlight[a] = 100;
+      for (let i = 0; i < 200 && !farLit; i++) {
+        AS.fireStep(sim, 0.1);
+        farLit = W.flow[W.tile(9, 6)] === AS.FLOW.FIRE || W.flow[W.tile(9, 7)] === AS.FLOW.FIRE || W.flow[W.tile(9, 8)] === AS.FLOW.FIRE;
+      }
+    }
+    ok(farLit, 'a burning animal at the far edge of a 3 wide bare strip lights the grass beyond (no fire stood on the strip)');
+    ok(![6, 7, 8].some(x => W.flow[W.tile(x, 3)] === AS.FLOW.FIRE) && audited(s, 'runner'), 'the strip itself never burns, and the layers audit');
+  }
+
+  // Through the real tick: an animal set alight in a meadow leaves a trail of fire behind it.
+  {
+    const s = meadow({ size: 31, settings: { FireSpread: 1 }, animals: [['SpreadFire', 'Bunny', '100%'], ['AlightHours', 'Bunny', 8], ['BurnDamage', 'Bunny', 0]] });
+    const { AS, sim, W } = s;
+    W.removeGrass(W.tile(15, 15));
+    const a = AS.spawnStarting(sim, 0, W.tile(15, 15));
+    AS.ignite(sim, W.tile(15, 15));
+    ok(sim.alightBound > 0, 'an animal set alight is counted');
+    hours(sim, 6);
+    ok(reached(W) > 0, `a bunny alight in a meadow lights it through the ordinary tick (${reached(W)} tiles reached)`);
+    ok(W.aAlight[a] <= 2.5, 'it burns down as before');
+    burnOut(sim);
+    hours(sim, 10);
+    ok(sim.alightBound === 0 && W.fCount === 0, 'when the last fire is out the count is back to zero');
+  }
+
+  // No fire and nobody alight: fire.js draws nothing (same dice as with the fire pass removed).
+  {
+    const run = off => {
+      const m = meadow({ size: 15, animals: [['SpreadFire', 'Bunny', '100%']] });
+      m.W.removeGrass(m.W.tile(7, 7));
+      m.AS.spawnStarting(m.sim, 0, m.W.tile(7, 7));
+      if (off) m.AS.fireStep = () => {};
+      tick(m.sim, 300);
+      return m.sim.rng.state();
+    };
+    ok(run(false) === run(true), 'with no fire and nobody alight the fire pass draws nothing');
+  }
+}
+
 // ---- the properties window names the cause
 {
   const s = stage({ size: 9, settings: FIRE, species: [quiet.grass, BURN, ANIMAL, [['BurnDamage', 'Bunny', 600]]], files: ['inspect'] });
