@@ -34,6 +34,104 @@
   const OLD_WINDOW_KEYS = { god: 'paint' };
 
   const debug = new URLSearchParams(location.search).has('debug');
+
+  // ---- The loading panel (#loading in life.html) ----
+  // A plain list of the real steps the page runs to make a world, each marked pending,
+  // running or done as it happens, with the numbers the run produced. Every figure comes from
+  // the tables, from AS or from the world itself, so retuning a table changes the text.
+  // ?loadhold=MS (debugging) keeps the panel up that long after the world is ready.
+  const LOAD_HOLD_MS = Math.max(0, Number(new URLSearchParams(location.search).get('loadhold')) || 0);
+  const Loading = (function () {
+    const listEl = document.getElementById('ld-steps');
+    const MARK = { pending: '[..]', running: '[>>]', done: '[ok]', skipped: '[--]' };
+    const rows = new Map();
+    const born = performance.now();
+    const n0 = (x) => Math.round(x).toLocaleString('en-US');
+    const n1 = (x, d = 1) => Number(x.toFixed(d)).toLocaleString('en-US');
+    const secs = ms => (ms < 1000 ? Math.max(1, Math.round(ms)) + ' ms' : (ms / 1000).toFixed(1) + ' s');
+    function addList(parent, cls, lines) {
+      const ul = document.createElement('ul');
+      ul.className = cls;
+      for (const t of lines) { const li = document.createElement('li'); li.textContent = t; ul.appendChild(li); }
+      parent.appendChild(ul);
+      return ul;
+    }
+    // `desc` is the prose under the step's name; plan() fills in the ones that need the tables.
+    function add(id, name, desc) {
+      if (!listEl) return;
+      const li = document.createElement('li');
+      li.className = 'ld-step';
+      li.dataset.state = 'pending';
+      const head = document.createElement('div');
+      head.className = 'ld-head';
+      const mark = document.createElement('span'); mark.className = 'ld-mark'; mark.textContent = MARK.pending;
+      const nm = document.createElement('span'); nm.className = 'ld-name'; nm.textContent = name;
+      const tm = document.createElement('span'); tm.className = 'ld-time';
+      head.append(mark, nm, tm);
+      li.appendChild(head);
+      const row = { li, mark, tm, desc: null, res: null, at: 0 };
+      rows.set(id, row);
+      if (desc) row.desc = addList(li, 'ld-desc', desc);
+      listEl.appendChild(li);
+    }
+    function describe(id, desc) {
+      const r = rows.get(id);
+      if (!r || r.desc) return;
+      r.desc = addList(r.li, 'ld-desc', desc);
+      // The results list sits below the prose.
+      if (r.res) r.li.appendChild(r.res);
+    }
+    function set(id, state, results, ms) {
+      const r = rows.get(id);
+      if (!r) return;
+      r.li.dataset.state = state;
+      r.mark.textContent = MARK[state];
+      if (state === 'running') {
+        r.at = performance.now();
+        // The card scrolls when the list is taller than the screen: keep the running step in view.
+        const card = listEl.parentNode;
+        if (card.scrollHeight > card.clientHeight) card.scrollTop = Math.max(0, r.li.offsetTop - 60);
+      }
+      if (state === 'done') r.tm.textContent = secs(ms !== undefined ? ms : performance.now() - r.at);
+      if (results && results.length) {
+        if (r.res) r.res.remove();
+        r.res = addList(r.li, 'ld-res', results);
+      }
+    }
+    // Back to pending for the steps a new world repeats.
+    function reset(ids) {
+      for (const id of ids) {
+        const r = rows.get(id);
+        if (!r) continue;
+        r.li.dataset.state = 'pending'; r.mark.textContent = MARK.pending; r.tm.textContent = '';
+        if (r.res) { r.res.remove(); r.res = null; }
+      }
+    }
+    function start(id) { const r = rows.get(id); if (r) r.at = born; set(id, 'running'); }
+    return { add, describe, set, reset, start, n0, n1, secs };
+  })();
+  Loading.add('tables', 'Read data tables');
+  Loading.add('states', 'Check behavior states');
+  Loading.add('params', 'Set world parameters');
+  Loading.add('terrain', 'Grow terrain, settle water (Web Worker)');
+  Loading.add('lay', 'Lay out the world');
+  Loading.start('tables');
+
+  // One line per stage that does real work, written once the tables are read. A named
+  // setting is shown with its value; AS exports the few constants that live in the code.
+  function planLoading(T) {
+    const S = T.world, n1 = Loading.n1;
+    const meadows = String(S.StartLayout).toLowerCase() === 'meadows';
+    Loading.describe('terrain', [
+      `Ground: ${S.GrowRounds} rounds of uplift, steepest-descent drainage, stream-power erosion (RiverCut ${S.RiverCut}).`,
+      `Water: ${S.PreRunDays}-day pre-run, Manning surface flow, Darcy soil flow, ending at play's ${n1(AS.WATER_STEP_DAYS * 1440)}-minute step.`,
+    ]);
+    Loading.describe('lay', [
+      meadows
+        ? `${S.BunnyColonies} colonies, ${S.WolfPacks} packs, ${Math.round(S.StartGrass * 100)}% meadow.`
+        : `Scattered: ${Math.round(S.StartGrass * 100)}% grass, ${S.StartBunnies} bunnies, ${S.StartWolves} wolves.`,
+    ]);
+  }
   let speedIndex = START_SPEED;
   let sim = null;
   // Frame-loop state. Declared before the UI exists, since a key can change speed while the
@@ -159,18 +257,56 @@
       wk.postMessage({ base: new URL(AS.BASE, location.href).href, v: AS.V, T, seed, water: waterOn });
     });
   }
+  // The figures the terrain step reports: this world's drawn values and the water that settled.
+  function terrainFigures(S, elev, H, G, water) {
+    const { n0, n1 } = Loading;
+    const out = [
+      `Relief ${n1(S.Relief)} m, ${S.RiverMouths} river mouths, rain ${n1(S.Rain, 2)} mm/day`,
+    ];
+    if (water && H) {
+      let wet = 0, soil = 0;
+      for (let i = 0; i < H.length; i++) { if (H[i] > 0) wet++; soil += G[i]; }
+      const room = S.SoilDepth * AS.SOIL_POROSITY;
+      out.push(`At rest: ${n1(100 * wet / H.length)}% of tiles under water, soil ${n0(100 * soil / H.length / room)}% full`);
+    } else if (!water) out.push('Water is off, so only the ground was made.');
+    return out;
+  }
   async function makeWorld(seed) {
-    if (loadingEl) { loadingEl.hidden = false; await nextFrame(); await nextFrame(); }
+    const { n0, n1 } = Loading, W0 = T.world;
+    Loading.reset(['params', 'terrain', 'lay']);
+    Loading.start('params');
+    Loading.set('params', 'done', [
+      `${n0(W0.WorldWidth)} x ${n0(W0.WorldHeight)} tiles (${(W0.WorldWidth * AS.TILE_M / 1000).toFixed(1)} x ${(W0.WorldHeight * AS.TILE_M / 1000).toFixed(1)} km), seed ${seed}`,
+    ]);
+    if (loadingEl) { loadingEl.hidden = false; Loading.start('terrain'); await nextFrame(); await nextFrame(); }
     try {
       const grown = typeof Worker === 'function' ? await growInWorker(seed) : null;
-      return AS.Sim(T, seed, { water: waterOn, terrain: grown || undefined });
+      if (grown) Loading.set('terrain', 'done', terrainFigures(grown.S, grown.elev, grown.H, grown.G, grown.water));
+      else Loading.set('terrain', 'skipped', ['No Web Worker here, so the ground is grown on the page, inside the next step.']);
+      Loading.start('lay');
+      await nextFrame(); await nextFrame();
+      const made = AS.Sim(T, seed, { water: waterOn, terrain: grown || undefined });
+      const W = made.W;
+      if (!grown) Loading.set('terrain', 'skipped', terrainFigures(made.terrain, W.elev, W.water && W.water.H, W.water && W.water.G, !!W.water));
+      Loading.set('lay', 'done', [
+        `${n0(W.gCount)} blades, ${n0(W.bunnies)} bunnies, ${n0(W.wolves)} wolves`,
+      ]);
+      if (LOAD_HOLD_MS) await new Promise(r => setTimeout(r, LOAD_HOLD_MS));
+      return made;
     } finally { if (loadingEl) loadingEl.hidden = true; }
   }
 
   const { T, errors, warnings } = await AS.loadTables(AS.V);
   if (!T) { ui.errors(errors, warnings); return; }
+  {
+    const withStates = AS.SPECIES_KEY.filter(key => T.states[key]);
+    Loading.set('tables', 'done', [`${Object.keys(T.world).length} settings, ${withStates.length} species`]);
+    planLoading(T);
+    Loading.start('states');
+  }
   const states = AS.checkStates(T);
   if (states.errors.length) { ui.errors(states.errors, warnings.concat(states.warnings)); return; }
+  Loading.set('states', 'done', [AS.SPECIES_KEY.filter(key => T.states[key]).map(key => `${key} ${T.states[key].length}`).join(', ') + ' states']);
   const allWarnings = warnings.concat(states.warnings, AS.inspectWarnings(T));
   if (allWarnings.length) ui.warnings(allWarnings);
 

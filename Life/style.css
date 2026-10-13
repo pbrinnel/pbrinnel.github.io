@@ -458,14 +458,38 @@ body.nuke-armed #map, body.paint-armed #map { cursor: crosshair; }
 .end-day { color: #8a8d80; margin: 6px 0 14px; }
 .end-buttons { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
 
-/* The loading card (main.js makeWorld). The spinner turns by a transform animation, which the
+/* The loading panel (main.js Loading, makeWorld). The spinner turns by a transform animation, which the
    browser runs off the busy page, so it keeps turning while the world is being made. One
    slow steady turn, nothing that flashes. */
-#loading { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; background: rgba(10, 12, 10, 0.72); }
+#loading { position: fixed; inset: 0; z-index: 30; display: grid; place-items: start center; overflow: hidden; background: rgba(10, 12, 10, 0.72); }
 #loading[hidden] { display: none; }
-.ld-card { display: grid; justify-items: center; gap: 10px; padding: 22px 28px; background: var(--insp-bg); border: 1px solid var(--hud-line); color: var(--fg); }
-.ld-text { color: var(--hud-on); font-size: 15px; }
-.ld-sub { color: var(--hud-dim); font-size: 12px; }
-.ld-spin { width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--hud-line); border-top-color: var(--hud-on); animation: ld-turn 1.2s linear infinite; will-change: transform; }
+.ld-card { background: var(--insp-bg); border: 1px solid var(--hud-line); color: var(--fg); }
+.ld-spin { border-radius: 50%; border: 3px solid var(--hud-line); border-top-color: var(--hud-on); animation: ld-turn 1.2s linear infinite; will-change: transform; }
 @keyframes ld-turn { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .ld-spin { animation-duration: 4s; } }
+
+/* The loading panel's steps (main.js Loading): a plain monospace list, a marker per step that
+   changes once as the step starts and once as it ends. Nothing here animates but the slow
+   spinner, and the card is anchored to the top so a step's results never move the heading. */
+.ld-card { display: block; box-sizing: border-box; width: min(720px, calc(100vw - 24px)); max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); margin-top: 12px; padding: 16px 18px 18px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--hud-line) transparent; font-size: 12px; line-height: 1.45; }
+.ld-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.ld-title { margin: 0; font-size: 15px; font-weight: normal; letter-spacing: 0.04em; text-transform: uppercase; color: var(--hud-on); }
+.ld-spin { flex: none; width: 14px; height: 14px; border-width: 2px; }
+.ld-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.ld-head { display: grid; grid-template-columns: 3.2em 1fr auto; gap: 8px; align-items: baseline; }
+.ld-name { color: var(--fg); }
+.ld-mark, .ld-time { color: var(--hud-dim); white-space: nowrap; }
+.ld-desc, .ld-res { list-style: none; margin: 4px 0 0; padding: 0 0 0 calc(3.2em + 8px); }
+.ld-desc li, .ld-res li { margin: 0 0 4px; overflow-wrap: anywhere; }
+.ld-desc li { color: var(--hud-dim); }
+.ld-res li { color: var(--fg); }
+.ld-res li::before { content: "> "; color: var(--hud-dim); }
+.ld-step[data-state="pending"] .ld-name { color: var(--hud-dim); }
+.ld-step[data-state="running"] .ld-mark, .ld-step[data-state="running"] .ld-name { color: var(--hud-on); }
+.ld-step[data-state="running"] .ld-desc li { color: var(--fg); }
+.ld-step[data-state="skipped"] .ld-name { color: var(--hud-dim); }
+@media (max-width: 600px) {
+  .ld-card { padding: 12px 12px 14px; font-size: 11.5px; }
+  .ld-head { grid-template-columns: 2.9em 1fr auto; gap: 6px; }
+  .ld-desc, .ld-res { padding-left: calc(2.9em + 6px); }
+}

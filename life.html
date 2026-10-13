@@ -23,7 +23,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>Life</title>
 <link rel="preload" href="Life/fonts/dejavu-sans-mono.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="Life/style.css?v=60">
+<link rel="stylesheet" href="Life/style.css?v=61">
 </head>
 <body>
 <canvas id="map"></canvas>
@@ -33,47 +33,48 @@
 <aside id="minimap" hidden></aside>
 <div id="errors" hidden></div>
 <!-- Shown from the first paint until a world is ready (main.js makeWorld): making one takes
-     seconds (growing the ground, settling the water), and the page is busy meanwhile. -->
-<div id="loading" role="status" aria-live="polite"><div class="ld-card"><span class="ld-spin" aria-hidden="true"></span><span class="ld-text">Making the world…</span><span class="ld-sub">growing the ground and letting the water settle</span></div></div>
+     seconds (growing the ground, settling the water), and the page is busy meanwhile.
+     main.js fills #ld-steps with the real steps as they run. -->
+<div id="loading" role="status" aria-live="off"><div class="ld-card"><div class="ld-top"><h1 class="ld-title">Generating world</h1><span class="ld-spin" aria-hidden="true"></span></div><ol class="ld-steps" id="ld-steps"></ol></div></div>
 <!-- V is the cache-busting version: bump it and every ?v= below together (Life/CLAUDE.md).
      BASE is where the project's files live, relative to this page. -->
-<script>window.AS = { V: 60, BASE: 'Life/', FONT: 'AgentSimMono' };</script>
-<script src="Life/js/tables.js?v=60"></script>
-<script src="Life/js/rng.js?v=60"></script>
-<script src="Life/js/world.js?v=60"></script>
-<script src="Life/js/grass.js?v=60"></script>
-<script src="Life/js/corpse.js?v=60"></script>
-<script src="Life/js/warren.js?v=60"></script>
-<script src="Life/js/weather.js?v=60"></script>
-<script src="Life/js/sim.js?v=60"></script>
-<script src="Life/js/fire.js?v=60"></script>
-<script src="Life/js/paint.js?v=60"></script>
-<script src="Life/js/water.js?v=60"></script>
-<script src="Life/js/terrain.js?v=60"></script>
-<script src="Life/js/start.js?v=60"></script>
-<script src="Life/js/sight.js?v=60"></script>
-<script src="Life/js/animals.js?v=60"></script>
-<script src="Life/js/moving.js?v=60"></script>
-<script src="Life/js/drink.js?v=60"></script>
-<script src="Life/js/escape.js?v=60"></script>
-<script src="Life/js/breed.js?v=60"></script>
-<script src="Life/js/bunny.js?v=60"></script>
-<script src="Life/js/wolf.js?v=60"></script>
-<script src="Life/js/human.js?v=60"></script>
-<script src="Life/js/glyphs.js?v=60"></script>
-<script src="Life/js/sprites.js?v=60"></script>
-<script src="Life/js/camera.js?v=60"></script>
-<script src="Life/js/render.js?v=60"></script>
-<script src="Life/js/inspect.js?v=60"></script>
-<script src="Life/js/drag.js?v=60"></script>
-<script src="Life/js/graph.js?v=60"></script>
-<script src="Life/js/minimap.js?v=60"></script>
-<script src="Life/js/bench.js?v=60"></script>
-<script src="Life/js/ui-parts.js?v=60"></script>
-<script src="Life/js/cards.js?v=60"></script>
-<script src="Life/js/properties.js?v=60"></script>
-<script src="Life/js/paint-tab.js?v=60"></script>
-<script src="Life/js/ui.js?v=60"></script>
-<script src="Life/js/main.js?v=60"></script>
+<script>window.AS = { V: 61, BASE: 'Life/', FONT: 'AgentSimMono' };</script>
+<script src="Life/js/tables.js?v=61"></script>
+<script src="Life/js/rng.js?v=61"></script>
+<script src="Life/js/world.js?v=61"></script>
+<script src="Life/js/grass.js?v=61"></script>
+<script src="Life/js/corpse.js?v=61"></script>
+<script src="Life/js/warren.js?v=61"></script>
+<script src="Life/js/weather.js?v=61"></script>
+<script src="Life/js/sim.js?v=61"></script>
+<script src="Life/js/fire.js?v=61"></script>
+<script src="Life/js/paint.js?v=61"></script>
+<script src="Life/js/water.js?v=61"></script>
+<script src="Life/js/terrain.js?v=61"></script>
+<script src="Life/js/start.js?v=61"></script>
+<script src="Life/js/sight.js?v=61"></script>
+<script src="Life/js/animals.js?v=61"></script>
+<script src="Life/js/moving.js?v=61"></script>
+<script src="Life/js/drink.js?v=61"></script>
+<script src="Life/js/escape.js?v=61"></script>
+<script src="Life/js/breed.js?v=61"></script>
+<script src="Life/js/bunny.js?v=61"></script>
+<script src="Life/js/wolf.js?v=61"></script>
+<script src="Life/js/human.js?v=61"></script>
+<script src="Life/js/glyphs.js?v=61"></script>
+<script src="Life/js/sprites.js?v=61"></script>
+<script src="Life/js/camera.js?v=61"></script>
+<script src="Life/js/render.js?v=61"></script>
+<script src="Life/js/inspect.js?v=61"></script>
+<script src="Life/js/drag.js?v=61"></script>
+<script src="Life/js/graph.js?v=61"></script>
+<script src="Life/js/minimap.js?v=61"></script>
+<script src="Life/js/bench.js?v=61"></script>
+<script src="Life/js/ui-parts.js?v=61"></script>
+<script src="Life/js/cards.js?v=61"></script>
+<script src="Life/js/properties.js?v=61"></script>
+<script src="Life/js/paint-tab.js?v=61"></script>
+<script src="Life/js/ui.js?v=61"></script>
+<script src="Life/js/main.js?v=61"></script>
 </body>
 </html>
