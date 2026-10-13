@@ -124,6 +124,11 @@ and nothing settling to watch on day 1).
   view (under a wading animal too), and the properties window gives it (Depth).
 - **Rising water** drowns grass, floods warren holes, puts out scorched ground and washes
   corpses away; an animal that dies in water leaves no body. Nukes leave water.
+  - **Grass drowns only under standing water** (Paul, 12 Oct 2026, not built yet): water that
+    runs over grass and drains off leaves it alive; a blade dies once water has stood on its
+    tile for a while (a setting, about a day to start). My calls, to confirm: the beach ring
+    likewise takes a blade only after it has stood that long, and a blade under water
+    doesn't grow, seed, or burn.
 - **The beach:** a one-tile bare beach rings all water and moves with the shore. Grass never
   grows there, so animals can always reach water to drink.
 - **Wading:** animals wade water up to their `WadeDepth`, at `WadeSpeed`.
@@ -379,6 +384,10 @@ weather's next part comes next. Fire comes first of the weather systems, and win
   From the second mockup (Paul): the wet darkening should be stronger, and a passing
   shower's rain streaks stay on screen longer than its true crossing (about a second at
   least), so they don't read as a twitch.
+- **Lightning shouldn't be drowned out** (Paul, 12 Oct 2026): a storm's own rain mustn't stop
+  the fire it starts from spreading much. As in real storms, strikes can land outside the
+  rain core, around and ahead of the shower, and in dry spells storms are mostly dry
+  lightning (little rain reaching the ground); a passing shower is brief anyway.
 - **Order:** showers and spells; drought you can see; lightning.
 
 ## Looks
@@ -575,5 +584,6 @@ Nothing flashes full-screen or strobes. Animation frames change only with what a
 doing (a step, a bite). A pose for an event (a bite, a mouthful, a flinch, a death) holds
 for at least a quarter of a second of real time, whatever the speed, and when the sim runs
 so fast that steps would flicker, animals glide in their standing pose instead of cycling
-their legs. Water never blinks: its rules run in even steps, so a steady trickle looks
-steady. The bob of a swimmer is slow and its wake moves only with it.
+their legs. Water never blinks: its rules run in even steps, and its look eases in and out over
+`WATER_FADE_MS` of real time (wet or dry and depth band alike), so even at top speed a tile
+never completes an on/off cycle in under twice that (Paul, 12 Oct 2026). The bob of a swimmer is slow and its wake moves only with it.

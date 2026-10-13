@@ -124,6 +124,19 @@
   const OUTSIDE = '#040504', EDGE_LINE = 'rgba(176,186,150,0.28)';
   const WAKE_STEPS = 4, WAKE_ALPHA = 0.75;
 
+  // Water changes are drawn over real time, never in the sim's own steps (DESIGN.md,
+  // Photosensitivity). The water steps every 0.5 sim seconds, so at speed a shore tile can flip
+  // wet and dry, or change depth band, dozens of times a second, and bright blue on dark ground
+  // reads as flashing. Each tile instead eases between its looks at no more than 1 /
+  // WATER_FADE_MS of a look per millisecond: a full wet-dry-wet cycle takes at least twice that,
+  // at any speed. Long enough to read as water arriving at the slowest speed too.
+  const WATER_FADE_MS = AS.WATER_FADE_MS = 1200;
+  // A wading animal's stance follows the drawn water, not the sim's: it changes only once the
+  // tile on its feet is at least this much water, so a shore tile flipping every step can't
+  // flick the animal's feet in and out of view. At WATER_STANCE_MIN a fade has taken half its time.
+  const WATER_STANCE_MIN = 0.5;
+  const WADE_FLOOR_M = 1e-3;   // the depth a drying tile still counts for while its water is on screen
+
   // The Radius slider's preview (Paul, 12 Oct 2026): a circle the size the armed mode will
   // cover, in the middle of the map, held RADIUS_HOLD_MS then faded out over RADIUS_FADE_MS
   // of real time, so it shows the size without staying in the way. One slow fade, no blink.
@@ -279,7 +292,113 @@
     // greens from its rim (less scorch there) inward.
     const scorchFadeDays = sim => Math.min(sim.T.world.ScorchDays, sim.T.world.FireScorchDays);
 
-    function fillCells(sim) {
+    // ---- water, drawn over real time ----------------------------------------------------
+    // Per tile: tgt (the sim's look now: 0 dry, 1..3 the depth band + 1), and w[3t + band], how
+    // much of each band's look is on screen (0..1). A settled tile has weight 1 on its own band
+    // and 0 elsewhere. A tile joins `list` when its target changes and leaves when its weights
+    // have reached it, so a frame touches only the tiles that are moving. Going wet (or deeper)
+    // raises the new band's weight; the old band's look is held under it until it is fully there,
+    // so a crossfade between two wet looks never dips toward the ground. Going dry lowers every
+    // weight. A target that flips back mid-fade just turns the weights around from where they are.
+    let water = null, lastDrawMs = 0;
+    function waterStepTicks() {
+      return AS.WATER_STEP_DAYS ? Math.max(1, Math.round(AS.WATER_STEP_DAYS * AS.DAY_SECONDS * AS.TICK_HZ)) : 1;
+    }
+    function updateWater(sim, nowMs) {
+      const W = sim.W, n = W.n;
+      if (!water || water.W !== W || water.n !== n) {
+        water = { W, n, tgt: new Uint8Array(n), w: new Float32Array(n * 3), fade: new Uint8Array(n), list: new Int32Array(n), count: 0, step: -1, flips: -1, wet: -1, ms: nowMs };
+        const D = W.wDepth, tgt = water.tgt, w = water.w;
+        for (let t = 0; t < n; t++) if (D[t] > 0) { const c = AS.waterBand(D[t]) + 1; tgt[t] = c; w[t * 3 + c - 1] = 1; }
+        water.step = Math.floor(sim.tickCount / waterStepTicks()); water.flips = W.wetFlips; water.wet = W.waterCount;
+        return;
+      }
+      const st = Math.floor(sim.tickCount / waterStepTicks());
+      // Depths change only in a water step or when something is painted (which flips tiles), so
+      // one pass over the world per frame at most, and none while nothing has moved.
+      if (st !== water.step || W.wetFlips !== water.flips || W.waterCount !== water.wet) {
+        water.step = st; water.flips = W.wetFlips; water.wet = W.waterCount;
+        const D = W.wDepth, tgt = water.tgt, fade = water.fade, list = water.list;
+        for (let t = 0; t < n; t++) {
+          const d = D[t], c = d > 0 ? AS.waterBand(d) + 1 : 0;
+          if (c !== tgt[t]) { tgt[t] = c; if (!fade[t]) { fade[t] = 1; list[water.count++] = t; } }
+        }
+      }
+      if (!(nowMs > water.ms)) return;
+      const d = (nowMs - water.ms) / WATER_FADE_MS;
+      water.ms = nowMs;
+      const w = water.w, tgt = water.tgt, fade = water.fade, list = water.list;
+      for (let i = 0; i < water.count; i++) {
+        const t = list[i], b = t * 3, c = tgt[t];
+        let done;
+        if (c === 0) {
+          done = true;
+          for (let k = 0; k < 3; k++) { let v = w[b + k]; if (v > 0) { v -= d; if (v <= 0) v = 0; else done = false; w[b + k] = v; } }
+        } else {
+          let v = w[b + c - 1] + d;
+          done = v >= 1;
+          if (done) { v = 1; for (let k = 0; k < 3; k++) w[b + k] = 0; }
+          w[b + c - 1] = v;
+        }
+        if (done) { fade[t] = 0; list[i] = list[--water.count]; i--; }
+      }
+    }
+    // How much water is on screen at tile t (0..1: the layers laid over each other), and the band
+    // that shows most. Both are for the checks and the wading stance.
+    function waterShown(t) {
+      const b = t * 3, w = water.w;
+      return 1 - (1 - w[b]) * (1 - w[b + 1]) * (1 - w[b + 2]);
+    }
+    function bandShown(t) {
+      const b = t * 3, w = water.w;
+      if (waterShown(t) <= 0) return -1;
+      return w[b] >= w[b + 1] && w[b] >= w[b + 2] ? 0 : w[b + 1] >= w[b + 2] ? 1 : 2;
+    }
+    // The far view's color of a tile under its fading water: `c`, the ground without water,
+    // under the band looks, the fullest first, as drawn up close.
+    function farWaterMix(c, t) {
+      const b = t * 3, w = water.w;
+      let i0 = 0, i1 = 1, i2 = 2, x;
+      if (w[b + i0] < w[b + i1]) { x = i0; i0 = i1; i1 = x; }
+      if (w[b + i1] < w[b + i2]) { x = i1; i1 = i2; i2 = x; }
+      if (w[b + i0] < w[b + i1]) { x = i0; i0 = i1; i1 = x; }
+      if (w[b + i0] > 0) c = mixAbgr(c, FAR_WATERS[i0], w[b + i0]);
+      if (w[b + i1] > 0) c = mixAbgr(c, FAR_WATERS[i1], w[b + i1]);
+      if (w[b + i2] > 0) c = mixAbgr(c, FAR_WATERS[i2], w[b + i2]);
+      return c;
+    }
+    // A water tile up close, at its place on screen. Settled, one sprite; fading, the bands that
+    // are on screen, fullest first, each at its weight.
+    const wOrder = [0, 1, 2];
+    function drawWater(t, tx, ty, img, sh, px, dx, dy, dw, dh) {
+      if (!water.fade[t]) {
+        const c = water.tgt[t];
+        if (c) { const id = AS.spriteWater(tx, ty, c - 1); ctx.drawImage(img, sh.sx(id), sh.sy(id), px, px, dx, dy, dw, dh); }
+        return;
+      }
+      const b = t * 3, w = water.w;
+      wOrder[0] = 0; wOrder[1] = 1; wOrder[2] = 2;
+      if (w[b] < w[b + 1]) { wOrder[0] = 1; wOrder[1] = 0; }
+      if (w[b + wOrder[1]] < w[b + 2]) { const x = wOrder[1]; wOrder[1] = 2; wOrder[2] = x; }
+      if (w[b + wOrder[0]] < w[b + wOrder[1]]) { const x = wOrder[0]; wOrder[0] = wOrder[1]; wOrder[1] = x; }
+      for (let i = 0; i < 3; i++) {
+        const band = wOrder[i], a = w[b + band];
+        if (a <= 0) break;
+        const id = AS.spriteWater(tx, ty, band);
+        ctx.globalAlpha = a;
+        ctx.drawImage(img, sh.sx(id), sh.sy(id), px, px, dx, dy, dw, dh);
+      }
+      ctx.globalAlpha = 1;
+    }
+    // The depth an animal's feet are in, as drawn: the sim's, once the drawn water on its tile
+    // is at least WATER_STANCE_MIN, else none.
+    function stanceDepth(W, t) {
+      const shown = waterShown(t) >= WATER_STANCE_MIN;
+      return shown ? (W.wDepth[t] > 0 ? W.wDepth[t] : WADE_FLOOR_M) : 0;
+    }
+
+    function fillCells(sim, nowMs) {
+      updateWater(sim, nowMs === undefined ? lastDrawMs : nowMs);
       const W = sim.W;
       if (cell.w !== W.w || cell.h !== W.h) {
         cell.canvas = document.createElement('canvas');
@@ -291,7 +410,7 @@
       }
       const px = cell.px, kind = W.kind, size = W.gSize;
       const bg = FAR_GROUND, g0 = FAR_GRASS[0], g1 = FAR_GRASS[1], g2 = FAR_GRASS[2];
-      const corpse = FAR_CORPSE, waters = FAR_WATERS, depth = W.wDepth, holeAt = W.hole, scorch = W.scorch, fullDays = scorchFadeDays(sim);
+      const corpse = FAR_CORPSE, waters = FAR_WATERS, wtgt = water.tgt, wfade = water.fade, holeAt = W.hole, scorch = W.scorch, fullDays = scorchFadeDays(sim);
       const lo = 1 / 3, hi = 2 / 3;
       const flow = W.flow, ash = W.ash, fireDays = sim.T.world.FireScorchDays, emberDays = FIRE_EMBER_HOURS / 24;
       for (let t = 0, n = W.n; t < n; t++) {
@@ -299,13 +418,17 @@
         if (flow[t] === FLOW.FIRE) px[t] = AS.fireLook(AS.fireStage(W, t)).flame >= AS.FLAME.MID ? FAR_FIRE_HIGH : FAR_FIRE_MID;
         else if (k === KIND.GRASS) { const z = size[t]; px[t] = z < lo ? g0 : z < hi ? g1 : g2; }
         else if (k === KIND.CORPSE) px[t] = corpse;
-        else if (depth[t] > 0) px[t] = waters[AS.waterBand(depth[t])];   // under a wading animal too
-        else if (scorch[t] > 0) {
-          const ground = mixAbgr(bg, FAR_SCORCH, Math.min(1, scorch[t] / fullDays)), left = scorch[t];
-          // Embers glow only where a fuel fire burnt out (it left ash), never on a nuke's crater.
-          px[t] = ash[t] > 0 && left > fireDays - emberDays && left <= fireDays ? mixAbgr(ground, FAR_EMBER, (left - (fireDays - emberDays)) / emberDays) : ground;
+        else if (wtgt[t] !== 0 && !wfade[t]) px[t] = waters[wtgt[t] - 1];   // under a wading animal too
+        else {
+          // Ground; a tile whose water is arriving or leaving has it mixed over the ground.
+          let c;
+          if (scorch[t] > 0) {
+            const ground = mixAbgr(bg, FAR_SCORCH, Math.min(1, scorch[t] / fullDays)), left = scorch[t];
+            // Embers glow only where a fuel fire burnt out (it left ash), never on a nuke's crater.
+            c = ash[t] > 0 && left > fireDays - emberDays && left <= fireDays ? mixAbgr(ground, FAR_EMBER, (left - (fireDays - emberDays)) / emberDays) : ground;
+          } else c = holeAt[t] ? FAR_HOLE : bg;   // empty ground (or a hole), or an animal that the loop below paints
+          px[t] = wfade[t] ? farWaterMix(c, t) : c;
         }
-        else px[t] = holeAt[t] ? FAR_HOLE : bg;   // empty ground (or a hole), or an animal that the loop below paints
       }
       for (let s = 0, hiSlot = W.aHigh; s < hiSlot; s++) {
         // Alight, an animal takes the fire's bright color in place of its species', steady (no alternating).
@@ -358,8 +481,13 @@
             if (W.cMeat[row + tx] > 0) id = AS.spriteCarcass(W.cSpecies[row + tx]);
             else if (nowMs < deathUntil[row + tx]) id = AS.spriteCarcass(W.cSpecies[row + tx]);
             else id = AS.spriteSkull(W.cSpecies[row + tx]);
-          } else if (W.wDepth[row + tx] > 0) id = AS.spriteWater(tx, ty, AS.waterBand(W.wDepth[row + tx]));   // under a wading animal too
-          else continue;   // empty, or an animal on land (own pass)
+          } else {
+            // Water, as drawn over real time (updateWater), under a wading animal too; nothing
+            // for empty ground or an animal on land (own pass).
+            const dx = Math.round(tx * s - ox);
+            drawWater(row + tx, tx, ty, img, sh, px, dx, dy, Math.round((tx + 1) * s - ox) - dx, dh);
+            continue;
+          }
           const dx = Math.round(tx * s - ox), dw = Math.round((tx + 1) * s - ox) - dx;
           ctx.drawImage(img, sh.sx(id), sh.sy(id), px, px, dx, dy, dw, dh);
         }
@@ -399,7 +527,7 @@
           W.aPregnant[a] > 0, hold, stepMs, p, clock + AS.spriteIdleOffset(serial), posed);
         // In water (sprites.js, "in the water"): the tile under it now, mid-glide the one it is
         // nearer. Swimming: low, legs under, bobbing; drowning: down to its eyes. Wading: feet under.
-        const under = p < 0.5 ? W.aFrom[a] : W.aTile[a], depth = W.wDepth[under];
+        const under = p < 0.5 ? W.aFrom[a] : W.aTile[a], depth = stanceDepth(W, under);
         if (depth > 0) {
           const stage = stageOf(sim, a, W), left = facing.left(a);
           const dx = Math.round(ax * s - ox), dy = Math.round(ay * s - oy);
@@ -828,7 +956,13 @@
       setContourStep(m) { if (m > 0) contourStep = m; },
       get contourStep() { return contourStep; },
       // The far view's one-pixel-per-tile picture of the world, brought up to date (the minimap draws it).
-      farCanvas(sim) { fillCells(sim); return cell.canvas; },
+      // nowMs: the clock the water's fades run on (defaults to the last frame's).
+      farCanvas(sim, nowMs) { fillCells(sim, nowMs); return cell.canvas; },
+      // The water drawn on tile t now (0..1) and its fullest band (-1 none), after a draw or farCanvas.
+      waterLevel(t) { return water ? waterShown(t) : 0; },
+      waterBand(t) { return water ? bandShown(t) : -1; },
+      // Tiles whose water is moving between looks.
+      get waterFading() { return water ? water.count : 0; },
       get contours() { return contoursOn; },
       get intentLines() { return intentLines; },
       // sel: null or { tile, serial, slot }; alpha: 0–1 through the current tick; nowMs: real
@@ -837,6 +971,8 @@
       draw(sim, cam, sheet, sel, alpha, nowMs, speed) {
         const dpr = sizeCanvas();
         nowMs = nowMs || 0;
+        lastDrawMs = nowMs;
+        updateWater(sim, nowMs);
         stepSpeed = speed === undefined ? 1 : speed;
         if (statesFor !== sim.T) buildStates(sim.T);
         frameNo++;
@@ -854,7 +990,7 @@
           gusts.update(sim, nowMs, stepSpeed, alpha);
           drawSprites(sim, cam, sheet, sel, dpr, nowMs);
         } else {
-          fillCells(sim);
+          fillCells(sim, nowMs);
           const W = sim.W;
           ctx.imageSmoothingEnabled = false;
           ctx.drawImage(cell.canvas, 0, 0, W.w, W.h, -cam.x * s, -cam.y * s, W.w * s, W.h * s);

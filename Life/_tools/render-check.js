@@ -315,5 +315,107 @@ function rig(sim) {
   const px = new Uint32Array(image.data.buffer), red = c => c & 255;
   check(red(px[fueled]) > red(px[nuked]), `far view: embers glow on the fuel fire's tile, not the nuke's (${red(px[fueled])} > ${red(px[nuked])})`);
 }
+
+// Water is drawn over real time (WATER_FADE_MS), so a shore tile the sim flips every water step
+// can't flash at speed: its drawn water eases, at most 1 / WATER_FADE_MS per ms, and the far
+// view blends the same way.
+{
+  const FADE = AS.WATER_FADE_MS, STEP_TICKS = Math.round(AS.WATER_STEP_DAYS * AS.DAY_SECONDS * AS.TICK_HZ);
+  check(FADE >= 1000 && FADE <= 1500, `WATER_FADE_MS is cinematic but not sluggish (${FADE})`);
+  const simW = AS.Sim(T, 5), WW = simW.W;
+  ctx.window = { devicePixelRatio: 1 };
+  let image = null;
+  ctx.document = { createElement: () => ({ width: 0, height: 0, getContext: () => ({ createImageData: (w, h) => ({ data: new Uint8ClampedArray(w * h * 4) }), putImageData: img => { image = img; } }) }) };
+  const { r, sheet, rec } = rig(simW);
+  let tile = -1;
+  for (let t = 0; t < WW.n; t++) if (WW.isBare(t) && WW.wDepth[t] === 0 && !WW.scorch[t] && !WW.hole[t] && !WW.ash[t]) { tile = t; break; }
+  // The camera sees only a few tiles around it: the fades run over the whole world, the drawing is the cost here.
+  const cam = { x: 0, y: 0, scale: 10, visible: () => ({ x0: tile % WW.w, y0: (tile / WW.w) | 0, x1: tile % WW.w + 1, y1: ((tile / WW.w) | 0) + 1 }) };
+  const wetD = 2, deepD = 6;   // meters: a mid band, a deep band
+  const bandA = AS.waterBand(wetD), bandB = AS.waterBand(deepD);
+  check(bandA !== bandB, 'the test depths are in different bands');
+  let now = 0;
+  const frame = ms => { now += ms; r.draw(simW, cam, sheet, null, 0, now, 1); };
+  const stepWater = () => { simW.tickCount += STEP_TICKS; };
+  frame(16);
+  check(r.waterLevel(tile) === 0 && r.waterFading === 0, 'dry ground: no water drawn, nothing fading');
+
+  // Becomes wet and stays wet: eased in, full by WATER_FADE_MS, and settled (no work left).
+  WW.setDepth(tile, wetD); stepWater();
+  frame(16);
+  const first = r.waterLevel(tile);
+  check(first > 0 && first < 0.1, `a tile turning wet starts to show (${first.toFixed(3)}), it does not snap on`);
+  let sawMid = false;
+  for (let t = 16; t < FADE; t += 16) { frame(16); const l = r.waterLevel(tile); if (l > 0.3 && l < 0.7) sawMid = true; }
+  check(sawMid, 'a tile turning wet passes through half water');
+  frame(32);
+  check(r.waterLevel(tile) === 1 && r.waterBand(tile) === bandA && r.waterFading === 0, `wet and staying wet: full water in its band within WATER_FADE_MS (${r.waterLevel(tile)})`);
+
+  // The far view blends too: halfway through a fade the pixel is between ground and water.
+  WW.setDepth(tile, 0); stepWater();
+  frame(16); for (let t = 0; t < FADE / 2 - 16; t += 16) frame(16);
+  r.farCanvas(simW);
+  const px = new Uint32Array(image.data.buffer), red = c => c & 255, blue = c => (c >>> 16) & 255;
+  const dryRef = (() => { let o = -1; for (let t = 0; t < WW.n; t++) if (WW.isBare(t) && !WW.scorch[t] && !WW.hole[t] && WW.wDepth[t] === 0 && t !== tile) { o = t; break; } return px[o]; })();
+  frame(FADE); r.farCanvas(simW);
+  check(px[tile] === dryRef, 'far view: once the water has left, the tile is the ground\'s color');
+  WW.setDepth(tile, wetD); stepWater(); frame(16); frame(FADE); r.farCanvas(simW);
+  const wetPx = px[tile];
+  check(blue(wetPx) > blue(dryRef) + 40, 'far view: wet tile is blue');
+  WW.setDepth(tile, 0); stepWater(); frame(16);
+  for (let t = 0; t < FADE / 2; t += 16) frame(16);
+  r.farCanvas(simW);
+  check(blue(px[tile]) > blue(dryRef) && blue(px[tile]) < blue(wetPx), `far view: halfway through drying the tile is between ground and water (${blue(px[tile])})`);
+  frame(FADE * 2); r.farCanvas(simW);
+
+  // A tile the sim flips every water step, at the top speed. Water steps every WATER_STEP_DAYS ×
+  // DAY_SECONDS sim seconds; at 50× and more that is a step in well under a frame (60 fps).
+  // However fast, the drawn level moves at most dt / FADE per frame, so it never completes a
+  // wet-dry-wet cycle in under 2 × WATER_FADE_MS.
+  for (const stepMs of [1, 10, 100, FADE / 2, 2 * FADE]) {
+    WW.setDepth(tile, 0); stepWater(); frame(16); frame(2 * FADE);
+    let wet = false, prev = r.waterLevel(tile), maxSlope = 0, since = 0, cycles = 0, up = false, lastUp = -1e9, worstCycleMs = Infinity, simNow = now;
+    const end = now + 6 * FADE;
+    let nextFlip = now, nowT = now;
+    while (nowT < end) {
+      const dt = 1000 / 60;
+      nowT += dt;
+      while (nextFlip <= nowT) {   // every sim step that fell in this frame
+        wet = !wet; if (wet) WW.setDepth(tile, wetD); else WW.setDepth(tile, 0);
+        stepWater(); nextFlip += stepMs;
+      }
+      now = nowT; r.draw(simW, cam, sheet, null, 0, now, 1);
+      const l = r.waterLevel(tile);
+      maxSlope = Math.max(maxSlope, Math.abs(l - prev) / dt * FADE);
+      // A visible on/off cycle: from below 0.1 to above 0.9 and back.
+      if (!up && l >= 0.9) { up = true; if (lastUp > -1e8) worstCycleMs = Math.min(worstCycleMs, now - lastUp); lastUp = now; }
+      if (up && l <= 0.1) up = false;
+      prev = l;
+    }
+    void simNow; void since; void cycles;
+    check(maxSlope <= 1 + 1e-4, `a tile flipping every ${stepMs} ms eases at most 1/WATER_FADE_MS per ms (${maxSlope.toFixed(3)} of it)`);
+    check(worstCycleMs >= 2 * FADE - 20, `a tile flipping every ${stepMs} ms never shows a full on/off cycle in under 2 × WATER_FADE_MS (${worstCycleMs} ms)`);
+  }
+
+  // A flip back before the fade is done turns the water around from where it is: no jump.
+  WW.setDepth(tile, 0); stepWater(); frame(16); frame(2 * FADE);
+  WW.setDepth(tile, wetD); stepWater(); frame(16);
+  for (let t = 0; t < FADE * 0.4; t += 16) frame(16);
+  const mid = r.waterLevel(tile);
+  WW.setDepth(tile, 0); stepWater(); frame(16);
+  check(Math.abs(r.waterLevel(tile) - mid) <= 16 / FADE + 1e-6 && r.waterLevel(tile) < mid, 'flipping back mid-fade reverses smoothly from where it is');
+  frame(2 * FADE);
+  check(r.waterLevel(tile) === 0 && r.waterFading === 0, 'and the water leaves completely');
+
+  // A depth-band change crossfades under the old look, never dipping toward the ground.
+  WW.setDepth(tile, wetD); stepWater(); frame(16); frame(2 * FADE);
+  WW.setDepth(tile, deepD); stepWater(); frame(16);
+  let minLevel = 1, ids = new Set();
+  for (let t = 0; t < FADE; t += 16) { frame(16); minLevel = Math.min(minLevel, r.waterLevel(tile)); }
+  check(minLevel === 1, `a band change keeps full water on screen throughout (${minLevel})`);
+  frame(2 * FADE);
+  check(r.waterBand(tile) === bandB && r.waterFading === 0, 'and ends in the new band');
+  void ids; void red; void rec;
+}
 console.log(bad ? `FAIL (${bad})` : `PASS (${ids.length} glyphs, 12 animal combos, ${cases.length} grass cases)`);
 process.exit(bad ? 1 : 0);
