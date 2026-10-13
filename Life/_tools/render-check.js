@@ -1,7 +1,7 @@
 // Node check of glyphs.js (no DOM): ids, colors, grassGlyph, animalGlyph, stageOf; and render.js's pure parts.
 'use strict';
 const { load } = require('./harness.js');
-const { AS, texts, ctx } = load({}, ['sprites', 'render']);
+const { AS, texts, ctx } = load({}, ['sprites', 'lenses', 'render']);
 let bad = 0;
 const check = (c, m) => { if (!c) { bad++; console.log('FAIL: ' + m); } };
 
@@ -809,6 +809,253 @@ function rig(sim) {
     frame(2500);
     check(r.pulses === 0 && col(WOLF).length === 0, 'and both go');
   }
+}
+// Lenses (lenses.js, render.js): the dim and the items' colors, the counts, the easing, and what a frame costs.
+{
+  const { editCSV } = require('./harness.js');
+  const Ts = AS.parseTables({ ...texts, settings: editCSV(editCSV(texts.settings, 'WorldWidth', 'Value', '160'), 'WorldHeight', 'Value', '110') }).T;
+  ctx.window = { devicePixelRatio: 1 };
+  const SC = 10, FAR_SC = 3, IDS = AS.LENS_ITEM_IDS, ITEMS = AS.LENS_ITEMS, DIM_A = 0.55 * 255;
+  // The layer canvas keeps the last image put on it; strokes and arcs are recorded off the main canvas.
+  let layer = null;
+  ctx.document = { createElement: () => ({ width: 0, height: 0, getContext: () => ({
+    createImageData: (w, h) => ({ data: new Uint8ClampedArray(w * h * 4), width: w, height: h }),
+    putImageData: img => { layer = { data: Uint8ClampedArray.from(img.data), w: img.width }; } }) }) };
+  function rigL(sim, scale = SC) {
+    const W = sim.W, rec = { strokes: [], layerDraws: 0 };
+    let stroke = '';
+    const g = new Proxy({}, {
+      get(_, k) {
+        if (k === 'drawImage') return img => { if (img && img.getContext) rec.layerDraws++; };
+        if (k === 'stroke') return () => rec.strokes.push(stroke);
+        if (k === 'canvas') return canvas;
+        if (k === 'createRadialGradient') return () => ({ addColorStop() {} });
+        return () => {};
+      },
+      set(_, k, v) { if (k === 'strokeStyle') stroke = v; return true; },
+    });
+    const canvas = { width: W.w * scale, height: W.h * scale, clientWidth: W.w * scale, clientHeight: W.h * scale, getContext: () => g };
+    const r = AS.Renderer(canvas);
+    const vis = { x0: 0, y0: 0, x1: W.w - 1, y1: W.h - 1 };
+    const cam = { x: 0, y: 0, scale, visible: () => vis };
+    const sheet = { get: px => ({ canvas: {}, px, sx: i => i, sy: () => 0 }) };
+    let now = 0;
+    const frame = (ms = 16) => { now += ms; rec.strokes.length = 0; rec.layerDraws = 0; r.draw(sim, cam, sheet, null, 0, now, 1); return now; };
+    return { r, rec, frame, cam, vis };
+  }
+  const px = t => { if (!layer) throw new Error('no layer; lens ' + r.lens + ' dim ' + r.lensDim); const i = t * 4, d = layer.data; return [d[i], d[i + 1], d[i + 2], d[i + 3]]; };
+  const hex = id => ITEMS[id].rgb;
+  const ringed = (rec, id) => rec.strokes.some(st => st.startsWith(`rgba(${hex(id).join(',')},`));
+  const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+
+  // 0. The interface the Info window builds to.
+  const lensT0 = Date.now();
+  check(AS.LENSES.map(l => l.id).join() === 'fire,water,weather,ground,condition,activity', 'six lenses in order');
+  check(AS.LENSES.every(l => l.name && /^#[0-9a-f]{6}$/.test(l.accent) && l.icon && l.blurb && l.items.length && l.items.every(i => ITEMS[i])), 'every lens has a name, accent, icon, blurb and known items');
+  check(IDS.every(id => ITEMS[id].name && /^#[0-9a-f]{6}$/.test(ITEMS[id].color) && (ITEMS[id].draw === 'tint' || ITEMS[id].draw === 'ring') && ITEMS[id].tip), 'every item has a name, color, draw and tip');
+  check(IDS.every(id => AS.LENSES.some(l => l.items.includes(id))), 'every item is in some lens');
+
+  // A world with a bit of everything: a burn, ash, roots, scorch, strikes, water, sunk grass, holes, rain, and animals in every condition.
+  const sim = AS.Sim(Ts, 21), W = sim.W, K = AS.KIND;
+  const { r, rec, frame } = rigL(sim);
+  const blades = [];
+  for (let t = 3000; t < W.n && blades.length < 40; t++) if (W.kind[t] === K.GRASS && !W.hole[t] && W.flow[t] === AS.FLOW.NONE && !W.beach[t] && !W.scorch[t]) blades.push(t);
+  for (const t of blades.slice(0, 3)) AS.ignite(sim, t);
+  blades.slice(3, 20).forEach(t => { W.ash[t] = 1; });
+  blades.slice(8, 12).forEach(t => { W.roots[t] = 1; });
+  blades.slice(12, 18).forEach(t => { W.scorch[t] = 1; });
+  blades.slice(25, 28).forEach(t => { W.sunk[t] = 1; });
+  for (const t of blades.slice(30, 32)) sim.weather.strikeAt(sim, t);
+  const sh = sim.weather.showers;
+  sh.n = 2; sh.x = Float64Array.of(40, 120); sh.y = Float64Array.of(30, 80); sh.r = Float64Array.of(8, 5); sh.mmh = Float64Array.of(5, 5); sh.left = Float64Array.of(9, 9); sh.storm = Uint8Array.of(1, 0);
+  // Animals: spread conditions and states over the first ones.
+  const slots = []; for (let s = 0; s < W.aHigh; s++) if (W.aAlive[s]) slots.push(s);
+  const stIdx = (sp, name) => sim.T.states[AS.SPECIES_KEY[sp]].findIndex(x => x.name === name);
+  const jobs = [s => { W.aAlight[s] = 5; }, s => { W.aFullness[s] = 0; }, s => { W.aWater[s] = 0; }, s => { W.aHP[s] = 1; }, s => { W.aStamina[s] = 0; }, s => { W.aPregnant[s] = 3; }, s => { W.aAge[s] = 0; }];
+  slots.slice(0, 7 * 3).forEach((s, i) => jobs[i % 7](s));
+  const NAMES = ['ESCAPE', 'HIDE', 'FLEE', 'DRINK', 'EAT', 'HUNT', 'MATE', 'DIG', 'REST', 'WANDER', 'PROWL', 'FEED', 'GIVE_UP'];
+  slots.slice(30, 30 + 40).forEach((s, i) => { const k = stIdx(W.aSpecies[s], NAMES[i % NAMES.length]); if (k >= 0) W.aState[s] = k; });
+  // Soil: a few dry and wet tiles once the renderer has its first look.
+  frame(16);
+  const room = W.water.room, G = W.water.G;
+  blades.slice(33, 36).forEach(t => { G[t] = room * 0.0004; });
+  blades.slice(36, 39).forEach(t => { G[t] = room * 0.9; });
+  for (let i = 0; i < 60; i++) frame(100);
+  check(r.soilLevels && Array.from(blades.slice(36, 39)).some(t => r.soilLevel(t) > 0) && blades.slice(33, 36).some(t => r.soilLevel(t) < 0), 'the test world has wet and dry soil on screen');
+
+  // 1. lensCounts agrees with counts made straight from the world, for every item.
+  {
+    const c = AS.lensCounts(sim, r), want = {};
+    for (const id of IDS) want[id] = 0;
+    for (let t = 0; t < W.n; t++) {
+      if (W.ash[t] > 0) want.ash++; if (W.roots[t]) want.roots++; if (W.scorch[t] > 0) want.scorched++; if (W.sunk[t]) want.sunk++;
+      if (W.wDepth[t] > 0) { want.water++; continue; }
+      if (W.beach[t]) want.beach++;
+      const l = r.soilLevel(t); if (l > 0) want.wet++; else if (l < 0) want.dry++;
+    }
+    for (let t = 0; t < W.n; t++) { if (W.flow[t] === AS.FLOW.FIRE) want.burn++; if (W.hole[t]) want.holes++; }
+    const st = sim.weather.strikes; for (let k = 0; k < Math.min(st.n, 32); k++) if ((sim.simSeconds - st.atSec[k]) / AS.DAY_SECONDS < sim.T.world.FireScorchDays) want.strikes++;
+    want.showers = sh.n;
+    const ACT = { ESCAPE: 'fleeFire', HIDE: 'hiding', FLEE: 'fleeing', DRINK: 'drinking', EAT: 'eating', FEED: 'eating', SEEK_FOOD: 'eating', FORAGE: 'eating', HUNT: 'hunting', MATE: 'mating', DIG: 'digging', REST: 'resting', GIVE_UP: 'resting', WANDER: 'wandering', PROWL: 'wandering' };
+    for (let s = 0; s < W.aHigh; s++) {
+      if (!W.aAlive[s]) continue;
+      const sp = W.aSpecies[s], S = sim.T[AS.SPECIES_KEY[sp]], name = sim.T.states[AS.SPECIES_KEY[sp]][W.aState[s]]?.name;
+      if (W.aAlight[s] > 0) want.alight++;
+      if (W.aFullness[s] < S.HungryAt * S.FullnessMax) want.hungry++;
+      if (W.aWater[s] < S.ThirstyAt * S.WaterMax) want.thirsty++;
+      if (W.aHP[s] < S.HPMax) want.hurt++;
+      if (W.aStamina[s] === 0) want.exhausted++;
+      if (W.aPregnant[s] > 0) want.pregnant++;
+      const stage = AS.stageOf(S, W.aAge[s]); if (stage === AS.STAGE.BABY) want.babies++; if (stage === AS.STAGE.ELDER) want.elders++;
+      if (name === 'WANDER' && sp === AS.SPECIES.BUNNY && AS.bunnyStress(sim, s).leavingHome) want.leaving++; else if (ACT[name]) want[ACT[name]]++;
+    }
+    const wrong = IDS.filter(id => c[id] !== want[id]);
+    check(wrong.length === 0, `lensCounts matches a direct count for every item${wrong.map(id => ` (${id}: ${c[id]} vs ${want[id]})`).join('')}`);
+    check(IDS.filter(id => want[id] > 0).length >= 26, `the test world has members for most items (${IDS.filter(id => want[id] === 0)} empty)`);
+    for (const id of IDS) if (ITEMS[id].kind === 'tiles') check(ITEMS[id].draw === (c[id] <= AS.LENS_RING_MAX ? 'ring' : 'tint'), `${id}: ${c[id]} members, draws as ${ITEMS[id].draw}`);
+    check(ITEMS.alight.draw === 'ring' && ITEMS.hungry.draw === 'ring' && ITEMS.showers.draw === 'tint', 'animals ring, showers tint');
+  }
+
+  // 2. Each lens draws its items' colors where members are and nothing where they are not.
+  const members = (id) => {   // tiles an item covers, from the lists the draw keeps: re-derived from the world
+    const out = [];
+    const c = ITEMS[id];
+    if (c.kind === 'tiles') {
+      for (let t = 0; t < W.n; t++) {
+        const dry = W.wDepth[t] <= 0;
+        const yes = { burn: W.flow[t] === AS.FLOW.FIRE, ash: W.ash[t] > 0, roots: W.roots[t], scorched: W.scorch[t] > 0, water: !dry, beach: dry && W.beach[t], sunk: W.sunk[t],
+          wet: dry && r.soilLevel(t) > 0, dry: dry && r.soilLevel(t) < 0, holes: W.hole[t] }[id];
+        if (yes) out.push(t);
+      }
+    }
+    return out;
+  };
+  const settle = (ms = 700) => { for (let t = 0; t < ms; t += 50) frame(50); };
+  for (const lens of AS.LENSES) {
+    r.setLens(lens.id, new Set());
+    settle();
+    let blank = -1;
+    const covered = new Set();
+    for (const id of lens.items) { if (ITEMS[id].kind === 'tiles') for (const t of members(id)) covered.add(t); }
+    for (let s = 0; s < W.aHigh; s++) if (W.aAlive[s]) { covered.add(W.aTile[s]); covered.add(W.aFrom[s]); }
+    for (let t = 0; t < W.n; t++) { const x = t % W.w, y = (t / W.w) | 0; if (!covered.has(t) && Math.hypot(x - 40, y - 30) > 9 && Math.hypot(x - 120, y - 80) > 6) { blank = t; break; } }
+    const dimPx = px(blank);
+    check(dimPx[3] > DIM_A - 3 && dimPx[3] < DIM_A + 3 && dimPx[0] === 8 && dimPx[1] === 10 && dimPx[2] === 8, `${lens.id}: a tile in none of its items is plainly dimmed (${dimPx})`);
+    check(r.lensDim === 1 && rec.layerDraws === 1, `${lens.id}: the dim is on, drawn in one call`);
+    let shown = 0;
+    for (const id of lens.items) {
+      const it = ITEMS[id], list = it.kind === 'tiles' ? members(id) : null;
+      if (list && !list.length) continue;
+      if (it.kind === 'tiles') {
+        const t = list[0], p = px(t);
+        // lit: less dim than the rest, and a tint is nearer its color than the dim is
+        if (it.draw === 'tint' && dist(p, hex(id)) < dist(dimPx, hex(id))) shown++;
+        else if (it.draw === 'ring' && ringed(rec, id) && p[3] < dimPx[3]) shown++;   // a ring also lights its tile
+        else check(false, `${lens.id}/${id}: ${it.draw} not shown (pixel ${p})`);
+      } else if (it.kind === 'animals') {
+        check(ringed(rec, id) || !IDS.length, `${lens.id}/${id}: its animals are ringed in its color`);
+        shown++;
+      } else {
+        const p = px(40 + 30 * W.w), q = px(120 + 80 * W.w);
+        check(dist(p, hex(id)) < dist(dimPx, hex(id)) && dist(q, hex(id)) < dist(dimPx, hex(id)), `${lens.id}/${id}: tiles under both showers are tinted`);
+        shown++;
+      }
+    }
+    check(shown >= lens.items.length - 2, `${lens.id}: ${shown} of ${lens.items.length} items drawn`);
+    // an item of another lens that this one doesn't have draws nothing
+    const colors = new Set(lens.items.map(id => ITEMS[id].color));
+    const other = IDS.find(id => !colors.has(ITEMS[id].color) && ITEMS[id].kind === 'animals');
+    check(!other || !ringed(rec, other), `${lens.id}: ${other}, not one of its items, is not ringed`);
+  }
+
+  // 3. Unticking an item eases it out; the others stay.
+  {
+    r.setLens('fire', new Set()); settle();
+    const ash = members('ash')[0];
+    check(ringed(rec, 'burn') && px(ash)[3] < DIM_A - 5, 'fire lens: burning tiles ringed, ash lit');
+    const hidden = new Set(['ash']);
+    r.setLens('fire', hidden);
+    frame(50);
+    const mid = r.lensLevel('ash');
+    check(mid > 0 && mid < 1, `an unticked item eases out, not off (${mid.toFixed(2)})`);
+    settle();
+    const q = px(ash);
+    check(r.lensLevel('ash') === 0, 'it is gone after the fade');
+    check(Math.abs(q[3] - DIM_A) <= 3, `its tile is dimmed like the rest (alpha ${q[3]})`);
+    check(ringed(rec, 'burn') && r.lensLevel('burn') === 1, 'while the others stay');
+    hidden.delete('ash'); settle(100);
+    check(r.lensLevel('ash') > 0, 'ticking it again brings it back (the set is read every frame)');
+  }
+
+  // 4. Easing: no frame jumps from nothing to full, a switch crossfades, a stalled frame moves a bounded step.
+  {
+    r.setLens(null, new Set()); settle(); 
+    check(r.lensDim === 0 && !ringed(rec, 'burn'), 'no lens: nothing dimmed, nothing drawn');
+    const levels = [], dims = [];
+    r.setLens('fire', new Set());
+    for (let i = 0; i < 30; i++) { frame(16); levels.push(r.lensLevel('ash')); dims.push(r.lensDim); }
+    const maxStep = Math.max(...levels.map((v, i) => Math.abs(v - (i ? levels[i - 1] : 0))), ...dims.map((v, i) => Math.abs(v - (i ? dims[i - 1] : 0))));
+    check(maxStep <= 16 / 300 + 1e-6 && dims[0] < 0.1, `a lens comes in over 300 ms, no frame moves more than a frame's share (${maxStep.toFixed(3)})`);
+    check(dims[29] === 1 && dims.findIndex(v => v === 1) * 16 >= 280 && dims.findIndex(v => v === 1) * 16 <= 340, `full after about 300 ms (frame ${dims.findIndex(v => v === 1)})`);
+    // switch: the old items leave as the new arrive, and the dim never dips
+    r.setLens('water', new Set());
+    let dipped = false, crossed = false;
+    for (let i = 0; i < 25; i++) { frame(16); if (r.lensDim < 1) dipped = true; if (r.lensLevel('ash') > 0.05 && r.lensLevel('ash') < 0.95 && r.lensLevel('water') > 0.05 && r.lensLevel('water') < 0.95) crossed = true; }
+    check(!dipped && crossed, 'switching lens crossfades the items and keeps the dim');
+    check(r.lensLevel('ash') === 0 && r.lensLevel('water') === 1, 'and it ends on the new lens');
+    // a stalled frame (a background tab): at most a bounded step
+    r.setLens('ground', new Set()); frame(5000);
+    check(r.lensLevel('holes') <= 100 / 300 + 1e-6, `a stalled frame moves a lens a bounded step (${r.lensLevel('holes').toFixed(2)})`);
+    r.setLens(null, new Set()); settle(); r.setLens('nonsense', new Set()); frame(); check(r.lens === null, 'an unknown lens is none');
+  }
+
+  // 5. Cost: after the scan, a frame reads none of the tile layers it scanned; counts are throttled.
+  {
+    r.setLens('ground', new Set()); settle(400);
+    // The sprite pass reads some of these layers itself, so the lens's share is what a frame reads over a frame without a lens.
+    const tracked = ['ash', 'roots', 'scorch', 'sunk', 'beach'];
+    const reads = {}, orig = {};
+    for (const k of tracked) { orig[k] = W[k]; reads[k] = 0; W[k] = new Proxy(orig[k], { get(tg, key) { if (typeof key === 'string' && key.length && key.charCodeAt(0) <= 57) reads[k]++; return tg[key]; } }); }
+    const total = () => tracked.reduce((n, k) => n + reads[k], 0);
+    r.setLens(null, new Set()); settle(400);
+    for (const k of tracked) reads[k] = 0;
+    for (let i = 0; i < 10; i++) frame(16);
+    const without = total();
+    r.setLens('ground', new Set()); settle(150);   // its items show and are scanned
+    AS.lensCounts(sim, r);                          // fresh counts, so none fall in the window
+    for (const k of tracked) reads[k] = 0;
+    for (let i = 0; i < 10; i++) frame(16);   // 160 ms: no scan
+    const quiet = total();
+    for (const k of tracked) reads[k] = 0;
+    frame(250);   // past LENS_SCAN_MS: a scan frame
+    const scanReads = total();
+    for (const k of tracked) W[k] = orig[k];
+    check(scanReads - without / 10 >= W.n * 0.8, `a scan reads the tile layers once over the view (${scanReads} reads, ${W.n} tiles, ${without / 10} a frame without a lens)`);
+    check(quiet <= without * 1.05, `frames between scans read no more than frames without a lens (${quiet} vs ${without} over 10 frames)`);
+    let calls = 0; const real = AS.lensCounts; AS.lensCounts = (...a) => { calls++; return real(...a); };
+    for (let i = 0; i < 62; i++) frame(16);   // about a second
+    AS.lensCounts = real;
+    check(calls >= 1 && calls <= 3, `whole-map counts come about twice a second (${calls} in a second)`);
+    // Counts taken by the Info window count as fresh: no second set in the next frames.
+    AS.lensCounts(sim, r); calls = 0; AS.lensCounts = (...a) => { calls++; return real(...a); };
+    for (let i = 0; i < 20; i++) frame(16);
+    AS.lensCounts = real;
+    check(calls === 0, 'counts the Info window just took are not taken again at once');
+  }
+
+  // 6. Zoomed out: the same lens colors the cell pixels, and rings stay small marks.
+  {
+    const simF = AS.Sim(Ts, 21);
+    const F = rigL(simF, FAR_SC);
+    F.frame(16); F.r.setLens('water', new Set());
+    for (let i = 0; i < 20; i++) F.frame(50);
+    let wt = -1; for (let t = 0; t < simF.W.n && wt < 0; t++) if (simF.W.wDepth[t] > 0) wt = t;
+    check(wt >= 0 && dist(px(wt), hex('water')) < dist([8, 10, 8], hex('water')), 'far view: water is tinted in the same layer');
+    F.r.setLens('fire', new Set());
+    for (let i = 0; i < 20; i++) F.frame(50);
+    check(F.rec.strokes.length === 0 || F.rec.strokes.every(st => st.startsWith('rgba(')), 'far view: rings draw without trouble');
+  }
+  console.log(`lenses: ${IDS.length} items, ${AS.LENSES.length} lenses checked in ${Date.now() - lensT0} ms`);
 }
 console.log(bad ? `FAIL (${bad})` : `PASS (${ids.length} glyphs, 12 animal combos, ${cases.length} grass cases)`);
 process.exit(bad ? 1 : 0);

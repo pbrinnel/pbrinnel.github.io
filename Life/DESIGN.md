@@ -473,7 +473,7 @@ weather's next part comes next. Fire comes first of the weather systems, and win
     with a small icon each, no taller than the bar. Every window can be resized from its
     bottom-right corner, and keeps its size per viewer (desktop; on a phone the graph only).
     Scrollbars are thin and muted.
-  - **Lenses** (Paul, 13 Oct 2026; being mocked up, after Civilization VI's lenses and
+  - **Lenses** (Paul, 13 Oct 2026; built as mocked, after Civilization VI's lenses and
     RimWorld's overlays): a row of lens buttons in Info (Fire, Water, Weather, Ground,
     Condition, Activity), one on at a time; the rest of the map dims a little and the
     lens's items show in their colors, with a legend (swatch, name, live count, a checkbox
@@ -620,4 +620,5 @@ for at least a quarter of a second of real time, whatever the speed, and when th
 so fast that steps would flicker, animals glide in their standing pose instead of cycling
 their legs. Water never blinks: its rules run in even steps, and its look eases in and out over
 `WATER_FADE_MS` of real time (wet or dry and depth band alike), so even at top speed a tile
-never completes an on/off cycle in under twice that (Paul, 12 Oct 2026). The bob of a swimmer is slow and its wake moves only with it.
+never completes an on/off cycle in under twice that (Paul, 12 Oct 2026). A lens's dim and tints
+ease over `LENS_FADE_MS`. The bob of a swimmer is slow and its wake moves only with it.

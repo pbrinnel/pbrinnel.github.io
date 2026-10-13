@@ -345,7 +345,9 @@
     let lensRows = [];     // the legend's rows: { id, cb, row, n, shown }
     let lensCounts = null; // the last counts given, to give a rebuilt legend
     let lensLegend = null, lensTip = null;
-    const lensIconSvg = path => `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${path}"/></svg>`;
+    // lenses.js builds each icon (some are several shapes, some filled); a bare path is the fallback.
+    const lensIconSvg = l => typeof AS.lensIconSvg === 'function' ? AS.lensIconSvg(l)
+      : `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${l.icon}"/></svg>`;
     const lensHiddenAll = () => {
       const out = {};
       for (const k in hiddenBy) if (hiddenBy[k].size) out[k] = [...hiddenBy[k]];
@@ -368,6 +370,10 @@
       for (const r of lensRows) {
         const text = fmtInt(lensCounts[r.id] || 0);
         if (text !== r.shown) { r.shown = text; r.n.textContent = text; }
+        // A tile item rings while it is small and tints once it is big (lenses.js decides with
+        // each count), so the swatch follows.
+        const it = AS.LENS_ITEMS && AS.LENS_ITEMS[r.id], ring = !!it && it.draw === 'ring';
+        if (r.sw && ring !== r.ring) { r.ring = ring; r.sw.classList.toggle('ring', ring); }
       }
     }
     function setLens(id) {
@@ -416,9 +422,10 @@
           reportLens();
         });
         const n = el('span', 'lg-n', '–');
-        row.append(el('span', 'lg-sw' + (it.draw === 'ring' ? ' ring' : '')), el('span', 'lg-name', it.name), n, cb);
+        const sw = el('span', 'lg-sw' + (it.draw === 'ring' ? ' ring' : ''));
+        row.append(sw, el('span', 'lg-name', it.name), n, cb);
         rows.appendChild(row);
-        lensRows.push({ id, cb, row, n, shown: '–' });
+        lensRows.push({ id, cb, row, n, sw, shown: '–', ring: it.draw === 'ring' });
       }
       const key = el('div', 'lg-key');
       const tint = el('span'), ring = el('span');
@@ -439,7 +446,7 @@
         hiddenBy[l.id] = new Set((opts.lensHidden && opts.lensHidden[l.id]) || []);
         const b = lensBtns[l.id] = el('button', 'lens-btn');
         b.type = 'button';
-        b.innerHTML = lensIconSvg(l.icon);
+        b.innerHTML = lensIconSvg(l);
         b.style.setProperty('--acc', l.accent);
         b.title = `${l.name} lens: ${l.blurb}`;
         b.setAttribute('aria-label', l.name + ' lens');

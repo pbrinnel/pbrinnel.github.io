@@ -153,6 +153,25 @@
   const rgbOf = hex => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)).join(',');
   const LOCATE_COLORS = AS.LOCATE_COLORS = Object.freeze({ blades: '25,158,112', bunnies: '217,89,38', wolves: '57,135,229', humans: '199,99,179', corpses: '200,200,190', fires: rgbOf(AS.FIRE_PALETTE.y) });
 
+  // Lenses (lenses.js): the map seen through one set of items. Everything not in an item dims and
+  // each item's members light in its color; all of it eases over LENS_FADE_MS of real time, a
+  // switch of lens crossfades, and a long frame moves it at most LENS_DT_MAX_MS' worth (DESIGN.md,
+  // Photosensitivity). Tile sets with many members tint, small ones ring (RING_MAX in lenses.js).
+  const LENS_FADE_MS = 300, LENS_DT_MAX_MS = 100;
+  const LENS_DIM_RGB = [8, 10, 8], LENS_DIM_ALPHA = 0.55, LENS_TINT_ALPHA = 0.42;
+  const LENS_RING_R = 0.68;   // tiles; a locate ring is 0.8
+  const LENS_RING_MIN_CSS_PX = 4, LENS_RING_CSS_PX = 2, LENS_RING_HALO_CSS_PX = 4;
+  const LENS_RING_ALPHA = 0.95, LENS_HALO_ALPHA = 0.65, LENS_HALO_RGB = '10,12,10';
+  // Members are found in a pass over the view plus a margin, at most every LENS_SCAN_MS (or when the
+  // view leaves it), never per frame; the whole-map counts that decide tint or ring come every LENS_COUNT_MS.
+  const LENS_SCAN_MS = 250, LENS_COUNT_MS = 500, LENS_SCAN_MARGIN = 0.25, LENS_SCAN_MARGIN_MIN = 8;
+  // Zoomed out, so many animals that rings would be a smear are painted as pixels (LENS_MARK_ALPHA) instead.
+  const LENS_FAR_RINGS_MAX = 2000, LENS_MARK_ALPHA = 0.9;
+  const LENS_SHOWER_ALPHA = 0.5, LENS_STORM_ALPHA = 0.95, LENS_SHOWER_CSS_PX = 2, LENS_STORM_DASH_CSS_PX = [6, 4];
+  const LENS_BOLT_MIN_CSS_PX = 12;   // the storm's bolt mark, at least this tall
+  const LENS_BOLT = [[0.12, -0.55], [-0.28, 0.06], [-0.02, 0.06], [-0.14, 0.55], [0.28, -0.1], [0.02, -0.1]];
+  const LENS_MIN_ALPHA = 0.003;
+
   // Topo lines (Paul, 11 Oct 2026, over shading): a thin line every few meters (CONTOUR_M until
   // the viewer's slider picks another spacing) of
   // W.elev, every CONTOUR_BOLD_EVERY-th one bolder, under the grass and animals and never
@@ -1501,7 +1520,188 @@
       ctx.strokeRect((pos[0] - cam.x) * s + lw / 2, (pos[1] - cam.y) * s + lw / 2, s - lw, s - lw);
     }
 
-    return {
+
+    // ---- lenses ----------------------------------------------------------------------------------
+    // One canvas, a pixel per tile of the view, holds the dimming and every tint: the dim is its
+    // fill, each lit tile is wiped back toward clear by its item's alpha, and tints go over. It is
+    // drawn scaled up in one call, in both views. Rings are drawn on the main canvas afterwards.
+    // Members come from lists the throttled scan keeps (see LENS_SCAN_MS); each frame touches only
+    // the members, plus the one fill and upload of the view's pixels.
+    const lens = {
+      ready: false, id: null, has: null, hidden: null, dim: 0, ms: -1, W: null, rect: null, scanMs: -Infinity,
+      countsMs: -Infinity, countsSim: null, a: null, scanned: null, need: null, liveIdx: null, lists: null,
+      canvas: null, lctx: null, img: null, u32: null, w: 0, h: 0, order: [],
+    };
+    function lensInit() {
+      if (lens.ready || !AS.LENSES) return lens.ready;
+      const n = AS.LENS_ITEM_IDS.length;
+      lens.a = new Float32Array(n); lens.scanned = new Uint8Array(n); lens.need = new Uint8Array(n); lens.liveIdx = new Int32Array(n);
+      lens.lists = AS.LENS_ITEM_IDS.map(() => AS.lensNewList());
+      lens.ready = true;
+      return true;
+    }
+    const lensApproach = (v, target, step) => (v < target ? Math.min(target, v + step) : Math.max(target, v - step));
+    const lensRgbaDim = alpha => (Math.round(alpha * 255) << 24 | LENS_DIM_RGB[2] << 16 | LENS_DIM_RGB[1] << 8 | LENS_DIM_RGB[0]) >>> 0;
+
+    // The tiles whose centers lie inside the live showers, within rect R: fn(tile) for each.
+    function eachShowerTile(sim, R, fn) {
+      const sh = sim.weather && sim.weather.showers;
+      if (!sh) return;
+      const w = sim.W.w;
+      for (let i = 0; i < sh.n; i++) {
+        const x = sh.x[i], y = sh.y[i], r = sh.r[i], r2 = r * r;
+        const ty0 = Math.max(R.y0, Math.floor(y - r)), ty1 = Math.min(R.y1, Math.ceil(y + r));
+        const tx0 = Math.max(R.x0, Math.floor(x - r)), tx1 = Math.min(R.x1, Math.ceil(x + r));
+        for (let ty = ty0; ty <= ty1; ty++) {
+          const dy = ty + 0.5 - y;
+          for (let tx = tx0; tx <= tx1; tx++) { const dx = tx + 0.5 - x; if (dx * dx + dy * dy <= r2) fn(ty * w + tx); }
+        }
+      }
+    }
+
+    function drawLens(sim, cam, dpr, nowMs) {
+      const L = lens, IDS = AS.LENS_ITEM_IDS, ITEMS = AS.LENS_ITEMS, W = sim.W, N = IDS.length;
+      const step = L.ms < 0 ? 0 : Math.min(LENS_DT_MAX_MS, Math.max(0, nowMs - L.ms)) / LENS_FADE_MS;
+      L.ms = nowMs;
+      L.dim = lensApproach(L.dim, L.id ? 1 : 0, step);
+      let live = 0;
+      for (let i = 0; i < N; i++) {
+        const target = L.has && L.has[i] && !(L.hidden && L.hidden.has(IDS[i])) ? 1 : 0;
+        let a = lensApproach(L.a[i], target, step);
+        if (a <= LENS_MIN_ALPHA && target === 0) a = 0;
+        L.a[i] = a;
+        if (a > 0) L.liveIdx[live++] = i; else L.scanned[i] = 0;
+      }
+      // Nothing to show yet or any more. A lens just chosen starts from here next frame, so its clock keeps running.
+      if (L.dim <= LENS_MIN_ALPHA && live === 0) { L.dim = 0; if (L.id === null) L.ms = -1; return; }
+      const v = cam.visible(), R = { x0: Math.max(0, v.x0), y0: Math.max(0, v.y0), x1: Math.min(W.w - 1, v.x1), y1: Math.min(W.h - 1, v.y1) };
+      if (R.x1 < R.x0 || R.y1 < R.y0) return;
+      const s = cam.scale * dpr, far = cam.scale < CELL_PX;
+      // Members: rescan when the view leaves the scanned rect, an item newly shows, or the scan is old.
+      let sc = L.rect, rescan = L.W !== W || !sc || R.x0 < sc.x0 || R.y0 < sc.y0 || R.x1 > sc.x1 || R.y1 > sc.y1 || nowMs - L.scanMs >= LENS_SCAN_MS || nowMs < L.scanMs;
+      for (let k = 0; k < live && !rescan; k++) if (!L.scanned[L.liveIdx[k]]) rescan = true;
+      if (rescan) {
+        const mx = Math.max(LENS_SCAN_MARGIN_MIN, Math.round((R.x1 - R.x0 + 1) * LENS_SCAN_MARGIN)), my = Math.max(LENS_SCAN_MARGIN_MIN, Math.round((R.y1 - R.y0 + 1) * LENS_SCAN_MARGIN));
+        sc = L.rect = { x0: Math.max(0, R.x0 - mx), y0: Math.max(0, R.y0 - my), x1: Math.min(W.w - 1, R.x1 + mx), y1: Math.min(W.h - 1, R.y1 + my) };
+        L.need.fill(0);
+        for (let k = 0; k < live; k++) { L.need[L.liveIdx[k]] = 1; L.scanned[L.liveIdx[k]] = 1; }
+        AS.lensScanTiles(sim, soil ? soil.cur : null, sc, L.need, L.lists);
+        AS.lensScanAnimals(sim, L.need, L.lists);
+        L.W = W; L.scanMs = nowMs;
+      }
+      // Whole-map counts decide tint or ring (and the Info legend asks for the same ones).
+      if (live > 0 && (L.countsSim !== sim || nowMs - L.countsMs >= LENS_COUNT_MS || nowMs < L.countsMs)) {
+        L.countsSim = sim;
+        AS.lensCounts(sim, api);
+      }
+      // The view's pixels: the dim, then each item's members wipe it and tint.
+      const lw = R.x1 - R.x0 + 1, lh = R.y1 - R.y0 + 1;
+      if (!L.canvas) { L.canvas = document.createElement('canvas'); L.lctx = L.canvas.getContext('2d'); }
+      if (L.w !== lw || L.h !== lh) {
+        L.canvas.width = L.w = lw; L.canvas.height = L.h = lh;
+        L.img = L.lctx.createImageData(lw, lh); L.u32 = new Uint32Array(L.img.data.buffer);
+      }
+      const d = L.img.data, u32 = L.u32, w = W.w;
+      u32.fill(lensRgbaDim(LENS_DIM_ALPHA * L.dim));
+      const wipe = (t, a) => {
+        const x = t % w - R.x0, y = ((t / w) | 0) - R.y0;
+        if (x < 0 || y < 0 || x >= lw || y >= lh) return;
+        const p = (y * lw + x) * 4 + 3;
+        d[p] = d[p] * (1 - a);
+      };
+      const tint = (t, rgb, ca) => {
+        const x = t % w - R.x0, y = ((t / w) | 0) - R.y0;
+        if (x < 0 || y < 0 || x >= lw || y >= lh) return;
+        const p = (y * lw + x) * 4, pa = d[p + 3] / 255, oa = ca + pa * (1 - ca);
+        if (oa <= 0) return;
+        const k = pa * (1 - ca);
+        d[p] = (rgb[0] * ca + d[p] * k) / oa; d[p + 1] = (rgb[1] * ca + d[p + 1] * k) / oa; d[p + 2] = (rgb[2] * ca + d[p + 2] * k) / oa;
+        d[p + 3] = oa * 255;
+      };
+      const ringItems = [], tintItems = [];
+      let showersIdx = -1;
+      for (let k = 0; k < live; k++) {
+        const i = L.liveIdx[k], it = ITEMS[IDS[i]], list = L.lists[i];
+        if (it.kind === 'showers') { showersIdx = i; tintItems.push(i); continue; }
+        const asRing = it.kind === 'animals' ? !(far && list.n / 2 > LENS_FAR_RINGS_MAX) : it.draw === 'ring';
+        (asRing ? ringItems : tintItems).push(i);
+        const a = L.a[i];
+        if (it.kind === 'tiles') for (let j = 0; j < list.n; j++) wipe(list.a[j], a);
+        else for (let j = 0; j < list.n; j += 2) {
+          const sl = list.a[j];
+          if (!W.aAlive[sl] || W.aSerial[sl] !== list.a[j + 1]) continue;
+          wipe(W.aTile[sl], a);
+          if (W.aFrom[sl] !== W.aTile[sl]) wipe(W.aFrom[sl], a);
+        }
+      }
+      if (showersIdx >= 0) eachShowerTile(sim, R, t => wipe(t, L.a[showersIdx]));
+      // The biggest tints first, so a small set's color is on top; the showers are few (a handful of circles), so last.
+      tintItems.sort((p, q) => (p === showersIdx ? 1 : 0) - (q === showersIdx ? 1 : 0) || L.lists[q].n - L.lists[p].n);
+      for (const i of tintItems) {
+        const it = ITEMS[IDS[i]], list = L.lists[i], a = L.a[i];
+        if (it.kind === 'showers') eachShowerTile(sim, R, t => tint(t, it.rgb, LENS_TINT_ALPHA * a));
+        else if (it.kind === 'tiles') for (let j = 0; j < list.n; j++) tint(list.a[j], it.rgb, LENS_TINT_ALPHA * a);
+        else for (let j = 0; j < list.n; j += 2) {
+          const sl = list.a[j];
+          if (W.aAlive[sl] && W.aSerial[sl] === list.a[j + 1]) tint(W.aTile[sl], it.rgb, LENS_MARK_ALPHA * a);
+        }
+      }
+      L.lctx.putImageData(L.img, 0, 0);
+      const smooth = ctx.imageSmoothingEnabled;
+      ctx.imageSmoothingEnabled = false;
+      const dx = Math.round((R.x0 - cam.x) * s), dy = Math.round((R.y0 - cam.y) * s);
+      ctx.drawImage(L.canvas, 0, 0, lw, lh, dx, dy, Math.round((R.x1 + 1 - cam.x) * s) - dx, Math.round((R.y1 + 1 - cam.y) * s) - dy);
+      ctx.imageSmoothingEnabled = smooth;
+      // Showers: the outline of each, dashed with a bolt on a storm.
+      if (showersIdx >= 0) {
+        const sh = sim.weather.showers, a = L.a[showersIdx], bolt = Math.max(s, LENS_BOLT_MIN_CSS_PX * dpr) * 1.2;
+        for (let i = 0; i < sh.n; i++) {
+          const x = sh.x[i], y = sh.y[i], r = sh.r[i];
+          if (x + r < R.x0 || x - r > R.x1 + 1 || y + r < R.y0 || y - r > R.y1 + 1) continue;
+          const cx = (x - cam.x) * s, cy = (y - cam.y) * s, storm = sh.storm[i] === 1;
+          ctx.beginPath();
+          ctx.arc(cx, cy, r * s, 0, Math.PI * 2);
+          ctx.lineWidth = LENS_SHOWER_CSS_PX * dpr;
+          ctx.strokeStyle = `rgba(255,255,255,${(storm ? LENS_STORM_ALPHA : LENS_SHOWER_ALPHA) * a})`;
+          if (storm) ctx.setLineDash(LENS_STORM_DASH_CSS_PX.map(q => q * dpr));
+          ctx.stroke();
+          if (storm) {
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            LENS_BOLT.forEach(([bx, by], q) => (q ? ctx.lineTo(cx + bx * bolt, cy + by * bolt) : ctx.moveTo(cx + bx * bolt, cy + by * bolt)));
+            ctx.closePath();
+            ctx.lineWidth = 3 * dpr;
+            ctx.strokeStyle = `rgba(${LENS_HALO_RGB},${0.7 * a})`;
+            ctx.stroke();
+            ctx.fillStyle = `rgba(255,255,255,${a})`;
+            ctx.fill();
+          }
+        }
+      }
+      // Rings: a dark halo under the item's color, one path per item.
+      const rr = Math.max(LENS_RING_R * s, LENS_RING_MIN_CSS_PX * dpr);
+      for (const i of ringItems) {
+        const it = ITEMS[IDS[i]], list = L.lists[i], a = L.a[i];
+        ctx.beginPath();
+        const ring = (tx, ty) => { const cx = (tx + 0.5 - cam.x) * s, cy = (ty + 0.5 - cam.y) * s; ctx.moveTo(cx + rr, cy); ctx.arc(cx, cy, rr, 0, Math.PI * 2); };
+        if (it.kind === 'tiles') for (let j = 0; j < list.n; j++) { const t = list.a[j]; ring(t % w, (t / w) | 0); }
+        else for (let j = 0; j < list.n; j += 2) {
+          const sl = list.a[j];
+          if (!W.aAlive[sl] || W.aSerial[sl] !== list.a[j + 1]) continue;
+          animalPos(W, sl, curAlpha, pos);
+          if (pos[0] < R.x0 - 1 || pos[0] > R.x1 + 1 || pos[1] < R.y0 - 1 || pos[1] > R.y1 + 1) continue;
+          ring(pos[0], pos[1]);
+        }
+        ctx.lineWidth = LENS_RING_HALO_CSS_PX * dpr;
+        ctx.strokeStyle = `rgba(${LENS_HALO_RGB},${LENS_HALO_ALPHA * a})`;
+        ctx.stroke();
+        ctx.lineWidth = LENS_RING_CSS_PX * dpr;
+        ctx.strokeStyle = `rgba(${it.rgb[0]},${it.rgb[1]},${it.rgb[2]},${LENS_RING_ALPHA * a})`;
+        ctx.stroke();
+      }
+    }
+
+    const api = {
       setIntentLines(on) { intentLines = !!on; },
       setContours(on) { contoursOn = !!on; },
       // Meters between topo lines (each spacing is worked out once per world, then kept).
@@ -1573,6 +1773,7 @@
         ctx.lineWidth = dpr;
         ctx.strokeRect(wx - dpr / 2, wy - dpr / 2, ww + dpr, wh + dpr);
         if (blasts.length) drawBlasts(cam, dpr, nowMs);
+        if (lens.id !== null || lens.dim > 0) drawLens(sim, cam, dpr, nowMs); else lens.ms = -1;
         if (located) for (const key of located) if (LOCATE_COLORS[key]) drawLocate(sim, cam, dpr, key, 1, 1);
         if (pulses.length) drawPulses(sim, cam, dpr, nowMs);
         if (sel) drawSelection(sim, cam, sel, dpr);
@@ -1598,6 +1799,26 @@
         blasts.push({ x: tx + 0.5, y: ty + 0.5, r: radius, t0: nowMs === undefined ? performance.now() : nowMs });
       },
       get blasts() { return blasts.length; },
+      // The lens to look through (an id from AS.LENSES, or null for none) and which of its items are
+      // unticked (a Set of item ids, read every frame). The dim and the tints ease over LENS_FADE_MS,
+      // so switching crossfades and an unticked item eases out.
+      setLens(id, hidden) {
+        if (!lensInit()) return;
+        const def = id && AS.LENSES.find(l => l.id === id);
+        lens.id = def ? def.id : null;
+        lens.has = new Uint8Array(AS.LENS_ITEM_IDS.length);
+        if (def) for (const item of def.items) lens.has[AS.LENS_ITEM_INDEX[item]] = 1;
+        lens.hidden = hidden || null;
+      },
+      get lens() { return lens.id; },
+      // How much of an item is on screen now (0..1, eased) and of the dimming, after a draw.
+      lensLevel(itemId) { return lens.ready ? lens.a[AS.LENS_ITEM_INDEX[itemId]] : 0; },
+      get lensDim() { return lens.dim; },
+      // lensCounts calls this when it has fresh counts, so the draw doesn't make its own for a while.
+      lensCountsFresh() { lens.countsMs = lastDrawMs; },
+      // The soil level drawn on every tile (Int8Array, -3 driest .. 3 wettest), or null in a world without rain.
+      get soilLevels() { return soil ? soil.cur : null; },
     };
+    return api;
   };
 })(globalThis.AS);
