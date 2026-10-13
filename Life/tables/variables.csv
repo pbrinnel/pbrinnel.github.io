@@ -26,4 +26,5 @@ InHole,Dynamic,Bunny,yes / no,Walks onto a warren hole,Walks off it,A bunny in a
 LastUsed,Dynamic,Hole,0 – CollapseDays (days),Every tick no bunny stands on it,A bunny stands on it,CollapseDays → the hole collapses into bare ground
 Elevation,Static,Tile,0 – Relief (m),—,—,"How high the ground is; water settles in the low places (the topo lines are every 5 m of it)"
 Ground,Dynamic,Tile,Ground / Beach / Water / Warren hole / On fire,—,—,"Beach: land touching water, kept bare so animals can drink there"
+Ash,Dynamic,Tile,0 – (grass Size),"A blade or a body burns out here (Ash by its Size or species), added to what is there","Grass growing on it spends it, one unit per unit of extra growth (AshBoost); it weathers away (AshHalfLife); water washes it off; a nuke leaves none","0 → no boost; the ground is plain again"
 Depth,Dynamic,Water,0 – (m),Rain; water flowing in from higher; springs; WATER MODE,Flowing away downhill; soaking into the soil; evaporation; drinking (WaterLiters),"How deep the water stands now: the water rules (water.js) move it all the time. Shown by its shade: lighter shallow, darker deep"

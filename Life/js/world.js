@@ -146,6 +146,12 @@
       // hole may be dug; animals walk over it. Only a ground property, so `kind` is untouched.
       scorch: new Float32Array(n),
 
+      // Ash, by tile, in units of grass Size (the unit of a corpse's Nutrient): what a fuel fire
+      // leaves when it burns out (fire.js). Once the scorch is over, grass on the tile grows,
+      // seeds and sprouts AshBoost times faster and the growth spends it (grass.js), and it
+      // weathers away (AshHalfLife). It stays on the tile that burned; wind never moves it.
+      ash: new Float32Array(n),
+
       // How deep the water on a tile is, in meters (0 on land). Any depth puts the tile's flow
       // at WATER.
       wDepth: new Float32Array(n),
@@ -329,6 +335,7 @@
         if (W.kind[t] === KIND.GRASS) W.removeGrass(t);
         if (W.hole[t]) W.removeHole(t);
         W.scorch[t] = 0;   // ground under water isn't burning
+        W.ash[t] = 0;      // and water washes the ash off
       } else {
         W.waterCount--;
       }
@@ -379,6 +386,7 @@
       if (W.hole[t] || W.scorch[t] > 0) throw new Error(`tile ${t} can't take water`);
       if (!W.isBare(t)) throw new Error(`tile ${t} can't take water (kind ${W.kind[t]}, flow ${W.flow[t]})`);
       W.flow[t] = FLOW.WATER;
+      W.ash[t] = 0;
       W.wDepth[t] = depth > 0 ? depth : LAID_DEPTH;
       if (W.water) { W.water.H[t] = W.wDepth[t]; W.water.listWet(); }   // the rules move it from here
       W.waterCount++;

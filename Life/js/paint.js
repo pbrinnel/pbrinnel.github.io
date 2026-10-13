@@ -50,6 +50,7 @@
         if (W.hole[t]) { W.removeHole(t); out.holes++; }
         const left = days * (1 - (R > 0 ? RIM_COOL_SHARE * Math.sqrt(d2) / R : 0));
         if (left > W.scorch[t]) W.scorch[t] = left;
+        W.ash[t] = 0;   // a nuke vaporizes: it leaves no ash, and takes any that was there
       }
     }
     return out;

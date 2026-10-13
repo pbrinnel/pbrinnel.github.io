@@ -189,7 +189,7 @@ function rig(sim) {
   const fireDays = sim3.T.world.FireScorchDays;
   // Burn the blade out by hand: a fresh scorch glows, an old one doesn't.
   W3.removeFire(blade); W3.removeGrass(blade);
-  W3.scorch[blade] = fireDays;
+  W3.scorch[blade] = fireDays; W3.ash[blade] = sim3.T.grass.Ash;   // embers glow where a fuel fire left ash
   r2.farCanvas(sim3); const fresh = px32(blade);
   W3.scorch[blade] = fireDays * 0.5; r2.farCanvas(sim3); const old = px32(blade);
   W3.scorch[blade] = fireDays - 12 / 24 * 0.5; r2.farCanvas(sim3); const dimmer = px32(blade);
@@ -267,6 +267,53 @@ function rig(sim) {
     check(got.length === 1 && got[0] === AS.spriteFire(look.flame, AS.flameFrame(2000, bare % W4.w, (bare / W4.w) | 0)), `ember at stage ${stage}: just its flame (got ${got})`);
   }
   console.log(`alight: ${seen.length} flame frames in 30 s (shortest ${Math.round(Math.min(...gaps.slice(1)))} ms), far ${lit.toString(16)} vs ${plain.toString(16)}`);
+}
+
+// Ash and embers follow W.ash: ash pixels on a tile with ash and none on a scorched tile without
+// (a nuke's), thinner as the ash is spent; embers only where a fuel fire burnt out, near and far.
+{
+  const sim5 = AS.Sim(T, 17), W5 = sim5.W, S5 = sim5.T;
+  ctx.window = { devicePixelRatio: 1 };
+  const fireDays = S5.world.FireScorchDays, full = S5.grass.Ash, SCALE = 10;
+  const dry = [];
+  for (let t = 0; t < W5.n && dry.length < 3; t++) if (W5.kind[t] === AS.KIND.EMPTY && W5.flow[t] === AS.FLOW.NONE && W5.wDepth[t] === 0 && !W5.hole[t] && W5.scorch[t] === 0) dry.push(t);
+  const [fueled, nuked, plain] = dry;
+  // A recording canvas: ash is batched into rect() calls under a globalAlpha, embers are small fillRects.
+  let alpha = 1;
+  const rec = { ash: [], embers: [] };
+  const g = new Proxy({}, { get(_, k) {
+    if (k === 'rect') return (x, y, w, h) => rec.ash.push([x, y, alpha]);
+    if (k === 'fillRect') return (x, y, w, h) => { if (w < SCALE) rec.embers.push([x, y]); };
+    if (k === 'canvas') return canvas;
+    return () => {};
+  }, set(_, k, v) { if (k === 'globalAlpha') alpha = v; return true; } });
+  const canvas = { width: W5.w * SCALE, height: W5.h * SCALE, clientWidth: W5.w * SCALE, clientHeight: W5.h * SCALE, getContext: () => g };
+  const r5 = AS.Renderer(canvas);
+  const cam5 = { x: 0, y: 0, scale: SCALE, visible: () => ({ x0: 0, y0: 0, x1: W5.w - 1, y1: W5.h - 1 }) };
+  const sheet5 = { get: px => ({ canvas: {}, px, sx: i => i, sy: () => 0 }) };
+  const inTile = (list, t) => list.filter(e => e[0] >= (t % W5.w) * SCALE && e[0] < (t % W5.w + 1) * SCALE && e[1] >= ((t / W5.w) | 0) * SCALE && e[1] < ((t / W5.w | 0) + 1) * SCALE);
+  const look = () => { rec.ash.length = 0; rec.embers.length = 0; r5.draw(sim5, cam5, sheet5, null, 0, 1000, 1); };
+  W5.scorch[fueled] = fireDays; W5.ash[fueled] = full;
+  W5.scorch[nuked] = fireDays;                 // scorched but no ash: a nuke's
+  look();
+  const strong = inTile(rec.ash, fueled);
+  check(strong.length > 0, 'ash pixels are drawn on a tile with ash');
+  check(inTile(rec.ash, nuked).length === 0 && inTile(rec.ash, plain).length === 0, 'none on a scorched tile with no ash, nor on plain ground');
+  check(inTile(rec.embers, fueled).length > 0 && inTile(rec.embers, nuked).length === 0, 'embers glow on the tile a fuel fire burnt out and never on a nuke\'s');
+  // Spent or weathered ash draws fainter; more than a full blade's is capped; ash past the scorch still shows.
+  W5.ash[fueled] = full * 0.3; look();
+  check(inTile(rec.ash, fueled).length === strong.length && inTile(rec.ash, fueled)[0][2] < strong[0][2], 'a third of the ash is drawn at a lower alpha');
+  W5.ash[fueled] = full * 5; look();
+  check(inTile(rec.ash, fueled)[0][2] === strong[0][2], 'more ash than a full blade\'s draws no stronger than a full one');
+  W5.scorch[fueled] = 0; look();
+  check(inTile(rec.ash, fueled).length > 0 && inTile(rec.embers, fueled).length === 0, 'ash outlasts the scorch (and the embers go with it)');
+  // The far view: the fresh-burn glow needs ash.
+  let image = null;
+  ctx.document = { createElement: () => ({ width: 0, height: 0, getContext: () => ({ createImageData: (w, h) => ({ data: new Uint8ClampedArray(w * h * 4) }), putImageData: img => { image = img; } }) }) };
+  W5.scorch[fueled] = fireDays; W5.scorch[nuked] = fireDays; W5.ash[fueled] = full;
+  r5.farCanvas(sim5);
+  const px = new Uint32Array(image.data.buffer), red = c => c & 255;
+  check(red(px[fueled]) > red(px[nuked]), `far view: embers glow on the fuel fire's tile, not the nuke's (${red(px[fueled])} > ${red(px[nuked])})`);
 }
 console.log(bad ? `FAIL (${bad})` : `PASS (${ids.length} glyphs, 12 animal combos, ${cases.length} grass cases)`);
 process.exit(bad ? 1 : 0);

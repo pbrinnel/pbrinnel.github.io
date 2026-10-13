@@ -65,8 +65,8 @@
   // of the time, stepping with the sway clock (sprites.js, FLAME_HOLD_MS).
   const FIRE_EMBER_HOURS = 12;
   const EMBER_PIXELS = 3, EMBER_FIRST_ROW = 5, EMBER_LIT_EVERY = 3;
-  // Scattered ash on scorched ground: ASH_PIXELS gray pixels in the lower rows of the tile,
-  // placed by a hash of the tile (and fading with the scorch, like the ground under it).
+  // Scattered ash on ground a fire burnt (W.ash): ASH_PIXELS gray pixels in the lower rows of the
+  // tile, placed by a hash of the tile, fainter as the ash is spent or weathers.
   const ASH_PIXELS = 4, ASH_FIRST_ROW = 4, ASH_ROWS = 4;
   const SALT_ASH_X = 10, SALT_ASH_Y = 20, SALT_EMBER_X = 30;
   const SCORCH_FADE_STEPS = 8;   // sprite mode quantizes the fade to this many alphas, so a big crater doesn't pay a state change per tile
@@ -293,7 +293,7 @@
       const bg = FAR_GROUND, g0 = FAR_GRASS[0], g1 = FAR_GRASS[1], g2 = FAR_GRASS[2];
       const corpse = FAR_CORPSE, waters = FAR_WATERS, depth = W.wDepth, holeAt = W.hole, scorch = W.scorch, fullDays = scorchFadeDays(sim);
       const lo = 1 / 3, hi = 2 / 3;
-      const flow = W.flow, fireDays = sim.T.world.FireScorchDays, emberDays = FIRE_EMBER_HOURS / 24;
+      const flow = W.flow, ash = W.ash, fireDays = sim.T.world.FireScorchDays, emberDays = FIRE_EMBER_HOURS / 24;
       for (let t = 0, n = W.n; t < n; t++) {
         const k = kind[t];
         if (flow[t] === FLOW.FIRE) px[t] = AS.fireLook(AS.fireStage(W, t)).flame >= AS.FLAME.MID ? FAR_FIRE_HIGH : FAR_FIRE_MID;
@@ -302,7 +302,8 @@
         else if (depth[t] > 0) px[t] = waters[AS.waterBand(depth[t])];   // under a wading animal too
         else if (scorch[t] > 0) {
           const ground = mixAbgr(bg, FAR_SCORCH, Math.min(1, scorch[t] / fullDays)), left = scorch[t];
-          px[t] = left > fireDays - emberDays && left <= fireDays ? mixAbgr(ground, FAR_EMBER, (left - (fireDays - emberDays)) / emberDays) : ground;
+          // Embers glow only where a fuel fire burnt out (it left ash), never on a nuke's crater.
+          px[t] = ash[t] > 0 && left > fireDays - emberDays && left <= fireDays ? mixAbgr(ground, FAR_EMBER, (left - (fireDays - emberDays)) / emberDays) : ground;
         }
         else px[t] = holeAt[t] ? FAR_HOLE : bg;   // empty ground (or a hole), or an animal that the loop below paints
       }
@@ -492,13 +493,15 @@
       ctx.drawImage(img, sh.sx(fid), sh.sy(fid), px, px, dx, dy, dw, dh);
     }
 
-    // Ash on every scorched tile, and embers on the ones that burnt out lately (from FireScorchDays
-    // down by FIRE_EMBER_HOURS), over the scorch. Ash is batched per alpha step: it fades with
-    // the scorch over FireScorchDays (a nuke's deeper scorch keeps it whole).
+    // Ash on every tile that has some (W.ash), thinning as grass spends it and the weather takes it,
+    // and embers on the ones that burnt out lately (scorch from FireScorchDays down by
+    // FIRE_EMBER_HOURS), over the scorch. A nuke's crater has scorch but no ash, so it gets neither.
+    // Ash is batched per alpha step, by its share of a full blade's.
     const ashRects = Array.from({ length: SCORCH_FADE_STEPS + 1 }, () => []);
     const emberTiles = [];
     function drawAshAndEmbers(sim, v, s, ox, oy, nowMs) {
-      const W = sim.W, scorch = W.scorch, fireDays = sim.T.world.FireScorchDays, emberDays = FIRE_EMBER_HOURS / 24;
+      const W = sim.W, scorch = W.scorch, ash = W.ash, fireDays = sim.T.world.FireScorchDays, emberDays = FIRE_EMBER_HOURS / 24;
+      const fullAsh = sim.T.grass.Ash;
       for (const r of ashRects) r.length = 0;
       emberTiles.length = 0;
       let any = false;
@@ -506,11 +509,12 @@
         const dy = Math.round(ty * s - oy), dh = Math.round((ty + 1) * s - oy) - dy;
         const row = ty * W.w;
         for (let tx = v.x0; tx <= v.x1; tx++) {
+          const here = ash[row + tx];
+          if (!(here > 0)) continue;
           const left = scorch[row + tx];
-          if (!(left > 0)) continue;
           const dx = Math.round(tx * s - ox), dw = Math.round((tx + 1) * s - ox) - dx;
           const u = Math.max(1, Math.round(dw / AS.SPRITE_SIZE)), uh = Math.max(1, Math.round(dh / AS.SPRITE_SIZE));
-          const list = ashRects[Math.max(1, Math.ceil(Math.min(1, left / fireDays) * SCORCH_FADE_STEPS))];
+          const list = ashRects[Math.max(1, Math.ceil(Math.min(1, here / fullAsh) * SCORCH_FADE_STEPS))];
           for (let k = 0; k < ASH_PIXELS; k++) {
             const ax = Math.floor(AS.spriteHash(tx, ty, SALT_ASH_X + k) * AS.SPRITE_SIZE);
             const ay = ASH_FIRST_ROW + Math.floor(AS.spriteHash(tx, ty, SALT_ASH_Y + k) * ASH_ROWS);

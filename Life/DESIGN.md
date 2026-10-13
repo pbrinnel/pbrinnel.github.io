@@ -304,8 +304,8 @@ last only as long as their lives.
   `CorpseDecay` ends, whichever comes first, so a bigger body feeds more grass.
 
 ## Fire and wind (planned)
-Decided by Paul, 12 Oct 2026. Wind, fire, and animals and fire are built; the ash is
-next. Fire comes first of the weather systems, and wind is real weather, not an animation.
+Decided by Paul, 12 Oct 2026. Wind, fire, animals and fire, and the ash are built;
+weather's next part comes next. Fire comes first of the weather systems, and wind is real weather, not an animation.
 
 - **Wind is in the sim** (built). The world has a wind, a direction and a strength that drift
   slowly over the world's time from its seed: breezes most of the time, stronger spells now
@@ -328,8 +328,15 @@ next. Fire comes first of the weather systems, and wind is real weather, not an 
   flames with it showing through); the last fifth, full flames engulf it; then embers, then
   scorched ground with scattered ash. Each flame sways a pixel at most every 0.8 s on its own
   timer; nothing flashes or brightens all at once.
-- **Afterward**, a short scorch, then the ash makes grass regrow faster, as grassland comes
-  back thicker after fire.
+- **Afterward**, a short scorch (`FireScorchDays`, nothing grows), then the ash makes grass
+  regrow faster, as grassland comes back thicker after fire (built 12 Oct 2026; Paul: keep the
+  short wait, and wind never moves ash). What burns out leaves ash on its own tile: a blade by
+  its Size, a body by its species (`Ash`); a bare ember leaves none, and a nuke vaporizes, so
+  it leaves none and clears what was there. Ash works like a corpse's Nutrient: grass on the
+  tile grows, seeds and sprouts `AshBoost` times faster, each unit of extra growth spends a
+  unit of ash, and where a corpse's boost also reaches, only the larger counts. Ash weathers
+  away (`AshHalfLife`) and water washes it off. It shows as gray specks that thin as it goes,
+  and only ground that had fuel glows with embers.
 - **Animals catch fire** (Paul, 12 Oct 2026: anything but water can burn): from a burning
   neighbor, as a chance per hour by how readily its species catches, or when painted. Alight,
   it loses HP every second until its fire burns out or it reaches water, which puts it out;

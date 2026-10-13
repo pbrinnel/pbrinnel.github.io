@@ -109,6 +109,8 @@ function audit(AS, sim, label) {
     } else {
       check(W.hSlot[t] === -1, `${label}: tile ${t} has hSlot but no hole`);
     }
+    check(W.ash[t] >= 0 && Number.isFinite(W.ash[t]), `${label}: tile ${t} ash ${W.ash[t]}`);
+    check(W.wDepth[t] === 0 || W.ash[t] === 0, `${label}: wet tile ${t} has ash ${W.ash[t]}`);
     check(W.scorch[t] >= 0 && !Number.isNaN(W.scorch[t]), `${label}: tile ${t} scorch ${W.scorch[t]}`);
     if (W.scorch[t] > 0) {
       check(k !== K.GRASS, `${label}: grass on scorched tile ${t}`);

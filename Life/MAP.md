@@ -38,12 +38,12 @@ load time: every file reads other files' `AS.*` inside functions, at call time.
 | `tables.js` | fetch + parse + validate the CSVs into frozen `T` | `loadTables`, `parseTables` |
 | `rng.js` | seeded randomness (mulberry32); the only source the sim may use | `makeRng`, `newSeed` |
 | `world.js` | the grid and every store (typed arrays, [Data](#data-struct-of-arrays-worldjs)) and the only code that changes occupancy; the species lists (`SPECIES`, `SPECIES_KEY`, `POP_KEY`, `kindOf`, `canEnterHole`): a species is one entry in each | `World`, `KIND`, `SPECIES`, `SPECIES_KEY`, `SPECIES_COUNT`, `POP_KEY`, `kindOf`, `canEnterHole`, `SEX` |
-| `grass.js` | growth (an hour's worth), age, seeding, sprouting on empty tiles, old age, all in hourly slices; scorch cooling; bites | `grassTick`, `grassBite`, `grassStage` |
+| `grass.js` | growth (an hour's worth), age, seeding, sprouting on empty tiles, old age, all in hourly slices; scorch cooling; ash: weathering (`AshHalfLife`) and the `AshBoost` it gives, the larger of it and a corpse's, spent like Nutrient; bites | `grassTick`, `grassBite`, `grassStage` |
 | `corpse.js` | decay, and the boost field grass drinks from | `corpseTick`, `corpseAdded`, `corpseBoost` |
 | `warren.js` | warren holes' clocks: marks a hole used while a bunny stands on it, collapses holes unused for `CollapseDays` (hourly) | `warrenTick`, `holeWithin` |
 | `weather.js` | the world's wind (`sim.wind = { from, kmh, toX, toY }`, `sim.weather`): three mean-reverting walks per in-world hour around the world's typical wind (`Wind`, a range) and a prevailing direction from the seed, capped at typical × `WindSpells`, changing over `WindChangeHours`; its own generator (never `sim.rng`, so worlds play out the same whatever the wind does); `windWords`, `windFromName` for the UI | `Wind`, `weatherTick`, `windWords`, `windFromName`, `WIND` |
 | `sim.js` | the fixed tick, populate, events ring, population history | `Sim`, `TICK_HZ`, `DT`, `DAY_SECONDS`, `TICKS_PER_HOUR`, `EV`, `debugDropCorpse` |
-| `fire.js` | fire, a Flow-layer agent: `ignite(sim, t)` (the one way a fire starts), `fireTick` (every `FIRE_EVERY` ticks: each burning tile ages and may light its 8 neighbors at `FireSpread` × fuel × soil dryness × wind ÷ distance per hour, then burns out to `FireScorchDays` of scorch, its blade or corpse gone), `fireStage` (0..1 through its burn, for the drawing); rolls `sim.rng` only while something burns | `ignite`, `fireTick`, `fireStep`, `fireStage`, `FIRE` |
+| `fire.js` | fire, a Flow-layer agent: `ignite(sim, t)` (the one way a fire starts), `fireTick` (every `FIRE_EVERY` ticks: each burning tile ages and may light its 8 neighbors at `FireSpread` × fuel × soil dryness × wind ÷ distance per hour, then burns out to `FireScorchDays` of scorch and its `Ash` added to `W.ash`, its blade or corpse gone), `fireStage` (0..1 through its burn, for the drawing); rolls `sim.rng` only while something burns | `ignite`, `fireTick`, `fireStep`, `fireStage`, `FIRE` |
 | `paint.js` | PAINT's powers: the brushes and the nuke ([The page](#the-page)) | `nuke`, `paintCircle` |
 | `water.js` | the water rules ([Water](#water)) | `Water`, `waterTick`, `syncWater`, `TILE_M`, `WATER_TINY`, `WATER_STEP_DAYS` |
 | `terrain.js` | every world's ground, grown before day 0, and its first water ([Water](#water)) | `growTerrain`, `layTerrain`, `terrainOf`, `terrainShape` |
@@ -113,6 +113,9 @@ load time: every file reads other files' `AS.*` inside functions, at call time.
   `wNext`, `wShore`); see [Water](#water).
 - **Scorch**, by tile: `scorch` (Float32, days left); set by `nuke`, counted down by the
   hourly grass pass; `addGrass` and `addHole` refuse a scorched tile.
+- **Ash**, by tile: `ash` (Float32, grass Size units); added by fire.js `burnOut`, weathered
+  and spent on boosted growth by the hourly grass pass, cleared by water (`setDepth`,
+  `addWater`) and by a nuke.
 - **Corpses**, by tile: `cCause` (`AS.CAUSE`: old age, starved, thirst, both, debug, or
   `ATTACKED` plus the biter's species code; set by `addCorpse`, shown as the inspector's
   Cause row), `cNut`, `cMeat` (Fullness left on the body, set from `MeatOnBody` by
@@ -367,7 +370,8 @@ never flash: see DESIGN.md, Photosensitivity.
   flames; above it, full flames hide it), the flame swaying a frame at most every
   `FLAME_HOLD_MS` of real time on each tile's own clock (`flameFrame`). Scorched ground fades
   only in its last `min(ScorchDays, FireScorchDays)` days; recently burnt tiles glow with
-  embers (`FIRE_EMBER_HOURS`), and every scorched tile has ash pixels placed by a tile hash.
+  embers (`FIRE_EMBER_HOURS`, only where there is ash, so never a nuke's crater), and every
+  tile with ash has ash pixels placed by a tile hash, fainter as the ash runs down.
   The far view colors burning tiles by stage and embers fading to scorch. `AS.spriteFlame()`
   is the PAINT and Info icon; 'fires' is a locate kind. A burning animal (`aAlight`) carries
   flames on its back (`drawAlight`, raised `ALIGHT_RAISE` rows) and is `FAR_ALIGHT` red far
