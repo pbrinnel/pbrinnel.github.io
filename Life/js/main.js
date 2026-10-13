@@ -493,7 +493,7 @@
       speedIndex, achieved, day: sim.day, seed: sim.seed, wind: sim.wind, weather: sim.weather, mapW: sim.W.w, mapH: sim.W.h,
       humansSeen: humansSeen || (humansSeen = W.humans > 0),
       firesSeen: firesSeen || (firesSeen = W.fCount > 0),
-      counts: { bunnies: W.bunnies, wolves: W.wolves, humans: W.humans, total: W.bunnies + W.wolves + W.humans, blades: W.gCount, corpses: W.cCount, fires: W.fCount },
+      counts: { bunnies: W.bunnies, wolves: W.wolves, humans: W.humans, total: W.bunnies + W.wolves + W.humans, blades: W.gCount + W.sunkCount, corpses: W.cCount, fires: W.fCount },
     });
     // CPU time only: the browser's own compositing shows up in `interval`, not here.
     if (app.onFrame) {
@@ -512,7 +512,9 @@
   // world starts without (the benchmark's grass-only worlds) never counts as dying out.
   // Humans are optional (only painted in), so their dying out never ends a run: not listed.
   const EXTINCT = [['wolves', 'WOLVES EXTINCT'], ['bunnies', 'BUNNIES EXTINCT'], ['grass', 'GRASS EXTINCT']];
-  const counts = W => ({ wolves: W.wolves, bunnies: W.bunnies, grass: W.gCount });
+  // Sunk blades (under water, alive until DrownHours) count: a flood that drains leaves them
+  // standing again, so leaving them out drew a deep valley that wasn't grass dying.
+  const counts = W => ({ wolves: W.wolves, bunnies: W.bunnies, grass: W.gCount + W.sunkCount });
   let gone = new Set(), absent = new Set(), runSpeed = speedIndex;
   // Whether this world has had a human (they're optional; the Info count hides until then).
   let humansSeen = false;
