@@ -402,12 +402,12 @@ weather's next part comes next. Fire comes first of the weather systems, and win
   L1 bolt, at most one every `BOLT_GAP_MS`; Info's Weather row ("storm", "rain, 6 mm
   today", "showers nearby", "dry for 9 days", "clear"). A shower's swath shows plainly after
   a dry spell and hardly at all in a wet one (the soil is already damp); Paul to judge.
-- **Rain animation R5 without the haze** (Paul, 13 Oct 2026; the first streaks vibrated at
+- **Rain animation R5 without the haze** (Paul, 13 Oct 2026, built; the first streaks vibrated at
   any speed but 1×): softer, sparser streaks plus ripples on water and splashes on ground,
   all moving on real time so they look the same at every sim speed; only where it rains
   follows the sim. Every shower leaves a visible swath: ground darkens where the soil is
   wetter than it has been lately, then eases back.
-- **Lightning more dramatic, even if less realistic** (Paul, 13 Oct 2026: the first bolt was
+- **Lightning more dramatic, even if less realistic** (Paul, 13 Oct 2026, built: the first bolt was
   barely perceptible): a bolder bolt with branches and a local glow and scorch where it
   lands, still never a full-screen flash, still rate-limited.
 - **Order:** showers and spells; drought you can see; lightning.

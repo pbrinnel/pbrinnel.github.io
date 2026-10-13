@@ -435,26 +435,29 @@ function rig(sim) {
   const Ts = AS.parseTables({ ...texts, settings: editCSV(editCSV(texts.settings, 'WorldWidth', 'Value', '160'), 'WorldHeight', 'Value', '110') }).T;
   // A recording canvas and renderer. `view` is the camera's visible rectangle (default: all of it).
   function rig2(sim, view, scale = SC) {
-    const W = sim.W, rec = { ids: [], tiles: [], rects: [], strokes: [], lineTos: 0 };
-    let alpha = 1, fill = '', stroke = '';
+    const W = sim.W, rec = { ids: [], tiles: [], rects: [], strokes: [], arcs: [], ellipses: [], lineTos: 0 };
+    let alpha = 1, fill = '', stroke = '', width = 1;
     const g = new Proxy({}, {
       get(_, k) {
         if (k === 'drawImage') return (img, sx, sy, sw, sh, dx, dy) => { rec.ids.push(sx); rec.tiles.push([dx, dy]); };
         if (k === 'rect') return (x, y, w, h) => rec.rects.push({ x, y, w, h, alpha, fill });
         if (k === 'fillRect') return (x, y, w, h) => rec.rects.push({ x, y, w, h, alpha, fill, single: true });
         if (k === 'lineTo') return () => { rec.lineTos++; };
-        if (k === 'stroke') return () => rec.strokes.push({ style: stroke, alpha });
+        if (k === 'stroke') return () => rec.strokes.push({ style: stroke, alpha, width });
+        if (k === 'arc') return (x, y, r) => rec.arcs.push({ x, y, r });
+        if (k === 'ellipse') return (x, y, rx, ry) => rec.ellipses.push({ x, y, rx, ry });
+        if (k === 'createRadialGradient') return () => ({ addColorStop() {} });
         if (k === 'canvas') return canvas;
         return () => {};
       },
-      set(_, k, v) { if (k === 'globalAlpha') alpha = v; else if (k === 'fillStyle') fill = v; else if (k === 'strokeStyle') stroke = v; return true; },
+      set(_, k, v) { if (k === 'globalAlpha') alpha = v; else if (k === 'fillStyle') fill = v; else if (k === 'strokeStyle') stroke = v; else if (k === 'lineWidth') width = v; return true; },
     });
     const canvas = { width: W.w * SC, height: W.h * SC, clientWidth: W.w * SC, clientHeight: W.h * SC, getContext: () => g };
     const r = AS.Renderer(canvas);
     const vis = view || { x0: 0, y0: 0, x1: W.w - 1, y1: W.h - 1 };
     const cam = { x: 0, y: 0, scale, visible: () => vis };
     const sheet = { get: px => ({ canvas: {}, px, sx: i => i, sy: () => 0 }) };
-    const clear = () => { rec.ids.length = 0; rec.tiles.length = 0; rec.rects.length = 0; rec.strokes.length = 0; rec.lineTos = 0; };
+    const clear = () => { rec.ids.length = 0; rec.tiles.length = 0; rec.rects.length = 0; rec.strokes.length = 0; rec.arcs.length = 0; rec.ellipses.length = 0; rec.lineTos = 0; };
     let now = 0;
     const frame = (ms, speed = 1) => { now += ms; clear(); r.draw(sim, cam, sheet, null, 0, now, speed); return now; };
     return { r, cam, rec, frame, clear, get now() { return now; }, set view(v) { vis.x0 = v.x0; vis.y0 = v.y0; vis.x1 = v.x1; vis.y1 = v.y1; } };
@@ -471,9 +474,14 @@ function rig(sim) {
     const simS = AS.Sim(Ts, 5), WS = simS.W, room = WS.water.room, G = WS.water.G;
     const tiles = grassTiles(simS, 18, 3000);
     const fs = tiles.map((_, i) => 0.0004 * Math.pow(0.95 / 0.0004, i / (tiles.length - 1)));   // from drier than any meadow to nearly full
-    tiles.forEach((t, i) => { G[t] = room * fs[i]; WS.gSize[t] = 0.9; });
+    // The wet look is a tile's share ABOVE ITS OWN AVERAGE, so every tile starts at a meadow's usual share
+    // and is then raised or dried to its test share; the dry look is absolute.
+    const BASE = 0.02;
+    tiles.forEach(t => { G[t] = room * BASE; WS.gSize[t] = 0.9; });
     const { r, rec, frame } = rig2(simS);
     frame(16);
+    tiles.forEach((t, i) => { G[t] = room * fs[i]; });
+    for (let ms = 0; ms < 14 * FADE; ms += 100) frame(100);
     const levels = tiles.map(t => r.soilLevel(t));
     check(levels.every((l, i) => i === 0 || l >= levels[i - 1]), `soil level never falls as soil water rises (${levels})`);
     check(levels[0] < 0 && levels[levels.length - 1] > 0, 'the driest soil is dry and the wettest wet');
@@ -546,8 +554,9 @@ function rig(sim) {
     check(plain && !rec.rects.some(q => q.fill === VEIL) && tiles.every(t => r.soilLevel(t) === 0) && r.soilFading === 0, `a world ${label} has no soil tint`);
   }
 
-  // 4. Rain streaks: only under a shower, kept STREAK_HOLD_MS after it passes, then eased out; at
-  // speed (or paused) they stand still; none zoomed out; none with no showers.
+  // 4. Rain: only under a shower, kept STREAK_HOLD_MS after it passes, then eased out. Its motion runs
+  // on the real clock alone, so the same clock draws the same rain at 1x and 50x; none zoomed out;
+  // none with no showers; rings on water and splashes on ground.
   {
     const simR = AS.Sim(Ts, 3), WR = simR.W, S = simR.weather.showers;
     S.n = 0;
@@ -557,41 +566,61 @@ function rig(sim) {
     const streaks = () => rec.rects.filter(q => q.fill === STREAK);
     const under = cy * WR.w + cx, away = (cy - 19) * WR.w + cx + 29;
     frame(16); frame(100);
-    check(streaks().length === 0 && r.streakLevel(under) === 0, 'no showers: no streaks');
+    check(streaks().length === 0 && rec.ellipses.length === 0 && r.streakLevel(under) === 0, 'no showers: no rain');
     S.n = 1; S.x[0] = cx; S.y[0] = cy; S.r[0] = R; S.mmh[0] = 10; S.left[0] = 100; if (S.storm) S.storm[0] = 0;
     for (let ms = 0; ms < 600; ms += 16) frame(16);
-    check(streaks().length > 0 && r.streakLevel(under) === 1, 'a shower overhead: streaks under it');
+    check(streaks().length > 0 && r.streakLevel(under) === 1, 'a shower overhead: rain under it');
     check(r.streakLevel(away) === 0, 'and none in the corner of the view it does not reach');
-    // it passes: streaks hold at full for STREAK_HOLD_MS, then ease out, gone within a second or so
+    const alphas = new Set(streaks().map(q => q.alpha));
+    check(Math.max(...alphas) <= 0.7 + 1e-9 && alphas.size >= 3, `the streaks are soft: several alphas, none above 0.7 (${[...alphas].map(a => a.toFixed(2))})`);
+    // it passes: rain holds at full for STREAK_HOLD_MS, then eases out
     S.n = 0;
     const t0 = frame(16), level = []; let n0 = streaks().length;
-    for (let ms = 16; ms < HOLD + 2500; ms += 16) { const now = frame(16); level.push([now - t0, r.streakLevel(under), streaks().length]); }
+    for (let ms = 16; ms < HOLD + 3000; ms += 16) { const now = frame(16); level.push([now - t0, r.streakLevel(under), streaks().length]); }
     const atHold = level.find(([ms]) => ms >= HOLD - 32);
-    check(n0 > 0 && atHold[1] === 1 && atHold[2] > 0, `streaks are still at full ${HOLD} ms after the shower has gone`);
-    check(level[level.length - 1][1] === 0 && level[level.length - 1][2] === 0, 'then they are gone');
+    check(n0 > 0 && atHold[1] === 1 && atHold[2] > 0, `rain is still at full ${HOLD} ms after the shower has gone`);
+    check(level[level.length - 1][1] === 0 && level[level.length - 1][2] === 0, 'then it is gone');
     let monotone = true; for (let i = 1; i < level.length; i++) if (level[i][0] > HOLD + 32 && level[i][1] > level[i - 1][1] + 1e-9) monotone = false;
-    check(monotone, 'and ease out without coming back');
-    // paused or fast, they stand still (the same rects frame to frame); at 1x they fall
+    check(monotone, 'and eases out without coming back');
+    const rise = [];
     S.n = 1; S.x[0] = cx; S.y[0] = cy; S.r[0] = R; S.left[0] = 100;
-    for (let ms = 0; ms < 1500; ms += 16) frame(16, 1);
-    const pos = () => JSON.stringify(streaks().map(q => [q.x, q.y]));
-    const a = pos(); frame(250, 1); const b = pos();
-    check(a !== b, 'at 1x the streaks fall');
-    for (let ms = 0; ms < 2000; ms += 16) frame(16, 20);
-    const c = pos(); frame(250, 20); frame(250, 20); const d = pos();
-    check(c === d && streaks().length > 0, 'at 20x they hold still, so nothing churns');
-    for (let ms = 0; ms < 2000; ms += 16) frame(16, 0);
-    const e = pos(); frame(250, 0);
-    check(e === pos(), 'paused, they hold still');
+    for (let ms = 0; ms < 400; ms += 16) { frame(16); rise.push(r.streakLevel(under)); }
+    check(rise.every((v, i) => i === 0 || v >= rise[i - 1]) && rise[0] < 0.2 && rise[rise.length - 1] === 1, 'it eases in over about 0.3 s, never popping on');
+    // Real-time motion: two renderers on the same sim and the same clock, one told 1x and one 50x,
+    // draw the very same rain; and it moves on the clock whatever the speed (even paused).
+    {
+      const A = rig2(simR, view), B = rig2(simR, view), C = rig2(simR, view);
+      for (let ms = 0; ms < 1500; ms += 16) { A.frame(16, 1); B.frame(16, 50); C.frame(16, 0); }
+      const sig = z => JSON.stringify(z.rec.rects.filter(q => q.fill === STREAK).map(q => [q.x, q.y, q.alpha])) + JSON.stringify(z.rec.ellipses);
+      const a1 = sig(A), b1 = sig(B), c1 = sig(C);
+      check(a1 === b1 && a1 === c1 && a1.length > 10, 'at 1x, 50x and paused the same clock draws the same rain');
+      for (let ms = 0; ms < 250; ms += 16) { A.frame(16, 1); B.frame(16, 50); }
+      check(sig(A) === sig(B) && sig(A) !== a1, 'and it moves on the real clock, the same at both speeds');
+    }
+    // Rings on water, a dot and specks on ground.
+    {
+      const WW = simR.W, STEP = Math.round(AS.WATER_STEP_DAYS * AS.DAY_SECONDS * AS.TICK_HZ);
+      const lake = new Set();
+      for (let y = cy - 6; y <= cy + 6; y++) for (let x = cx - 6; x <= cx + 6; x++) { WW.setDepth(y * WW.w + x, 2); lake.add(y * WW.w + x); }
+      simR.tickCount += STEP;
+      const Z = rig2(simR, view);
+      for (let ms = 0; ms < 3000; ms += 16) Z.frame(16, 1);
+      const rings = []; for (let ms = 0; ms < 1500; ms += 16) { Z.frame(16, 1); for (const e of Z.rec.ellipses) rings.push(e); }
+      check(rings.length > 0 && rings.every(e => WW.wDepth[Math.floor(e.y / SC) * WW.w + Math.floor(e.x / SC)] > 0), `rings appear, and only on tiles with water (${rings.length} seen)`);
+      check(rings.every(e => Math.abs(e.ry * 2 - e.rx) < 1e-6), 'a ring is twice as wide as tall');
+      check(Z.rec.rects.some(q => q.fill === STREAK && q.w <= SC / 4), 'dots and streak pixels are small');
+    }
     // zoomed out, none
+    S.n = 1; S.x[0] = cx; S.y[0] = cy; S.r[0] = R; S.left[0] = 100;
     const far = rig2(simR, view, 3);
     far.frame(16); far.frame(2000, 1);
-    check(far.rec.rects.filter(q => q.fill === STREAK).length === 0, 'zoomed out (far view): no streaks');
+    check(far.rec.rects.filter(q => q.fill === STREAK).length === 0 && far.rec.ellipses.length === 0, 'zoomed out (far view): no rain');
     S.n = 0;
   }
 
-  // 5. Lightning: a new strike (sim.weather.strikes) draws one thin pale bolt, fading in, holding, fading out,
-  // never above BOLT_PEAK; the next strike inside BOLT_GAP_MS draws none; off screen or zoomed out, none.
+  // 5. Lightning: a new strike (sim.weather.strikes) draws a bright bolt with forks and a local glow,
+  // fading in over ~0.2 s, holding, fading out; a scorch mark where it lands; the next strike inside
+  // BOLT_GAP_MS draws none; off screen, none; zoomed out, a small bright mark; the rest of the screen never brightens.
   {
     const simL = AS.Sim(Ts, 4), WL = simL.W;
     const cx = Math.floor(WL.w / 2), cy = Math.floor(WL.h / 2);
@@ -600,44 +629,185 @@ function rig(sim) {
     strikes.n = 0;
     const strike = (x, y) => { const i = strikes.n % strikes.tile.length; strikes.tile[i] = y * WL.w + x; strikes.atSec[i] = simL.simSeconds; strikes.lit[i] = 0; strikes.n++; };
     const { r, rec, frame } = rig2(simL, view);
-    const boltAlpha = () => { const q = rec.strokes.filter(s => s.style.startsWith(`rgba(${AS.BOLT_RGB},`)); return q.length ? parseFloat(q[0].style.split(',')[3]) : 0; };
+    const boltStrokes = () => rec.strokes.filter(s => s.style.startsWith(`rgba(${AS.BOLT_RGB},`));
+    const boltAlpha = () => boltStrokes().reduce((m, s) => Math.max(m, parseFloat(s.style.split(',')[3])), 0);
+    const PEAK = AS.BOLT_PEAK, SCAR = 'rgb(22,14,10)';
     frame(16); frame(100);
     check(boltAlpha() === 0 && r.bolt === null, 'no strike, no bolt');
     // history that was there before it was looked at is not replayed
-    strike(cx, cy); const first = frame(16);
-    check(r.bolt !== null || boltAlpha() >= 0, 'a strike is noticed');
+    strike(cx, cy); frame(16);
     strikes.n = 0;
-    const sim0 = simL; void sim0;
     // a strike off screen draws nothing and costs the gap nothing
     frame(GAP + 100); strike(cx + 200, cy);
     let alpha = 0; for (let ms = 0; ms < 2500; ms += 16) { frame(16); alpha = Math.max(alpha, boltAlpha()); }
     check(alpha === 0 && r.bolt === null, 'a strike off screen draws no bolt');
-    // an on-screen strike: one bolt, shaped fade, peak under the cap
+    // an on-screen strike: one bolt, a shaped fade, a peak under the cap
     strike(cx + 3, cy + 2); const t0 = frame(16);
-    const track = []; for (let ms = 0; ms < 2600; ms += 16) { const now = frame(16); track.push([now - t0, boltAlpha(), rec.lineTos]); }
+    const track = []; let maxArc = 0, bright = 0, forks = 0, lineWide = 0;
+    for (let ms = 0; ms < 2600; ms += 16) {
+      const now = frame(16);
+      track.push([now - t0, boltAlpha(), rec.lineTos]);
+      for (const a of rec.arcs) maxArc = Math.max(maxArc, a.r);
+      if (track[track.length - 1][0] > 400 && track[track.length - 1][0] < 700) { forks = Math.max(forks, boltStrokes().length); lineWide = Math.max(lineWide, ...boltStrokes().map(s => s.width)); }
+      bright += rec.rects.filter(q => !q.single ? false : /^rgba\(226,238,255/.test(q.fill)).length;
+    }
     const peak = Math.max(...track.map(q => q[1]));
-    check(peak > 0.2 && peak <= 0.7, `the bolt shows, peaking at ${peak.toFixed(2)} (at most 0.7)`);
+    check(peak > 0.8 && peak <= PEAK + 1e-9, `the bolt is bold, peaking at ${peak.toFixed(2)} (BOLT_PEAK ${PEAK})`);
     check(track.some(q => q[2] > 4), 'it is a jagged line of several segments');
+    check(forks >= 3, `a core and at least two forks are drawn at the hold (${forks} strokes in the bolt's color)`);
+    check(lineWide >= 2 && lineWide <= 3.01, `the core is 2-3 px wide (${lineWide})`);
     const at = ms => track.find(q => q[0] >= ms)[1];
-    check(at(100) < at(450) && at(450) >= peak - 1e-9 && at(1300) < at(450) && at(1300) > 0 && at(2400) === 0, `it fades in, holds, and fades out over ${(track.filter(q => q[1] > 0).length * 16 / 1000).toFixed(1)} s (${[100, 450, 1300, 2400].map(ms => at(ms).toFixed(2))})`);
+    check(at(16) < 0.15 && at(100) > at(16) && at(100) < at(300) && at(300) >= peak - 1e-9, `it fades in over ~0.2 s, not a pop (${[16, 100, 300].map(ms => at(ms).toFixed(2))})`);
+    check(at(450) >= peak - 1e-9 && at(1300) < at(450) && at(1300) > 0 && at(2400) === 0, `it holds, then fades out (${[450, 1300, 2400].map(ms => at(ms).toFixed(2))})`);
     let monotone = true, rising = true;
-    for (let i = 1; i < track.length; i++) { if (track[i][0] < 280 && track[i][1] < track[i - 1][1]) rising = false; if (track[i][0] > 950 && track[i][1] > track[i - 1][1]) monotone = false; }
+    for (let i = 1; i < track.length; i++) { if (track[i][0] < 190 && track[i][1] < track[i - 1][1]) rising = false; if (track[i][0] > 850 && track[i][1] > track[i - 1][1]) monotone = false; }
     check(rising && monotone, 'in without a step back, out without a step back');
+    // the glow is local: a circle of BOLT_GLOW_TILES at most, and nothing else of the screen brightens
+    check(maxArc > 0 && maxArc <= AS.BOLT_GLOW_TILES * SC + 1e-6, `the glow is a circle no bigger than BOLT_GLOW_TILES tiles (${maxArc} px)`);
+    check(bright === 0, 'no rectangle of the bolt\'s color brightens the screen');
+    // the scorch mark stays after the bolt, and goes with the ground
+    frame(16);
+    check(r.scars === 1 && rec.rects.some(q => q.fill === SCAR), 'a scorch mark is left where it landed');
+    const days = simL.T.world.FireScorchDays;
+    simL.tickCount += Math.round(days * 0.4 * AS.DAY_SECONDS * AS.TICK_HZ);
+    frame(16);
+    const fullAlpha = Math.max(...rec.rects.filter(q => q.fill === SCAR).map(q => q.alpha));
+    simL.tickCount += Math.round(days * 0.4 * AS.DAY_SECONDS * AS.TICK_HZ);
+    frame(16);
+    const laterAlpha = Math.max(0, ...rec.rects.filter(q => q.fill === SCAR).map(q => q.alpha));
+    check(fullAlpha > 0 && laterAlpha > 0 && laterAlpha < fullAlpha, `the mark fades with the ground (${fullAlpha.toFixed(2)} then ${laterAlpha.toFixed(2)})`);
+    simL.tickCount += Math.round(days * 0.5 * AS.DAY_SECONDS * AS.TICK_HZ);
+    frame(16);
+    check(r.scars === 0 && !rec.rects.some(q => q.fill === SCAR), 'and is gone when the ground has recovered');
     // a second strike inside the gap draws none; one after it draws one
     strike(cx - 4, cy + 1);
     let second = 0; for (let ms = 0; ms < 2500; ms += 16) { frame(16); second = Math.max(second, boltAlpha()); }
     check(second === 0, `a second strike within BOLT_GAP_MS draws no bolt`);
     frame(GAP); strike(cx - 5, cy + 3);
     let third = 0; for (let ms = 0; ms < 1500; ms += 16) { frame(16); third = Math.max(third, boltAlpha()); }
-    check(third > 0.2, 'a strike after the gap draws a bolt again');
-    // zoomed out, none, and zooming in replays nothing
+    check(third > 0.8, 'a strike after the gap draws a bolt again');
+    // zoomed out, a small bright mark that fades the same way, and no bolt line
     const far = rig2(simL, view, 3); far.frame(16); far.frame(2 * GAP);
-    strike(cx, cy + 1); let farA = 0; for (let ms = 0; ms < 1500; ms += 16) { far.frame(16); farA = Math.max(farA, far.rec.strokes.filter(s => s.style.startsWith(`rgba(${AS.BOLT_RGB}`)).length); }
-    check(farA === 0, 'zoomed out: no bolt');
+    strike(cx, cy + 1);
+    const farTrack = [], mark = q => /^rgba\(226,238,255/.test(q.fill) && q.single;
+    let farLines = 0, farMaxArc = 0;
+    for (let ms = 0; ms < 2600; ms += 16) {
+      far.frame(16);
+      const m = far.rec.rects.filter(mark); farTrack.push([ms, m.length ? parseFloat(m[0].fill.split(',')[3]) : 0, m.length ? m[0].w : 0]);
+      farLines += far.rec.strokes.filter(s => s.style.startsWith(`rgba(${AS.BOLT_RGB},`)).length;
+      for (const a of far.rec.arcs) farMaxArc = Math.max(farMaxArc, a.r);
+    }
+    const farAt = ms => farTrack.find(q => q[0] >= ms)[1], farPeak = Math.max(...farTrack.map(q => q[1]));
+    check(farLines === 0, 'zoomed out: no bolt line');
+    check(farPeak > 0.8 && farTrack.every(q => q[2] <= 8) && farMaxArc > 0 && farMaxArc <= 14, `zoomed out: a small bright mark with a local glow (peak ${farPeak.toFixed(2)}, glow ${farMaxArc} px)`);
+    check(farAt(16) < 0.15 && farAt(450) >= farPeak - 1e-9 && farAt(1300) < farAt(450) && farAt(2400) === 0, 'and it fades in, holds and out as the bolt does');
     // no strikes object at all: nothing happens
     const bare = AS.Sim(Ts, 4); bare.weather.strikes = undefined;
     const b = rig2(bare, view); b.frame(16); b.frame(100);
     check(b.rec.strokes.length === 0 && b.r.bolt === null, 'a sim without sim.weather.strikes draws no bolt and does not fail');
+  }
+
+  // 6. A shower leaves a swath on ground that is already damp: the wet look follows how far a tile is above its
+  // own recent average, easing back as it dries toward it. The dry side stays on the absolute share.
+  {
+    const simS = AS.Sim(Ts, 12), WS = simS.W, room = WS.water.room, G = WS.water.G;
+    const [damp, fresh] = grassTiles(simS, 2, 3000);
+    const view = { x0: 0, y0: 0, x1: WS.w - 1, y1: WS.h - 1 };
+    const { r, frame } = rig2(simS, view);
+    const DAYS = AS.DAY_SECONDS * AS.TICK_HZ;
+    const settle = (ms = 14 * FADE) => { for (let t = 0; t < ms; t += 100) frame(100); };
+    const DAMP = 0.06, SHOWER = 0.02;   // a share that used to count as wet by itself, and about a shower's worth
+    G[damp] = room * DAMP; G[fresh] = room * 0.012;
+    frame(16); settle();
+    check(r.soilLevel(damp) === 0, `damp ground that has been damp for a while draws no veil (level ${r.soilLevel(damp)})`);
+    G[damp] = room * (DAMP + SHOWER); G[fresh] = room * (0.012 + SHOWER);
+    settle();
+    check(r.soilLevel(damp) > 0 && r.soilLevel(fresh) > 0, `a shower darkens damp ground and dry ground alike (${r.soilLevel(damp)}, ${r.soilLevel(fresh)})`);
+    // days pass at the new level: the average catches up and the veil eases back, a level at a time
+    const seen = [r.soilLevel(damp)];
+    for (let d = 0; d < 8; d++) { simS.tickCount += Math.round(0.5 * DAYS); settle(3 * FADE); const l = r.soilLevel(damp); if (l !== seen[seen.length - 1]) seen.push(l); }
+    check(seen.every((l, i) => i === 0 || l === seen[i - 1] - 1) && r.soilLevel(damp) === 0, `it eases back toward its average a level at a time (${seen})`);
+    // a drying tile: below its average it is not wet
+    G[damp] = room * 0.03; settle();
+    check(r.soilLevel(damp) <= 0, 'a tile drier than its average draws no veil');
+    // dry stays absolute: a tile whose share falls under the dry thresholds goes to straw however high its average was
+    G[damp] = room * 0.0005; settle();
+    check(r.soilLevel(damp) < 0, `and a very dry share is straw whatever the average (${r.soilLevel(damp)})`);
+    // the average moves on only with sim time: nothing changes while paused
+    const lv = r.soilLevel(fresh); settle(4 * FADE);
+    check(r.soilLevel(fresh) === lv, 'with the sim paused (no time passing) the look holds');
+  }
+
+  // 7. A dry blade that catches fire keeps its straw color under the char.
+  {
+    const simD = AS.Sim(Ts, 13), WD = simD.W, room = WD.water.room, G = WD.water.G;
+    const [blade] = grassTiles(simD, 1, 5000);
+    WD.gSize[blade] = 0.9;
+    const third = AS.grassGlyph(0.9) - AS.GLYPH.GRASS_0;
+    G[blade] = room * 0.0005;
+    const view = { x0: blade % WD.w - 1, y0: ((blade / WD.w) | 0) - 1, x1: blade % WD.w + 1, y1: ((blade / WD.w) | 0) + 1 };
+    const { r, rec, frame } = rig2(simD, view);
+    frame(16); for (let t = 0; t < 14 * FADE; t += 100) frame(100);
+    const lvl = r.soilLevel(blade);
+    check(lvl < 0, `the blade is dry (level ${lvl})`);
+    check(AS.ignite(simD, blade), 'a dry blade can be set alight');
+    let ok = true, n = 0;
+    for (const stage of [0, 0.3, 0.6]) {
+      WD.fireAge[blade] = stage * WD.fireTime[blade];
+      while (AS.fireStage(WD, blade) < stage) WD.fireAge[blade] = WD.fireAge[blade] * (1 + 1e-7) + 1e-9;
+      frame(16);
+      const look = AS.fireLook(stage), x = (blade % WD.w) * SC, y = ((blade / WD.w) | 0) * SC;
+      const got = rec.ids.filter((_, i) => rec.tiles[i][0] === x && rec.tiles[i][1] === y);
+      if (look.char >= 0) { ok = ok && got[0] === AS.spriteCharGrassDry(third, look.char, -lvl) && got[0] !== AS.spriteCharGrass(third, look.char); n++; }
+    }
+    check(ok && n === 3, 'a burning dry blade draws its straw-colored charred sprite, not the green one');
+    // a green blade still burns green
+    const [green] = grassTiles(simD, 1, 9000);
+    WD.gSize[green] = 0.9; G[green] = room * 0.05;
+    const view2 = { x0: green % WD.w - 1, y0: ((green / WD.w) | 0) - 1, x1: green % WD.w + 1, y1: ((green / WD.w) | 0) + 1 };
+    const g2 = rig2(simD, view2); g2.frame(16); for (let t = 0; t < 14 * FADE; t += 100) g2.frame(100);
+    check(AS.ignite(simD, green), 'a damp blade can be set alight');
+    WD.fireAge[green] = 0;
+    g2.frame(16);
+    const gx = (green % WD.w) * SC, gy = ((green / WD.w) | 0) * SC;
+    check(g2.rec.ids.filter((_, i) => g2.rec.tiles[i][0] === gx && g2.rec.tiles[i][1] === gy)[0] === AS.spriteCharGrass(third, 0), 'a blade on damp soil burns green as before');
+  }
+
+  // 8. The graph's quick look (pulseLocate): rings on every member of a kind that ease in over ~250 ms and
+  // are gone by 2 s, overlapping freely, apart from the toggled rings.
+  {
+    const simP = AS.Sim(Ts, 14);
+    simP.weather.field = null;   // no soil tint: the rings are what is counted
+    const P = rig2(simP), { r, rec, frame } = P;
+    const WOLF = `rgba(${AS.LOCATE_COLORS.wolves},`, BUN = `rgba(${AS.LOCATE_COLORS.bunnies},`;
+    const col = (p) => rec.strokes.filter(s => s.style.startsWith(p));
+    const alphaOf = p => col(p).reduce((m, s) => Math.max(m, parseFloat(s.style.split(',')[3])), 0);
+    r.locate(new Set(['bunnies']), 0);
+    frame(16);
+    check(col(WOLF).length === 0 && alphaOf(BUN) > 0, 'only the toggled kind is ringed to begin with');
+    const bunnyAlpha = alphaOf(BUN);
+    const t0 = P.now; r.pulseLocate('wolves', t0); r.pulseLocate('nothing-here', t0);
+    check(r.pulses === 1, 'a pulse is added for a known kind and not for an unknown one');
+    const track = [];
+    let bunniesSteady = true;
+    for (let ms = 0; ms < 2300; ms += 50) {
+      const now = frame(50);
+      track.push([now - t0, alphaOf(WOLF), col(WOLF).length]);
+      if (Math.abs(alphaOf(BUN) - bunnyAlpha) > 1e-9) bunniesSteady = false;
+    }
+    void rec;
+    const at = ms => track.find(q => q[0] >= ms);
+    check(at(50)[1] < at(250)[1] && at(250)[1] >= AS.LOCATE_ALPHA - 0.05, `it eases in over ~250 ms (${[50, 150, 250].map(ms => at(ms)[1].toFixed(2))})`);
+    check(at(1000)[1] > 0 && at(1000)[1] < at(250)[1] && at(1900)[1] < at(1000)[1], 'then fades out');
+    check(at(2100)[1] === 0 && r.pulses === 0, 'and is gone by 2 s');
+    check(bunniesSteady, 'the toggled rings are unaffected throughout');
+    // pulses overlap
+    const base = P.now;
+    r.pulseLocate('wolves', base); frame(500); r.pulseLocate('wolves', base + 500);
+    frame(300);
+    check(r.pulses === 2 && col(WOLF).length >= 2, `two pulses can be on screen at once (${r.pulses}, ${col(WOLF).length} strokes)`);
+    frame(2500);
+    check(r.pulses === 0 && col(WOLF).length === 0, 'and both go');
   }
 }
 console.log(bad ? `FAIL (${bad})` : `PASS (${ids.length} glyphs, 12 animal combos, ${cases.length} grass cases)`);

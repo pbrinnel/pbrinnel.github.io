@@ -284,7 +284,8 @@
   // the bunny peeking out of it (by sex), the water (three depths × three variants), the
   // nuke icon, the eight flames (four kinds × two sway frames), and last the charred things:
   // for each charring (CHAR_BRIGHTNESS) the three grass thirds, then each species' carcass,
-  // then each species' skull; and at the very end the dried grass (see DRY0).
+  // then each species' skull; then the dried grass (see DRY0); and at the very end the charred
+  // dried grass (see CHARDRY0).
   const N_SPECIES = AS.SPECIES_COUNT;
   const ANIMAL_SPRITES = N_SPECIES * 2 * 3 * 2 * FRAMES;
   const SKULL0 = ANIMAL_SPRITES, GRASS0 = SKULL0 + N_SPECIES, LEAN0 = GRASS0 + 3, LEAN_LEFT0 = LEAN0 + 3, CARCASS0 = LEAN_LEFT0 + 3;
@@ -293,7 +294,10 @@
   const FIRE0 = NUKE0 + 1, CHAR0 = FIRE0 + FIRE_BITMAPS.length, CHARRED_THINGS = 3 + 2 * N_SPECIES;
   // Last, the dried grass: for each step of dryness the three thirds standing, leaning right and
   // leaning left (nine to a step).
-  const DRY0 = CHAR0 + CHAR_BRIGHTNESS.length * CHARRED_THINGS, DRY_PER_STEP = 9, COUNT = DRY0 + DRY_MIX.length * DRY_PER_STEP;
+  const DRY0 = CHAR0 + CHAR_BRIGHTNESS.length * CHARRED_THINGS, DRY_PER_STEP = 9;
+  // Last of all, a dry blade that caught fire: each dry step charred at each level, the three
+  // thirds. It keeps its straw color under the char, so burning never turns a dry blade green.
+  const CHARDRY0 = DRY0 + DRY_MIX.length * DRY_PER_STEP, COUNT = CHARDRY0 + DRY_MIX.length * CHAR_BRIGHTNESS.length * 3;
   const SHEET_COLS = 19;
   const BY_SPECIES = [BUNNY, WOLF, HUMAN];
   // The row of a species' standing eye, and the columns a frame's row covers ([first, last],
@@ -328,6 +332,8 @@
   // A blade dried to `step` (1..DRY_STEPS), standing (lean 0), leaning right (1) or left (-1).
   AS.DRY_STEPS = DRY_MIX.length;
   AS.spriteGrassDry = (third, lean, step) => DRY0 + (step - 1) * DRY_PER_STEP + (lean > 0 ? 3 : lean < 0 ? 6 : 0) + third;
+  // The same blade burning (charring `level`, as AS.spriteCharGrass), dried to `step`.
+  AS.spriteCharGrassDry = (third, level, step) => CHARDRY0 + ((step - 1) * CHAR_BRIGHTNESS.length + level) * 3 + third;
   AS.STRAW = STRAW;
   AS.DRY_MIX = DRY_MIX;
   AS.spritePeek = sex => PEEK0 + sex;   // a bunny in a hole, by sex
@@ -544,6 +550,7 @@
         at(AS.spriteGrassDry(i, 0, step), (x, y) => paint(g, x, y, px, GRASS_BITMAPS[i], base, false, 1));
         at(AS.spriteGrassDry(i, 1, step), (x, y) => paint(g, x, y, px, GRASS_LEAN[i], base, false, 1));
         at(AS.spriteGrassDry(i, -1, step), (x, y) => paint(g, x, y, px, GRASS_LEAN_LEFT[i], base, false, 1));
+        for (let lv = 0; lv < CHAR_BRIGHTNESS.length; lv++) at(AS.spriteCharGrassDry(i, lv, step), (x, y) => paint(g, x, y, px, GRASS_BITMAPS[i], base, false, 1, CHAR_BRIGHTNESS[lv]));
       }
       for (let i = 0; i < 3; i++) {
         at(GRASS0 + i, (x, y) => paint(g, x, y, px, GRASS_BITMAPS[i], GRASS_COLORS[i], false, 1));

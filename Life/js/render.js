@@ -55,14 +55,22 @@
 
   // Soil wetness (Paul, from the weather mockup): the soil water a tile holds against its room
   // (W.water.G over W.water.room, the quantity fire.js reads as dryness) sets a signed level,
-  // -SOIL_DRY_BELOW.length (driest) .. SOIL_WET_AT.length (wettest). Wet soil darkens and cools
+  // -SOIL_DRY_BELOW.length (driest) .. SOIL_WET_ABOVE.length (wettest). Wet soil darkens and cools
   // the tile (a WET_RGB veil, WET_ALPHA by level, stronger than the mockup's); dry soil fades
-  // the grass toward straw (sprites.js, DRY_MIX), the ground untouched. Meadow soil sits at a few
-  // hundredths of its room and a shower adds about one hundredth, so the steps are spaced by
-  // doubling from there rather than evenly: a swath shows on ground that was dry, and ground
-  // beside water, always near its room, is always the darkest.
-  const SOIL_WET_AT = [0.03, 0.08, 0.2];
+  // the grass toward straw (sprites.js, DRY_MIX), the ground untouched.
+  // The wet side reads how far a tile is ABOVE ITS OWN RECENT AVERAGE (Paul, 13 Oct 2026: a
+  // shower must leave a visible swath on ground that is already damp): a slow average of the
+  // tile's share, over about SOIL_AVG_DAYS, and the excess over it is what darkens, easing back
+  // as the tile dries toward its average. The dry side stays on the absolute share, which is
+  // what fire reads. A shower adds about one hundredth of the room, so the excess steps double
+  // from a few thousandths.
+  const SOIL_WET_ABOVE = [0.004, 0.009, 0.02];
   const SOIL_DRY_BELOW = [0.008, 0.004, 0.002];
+  const SOIL_AVG_DAYS = 1.5;
+  // A tile's average is moved on at most once per this much sim time (a day is AS.DAY_SECONDS),
+  // by since / (tau + since) of the way, so a long gap between visits (fast speed) takes a big
+  // step without overshooting and a slow speed costs almost nothing.
+  const SOIL_AVG_TAU_S = SOIL_AVG_DAYS * AS.DAY_SECONDS, SOIL_AVG_MIN_S = 0.1 * AS.DAY_SECONDS;
   // A level is left only once the share is this much (relative) past its threshold, so a tile
   // sitting on one doesn't flap as the water steps.
   const SOIL_HYSTERESIS = 0.15;
@@ -79,9 +87,9 @@
   // spread over the sweep, never a sudden change of a large area.
   const SOIL_SWEEP_MS = 500, SOIL_FADE_MS = AS.SOIL_FADE_MS = 2000;
 
-  // The far view's tile colors by soil level (index level + SOIL_DRY_BELOW.length, see SOIL_WET_AT):
+  // The far view's tile colors by soil level (index level + SOIL_DRY_BELOW.length, see SOIL_WET_ABOVE):
   // FAR_GRASS_BY[third][index] and FAR_GROUND_BY[index].
-  const SOIL_LEVELS_DRY = SOIL_DRY_BELOW.length, SOIL_LEVELS_WET = SOIL_WET_AT.length;
+  const SOIL_LEVELS_DRY = SOIL_DRY_BELOW.length, SOIL_LEVELS_WET = SOIL_WET_ABOVE.length;
   const FAR_GRASS_BY = FAR_GRASS.map(c => {
     const row = [];
     for (let l = -SOIL_LEVELS_DRY; l <= SOIL_LEVELS_WET; l++) {
@@ -131,11 +139,14 @@
   // far out where a tile is a dot. An animal off the screen gets a pip on the map's edge in
   // its direction, when there are no more than LOCATE_PIPS_MAX of that kind off it (pips for
   // thousands would only line the edges).
-  const LOCATE_ALPHA = 0.9;
+  const LOCATE_ALPHA = AS.LOCATE_ALPHA = 0.9;
   const LOCATE_CSS_PX = 2;
   const LOCATE_MIN_CSS_PX = 14;
   const LOCATE_PIP_CSS_PX = 5;
   const LOCATE_PIPS_MAX = 200;
+  // A pulse (the graph's quick look): rings that ease in over LOCATE_PULSE_IN_MS, shrinking from
+  // 1 + LOCATE_PULSE_GROW times their size, and are faded out by LOCATE_PULSE_MS.
+  const LOCATE_PULSE_IN_MS = 250, LOCATE_PULSE_MS = 2000, LOCATE_PULSE_GROW = 0.5, LOCATE_PULSES_MAX = 12;
   // The graph's colors (graph.js), so a ring matches the kind's line; ui.js marks a toggled
   // count with the same color. Fires have no line: they take the flames' yellow from the fire
   // palette, since the orange the bunnies' line uses is taken.
@@ -176,33 +187,50 @@
   const WATER_STANCE_MIN = 0.5;
   const WADE_FLOOR_M = 1e-3;   // the depth a drying tile still counts for while its water is on screen
 
-  // Rain streaks (Paul's mockup A look): short thin slanted dashes, a few to a STREAK_CELL-tile
-  // square, under every shower in view. A shower crosses the screen in a fraction of a second,
-  // so a cell keeps its streaks STREAK_HOLD_MS of real time after the shower leaves it, easing
-  // in over STREAK_IN_MS and out over STREAK_OUT_MS; a cell's streaks cannot come and go faster
-  // than the sum of the three. Up to STREAK_MOVE_MAX_SPEED the streaks fall (STREAK_FALL_PX
-  // sprite pixels a second, a sprite pixel being one-eighth of a tile); faster, or paused, they
-  // hold still, fainter, so nothing churns. The fall is eased in and out over STREAK_MOTION_MS.
-  const STREAK_CELL = 4, STREAK_PER_CELL = 5, STREAK_LEN = 5;
-  const STREAK_HOLD_MS = AS.STREAK_HOLD_MS = 1200, STREAK_IN_MS = 300, STREAK_OUT_MS = 1000;
-  const STREAK_STALE_MS = STREAK_HOLD_MS + STREAK_IN_MS + STREAK_OUT_MS;   // a cell unseen this long is back at nothing
-  const STREAK_MOVE_MAX_SPEED = 5, STREAK_MOTION_MS = 1000, STREAK_FALL_PX = 56;
-  const STREAK_ALPHA = 0.5, STREAK_STILL_ALPHA = 0.26, STREAK_ALPHA_STEPS = 4;
-  const STREAK_RGB = AS.STREAK_RGB = '170,196,226';
+  // Rain (Paul, 13 Oct 2026; the mockup's R5 without its haze): sparse soft streaks, rings on
+  // water and small splashes on ground. Where it rains follows the sim: per RAIN_CELL-tile cell,
+  // `a` rises over RAIN_IN_MS while a shower covers the cell, holds STREAK_HOLD_MS after it
+  // leaves, and fades over RAIN_OUT_MS. Everything that MOVES runs on real time (the clock the
+  // draw is given), so rain looks the same at 1x and 50x and nothing vibrates. Close view only:
+  // a drop is far smaller than a far-view tile.
+  const RAIN_CELL = 4;
+  const STREAK_HOLD_MS = AS.STREAK_HOLD_MS = 1200, RAIN_IN_MS = 300, RAIN_OUT_MS = 1500;
+  const RAIN_STALE_MS = STREAK_HOLD_MS + RAIN_IN_MS + RAIN_OUT_MS;   // a cell unseen this long is back at nothing
+  const RAIN_ALPHA = 0.7, RAIN_ALPHA_STEPS = 6;
+  const RAIN_FIELD_MIN = 0.03;        // below this share of a cell's rain nothing is drawn
+  const STREAKS_PER_CELL = 4, STREAK_LEN = 5;   // sprite pixels; the trail fades toward its tail
+  const STREAK_SPEED = 24, STREAK_SPEED_SPREAD = 10;   // sprite pixels per real second
+  const RIPPLES_PER_CELL = 2, RIPPLE_SECONDS = 1.1, RIPPLE_SPREAD = 0.3;   // each lives about a second, born at zero strength
+  const RIPPLE_GROW = 4.5;            // a ring's radius runs from 1 to 1 + this many sprite pixels, twice as wide as tall
+  const SPLASH_SPECK_FROM = 0.3, SPLASH_SPECK_SPAN = 0.25;   // the side specks come in over this part of the splash's life
+  const STREAK_RGB = AS.STREAK_RGB = '196,216,238';
   const STREAK_SLOPE = 0.7;           // sideways sprite pixels per pixel fallen, in a wind of AS.GUSTS.FULL_KMH
   const STREAK_STAIR_AT = 2;          // device px per sprite pixel from which a streak is drawn pixel by pixel, else as one dash
-  const SALT_STREAK_X = 41, SALT_STREAK_Y = 42;
+  const SALT_STREAK_X = 41, SALT_STREAK_Y = 42, SALT_STREAK_V = 43, SALT_RIPPLE = 44;
 
-  // Lightning (Paul's L1): a thin jagged muted pale line from above the screen to the struck
-  // tile, easing in, holding, easing out, never above BOLT_PEAK and with no glow; nothing
-  // else on screen brightens. At most one bolt starts per BOLT_GAP_MS of real time (a strike
-  // in between is skipped; its fire shows anyway).
-  const BOLT_GAP_MS = AS.BOLT_GAP_MS = 5000, BOLT_IN_MS = 300, BOLT_HOLD_MS = 600, BOLT_OUT_MS = 1000;
-  const BOLT_PEAK = AS.BOLT_PEAK = 0.6, BOLT_RGB = AS.BOLT_RGB = '176,186,200';
+  // Lightning (Paul, 13 Oct 2026: bolder, even if less realistic): a bright pale blue-white bolt
+  // with forked branches from above the screen to the struck tile, a soft local glow a few tiles
+  // across and a scorch mark where it lands. It fades in over BOLT_IN_MS, holds, fades out;
+  // nothing outside the glow's circle brightens, and the line is a few pixels wide. At most one
+  // bolt starts per BOLT_GAP_MS of real time (a strike in between is skipped; its fire shows
+  // anyway). The scorch mark outlasts it and fades with the ground (SCAR_*).
+  const BOLT_GAP_MS = AS.BOLT_GAP_MS = 5000, BOLT_IN_MS = 200, BOLT_HOLD_MS = 600, BOLT_OUT_MS = 1200;
+  const BOLT_PEAK = AS.BOLT_PEAK = 0.95, BOLT_RGB = AS.BOLT_RGB = '226,238,255', BOLT_HALO_RGB = '140,180,240', BOLT_GLOW_RGB = '170,200,255';
+  const BOLT_CORE_CSS_PX = 2.5, BOLT_BRANCH_CSS_PX = 1.5, BOLT_HALO_MULT = 3, BOLT_HALO_ALPHA = 0.22, BOLT_BRANCH_ALPHA = 0.85;
+  const BOLT_GLOW_TILES = AS.BOLT_GLOW_TILES = 2.5, BOLT_GLOW_PEAK = 0.55;   // the glow's radius, and its alpha at the center
   const BOLT_ABOVE_TILES = 3;         // it starts this far above the top of the view when it strikes
   const BOLT_LEAN_TILES = 3;          // ... and as far sideways at most
   const BOLT_STEP_TILES = 0.42, BOLT_JAG_TILES = 0.22;
-  const SALT_BOLT = 51;
+  const BOLT_BRANCHES_MIN = 2, BOLT_BRANCH_EXTRA_CHANCE = 0.55;   // two forks, a third now and then
+  const BOLT_BRANCH_FROM = 0.2, BOLT_BRANCH_TO = 0.75;            // where along the bolt a fork leaves it
+  const BOLT_BRANCH_STEPS_MIN = 9, BOLT_BRANCH_STEPS_SPAN = 7, BOLT_BRANCH_DRIFT_TILES = 0.5;
+  const BOLT_FAR_CSS_PX = 4, BOLT_FAR_GLOW_CSS_PX = 11;   // the far view's mark and its glow
+  // The scorch mark: SCAR_PIXELS dark pixels around the tile's middle and SCAR_SPECKS fainter ones
+  // farther out. It lands as the bolt peaks, fades in over SCAR_IN_MS, stays at full for the first
+  // SCAR_FULL_SHARE of the ground's FireScorchDays and fades over the rest, in SCAR_STEPS steps.
+  const SCAR_RGB = '22,14,10', SCAR_ALPHA = 0.85, SCAR_SPECK_ALPHA = 0.4, SCAR_PIXELS = 6, SCAR_SPECKS = 4;
+  const SCAR_IN_MS = 600, SCAR_FULL_SHARE = 0.5, SCAR_STEPS = 8, SCAR_KEEP = 24;
+  const SALT_BOLT = 51, SALT_SCAR = 55;
 
   // The Radius slider's preview (Paul, 12 Oct 2026): a circle the size the armed mode will
   // cover, in the middle of the map, held RADIUS_HOLD_MS then faded out over RADIUS_FADE_MS
@@ -471,14 +499,16 @@
     // frame, and a tile whose tgt differs from cur joins the list and leaves it when they
     // agree; a frame touches only the tiles moving. A fade whose tgt turns back runs backwards
     // from where it is, so a tile that flaps never completes a change. Only worlds with rain
-    // (and so soil water) have any of it.
+    // (and so soil water) have any of it. avg and stamp (sim seconds of its last update) are
+    // each tile's slow average share, kept by the same sweep, so there is no extra pass.
     let soil = null;
-    function levelOf(f, prev) {
+    // f: the share of the tile's room now; ex: how far it is above its recent average.
+    function levelOf(f, ex, prev) {
       // Wet from the top level down, dry likewise: a level holds while the share stays within
       // SOIL_HYSTERESIS of its threshold, and is taken only once past it.
       let l = 0;
-      for (let i = SOIL_WET_AT.length - 1; i >= 0; i--) {
-        if (f >= SOIL_WET_AT[i] * (prev > i ? 1 - SOIL_HYSTERESIS : 1 + SOIL_HYSTERESIS)) { l = i + 1; break; }
+      for (let i = SOIL_WET_ABOVE.length - 1; i >= 0; i--) {
+        if (ex >= SOIL_WET_ABOVE[i] * (prev > i ? 1 - SOIL_HYSTERESIS : 1 + SOIL_HYSTERESIS)) { l = i + 1; break; }
       }
       if (l === 0 && f < SOIL_DRY_BELOW[0] * (prev < 0 ? 1 + SOIL_HYSTERESIS : 1 - SOIL_HYSTERESIS)) {
         l = -1;
@@ -495,19 +525,24 @@
       if (!soilIsLive(sim)) { soil = null; return; }
       const W = sim.W, n = W.n, G = W.water.G, room = W.water.room;
       if (!soil || soil.W !== W || soil.n !== n) {
-        soil = { W, n, tgt: new Int8Array(n), cur: new Int8Array(n), nxt: new Int8Array(n), prog: new Float32Array(n), act: new Uint8Array(n), list: new Int32Array(n), count: 0, pos: 0, ms: nowMs };
-        for (let t = 0; t < n; t++) soil.tgt[t] = soil.cur[t] = soil.nxt[t] = levelOf(G[t] / room, 0);
+        soil = { W, n, tgt: new Int8Array(n), cur: new Int8Array(n), nxt: new Int8Array(n), prog: new Float32Array(n), act: new Uint8Array(n), list: new Int32Array(n), avg: new Float32Array(n), stamp: new Float32Array(n), count: 0, pos: 0, ms: nowMs };
+        const simS0 = sim.tickCount * AS.DT;
+        for (let t = 0; t < n; t++) { const g = G[t] / room; soil.avg[t] = g; soil.stamp[t] = simS0; soil.tgt[t] = soil.cur[t] = soil.nxt[t] = levelOf(g, 0, 0); }
         return;
       }
       const dt = nowMs - soil.ms;
       if (!(dt > 0)) return;
       soil.ms = nowMs;
-      const tgt = soil.tgt, cur = soil.cur, nxt = soil.nxt, prog = soil.prog, act = soil.act, list = soil.list;
+      const tgt = soil.tgt, cur = soil.cur, nxt = soil.nxt, prog = soil.prog, act = soil.act, list = soil.list, avg = soil.avg, stamp = soil.stamp;
+      const simS = sim.tickCount * AS.DT;
       // Sweep a slice of the world, so the whole of it is looked at once per SOIL_SWEEP_MS.
       let count = Math.min(n, Math.ceil(n * Math.min(dt, SOIL_SWEEP_MS) / SOIL_SWEEP_MS));
       let t = soil.pos;
       while (count-- > 0) {
-        const l = levelOf(G[t] / room, tgt[t]);
+        const g = G[t] / room, since = simS - stamp[t];
+        if (since >= SOIL_AVG_MIN_S) { avg[t] += (g - avg[t]) * since / (SOIL_AVG_TAU_S + since); stamp[t] = simS; }
+        else if (since < 0) stamp[t] = simS;   // the clock went back (a loaded save): start the average's clock again
+        const l = levelOf(g, g - avg[t], tgt[t]);
         if (l !== tgt[t]) { tgt[t] = l; if (!act[t] && l !== cur[t]) { act[t] = 1; list[soil.count++] = t; } }
         if (++t === n) t = 0;
       }
@@ -827,7 +862,11 @@
       // A painted ember on bare ground has nothing to char: the flames stand on the ground.
       if (look.char >= 0 && W.kind[t] !== KIND.EMPTY) {
         let id;
-        if (W.kind[t] === KIND.GRASS) id = AS.spriteCharGrass(AS.grassGlyph(W.gSize[t]) - AS.GLYPH.GRASS_0, look.char);
+        if (W.kind[t] === KIND.GRASS) {
+          // A blade on dry soil burns in its straw color, not green (the level it is drawn at, so it matches the step it was in).
+          const third = AS.grassGlyph(W.gSize[t]) - AS.GLYPH.GRASS_0, dry = soil ? -soil.cur[t] : 0;
+          id = dry > 0 ? AS.spriteCharGrassDry(third, look.char, dry) : AS.spriteCharGrass(third, look.char);
+        }
         else if (W.cMeat[t] > 0 || nowMs < deathUntil[t]) id = AS.spriteCharCarcass(W.cSpecies[t], look.char);
         else id = AS.spriteCharSkull(W.cSpecies[t], look.char);
         ctx.drawImage(img, sh.sx(id), sh.sy(id), px, px, dx, dy, dw, dh);
@@ -937,110 +976,150 @@
       }
     }
 
-    // ---- rain streaks and lightning, over everything (sprite mode only) ----------------
-    // Streaks: per STREAK_CELL-tile cell, `a` is how much of its streaks show (0..1), eased
-    // toward 1 while `until` (real ms) is ahead of the clock and toward 0 after; `seen` is the
-    // last frame the cell was looked at, so one off screen for STREAK_STALE_MS starts again
-    // from nothing instead of popping in as the view comes back to it.
+    // ---- rain and lightning, over everything ---------------------------------------------
+    // Rain (sprite mode only): per RAIN_CELL-tile cell, `a` is how much of its rain shows (0..1),
+    // eased toward 1 while `until` (real ms) is ahead of the clock and toward 0 after; `seen` is
+    // the last frame the cell was looked at, so one off screen for RAIN_STALE_MS starts again
+    // from nothing instead of popping in as the view comes back to it. The drops themselves are
+    // placed by hashes of the cell and moved by the real clock, so only `a` ever depends on the sim.
     let rain = null;
-    const streakRects = Array.from({ length: STREAK_ALPHA_STEPS }, () => []);
-    function updateRain(sim, cam, dpr, nowMs) {
+    const dropRects = Array.from({ length: RAIN_ALPHA_STEPS }, () => []);
+    const ringList = Array.from({ length: RAIN_ALPHA_STEPS }, () => []);
+    function updateRain(sim, cam, nowMs) {
       const sh = sim.weather && sim.weather.showers;
       if (!sh) { rain = null; return; }
-      const W = sim.W, cw = Math.ceil(W.w / STREAK_CELL), ch = Math.ceil(W.h / STREAK_CELL);
-      if (!rain || rain.W !== W) rain = { W, cw, ch, a: new Float32Array(cw * ch), until: new Float64Array(cw * ch), seen: new Float64Array(cw * ch), ms: nowMs, motion: 0, phase: 0 };
-      const dt = Math.max(0, Math.min(nowMs - rain.ms, STREAK_STALE_MS));
+      const W = sim.W, cw = Math.ceil(W.w / RAIN_CELL), ch = Math.ceil(W.h / RAIN_CELL);
+      if (!rain || rain.W !== W) rain = { W, cw, ch, a: new Float32Array(cw * ch), until: new Float64Array(cw * ch), seen: new Float64Array(cw * ch), ms: nowMs };
+      const dt = Math.max(0, Math.min(nowMs - rain.ms, RAIN_STALE_MS));
       rain.ms = nowMs;
       const v = cam.visible();
-      const cx0 = Math.max(0, Math.floor(v.x0 / STREAK_CELL)), cx1 = Math.min(cw - 1, Math.floor(v.x1 / STREAK_CELL));
-      const cy0 = Math.max(0, Math.floor(v.y0 / STREAK_CELL)), cy1 = Math.min(ch - 1, Math.floor(v.y1 / STREAK_CELL));
+      const cx0 = Math.max(0, Math.floor(v.x0 / RAIN_CELL)), cx1 = Math.min(cw - 1, Math.floor(v.x1 / RAIN_CELL));
+      const cy0 = Math.max(0, Math.floor(v.y0 / RAIN_CELL)), cy1 = Math.min(ch - 1, Math.floor(v.y1 / RAIN_CELL));
       if (cx1 < cx0 || cy1 < cy0) return;
       // Cells under a shower in view are held for STREAK_HOLD_MS from now.
       for (let i = 0; i < sh.n; i++) {
         const x = sh.x[i], y = sh.y[i], r = sh.r[i];
         if (x + r < v.x0 || x - r > v.x1 + 1 || y + r < v.y0 || y - r > v.y1 + 1) continue;
         const r2 = r * r;
-        const ax0 = Math.max(cx0, Math.floor((x - r) / STREAK_CELL)), ax1 = Math.min(cx1, Math.floor((x + r) / STREAK_CELL));
-        const ay0 = Math.max(cy0, Math.floor((y - r) / STREAK_CELL)), ay1 = Math.min(cy1, Math.floor((y + r) / STREAK_CELL));
+        const ax0 = Math.max(cx0, Math.floor((x - r) / RAIN_CELL)), ax1 = Math.min(cx1, Math.floor((x + r) / RAIN_CELL));
+        const ay0 = Math.max(cy0, Math.floor((y - r) / RAIN_CELL)), ay1 = Math.min(cy1, Math.floor((y + r) / RAIN_CELL));
         for (let cy = ay0; cy <= ay1; cy++) {
-          const dy = (cy + 0.5) * STREAK_CELL - y;
+          const dy = (cy + 0.5) * RAIN_CELL - y;
           for (let cx = ax0; cx <= ax1; cx++) {
-            const dx = (cx + 0.5) * STREAK_CELL - x;
+            const dx = (cx + 0.5) * RAIN_CELL - x;
             if (dx * dx + dy * dy <= r2) rain.until[cy * cw + cx] = nowMs + STREAK_HOLD_MS;
           }
         }
       }
-      // They fall while the sim runs at a pace the eye can follow, and stand still otherwise.
-      const moving = stepSpeed > 0 && stepSpeed <= STREAK_MOVE_MAX_SPEED;
-      const m = rain.motion, dm = dt / STREAK_MOTION_MS;
-      rain.motion = moving ? Math.min(1, m + dm) : Math.max(0, m - dm);
-      rain.phase += STREAK_FALL_PX * rain.motion * dt / 1000;
       for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) {
         const c = cy * cw + cx;
-        let a = nowMs - rain.seen[c] > STREAK_STALE_MS ? 0 : rain.a[c];
+        let a = nowMs - rain.seen[c] > RAIN_STALE_MS ? 0 : rain.a[c];
         rain.seen[c] = nowMs;
-        if (rain.until[c] > nowMs) a = Math.min(1, a + dt / STREAK_IN_MS);
-        else a = Math.max(0, a - dt / STREAK_OUT_MS);
+        if (rain.until[c] > nowMs) a = Math.min(1, a + dt / RAIN_IN_MS);
+        else a = Math.max(0, a - dt / RAIN_OUT_MS);
         rain.a[c] = a;
       }
     }
-    function drawRain(sim, cam, dpr) {
+    // The rain's strength at a point (tile coordinates): the cells' values blended between their
+    // centers, so a shower's edge is soft instead of a ragged row of 4-tile squares.
+    function rainAt(x, y) {
+      const cw = rain.cw, ch = rain.ch, gx = x / RAIN_CELL - 0.5, gy = y / RAIN_CELL - 0.5;
+      const i = Math.floor(gx), j = Math.floor(gy), fx = gx - i, fy = gy - j, a = rain.a;
+      const i0 = i < 0 ? 0 : i, i1 = i + 1 > cw - 1 ? cw - 1 : i + 1, j0 = j < 0 ? 0 : j, j1 = j + 1 > ch - 1 ? ch - 1 : j + 1;
+      const top = a[j0 * cw + i0] * (1 - fx) + a[j0 * cw + i1] * fx, bot = a[j1 * cw + i0] * (1 - fx) + a[j1 * cw + i1] * fx;
+      return top * (1 - fy) + bot * fy;
+    }
+    const smooth01 = x => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
+    function drawRain(sim, cam, dpr, nowMs) {
       if (!rain) return;
-      const v = cam.visible(), s = cam.scale * dpr, ox = cam.x * s, oy = cam.y * s, u = s / AS.SPRITE_SIZE;
-      const cw = rain.cw;
-      const cx0 = Math.max(0, Math.floor(v.x0 / STREAK_CELL)), cx1 = Math.min(cw - 1, Math.floor(v.x1 / STREAK_CELL));
-      const cy0 = Math.max(0, Math.floor(v.y0 / STREAK_CELL)), cy1 = Math.min(rain.ch - 1, Math.floor(v.y1 / STREAK_CELL));
-      const wind = sim.wind;
+      const W = rain.W, v = cam.visible(), s = cam.scale * dpr, u = s / AS.SPRITE_SIZE, cw = rain.cw;
+      const cx0 = Math.max(0, Math.floor(v.x0 / RAIN_CELL)), cx1 = Math.min(cw - 1, Math.floor(v.x1 / RAIN_CELL));
+      const cy0 = Math.max(0, Math.floor(v.y0 / RAIN_CELL)), cy1 = Math.min(rain.ch - 1, Math.floor(v.y1 / RAIN_CELL));
+      const wind = sim.wind, a = rain.a, tSec = nowMs / 1000, S = AS.SPRITE_SIZE;
       const slope = wind ? wind.toX * Math.min(1, wind.kmh / AS.GUSTS.FULL_KMH) * STREAK_SLOPE : 0;
-      const stair = u >= STREAK_STAIR_AT, cellPx = STREAK_CELL * s, span = cellPx + STREAK_LEN * u;
-      const peak = STREAK_STILL_ALPHA + (STREAK_ALPHA - STREAK_STILL_ALPHA) * rain.motion;
-      const dash = Math.max(1, Math.round(u)), phase = rain.phase * u;
-      for (const r of streakRects) r.length = 0;
+      const stair = u >= STREAK_STAIR_AT, cellPx = RAIN_CELL * s, span = cellPx + STREAK_LEN * u;
+      const dash = Math.max(1, Math.round(u)), steps = RAIN_ALPHA_STEPS, waterOn = !!water;
+      for (const r of dropRects) r.length = 0;
+      for (const r of ringList) r.length = 0;
+      const bucket = f => Math.min(steps, Math.max(1, Math.ceil(f * steps))) - 1;
       let any = false;
       for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) {
-        const a = rain.a[cy * cw + cx];
-        if (a <= 0.01) continue;
-        const list = streakRects[Math.min(STREAK_ALPHA_STEPS, Math.ceil(a * STREAK_ALPHA_STEPS)) - 1];
-        const bx = cx * cellPx - ox, by = cy * cellPx - oy;
-        for (let k = 0; k < STREAK_PER_CELL; k++) {
+        const c = cy * cw + cx;
+        // A cell with no rain of its own may still be reached by a neighbor's, through rainAt.
+        if (a[c] + (cx > 0 ? a[c - 1] : 0) + (cx < cw - 1 ? a[c + 1] : 0) + (cy > 0 ? a[c - cw] : 0) + (cy < rain.ch - 1 ? a[c + cw] : 0) <= 0.01) continue;
+        const bx = cx * cellPx - cam.x * s, by = cy * cellPx - cam.y * s;
+        for (let k = 0; k < STREAKS_PER_CELL; k++) {
           const hx = AS.spriteHash(cx, cy, SALT_STREAK_X + k * 2) * cellPx;
+          const speed = (STREAK_SPEED + AS.spriteHash(cx, cy, SALT_STREAK_V + k * 2) * STREAK_SPEED_SPREAD) * u;
           // The head's place down the cell; the dash trails above it, slanted back against the way it falls.
-          const head = (AS.spriteHash(cx, cy, SALT_STREAK_Y + k * 2) * span + phase) % span;
+          const head = (AS.spriteHash(cx, cy, SALT_STREAK_Y + k * 2) * span + speed * tSec) % span;
+          const f = rainAt(cx * RAIN_CELL + hx / s, cy * RAIN_CELL + Math.min(head, cellPx) / s);
+          if (f < RAIN_FIELD_MIN) continue;
           if (stair) {
             for (let j = 0; j < STREAK_LEN; j++) {
               const yy = head - j * u;
               if (yy < 0 || yy > cellPx) continue;
-              list.push(Math.round(bx + hx + slope * yy), Math.round(by + yy), dash, dash);
+              dropRects[bucket(f * (1 - j / STREAK_LEN))].push(Math.round(bx + hx + slope * yy), Math.round(by + yy), dash, dash);
             }
           } else {
-            list.push(Math.round(bx + hx + slope * head), Math.round(by + head - STREAK_LEN * u), dash, Math.max(dash, Math.round(STREAK_LEN * u)));
+            dropRects[bucket(f * 0.6)].push(Math.round(bx + hx + slope * head), Math.round(by + head - STREAK_LEN * u), dash, Math.max(dash, Math.round(STREAK_LEN * u)));
           }
+          any = true;
         }
-        any = true;
+        for (let k = 0; k < RIPPLES_PER_CELL; k++) {
+          const per = RIPPLE_SECONDS * (1 - RIPPLE_SPREAD / 2 + AS.spriteHash(cx, cy, SALT_RIPPLE + k * 3) * RIPPLE_SPREAD);
+          const life = (tSec + AS.spriteHash(cx, cy, SALT_RIPPLE + k * 3 + 1) * per) / per, cyc = Math.floor(life), ph = life - cyc;
+          const px = cx * RAIN_CELL + AS.spriteHash(cx * 16 + k, cyc, SALT_RIPPLE + k * 3 + 2) * RAIN_CELL;
+          const py = cy * RAIN_CELL + AS.spriteHash(cy * 16 + k, cyc, SALT_RIPPLE + k * 3 + 2) * RAIN_CELL;
+          const tx = Math.floor(px), ty = Math.floor(py);
+          if (tx >= W.w || ty >= W.h) continue;
+          const f = rainAt(px, py);
+          if (f < RAIN_FIELD_MIN) continue;
+          if (waterOn && waterShown(ty * W.w + tx) >= WATER_STANCE_MIN) {
+            // A ring on water, born at zero strength so the rain's edge moving under it never pops it in.
+            const al = f * (1 - ph) * smooth01(ph * 6), r = (1 + RIPPLE_GROW * ph) * u;
+            if (al > 0.01) ringList[bucket(al)].push((px - cam.x) * s, (py - cam.y) * s, r, r * 0.5);
+          } else {
+            // A dot where a drop landed, its two side specks coming in late.
+            const al = f * Math.sin(Math.PI * ph), sp = al * 0.7 * smooth01((ph - SPLASH_SPECK_FROM) / SPLASH_SPECK_SPAN);
+            const x = Math.round((tx - cam.x) * s + Math.floor((px - tx) * S) * u), y = Math.round((ty - cam.y) * s + Math.floor((py - ty) * S) * u);
+            if (al > 0.01) dropRects[bucket(al)].push(x, y, dash, dash);
+            if (sp > 0.01) dropRects[bucket(sp)].push(x - dash, y - dash, dash, dash, x + dash, y - dash, dash, dash);
+          }
+          any = true;
+        }
       }
       if (!any) return;
       ctx.fillStyle = `rgb(${STREAK_RGB})`;
-      for (let q = 0; q < STREAK_ALPHA_STEPS; q++) {
-        const list = streakRects[q];
-        if (!list.length) continue;
-        ctx.globalAlpha = peak * (q + 1) / STREAK_ALPHA_STEPS;
-        ctx.beginPath();
-        for (let i = 0; i < list.length; i += 4) ctx.rect(list[i], list[i + 1], list[i + 2], list[i + 3]);
-        ctx.fill();
+      ctx.strokeStyle = `rgb(${STREAK_RGB})`;
+      ctx.lineWidth = Math.max(dpr, 0.8 * u);
+      for (let q = 0; q < steps; q++) {
+        const list = dropRects[q], rings = ringList[q];
+        if (!list.length && !rings.length) continue;
+        ctx.globalAlpha = RAIN_ALPHA * (q + 1) / steps;
+        if (list.length) {
+          ctx.beginPath();
+          for (let i = 0; i < list.length; i += 4) ctx.rect(list[i], list[i + 1], list[i + 2], list[i + 3]);
+          ctx.fill();
+        }
+        if (rings.length) {
+          ctx.beginPath();
+          for (let i = 0; i < rings.length; i += 4) { ctx.moveTo(rings[i] + rings[i + 2], rings[i + 1]); ctx.ellipse(rings[i], rings[i + 1], rings[i + 2], rings[i + 3], 0, 0, Math.PI * 2); }
+          ctx.stroke();
+        }
       }
       ctx.globalAlpha = 1;
     }
 
     // Lightning: strikes the sim has logged (sim.weather.strikes) since the last frame; the
     // newest of them on screen starts a bolt if the last began BOLT_GAP_MS ago. The bolt's
-    // path is worked out once, in tile coordinates, so it stays put as the view moves.
-    let boltSim = null, boltSeen = 0, boltLastMs = -Infinity, bolt = null;
-    // Zoomed out (`show` false) the strikes are read and let go, so zooming in doesn't replay them.
-    function consumeStrikes(sim, cam, nowMs, show) {
+    // path and forks are worked out once, in tile coordinates, so they stay put as the view
+    // moves. Seen from the far view the same bolt is a small bright mark (drawBoltFar).
+    let boltSim = null, boltSeen = 0, boltLastMs = -Infinity, bolt = null, scars = [];
+    function consumeStrikes(sim, cam, nowMs) {
       const st = sim.weather && sim.weather.strikes;
-      if (!st) { boltSim = null; bolt = null; return; }
-      if (boltSim !== sim || st.n < boltSeen) { boltSim = sim; boltSeen = st.n; bolt = null; boltLastMs = -Infinity; return; }
-      if (!show) { boltSeen = st.n; return; }
+      if (!st) { boltSim = null; bolt = null; scars = []; return; }
+      if (boltSim !== sim || st.n < boltSeen) { boltSim = sim; boltSeen = st.n; bolt = null; scars = []; boltLastMs = -Infinity; return; }
       if (st.n === boltSeen) return;
       const cap = st.tile.length, v = cam.visible(), W = sim.W;
       let pick = -1;
@@ -1060,26 +1139,106 @@
         pts[i * 2] = x0 + (x - x0) * f + jag;
         pts[i * 2 + 1] = top + (y - top) * f;
       }
-      bolt = { pts, t0: nowMs };
+      // Forks leave the bolt part of the way down and wander off sideways, never reaching the ground.
+      const nb = BOLT_BRANCHES_MIN + (AS.spriteHash(k, t, SALT_BOLT + 2) < BOLT_BRANCH_EXTRA_CHANCE ? 1 : 0), branches = [];
+      for (let b = 0; b < nb; b++) {
+        const at = Math.floor(steps * (BOLT_BRANCH_FROM + (BOLT_BRANCH_TO - BOLT_BRANCH_FROM) * ((b + AS.spriteHash(k, b, SALT_BOLT + 3)) / nb)));
+        const len = BOLT_BRANCH_STEPS_MIN + Math.floor(AS.spriteHash(k, b, SALT_BOLT + 4) * BOLT_BRANCH_STEPS_SPAN);
+        const dir = (b + (AS.spriteHash(k, t, SALT_BOLT + 5) < 0.5 ? 0 : 1)) % 2 ? 1 : -1;
+        const bp = new Float64Array((len + 1) * 2);
+        let bx = pts[at * 2], by = pts[at * 2 + 1];
+        bp[0] = bx; bp[1] = by;
+        for (let i = 1; i <= len; i++) {
+          bx += dir * BOLT_BRANCH_DRIFT_TILES * (0.5 + AS.spriteHash(i, k + b * 7, SALT_BOLT + 6));
+          by = Math.min(y - 0.5, by + BOLT_STEP_TILES * (0.5 + AS.spriteHash(i, k + b * 7, SALT_BOLT + 7) * 0.6));
+          bp[i * 2] = bx; bp[i * 2 + 1] = by;
+        }
+        branches.push(bp);
+      }
+      bolt = { pts, branches, x, y, t0: nowMs };
       boltLastMs = nowMs;
+      scars.push({ tile: t, atSec: sim.tickCount * AS.DT, born: nowMs });
+      if (scars.length > SCAR_KEEP) scars.shift();
+    }
+    // The bolt's brightness now, 0..1: in over BOLT_IN_MS, held, out over BOLT_OUT_MS. Null once it is over.
+    function boltLevel(nowMs) {
+      if (!bolt) return null;
+      const age = nowMs - bolt.t0;
+      if (age >= BOLT_IN_MS + BOLT_HOLD_MS + BOLT_OUT_MS) { bolt = null; return null; }
+      return age < BOLT_IN_MS ? smooth01(age / BOLT_IN_MS) : age < BOLT_IN_MS + BOLT_HOLD_MS ? 1 : 1 - smooth01((age - BOLT_IN_MS - BOLT_HOLD_MS) / BOLT_OUT_MS);
+    }
+    function glow(cx, cy, r, peak, rgb) {
+      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+      g.addColorStop(0, `rgba(${rgb},${peak})`);
+      g.addColorStop(0.45, `rgba(${rgb},${peak * 0.35})`);
+      g.addColorStop(1, `rgba(${rgb},0)`);
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
     }
     function drawBolt(cam, dpr, nowMs) {
-      if (!bolt) return;
-      const age = nowMs - bolt.t0, total = BOLT_IN_MS + BOLT_HOLD_MS + BOLT_OUT_MS;
-      if (age >= total) { bolt = null; return; }
-      const e = x => x * x * (3 - 2 * x);   // eased 0..1
-      const f = age < BOLT_IN_MS ? e(age / BOLT_IN_MS) : age < BOLT_IN_MS + BOLT_HOLD_MS ? 1 : 1 - e((age - BOLT_IN_MS - BOLT_HOLD_MS) / BOLT_OUT_MS);
-      if (f <= 0.01) return;
-      const s = cam.scale * dpr, p = bolt.pts;
-      ctx.beginPath();
-      for (let i = 0; i < p.length; i += 2) {
-        const x = (p[i] - cam.x) * s, y = (p[i + 1] - cam.y) * s;
-        if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
-      }
+      const f = boltLevel(nowMs);
+      if (f === null || f <= 0.01) return;
+      const s = cam.scale * dpr, trace = p => {
+        ctx.beginPath();
+        for (let i = 0; i < p.length; i += 2) {
+          const x = (p[i] - cam.x) * s, y = (p[i + 1] - cam.y) * s;
+          if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+        }
+        ctx.stroke();
+      };
+      // The glow stays inside a circle of BOLT_GLOW_TILES around the struck tile.
+      glow((bolt.x - cam.x) * s, (bolt.y - cam.y) * s, BOLT_GLOW_TILES * s, BOLT_GLOW_PEAK * f, BOLT_GLOW_RGB);
+      const core = Math.max(BOLT_CORE_CSS_PX * dpr, s / AS.SPRITE_SIZE);
       ctx.lineJoin = 'miter'; ctx.lineCap = 'butt';
-      ctx.lineWidth = Math.max(dpr, s / AS.SPRITE_SIZE);
+      ctx.lineWidth = core * BOLT_HALO_MULT;
+      ctx.strokeStyle = `rgba(${BOLT_HALO_RGB},${BOLT_HALO_ALPHA * f})`;
+      trace(bolt.pts);
+      ctx.lineWidth = BOLT_BRANCH_CSS_PX * dpr;
+      ctx.strokeStyle = `rgba(${BOLT_RGB},${BOLT_PEAK * BOLT_BRANCH_ALPHA * f})`;
+      for (const b of bolt.branches) trace(b);
+      ctx.lineWidth = core;
       ctx.strokeStyle = `rgba(${BOLT_RGB},${BOLT_PEAK * f})`;
-      ctx.stroke();
+      trace(bolt.pts);
+    }
+    // Zoomed out, a bolt is a small bright mark at the strike tile with a soft glow, fading the same way.
+    function drawBoltFar(cam, dpr, nowMs) {
+      const f = boltLevel(nowMs);
+      if (f === null || f <= 0.01) return;
+      const s = cam.scale * dpr, cx = (bolt.x - cam.x) * s, cy = (bolt.y - cam.y) * s, m = Math.max(BOLT_FAR_CSS_PX * dpr, s);
+      glow(cx, cy, BOLT_FAR_GLOW_CSS_PX * dpr, BOLT_GLOW_PEAK * f, BOLT_GLOW_RGB);
+      ctx.fillStyle = `rgba(${BOLT_RGB},${BOLT_PEAK * f})`;
+      ctx.fillRect(cx - m / 2, cy - m / 2, m, m);
+    }
+    // Scorch marks of the strikes that drew a bolt: they land as it peaks and fade with the ground
+    // (full for the first SCAR_FULL_SHARE of FireScorchDays, then out in SCAR_STEPS steps).
+    function drawScars(sim, cam, dpr, nowMs) {
+      if (!scars.length) return;
+      const W = sim.W, v = cam.visible(), s = cam.scale * dpr, u = s / AS.SPRITE_SIZE, days = sim.T.world.FireScorchDays, nowSec = sim.tickCount * AS.DT;
+      const px = Math.max(1, Math.round(u));
+      ctx.fillStyle = `rgb(${SCAR_RGB})`;
+      for (let i = scars.length - 1; i >= 0; i--) {
+        const sc = scars[i], old = (nowSec - sc.atSec) / AS.DAY_SECONDS / days;
+        if (old >= 1) { scars.splice(i, 1); continue; }
+        const tx = sc.tile % W.w, ty = (sc.tile / W.w) | 0;
+        if (tx < v.x0 || tx > v.x1 || ty < v.y0 || ty > v.y1) continue;
+        const land = smooth01((nowMs - sc.born - BOLT_IN_MS) / SCAR_IN_MS);
+        const fade = old <= SCAR_FULL_SHARE ? 1 : 1 - (old - SCAR_FULL_SHARE) / (1 - SCAR_FULL_SHARE);
+        const a = land * Math.ceil(fade * SCAR_STEPS) / SCAR_STEPS;
+        if (a <= 0) continue;
+        const ox = (tx - cam.x) * s, oy = (ty - cam.y) * s;
+        for (let pass = 0; pass < 2; pass++) {
+          ctx.globalAlpha = a * (pass ? SCAR_SPECK_ALPHA : SCAR_ALPHA);
+          ctx.beginPath();
+          // Core pixels within the middle four columns and rows of the tile, specks anywhere in it.
+          for (let q = 0; q < (pass ? SCAR_SPECKS : SCAR_PIXELS); q++) {
+            const cx = pass ? Math.floor(AS.spriteHash(sc.tile, q, SALT_SCAR) * AS.SPRITE_SIZE) : 2 + Math.floor(AS.spriteHash(sc.tile, q, SALT_SCAR + 1) * 4);
+            const cy = pass ? Math.floor(AS.spriteHash(sc.tile, q, SALT_SCAR + 2) * AS.SPRITE_SIZE) : 2 + Math.floor(AS.spriteHash(sc.tile, q, SALT_SCAR + 3) * 4);
+            ctx.rect(Math.round(ox + cx * u), Math.round(oy + cy * u), px, px);
+          }
+          ctx.fill();
+        }
+      }
+      ctx.globalAlpha = 1;
     }
 
     // ---- the Radius slider's preview ----
@@ -1206,9 +1365,10 @@
     // The rings (see LOCATE_ALPHA), one kind at a time: one path each, as there may be
     // thousands of blades.
     let located = null, locTop = 0;   // a Set of kinds, and the CSS px the HUD covers at the top
-    function drawLocate(sim, cam, dpr, key) {
+    // alphaScale and radiusScale shape a pulse (pulseLocate); a toggled ring is drawn at 1 and 1.
+    function drawLocate(sim, cam, dpr, key, alphaScale, radiusScale) {
       const W = sim.W, s = cam.scale * dpr;
-      const r = Math.max(LOCATE_MIN_CSS_PX * dpr, s * 1.6) / 2;
+      const r = Math.max(LOCATE_MIN_CSS_PX * dpr, s * 1.6) / 2 * radiusScale;
       const cw = canvas.width, ch = canvas.height;
       const x0 = Math.max(0, Math.floor(cam.x - 1)), y0 = Math.max(0, Math.floor(cam.y - 1));
       const x1 = Math.min(W.w - 1, Math.ceil(cam.x + cw / s + 1)), y1 = Math.min(W.h - 1, Math.ceil(cam.y + ch / s + 1));
@@ -1249,7 +1409,7 @@
           for (let tx = x0; tx <= x1; tx++) if (W.kind[row + tx] === kind) ring(tx, ty);
         }
       }
-      const a = LOCATE_ALPHA, color = LOCATE_COLORS[key];
+      const a = LOCATE_ALPHA * alphaScale, color = LOCATE_COLORS[key];
       ctx.lineWidth = (LOCATE_CSS_PX + 2) * dpr;
       ctx.strokeStyle = `rgba(0,0,0,${a * 0.6})`;
       ctx.stroke();
@@ -1276,6 +1436,20 @@
       }
     }
     const offPip = new Float64Array(LOCATE_PIPS_MAX * 2);
+
+    // A quick look from the graph (pulseLocate): rings on every member of a kind that ease in over
+    // LOCATE_PULSE_IN_MS and are gone by LOCATE_PULSE_MS, on the real clock, whatever the sim speed.
+    // They overlap freely (up to LOCATE_PULSES_MAX at once) and are drawn apart from the toggled rings.
+    let pulses = [];
+    function drawPulses(sim, cam, dpr, nowMs) {
+      pulses = pulses.filter(p => nowMs - p.t0 < LOCATE_PULSE_MS);
+      for (const p of pulses) {
+        const age = nowMs - p.t0;
+        // In: alpha 0 to 1 while the ring shrinks onto its mark; out: alpha 1 to 0.
+        const k = age < LOCATE_PULSE_IN_MS ? smooth01(age / LOCATE_PULSE_IN_MS) : 1 - smooth01((age - LOCATE_PULSE_IN_MS) / (LOCATE_PULSE_MS - LOCATE_PULSE_IN_MS));
+        if (k > 0.01) drawLocate(sim, cam, dpr, p.kind, k, 1 + LOCATE_PULSE_GROW * (age < LOCATE_PULSE_IN_MS ? 1 - smooth01(age / LOCATE_PULSE_IN_MS) : 0));
+      }
+    }
 
     // One path per species-and-sex color, one stroke each: there may be thousands of lines.
     // only >= 0 draws just that slot's line.
@@ -1347,11 +1521,12 @@
       // How much of tile t's streaks shows now (0..1), after a draw.
       streakLevel(t) {
         if (!rain) return 0;
-        const W = rain.W, c = (((t / W.w) | 0) / STREAK_CELL | 0) * rain.cw + ((t % W.w) / STREAK_CELL | 0);
+        const W = rain.W, c = (((t / W.w) | 0) / RAIN_CELL | 0) * rain.cw + ((t % W.w) / RAIN_CELL | 0);
         return rain.a[c];
       },
-      // The bolt on screen: null, or { age (real ms) }.
+      // The bolt on screen: null, or { age (real ms) }; and how many strike scorch marks are kept.
       get bolt() { return bolt ? { age: lastDrawMs - bolt.t0 } : null; },
+      get scars() { return scars.length; },
       get contours() { return contoursOn; },
       get intentLines() { return intentLines; },
       // sel: null or { tile, serial, slot }; alpha: 0–1 through the current tick; nowMs: real
@@ -1379,25 +1554,27 @@
         if (cam.scale >= CELL_PX) {
           gusts.update(sim, nowMs, stepSpeed, alpha);
           drawSprites(sim, cam, sheet, sel, dpr, nowMs);
-          updateRain(sim, cam, dpr, nowMs);
-          drawRain(sim, cam, dpr);
-          consumeStrikes(sim, cam, nowMs, true);
+          updateRain(sim, cam, nowMs);
+          drawRain(sim, cam, dpr, nowMs);
+          consumeStrikes(sim, cam, nowMs);
+          drawScars(sim, cam, dpr, nowMs);
           drawBolt(cam, dpr, nowMs);
         } else {
-          consumeStrikes(sim, cam, nowMs, false);
-          bolt = null;
+          consumeStrikes(sim, cam, nowMs);
           fillCells(sim, nowMs);
           const W = sim.W;
           ctx.imageSmoothingEnabled = false;
           ctx.drawImage(cell.canvas, 0, 0, W.w, W.h, -cam.x * s, -cam.y * s, W.w * s, W.h * s);
           ctx.imageSmoothingEnabled = true;
           if (contoursOn) drawContours(sim, cam, dpr, false);
+          drawBoltFar(cam, dpr, nowMs);
         }
         ctx.strokeStyle = EDGE_LINE;
         ctx.lineWidth = dpr;
         ctx.strokeRect(wx - dpr / 2, wy - dpr / 2, ww + dpr, wh + dpr);
         if (blasts.length) drawBlasts(cam, dpr, nowMs);
-        if (located) for (const key of located) if (LOCATE_COLORS[key]) drawLocate(sim, cam, dpr, key);
+        if (located) for (const key of located) if (LOCATE_COLORS[key]) drawLocate(sim, cam, dpr, key, 1, 1);
+        if (pulses.length) drawPulses(sim, cam, dpr, nowMs);
         if (sel) drawSelection(sim, cam, sel, dpr);
         if (preview) drawRadiusPreview(cam, dpr, nowMs);
       },
@@ -1407,6 +1584,14 @@
       // every frame; top is how many CSS px of the canvas's top the HUD covers, so pips stay below it.
       locate(kinds, top) { located = kinds && kinds.size ? kinds : null; locTop = top || 0; },
       get located() { return located ? [...located] : []; },
+      // A quick look at a kind (the graph's legend): rings on all of its members that ease in and
+      // fade out over LOCATE_PULSE_MS, however the toggled rings are set. nowMs: real time.
+      pulseLocate(kind, nowMs) {
+        if (!LOCATE_COLORS[kind]) return;
+        if (pulses.length >= LOCATE_PULSES_MAX) pulses.shift();
+        pulses.push({ kind, t0: nowMs === undefined ? performance.now() : nowMs });
+      },
+      get pulses() { return pulses.length; },
       // A nuke went off at tile (tx, ty), radius in tiles; the effect starts now (real time).
       blast(tx, ty, radius, nowMs) {
         if (blasts.length >= MAX_BLASTS) blasts.shift();
