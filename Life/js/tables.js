@@ -167,6 +167,8 @@
     ['FireScorchDays', 'pos'],
     ['AshBoost', 'pos'],
     ['AshHalfLife', 'pos'],
+    ['RootSurvive', 'frac'],
+    ['ResproutChance', 'frac'],
     ['EmberHours', 'pos'],
     ['BrushRadius', 'num'],
     ['AnimalWarnAt', 'pos'],

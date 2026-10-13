@@ -129,6 +129,8 @@
     },
     // The ash a fire left on the tile, in grass Size; 'None' once it is spent or weathered.
     Ash: (sim, c) => sim.W.ash[c.t] > 0 ? num(sim.W.ash[c.t], SIZE_DECIMALS) : 'None',
+    // Whether living roots under the tile wait to resprout once the scorch is over.
+    Roots: (sim, c) => sim.W.roots[c.t] ? 'Yes' : 'No',
     // How far through its burn a blade or corpse is; 'No' when it isn't burning.
     Burning: (sim, c) => sim.W.flow[c.t] === AS.FLOW.FIRE ? Math.round(AS.fireStage(sim.W, c.t) * 100) + '%' : 'No',
     Sex: (sim, c) => sim.W.aSex[c.s] === SEX.FEMALE ? 'Female' : 'Male',

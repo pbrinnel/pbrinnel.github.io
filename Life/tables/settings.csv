@@ -40,6 +40,8 @@ FireDryness,70%,Fire: how dry the ground is (0-100%) in a world without water; w
 FireScorchDays,2,Fire: days the burnt ground stays scorched (bare: nothing grows or is dug there) before grass can return
 AshBoost,3,"Fire: how many times faster grass grows, seeds and sprouts on a tile with ash (like CorpseBoost; where both apply, the larger counts and the other is ignored). Growth spends the ash"
 AshHalfLife,10,Fire: days for the ash on a tile to weather to half (it weathers away and never moves to another tile)
+RootSurvive,80%,Fire: share of burnt blades whose roots live through it and resprout once the scorch is over
+ResproutChance,50%,Fire: chance per day that living roots on burnt ground put up a new blade once the scorch is over
 EmberHours,1,"Fire: in-world hours a fire painted on bare ground burns (it has no fuel, so it is brief: about a second at 1×); long enough to be seen and to have a fair chance of lighting a blade beside it"
 BrushRadius,0,PAINT tab: the default radius in tiles of the grass/rabbit/wolf/human/water brush (0 = one tile; the Radius slider overrides it per mode)
 Seed,,Blank = new random seed each run; the seed used is shown on screen so you can paste it here to replay that start

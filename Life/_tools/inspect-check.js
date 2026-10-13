@@ -16,7 +16,7 @@ check(A.describe(sim, null) === null, 'null selection -> null');
 const sel = t => ({ tile: t, serial: W.serial[t], slot: -1 });
 for (let i = 0; i < 100; i++) sim.tick();
 let d = A.describe(sim, sel(grassT)); allValues.push(d);
-check(names(d) === 'Age,Lifestage,Dead,Size,Burning,Tile,Position,Elevation,Ground,Ash', 'blade rows: ' + names(d));
+check(names(d) === 'Age,Lifestage,Dead,Size,Burning,Tile,Position,Elevation,Ground,Ash,Roots', 'blade rows: ' + names(d));
 check(val(d, 'Age') === W.gAge[grassT].toFixed(2), 'blade age ' + val(d, 'Age'));
 check(val(d, 'Size') === W.gSize[grassT].toFixed(2), 'blade size ' + val(d, 'Size'));
 check(val(d, 'Dead') === 'No' && val(d, 'Position') === W.tx(grassT) + ', ' + W.ty(grassT), 'blade dead/position');
@@ -48,7 +48,7 @@ check(posRow.tip === '', 'Position tip empty: "' + posRow.tip + '"');
 const ce = empties[1];
 W.addCorpse(ce, A.SPECIES.WOLF); A.corpseAdded(sim, ce);
 d = A.describe(sim, sel(ce)); allValues.push(d);
-check(names(d) === 'Age,Lifestage,Dead,Nutrient,Burning,Cause,Meat,Tile,Position,Elevation,Ground,Ash', 'corpse rows: ' + names(d));
+check(names(d) === 'Age,Lifestage,Dead,Nutrient,Burning,Cause,Meat,Tile,Position,Elevation,Ground,Ash,Roots', 'corpse rows: ' + names(d));
 check(/^Wolf corpse #\d+$/.test(d.title), 'corpse title: ' + d.title);
 check(val(d, 'Lifestage') === '—' && val(d, 'Dead') === 'Yes' && val(d, 'Age') === '0.00', 'corpse values');
 const CN = T.wolf.CorpseNutrient, cnText = m => String(m % 1 ? m.toFixed(1) : m);
@@ -85,7 +85,7 @@ const mk = (t, sp, sx) => {
 const selA = s => ({ tile: W.aTile[s], serial: W.aSerial[s], slot: s });
 const bm = mk(empties[2], 0, 0), bf = mk(empties[3], 0, 1), wm = mk(empties[4], 1, 0), wf = mk(empties[5], 1, 1);
 const R = 'Fullness,Water,Stamina,HP,Alight,Age,Lifestage,Dead,State,Target,Sex,';
-const TILE = ',Tile,Position,Elevation,Ground,Ash';   // every selection ends with the tile under it
+const TILE = ',Tile,Position,Elevation,Ground,Ash,Roots';   // every selection ends with the tile under it
 const RB = 'Fullness,Water,Stress,Stamina,HP,Alight,Age,Lifestage,Dead,State,Target,Sex,';   // bunnies also have Stress
 const dbm = A.describe(sim, selA(bm)), dbf = A.describe(sim, selA(bf)), dwm = A.describe(sim, selA(wm)), dwf = A.describe(sim, selA(wf));
 allValues.push(dbm, dbf, dwm, dwf);
@@ -115,7 +115,7 @@ const ht = empties[10];
 W.addHole(ht, 0);
 const hsel = { tile: ht, serial: W.serial[ht], slot: -1, hole: true };
 const dh = A.describe(sim, hsel); allValues.push(dh);
-check(dh.title === 'Warren hole' && names(dh) === 'LastUsed,Tile,Position,Elevation,Ground,Ash', 'hole rows: ' + dh.title + ' / ' + names(dh));
+check(dh.title === 'Warren hole' && names(dh) === 'LastUsed,Tile,Position,Elevation,Ground,Ash,Roots', 'hole rows: ' + dh.title + ' / ' + names(dh));
 W.holeUsedAt[ht] = sim.simSeconds - 1.5 * A.DAY_SECONDS;
 check(val(A.describe(sim, hsel), 'LastUsed') === '1.50 days ago', 'hole LastUsed ' + val(A.describe(sim, hsel), 'LastUsed'));
 check(val(dbm, 'InHole') === 'No', 'bunny InHole off a hole');
@@ -167,7 +167,7 @@ check(dd.rows.some(r => r.name === 'Foo' && r.value === '—') && !dd.rows.some(
 // An empty tile, picked directly (Inspect Empty Tiles): only the tile's rows.
 { let et = -1; for (let t = 0; t < W.n && et < 0; t++) if (W.isBare(t) && !W.hole[t]) et = t;
   const de = A.describe(sim, { tile: et, serial: 0, slot: -1, empty: true }); allValues.push(de);
-  check(de.title === 'Tile ' + W.tx(et) + ', ' + W.ty(et) && names(de) === 'Position,Elevation,Ground,Ash' && /^\d+(\.\d)? m$/.test(val(de, 'Elevation')), 'empty tile: ' + de.title + ' / ' + names(de) + ' / ' + val(de, 'Elevation')); }
+  check(de.title === 'Tile ' + W.tx(et) + ', ' + W.ty(et) && names(de) === 'Position,Elevation,Ground,Ash,Roots' && /^\d+(\.\d)? m$/.test(val(de, 'Elevation')), 'empty tile: ' + de.title + ' / ' + names(de) + ' / ' + val(de, 'Elevation')); }
 const bads = []; for (const x of allValues) for (const r of x.rows) if (!r.heading && (/NaN|undefined/.test(r.value + r.tip + r.range) || r.value === '')) bads.push(r.name);
 check(bads.length === 0, 'no NaN/undefined/empty values ' + bads);
 console.log(bad ? 'FAILED ' + bad : 'ALL PASS');

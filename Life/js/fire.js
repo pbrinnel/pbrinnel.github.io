@@ -101,13 +101,20 @@
     const W = sim.W;
     // The ash is read before the fuel goes: a blade leaves Ash by its Size, a body by its species.
     // It adds to any ash already there. An ember has no fuel, so it leaves none.
-    let ash = 0;
-    if (W.kind[t] === KIND.GRASS) ash = sim.T.grass.Ash * W.gSize[t];
+    let ash = 0, roots = false, age = 0;
+    if (W.kind[t] === KIND.GRASS) {
+      ash = sim.T.grass.Ash * W.gSize[t];
+      age = W.gAge[t];   // the roots are this same plant, as old as it was
+      // Only a blade has roots (a body or an ember rolls nothing), and a sure answer needs no die.
+      const live = sim.T.world.RootSurvive;
+      roots = live >= 1 || (live > 0 && sim.rng.chance(live));
+    }
     else if (W.kind[t] === KIND.CORPSE) ash = sim.T[AS.SPECIES_KEY[W.cSpecies[t]]].Ash;
     W.removeFire(t);
     if (W.kind[t] === KIND.GRASS) W.removeGrass(t);
     else if (W.kind[t] === KIND.CORPSE) AS.corpseRemove(sim, t);   // (an ember has no solid to remove)
     if (ash > 0) W.ash[t] += ash;
+    if (roots) { W.roots[t] = 1; W.rootAge[t] = age; }
     const days = sim.T.world.FireScorchDays;
     if (days > W.scorch[t]) W.scorch[t] = days;
   }

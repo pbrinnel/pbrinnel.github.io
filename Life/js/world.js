@@ -152,6 +152,17 @@
       // weathers away (AshHalfLife). It stays on the tile that burned; wind never moves it.
       ash: new Float32Array(n),
 
+      // Living roots, by tile (1 = roots): grass survives a fire underground, so a blade that burns
+      // out may leave them (fire.js, RootSurvive) and the hourly grass pass puts up a new blade from
+      // them once the scorch is over (ResproutChance). Ground, not an occupant: a blade (any way it
+      // arrives), water, a hole or a nuke ends them. They never move and never weather, so they
+      // wait for as long as the tile stays bare.
+      roots: new Uint8Array(n),
+      // How old the burnt plant is, in days, on a tile with roots (0 without): the roots are the
+      // same plant, so they age like a blade (grass.js), die at the grass Lifespan, and a resprout
+      // takes this as its age, so a burn doesn't regrow as one cohort that dies together.
+      rootAge: new Float32Array(n),
+
       // How deep the water on a tile is, in meters (0 on land). Any depth puts the tile's flow
       // at WATER.
       wDepth: new Float32Array(n),
@@ -295,6 +306,7 @@
       if (W.scorch[t] > 0) throw new Error(`tile ${t} is scorched; no grass grows there`);
       if (W.beach[t]) throw new Error(`tile ${t} is beach (touches water); no grass grows there`);
       claim(t, KIND.GRASS);
+      W.roots[t] = 0; W.rootAge[t] = 0;   // the blade is the roots' growth now
       W.serial[t] = W.nextSerial++;
       W.gSize[t] = size;
       W.gAge[t] = age;
@@ -336,6 +348,7 @@
         if (W.hole[t]) W.removeHole(t);
         W.scorch[t] = 0;   // ground under water isn't burning
         W.ash[t] = 0;      // and water washes the ash off
+        W.roots[t] = 0; W.rootAge[t] = 0;   // and drowns the roots
       } else {
         W.waterCount--;
       }
@@ -387,6 +400,7 @@
       if (!W.isBare(t)) throw new Error(`tile ${t} can't take water (kind ${W.kind[t]}, flow ${W.flow[t]})`);
       W.flow[t] = FLOW.WATER;
       W.ash[t] = 0;
+      W.roots[t] = 0; W.rootAge[t] = 0;
       W.wDepth[t] = depth > 0 ? depth : LAID_DEPTH;
       if (W.water) { W.water.H[t] = W.wDepth[t]; W.water.listWet(); }   // the rules move it from here
       W.waterCount++;
@@ -432,6 +446,7 @@
       if (W.kind[t] === KIND.GRASS || W.flow[t] !== FLOW.NONE || (W.kind[t] >= KIND.BUNNY && W.kind[t] !== KIND.BUNNY)) throw new Error(`tile ${t} can't be dug (kind ${W.kind[t]})`);
       if (W.scorch[t] > 0) throw new Error(`tile ${t} is scorched; it can't be dug`);
       W.hole[t] = 1;
+      W.roots[t] = 0; W.rootAge[t] = 0;   // digging tears them out
       W.holeUsedAt[t] = usedAt || 0;
       W.hSlot[t] = W.hCount;
       W.hList[W.hCount++] = t;

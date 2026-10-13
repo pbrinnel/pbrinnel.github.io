@@ -79,7 +79,7 @@ const audited = (s, label) => audit(s.AS, s.sim, label);
 
 // ---- a lone blade burns out without a single die rolled, and leaves scorch
 {
-  const s = stage({ size: 9, settings: FIRE, species: [quiet.grass, BURN] });
+  const s = stage({ size: 9, settings: Object.assign({}, FIRE, { RootSurvive: '0%' }), species: [quiet.grass, BURN] });   // (a roots roll is a die: roots-check.js)
   const { AS, sim, W } = s, t = W.tile(4, 4);
   W.addGrass(t, 1, 0);
   const rng0 = sim.rng.state();

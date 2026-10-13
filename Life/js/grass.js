@@ -17,7 +17,7 @@
   // can never push the chance past 1. Rebuilt when the tables change (one per sim in practice).
   // sproutP and seedP: the hourly chances with no boost, worked out once. ashBoost and ashKeep:
   // the boost on a tile with ash, and the share of its ash that survives an hour.
-  let cachedT = null, hourlyRate = 0, seedsAlways = false, sproutRate = 0, sproutP = 0, seedP = 0, ashBoost = 1, ashKeep = 1;
+  let cachedT = null, resproutRate = 0, hourlyRate = 0, seedsAlways = false, sproutRate = 0, sproutP = 0, seedP = 0, ashBoost = 1, ashKeep = 1;
   // Per-day chance → per-hour hazard rate, so a boost multiplies the rate, not the chance.
   const hourlyHazard = c => (c > 0 && c < 1 ? -Math.log(1 - c) / HOURS_PER_DAY : 0);
   function prepare(T) {
@@ -28,6 +28,7 @@
     sproutRate = T.grass.SproutChance >= 1 ? Infinity : hourlyHazard(T.grass.SproutChance);
     sproutP = 1 - Math.exp(-sproutRate);
     seedP = 1 - Math.exp(-hourlyRate);
+    resproutRate = T.world.ResproutChance >= 1 ? Infinity : hourlyHazard(T.world.ResproutChance);
     ashBoost = T.world.AshBoost;
     ashKeep = Math.pow(2, -1 / (HOURS_PER_DAY * T.world.AshHalfLife));
   }
@@ -44,7 +45,7 @@
 
     const phase = sim.tickCount % AS.TICKS_PER_HOUR;
     const firstNew = W.nextSerial;   // blades seeded in this pass wait for the next hour
-    const scorch = W.scorch, ash = W.ash;
+    const scorch = W.scorch, ash = W.ash, roots = W.roots;
     for (let t = phase; t < W.n; t += AS.TICKS_PER_HOUR) {
       // Scorched ground cools an hour at a time; nothing grows on it until it reaches 0.
       let burnt = scorch[t];
@@ -53,10 +54,28 @@
       // scorch is over: a blade can't stand on scorch, and a bare tile checks it below.
       let cinder = ash[t];
       if (cinder > 0) { cinder *= ashKeep; if (cinder < ASH_GONE) cinder = 0; ash[t] = cinder; }
+      // Roots are the burnt plant and age like it, scorched or not; at the Lifespan it was due to
+      // die anyway, so they go before they can resprout.
+      if (roots[t]) {
+        const old = W.rootAge[t] + DAYS_PER_HOUR;
+        if (old >= g.Lifespan) { roots[t] = 0; W.rootAge[t] = 0; } else W.rootAge[t] = old;
+      }
       // A bare tile can grow a blade by itself (SproutChance), so grass can come back to
-      // land it has lost; a nearby corpse speeds that up like it speeds seeding.
+      // land it has lost; a nearby corpse speeds that up like it speeds seeding. Ground with living
+      // roots rolls its resprout instead (below).
       if (W.kind[t] === AS.KIND.EMPTY) {
-        if (sproutRate > 0 && W.flow[t] === AS.FLOW.NONE && !W.hole[t] && burnt === 0 && !W.beach[t]) {
+        const open = W.flow[t] === AS.FLOW.NONE && !W.hole[t] && burnt === 0 && !W.beach[t];   // where a blade may start
+        if (W.roots[t] && open) {
+          // Living roots put up a small blade of the same plant (its age goes on) in place of the
+          // plain sprout roll, boosted by the one larger boost on the tile like a sprout. With
+          // ResproutChance 0 they simply wait.
+          if (resproutRate > 0) {
+            let boost = 1;
+            if (cinder > 0) boost = ashBoost;
+            if (boostSrc[t] >= 0) { const cb = AS.corpseBoost(sim, t); if (cb > boost) boost = cb; }
+            if (rng.chance(1 - Math.exp(-resproutRate * boost))) W.addGrass(t, g.SproutSize, W.rootAge[t]);   // (addGrass ends the roots)
+          }
+        } else if (sproutRate > 0 && open) {
           let ps;
           if (cinder > 0) {
             // One boost per tile, the larger (a tie is the ash's), as corpse.js keeps overlap from stacking.

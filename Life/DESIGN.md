@@ -337,6 +337,13 @@ weather's next part comes next. Fire comes first of the weather systems, and win
   unit of ash, and where a corpse's boost also reaches, only the larger counts. Ash weathers
   away (`AshHalfLife`) and water washes it off. It shows as gray specks that thin as it goes,
   and only ground that had fuel glows with embers.
+- **Grass resprouts from its roots** (Paul, 12 Oct 2026): a burnt blade's roots live through
+  the fire with chance `RootSurvive`, and once the scorch is over they put up a small blade
+  with chance `ResproutChance` a day (ash or a corpse boosts it as it boosts sprouting). The
+  resprout is the same plant, so it keeps the burnt blade's age, and roots that reach the
+  grass Lifespan underground die; a burn ages like the meadow around it rather than all at
+  once. Water, a dug hole, a nuke or a blade starting there first ends the roots. Roots
+  don't show; the properties window has a Roots row.
 - **Animals catch fire** (Paul, 12 Oct 2026: anything but water can burn): from a burning
   neighbor, as a chance per hour by how readily its species catches, or when painted. Alight,
   it loses HP every second until its fire burns out or it reaches water, which puts it out;

@@ -111,6 +111,11 @@ function audit(AS, sim, label) {
     }
     check(W.ash[t] >= 0 && Number.isFinite(W.ash[t]), `${label}: tile ${t} ash ${W.ash[t]}`);
     check(W.wDepth[t] === 0 || W.ash[t] === 0, `${label}: wet tile ${t} has ash ${W.ash[t]}`);
+    check(W.roots[t] === 0 || W.roots[t] === 1, `${label}: tile ${t} roots ${W.roots[t]}`);
+    check(W.roots[t] ? Number.isFinite(W.rootAge[t]) && W.rootAge[t] >= 0 : W.rootAge[t] === 0, `${label}: tile ${t} rootAge ${W.rootAge[t]}`);
+    if (W.roots[t]) {
+      check(W.wDepth[t] === 0 && !W.hole[t] && k !== K.GRASS, `${label}: roots on tile ${t} that is wet, a hole or holds a blade`);
+    }
     check(W.scorch[t] >= 0 && !Number.isNaN(W.scorch[t]), `${label}: tile ${t} scorch ${W.scorch[t]}`);
     if (W.scorch[t] > 0) {
       check(k !== K.GRASS, `${label}: grass on scorched tile ${t}`);
