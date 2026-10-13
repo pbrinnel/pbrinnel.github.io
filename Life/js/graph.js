@@ -33,6 +33,8 @@
   const MARGIN = { left: 40, right: 90, top: 40, bottom: 22 };
   const POS_KEY = 'life-graph-pos';   // the window's remembered { x, y }, CSS px from the viewport's top-left
   const SIZE_KEY = 'life-graph-size';
+  const SIZE_PX_KEY = 'life-graph-wh';   // the size dragged with the corner grip, { w, h } in CSS px
+  const MIN_W = 240, MIN_H = 150;      // room for MARGIN and a plot with a few ticks
   const LABEL_GAP = 12;           // direct labels are kept at least this far apart, in px
   const SERIES = [
     { key: 'grass', name: 'grass' },
@@ -197,7 +199,13 @@
 
     // Showing the window again after Hide UI (display none → shown) changes its box: re-clamp
     // there, in case the viewport changed while it was away.
-    if (typeof ResizeObserver === 'function') new ResizeObserver(() => { if (g.open) applyPos(); }).observe(panel);
+    if (typeof ResizeObserver === 'function') new ResizeObserver(() => { if (g.open) { applyPos(); dirty = true; } }).observe(panel);
+
+    // The corner grip (ui-parts.js): the canvas fills the window, so a new size only needs a
+    // redraw. The +/− button goes back to the two preset sizes.
+    const sizer = AS.uiParts && AS.uiParts.Resizable
+      ? AS.uiParts.Resizable(panel, { key: SIZE_PX_KEY, minW: MIN_W, minH: MIN_H, onChange: () => { dirty = true; } })
+      : null;
 
     // Mouse or touch on the title bar (not its buttons) drags the window.
     let drag = null;   // { id, dx, dy }: pointer id and its offset inside the window
@@ -239,6 +247,7 @@
     applySize();
     sizeBtn.addEventListener('click', () => {
       small = !small;
+      if (sizer) sizer.reset();
       applySize();
       try { localStorage.setItem(SIZE_KEY, small ? 'small' : 'big'); } catch (e) { /* not kept */ }
       applyPos();

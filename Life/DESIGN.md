@@ -365,6 +365,21 @@ weather's next part comes next. Fire comes first of the weather systems, and win
 - **Order:** mockups of the fire and the wind's look; wind; fire; animals and fire; after
   the fire; later, weather's next part (rain that varies, droughts, lightning) and humans
   lighting fires.
+- **Rain is local** (Paul, 12 Oct 2026): it falls from showers that move with the wind, only
+  under them, so the land has wet and dry patches instead of the even rain every tile gets
+  now. At the map's size (4.5 × 3 km) a real shower, a few km across at the wind's speed,
+  crosses it in well under an in-world hour, so showers are physical and leave wet swaths
+  downwind; the look shows what they do (wet ground along a swath, rain streaks under a
+  shower, water rising), not slow-drifting clouds, which would be faked and could sweep the
+  screen like a flash. On top, wet and dry spells over days, from the world's seed like the
+  wind; over the long run a world still gets its `Rain`.
+- **Looks** (Paul, from the weather mockup): rain C (local, as above), drought E (grass
+  fades toward straw as its soil dries), lightning L1 (a dim, muted bolt that fades, never
+  a flash; the strike lights a fire through the one way fire starts).
+  From the second mockup (Paul): the wet darkening should be stronger, and a passing
+  shower's rain streaks stay on screen longer than its true crossing (about a second at
+  least), so they don't read as a twitch.
+- **Order:** showers and spells; drought you can see; lightning.
 
 ## Looks
 - **Sprites:** 8×8 pixel art drawn in code, no image files: a bunny, a wolf (pointed ears,
@@ -415,12 +430,16 @@ weather's next part comes next. Fire comes first of the weather systems, and win
   are open is kept per viewer.
   - **Info:** everything in it toggles what you see. **Counts** of bunnies, wolves, humans,
     the total, blades and corpses (each count also rings its kind on the map: see Finding
-    things). **Windows:** Graph, Minimap. **Map:** Topo lines and their spacing (0.5 to
+    things), with "(click to highlight on map)" under them. **Overlays:** Topo lines and their spacing (0.5 to
     20 m), and Intent lines (12 Oct 2026). **Properties: Off, Click or Hover**: no
     properties window; click or tap something to see it; or the window shows whatever the
     mouse is over (a tap still picks, so a phone works as with Click). Kept per viewer.
     **Inspect Empty Tiles**, also kept per viewer, lets a click or hover on bare ground pick
     the tile itself. **Tables:** the table-warnings button, when there are any.
+  - **The bar's window buttons** (Paul, 12 Oct 2026): Info, Paint, Graph, Map, side by side
+    with a small icon each, no taller than the bar. Every window can be resized from its
+    bottom-right corner, and keeps its size per viewer (desktop; on a phone the graph only).
+    Scrollbars are thin and muted.
   - **PAINT:** see [PAINT](#paint).
   - **Debug**, only with `?debug` in the address (12 Oct 2026): **World** (Water, the
     seed), **Tools** (Benchmark, the debug tools).
@@ -464,7 +483,8 @@ and **Size** (the Radius slider).
   animal of a random age (animals of random sex, from newborn to elder, full and rested;
   humans always adult). Grass skips warren holes, scorch and the beach; wolves and humans
   skip holes. While a paint mode is on, dragging paints instead of panning (pan with the
-  keys). Closing the PAINT window turns its mode off, so nothing paints while it's closed
+  keys). While a mode is on, a banner at the bottom says so ("PAINTING: FIRE", "NUKE ARMED")
+  with a Stop button, and the map has a steady colored edge (Paul, 12 Oct 2026). Closing the PAINT window turns its mode off, so nothing paints while it's closed
   (Paul, 12 Oct 2026).
 - **FIRE MODE** (12 Oct 2026): tap or drag to set everything in the brush's circle alight but
   water and warren holes: grass, bodies and animals catch, and bare ground gets a brief fire
@@ -482,9 +502,9 @@ and **Size** (the Radius slider).
   `ScorchDays` at the center and less toward the rim, so the crater greens from its edges.
   The blast shows as an expanding ring and a fading orange glow within its circle, never a
   flash.
-- **Radius slider:** sets the size for whichever mode is on, 0 (a single tile, one agent per
-  tap) to 75 tiles, a circle smaller than the crowd limit; each mode remembers its own
-  (paint modes start at `BrushRadius`, the nuke at `NukeRadius`). Moving it shows a circle
+- **Radius slider:** one size for every mode (Paul, 12 Oct 2026: not one per brush), 0 (a
+  single tile, one agent per tap) to 75 tiles, a circle smaller than the crowd limit; it
+  starts at `BrushRadius` and is remembered per viewer. Moving it shows a circle
   that size in the middle of the map, held half a second and then faded out over 1.4 s
   (12 Oct 2026).
 - **Too many animals, asked first:** the Info tab shows the total of all animals. Painting

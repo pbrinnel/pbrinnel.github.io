@@ -3,9 +3,9 @@
 // on through ui: the PAINT tab's controls (paint-tab.js), the properties window
 // (properties.js), and the cards and error page (cards.js).
 //
-// The bar is always visible: speed buttons, the day, the tab buttons (Info, PAINT, and Debug
-// with ?debug) and Hide UI. Each tab button opens and closes its own window, any of them at
-// once. Hide UI hides the bar, the windows, the graph and the properties window (CSS,
+// The bar is always visible: speed buttons, the day, the window buttons (Info, Paint, Graph,
+// Map, and Debug with ?debug) and Hide UI. Each button opens and closes its own window, any of
+// them at once; Info, Paint and Debug are made here, Graph and Map toggle windows of their own. Hide UI hides the bar, the windows, the graph and the properties window (CSS,
 // `ui-off` on <body>) and leaves a faint button in the corner.
 //
 // AS.UI({ debug, speeds, onSpeed(i), onDebugTool(mode), onBench(), onGraph(), onMinimap(),
@@ -27,10 +27,11 @@
 //   ui.nuke, ui.setNuke(on)          NUKE MODE armed (main.js reads it through onNuke)
 //   ui.mode, ui.setMode(name)        the PAINT tab's one armed mode: 'nuke', 'grass', 'bunny', 'wolf', 'human', 'water', 'fire' or ''
 //                                    (onMode(name) on every change; onNuke(on) when nuke flips)
-//   ui.setRadiusDefaults(nuke, brush)  the Radius slider's starting values (settings.csv); a radius the
-//                                    viewer chose earlier (kept per mode in localStorage) wins. Called once the tables load.
-//   ui.radiusOf(mode)                the radius in tiles that mode will use now (the slider's value for the armed mode)
-//   ui.setRadius(mode, r)            sets and keeps a mode's radius, as the slider does
+//   ui.setRadiusDefaults(nuke, brush)  the Radius slider's starting value (settings.csv): the brush's, for every
+//                                    mode (`nuke` is unused); a radius the viewer chose earlier (one value, in
+//                                    localStorage) wins. Called once the tables load.
+//   ui.radiusOf(mode)                the radius in tiles every mode will use now (the mode is ignored)
+//   ui.setRadius(mode, r)            sets and keeps the one radius, as the slider does
 //   ui.crowd(info)                   the "That's a crowd" card: info = { limit, onKeep(), onStop() }; null hides it
 //   ui.errors(errors, warnings)   the sim didn't start; show why
 //   ui.warnings(warnings)         the sim started; say quietly what the CSVs have extra
@@ -72,13 +73,29 @@
   // The tabs, in bar order: key, label, tooltip. Debug is there only with ?debug (Paul,
   // 12 Oct 2026: not needed for now).
   const ALL_TABS = [
-    ['info', 'Info', 'Counts, rings on the map, the graph, the minimap, topo and intent lines, and the properties window'],
-    ['paint', 'PAINT', 'Paint grass, animals and water, or drop a nuke'],
+    ['info', 'Info', 'Counts, rings on the map, topo and intent lines, and the properties window'],
+    ['paint', 'Paint', 'Paint grass, animals, water and fire, or drop a nuke'],
     ['debug', 'Debug', 'Water, Benchmark, the seed and the debug tools'],
   ];
+  // Each window button wears a small icon left of its name (Paul, 12 Oct 2026). Drawn in
+  // currentColor at 14 px so a button is no taller than the bar's other buttons and takes on
+  // the "on" colors with the text.
+  const svg14 = body => `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+  const BAR_ICONS = {
+    info: svg14('<circle cx="7" cy="7" r="5.6"/><path d="M7 6.3v3.7"/><circle cx="7" cy="4.2" r="0.4" fill="currentColor"/>'),
+    paint: svg14('<circle cx="7" cy="7" r="2.2" fill="currentColor"/><circle cx="7" cy="7" r="5.6" stroke-dasharray="2 2.2"/>'),
+    graph: svg14('<path d="M1.5 1.5v11h11"/><path d="M3.5 9l3-3.5 2 2 3.5-4.5"/>'),
+    map: svg14('<rect x="1.5" y="2.5" width="11" height="9" rx="1"/><rect x="6" y="5" width="4.5" height="3.5" rx="0.5"/>'),
+    debug: svg14('<path d="M4 4.5h6M3 7h8M4 9.5h6"/>'),
+  };
   // Where each tab window's dragged place is kept, under the names they first had (Info was
   // the side panel, PAINT the God tab), so windows stay where viewers put them.
   const POS_KEYS = { info: 'life-side-pos', paint: 'life-god-pos', debug: 'life-debug-pos' };
+  const SIZE_KEYS = { info: 'life-info-wh', paint: 'life-paint-wh', debug: 'life-debug-wh' };
+  // The smallest each window can be dragged to: wide enough that its widest control row
+  // (Paint's seven mode buttons in one line) still fits, tall enough for a row or two.
+  const TAB_MIN = { info: [240, 120], paint: [300, 120], debug: [240, 120] };
+  const PHONE_PX = 600;   // style.css's breakpoint: below it the tab windows are sheets under the bar
   // Counts in HUD order: a label (empty: the sprite icon replaces it once the sheet exists, see
   // setIcons; the total keeps its word), key in the counts object, tooltip.
   const COUNTS = [
@@ -132,13 +149,38 @@
     // the title bar and stacks the open ones under the bar.
     const tabBtns = {}, tabPanels = {}, tabWins = {}, tabHeads = {};
     const TABS = ALL_TABS.filter(([key]) => key !== 'debug' || debug);
-    for (const [key, label, tip] of TABS) {
-      const b = el('button', 'hud-btn hud-tab', label);
+    // A bar button: icon, then name.
+    function barButton(key, label, tip, cls) {
+      const b = el('button', 'hud-btn hud-tab ' + cls);
       b.type = 'button';
       b.title = tip;
+      const icon = el('span', 'hud-tab-icon');
+      icon.innerHTML = BAR_ICONS[key];
+      b.append(icon, label);
+      return b;
+    }
+    // Graph and Map toggle windows that close themselves too (their ×), so hud() reads the
+    // windows' state to light the buttons. They sit with Info and Paint, in that order.
+    let graphBtn = null, miniBtn = null;
+    const miniEl = document.getElementById('minimap');
+    function windowButtons() {
+      if (onGraph) {
+        graphBtn = barButton('graph', 'Graph', 'The population graph: how many of each over the whole run', 'hud-graph');
+        graphBtn.addEventListener('click', () => { if (!locked) onGraph(); graphBtn.blur(); });
+        tabBox.appendChild(graphBtn);
+      }
+      if (onMinimap) {
+        miniBtn = barButton('map', 'Map', 'The whole world, with a box on what you see: click it to go there', 'hud-minimap');
+        miniBtn.addEventListener('click', () => { if (!locked) onMinimap(); miniBtn.blur(); });
+        tabBox.appendChild(miniBtn);
+      }
+    }
+    for (const [key, label, tip] of TABS) {
+      const b = barButton(key, label, tip, 'hud-tab-' + key);
       b.addEventListener('click', () => { setWindow(key, !openWins.has(key)); b.blur(); });
       tabBox.appendChild(b);
       tabBtns[key] = b;
+      if (key === 'paint') windowButtons();
       const win = el('div', 'hud-tabstrip hud-win-' + key);
       win.hidden = true;
       const head = el('div', 'hud-side-head');
@@ -175,8 +217,7 @@
     }
     const showCounts = section('info', 'Counts', 'Tap a count to ring every one of that kind on the map');
     const showWind = section('info', 'Wind', 'The world\'s wind: where it blows from and how hard');
-    const showWindows = section('info', 'Windows');
-    const showElev = section('info', 'Map', 'What is drawn over the world');
+    const showElev = section('info', 'Overlays', 'What is drawn over the world');
     const showProps = section('info', 'Properties', 'The properties window: what something is and how it is doing');
     const showTables = section('info', 'Tables');
     const paintModes = section('paint', 'Modes');
@@ -217,6 +258,8 @@
       countsBox.appendChild(c);
     }
     showCounts.appendChild(countsBox);
+    // Nothing about a count says it is a button, so the row says so.
+    showCounts.appendChild(el('div', 'hud-hint', '(click to highlight on map)'));
 
     // The Wind row stays hidden until hud() is given a wind (the checks and older callers have none).
     const windArrow = el('span', 'hud-wind-arrow');
@@ -226,28 +269,7 @@
     const windRow = showWind.parentNode;
     windRow.hidden = true;
 
-    // The window closes itself too (its ×), so the button reads the window's state in hud().
-    let graphBtn = null;
-    if (onGraph) {
-      graphBtn = el('button', 'hud-control hud-graph', 'Graph');
-      graphBtn.type = 'button';
-      graphBtn.title = 'Population over the whole run';
-      graphBtn.addEventListener('click', () => { if (!locked) onGraph(); graphBtn.blur(); });
-      showWindows.appendChild(graphBtn);
-    }
-
-    // Likewise the minimap: its × closes it too, so hud() reads the window's state.
-    let miniBtn = null;
-    const miniEl = document.getElementById('minimap');
-    if (onMinimap) {
-      miniBtn = el('button', 'hud-control hud-minimap', 'Minimap');
-      miniBtn.type = 'button';
-      miniBtn.title = 'The whole world, with a box on what you see: click it to go there';
-      miniBtn.addEventListener('click', () => { if (!locked) onMinimap(); miniBtn.blur(); });
-      showWindows.appendChild(miniBtn);
-    }
-
-    // Unlike Graph, the Lines button owns its state: nothing else changes it.
+    // Unlike Graph and Map, the Lines button owns its state: nothing else changes it.
     let linesBtn = null;
     if (onLines) {
       let linesOn = !!opts.lines;
@@ -393,7 +415,7 @@
     }
 
     // ---- PAINT tab ----
-    const paint = AS.PaintTab(paintModes, paintSize, { onNuke, onMode, onRadius, isLocked: () => locked });
+    const paint = AS.PaintTab(paintModes, paintSize, { onNuke, onMode, onRadius, isLocked: () => locked, bannerParent: hudEl });
 
     top.append(strip, ...Object.values(tabWins));
     // The side panel starts just under the bar, whose height can change (it wraps when narrow).
@@ -524,10 +546,30 @@
 
     // ---- dragging, the properties window, the cards ----
     // The tab windows drag by their title bars, like the graph.
+    const drags = {};
     if (AS.Draggable) {
       for (const key of Object.keys(tabWins)) {
-        AS.Draggable(tabWins[key], tabHeads[key], POS_KEYS[key], key === 'info' ? (moved => document.body && document.body.classList.toggle('side-moved', moved)) : undefined);
+        drags[key] = AS.Draggable(tabWins[key], tabHeads[key], POS_KEYS[key], key === 'info' ? (moved => document.body && document.body.classList.toggle('side-moved', moved)) : undefined);
       }
+    }
+    // ...and resize by their bottom-right corners, on a computer; a phone's sheets keep CSS's size.
+    if (AS.uiParts.Resizable) {
+      for (const key of Object.keys(tabWins)) {
+        AS.uiParts.Resizable(tabWins[key], {
+          key: SIZE_KEYS[key], minW: TAB_MIN[key][0], minH: TAB_MIN[key][1],
+          enabled: () => (globalThis.innerWidth || 0) > PHONE_PX,
+          // Info hangs from the bar's left edge, so its corner grip needs no pin; pinning it would
+          // also count as dragging it (`side-moved`), and the graph and map would slide under it.
+          pin: () => { if (key !== 'info' && drags[key]) { const b = tabWins[key].getBoundingClientRect(); drags[key].place(b.left, b.top); } },
+        });
+      }
+    }
+    // The graph and minimap step aside for Info (CSS, --side-w), so a wider Info moves them over.
+    if (typeof ResizeObserver === 'function') {
+      new ResizeObserver(() => {
+        const w = tabWins.info.offsetWidth;
+        if (w > 0) document.documentElement.style.setProperty('--side-w', w + 'px');
+      }).observe(tabWins.info);
     }
     const props = AS.PropertiesWindow(inspEl, { below: top, onClose: onCloseInspector });
     const cards = AS.Cards({ hudEl, errorsEl });

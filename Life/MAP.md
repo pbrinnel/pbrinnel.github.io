@@ -66,7 +66,7 @@ load time: every file reads other files' `AS.*` inside functions, at call time.
 | `camera.js` | pan/zoom/pinch/wheel/keys, tap → tile; zoomed in, the view pans up to `OVERSCROLL` of itself past the world's edge; `cam.strokes` makes a one-pointer drag call `onStroke` (the brush) instead of panning | `Camera` |
 | `render.js` | draws the world: tiles from the sprite sheet, or cell mode zoomed out (its brighter far-view colors at the top); scorch, topo lines, the outside past the edge (`OUTSIDE`, `EDGE_LINE`), locate rings, the nuke's blast, the Radius preview; animals glide and act out events; intent lines; selection | `Renderer`, `CELL_PX`, `glideProgress` |
 | `inspect.js` | `variables.csv` → the inspector's rows for a selection | `describe`, `inspectWarnings` |
-| `drag.js` | `Draggable(panel, handle, key)`: drag a floating window by its title bar (computer only), kept on screen and remembered per viewer; double-click resets | `Draggable` |
+| `drag.js` | `Draggable(panel, handle, key)`: drag a floating window by its title bar (computer only), kept on screen and remembered per viewer; double-click resets; `place(x, y)` pins it | `Draggable` |
 | `graph.js` | the population graph window, from `sim.history` | `Graph`, `graphMath` |
 | `minimap.js` | the minimap window | `Minimap` |
 | `bench.js` | benchmark mode (grass series, animal series) | `runBench`, `benchMath` |
@@ -391,25 +391,24 @@ never flash: see DESIGN.md, Photosensitivity.
 
 ## The page
 
-- **The bar and tabs** (ui.js): speeds, day, the Info and PAINT tabs, plus Debug only with
-  `?debug` (keys `info`, `paint`, `debug`), and Hide UI (`H`). Each tab is a stack of labeled
+- **The bar and tabs** (ui.js): speeds, day, the window buttons Info, Paint, Graph and Map (each with a small icon), plus Debug only with
+  `?debug` (tab keys `info`, `paint`, `debug`; Graph and Map toggle their own windows through `onGraph` / `onMinimap`), and Hide UI (`H`). Each tab is a stack of labeled
   rows made by `section(tab, title)`, to which a new control is appended; each its own
   window, toggled by its button (`setWindow(key, on)`, `ui.windows`, `onWindows` → main.js
   keeps them in localStorage `life-ui-windows`). On a computer they float (CSS, `--side-w`,
   `--hud-bar`: Info down the left, `body.side-open` moving the graph and minimap aside;
-  PAINT bottom right; Debug right), dragged by their title bars (drag.js).
+  PAINT bottom right; Debug right), dragged by their title bars (drag.js) and resized by a bottom-right grip (`uiParts.Resizable` in ui-parts.js, size kept per window under `life-*-wh`; the graph, minimap and properties window use it too).
   - **Info:** per-species counts, each a toggle that rings that kind on the map through
     `onLocate(key, on)` and wears its color while on; Wind (an arrow the way it blows and
     `windWords`/`windFromName`, from hud's `wind` field, which main.js fills from `sim.wind`;
-    hidden until there is one); a Total; the Graph and Minimap
-    buttons; Topo lines (`onElevation`) and their spacing (`onContourStep`); Intent lines
+    hidden until there is one); a Total; a "(click to highlight on map)" hint under the counts; Topo lines (`onElevation`) and their spacing (`onContourStep`); Intent lines
     (`onLines`); Properties Off/Click/Hover through `onInspect`; Inspect Empty Tiles through
     `onInspectEmpty`.
   - **PAINT** (paint-tab.js, in the window ui.js makes): the modes (NUKE, GRASS, RABBIT,
     WOLF, HUMAN, WATER, FIRE: one at a time, `ui.mode`;
     icons once `setIcons` runs (main.js `ICON_SPRITE`), the name kept as `aria-label` and in
-    the tooltip; the nuke icon is sprites.js `spriteNuke`) with a Radius slider (0–100; each
-    mode keeps its own value in localStorage, defaults from `NukeRadius`/`BrushRadius`) and
+    the tooltip; the nuke icon is sprites.js `spriteNuke`) with a Radius slider (0–100; one
+    value for every mode, localStorage `life-radius`, default `BrushRadius`; `NukeRadius` is no longer used by the slider), an armed banner with Stop (`.paint-banner`; the colored edge is CSS on the body's `paint-armed`/`nuke-armed`) and
     the "That's a crowd" card (`ui.crowd`, cards.js).
   - **Debug:** the Water button (kept per viewer in localStorage `life-water`; starts a new
     world with `opts.water`), the seed, Benchmark and the debug tools.

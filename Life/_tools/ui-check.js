@@ -18,6 +18,8 @@ class El {
   appendChild(c) { writes++; this.children.push(c); c.parent = this; return c; }
   get parentNode() { return this.parent || null; }
   setAttribute(k, v) { (this.attrs || (this.attrs = {}))[k] = String(v); }
+  getBoundingClientRect() { return { left: this.rect ? this.rect.left : 0, top: this.rect ? this.rect.top : 0, width: parseFloat(this.style.width) || (this.rect && this.rect.width) || 300, height: parseFloat(this.style.height) || (this.rect && this.rect.height) || 200 }; }
+  setPointerCapture() {}
   getAttribute(k) { return this.attrs && k in this.attrs ? this.attrs[k] : null; }
   replaceWith(n) { if (this.parent) this.parent.children = this.parent.children.map(c => c === this ? n : c); n.parent = this.parent; }
   remove() { if (this.parent) this.parent.children = this.parent.children.filter(c => c !== this); this.parent = null; }
@@ -28,14 +30,14 @@ class El {
   all(p, out = []) { if (p(this)) out.push(this); this.children.forEach(c => c.all(p, out)); return out; }
 }
 let LS;   // what the page sees as localStorage (undefined: none, which the page copes with)
-function build(debug, extra = {}) {
+function build(debug, extra = {}, win = {}) {
   const ids = { hud: new El('div'), errors: new El('div'), inspector: new El('aside'), graph: new El('aside') };
   ids.graph._hidden = true;
   ids.errors._hidden = true; ids.inspector._hidden = true;
   const body = new El('body');
   const doc = { createElement: t => new El(t), getElementById: i => ids[i], body, listeners: {},
     addEventListener(t, f) { (this.listeners[t] ||= []).push(f); } };
-  const ctx = { document: doc, globalThis: null, AS: {}, localStorage: LS }; ctx.globalThis = ctx;
+  const ctx = { document: doc, globalThis: null, AS: {}, localStorage: LS, ...win }; ctx.globalThis = ctx;
   vm.createContext(ctx);
   // ui.js builds its debug tools from the species list, which world.js owns.
   vm.runInContext(fs.readFileSync(require('path').join(__dirname, '../js/world.js'), 'utf8'), ctx);
@@ -43,7 +45,7 @@ function build(debug, extra = {}) {
   for (const f of ['ui-parts', 'cards', 'properties', 'paint-tab', 'ui']) vm.runInContext(fs.readFileSync(require('path').join(__dirname, '../js/' + f + '.js'), 'utf8'), ctx);
   const calls = [], tools = [];
   const speeds = [0, 1, 2, 5, 20, Infinity];
-  const ui = ctx.AS.UI({ debug, speeds, onSpeed: i => calls.push(i), onDebugTool: m => tools.push(m), onCloseInspector: () => calls.push('closed'), onBench: () => calls.push('bench'), onGraph: () => calls.push('graph'), ...extra });
+  const ui = ctx.AS.UI({ debug, speeds, onSpeed: i => calls.push(i), onDebugTool: m => tools.push(m), onCloseInspector: () => calls.push('closed'), onBench: () => calls.push('bench'), onGraph: () => calls.push('graph'), onMinimap: () => calls.push('map'), ...extra });
   return { ui, ids, doc, calls, tools, body, ctx };
 }
 // The speed buttons only (not the tabs, Hide UI or the debug tools).
@@ -195,14 +197,14 @@ const winOf = (ids, key) => ids.hud.all(e => e.className === 'hud-tabstrip hud-w
   const barText = bar.children.map(c => c.className).join('|');
   for (const c of ['hud-speeds', 'hud-speedname', 'hud-day', 'hud-tabs', 'hud-hide']) assert(barText.includes(c), c);
   assert(!bar.all(e => e.className.includes('hud-count') || e.className.includes('hud-lines') || e.className.includes('hud-nuke')).length); ok('the bar holds speeds, day, tabs and Hide UI, none of the tab contents');
-  assert.deepStrictEqual(ids.hud.all(e => e.className.split(' ').includes('hud-tab')).map(b => b.textContent), ['Info', 'PAINT']); ok('two tabs: Info, PAINT (Debug only with ?debug)');
-  assert.deepStrictEqual(build(true).ids.hud.all(e => e.className.split(' ').includes('hud-tab')).map(b => b.textContent), ['Info', 'PAINT', 'Debug']); ok('with ?debug a third: Debug');
+  assert.deepStrictEqual(ids.hud.all(e => e.className.split(' ').includes('hud-tab')).map(b => b.textContent), ['Info', 'Paint', 'Graph', 'Map']); ok('four window buttons in the bar, in order: Info, Paint, Graph, Map (Debug only with ?debug)');
+  assert.deepStrictEqual(build(true).ids.hud.all(e => e.className.split(' ').includes('hud-tab')).map(b => b.textContent), ['Info', 'Paint', 'Graph', 'Map', 'Debug']); ok('with ?debug a fifth: Debug');
   assert(!ids.hud.all(e => e.className.split(' ').includes('hud-water')).length && !ids.hud.textContent.includes('Benchmark')); ok('without ?debug, no Water or Benchmark on the page');
   assert.strictEqual(ids.hud.all(e => e.className.includes('hud-hide'))[0].textContent, 'Hide UI'); ok('a Hide UI button');
 }
 { const { ui, ids } = build(true, { onLines() {} });
   assert.strictEqual(ui.windows.join(','), 'info'); assert(!winOf(ids, 'info').hidden && winOf(ids, 'debug').hidden && winOf(ids, 'paint').hidden); ok('Info is open by default, alone');
-  assert(panelOf(ids, 'info').textContent.includes('Graph') && panelOf(ids, 'info').all(e => e.className === "hud-glyph").length === 7); ok('Info holds the seven counts (humans, fires and the Total included) and the Graph button');
+  assert(!panelOf(ids, 'info').textContent.includes('Graph') && panelOf(ids, 'info').all(e => e.className === "hud-glyph").length === 7); ok('Info holds the seven counts (humans, fires and the Total included) and no Graph button (it moved to the bar)');
   assert(panelOf(ids, 'info').all(e => e.className.includes('hud-lines')).length === 1 && panelOf(ids, 'debug').textContent.includes('Benchmark') && panelOf(ids, 'debug').textContent.includes('Seed')); ok('Info holds Intent lines; Debug holds Benchmark and the Seed');
   assert(panelOf(ids, 'paint').textContent.includes('NUKE MODE')); ok('PAINT holds NUKE MODE');
 }
@@ -211,10 +213,10 @@ const winOf = (ids, key) => ids.hud.all(e => e.className === 'hud-tabstrip hud-w
   assert(winOf(ids, 'info').hidden && ui.windows.length === 0 && seen.length === 0); ok('windows: [] starts with none open, and that is not reported');
   tabBtn(ids, 'Debug').fire('click');
   assert(!winOf(ids, 'debug').hidden && winOf(ids, 'info').hidden && tabBtn(ids, 'Debug').classList.contains('on')); ok('a tab button opens its own window');
-  tabBtn(ids, 'PAINT').fire('click');
-  assert(!winOf(ids, 'debug').hidden && !winOf(ids, 'paint').hidden && tabBtn(ids, 'Debug').classList.contains('on') && tabBtn(ids, 'PAINT').classList.contains('on')); ok('another opens beside it: both stay open');
-  tabBtn(ids, 'PAINT').fire('click');
-  assert(winOf(ids, 'paint').hidden && !winOf(ids, 'debug').hidden && !tabBtn(ids, 'PAINT').classList.contains('on')); ok('clicking an open one closes just that window');
+  tabBtn(ids, 'Paint').fire('click');
+  assert(!winOf(ids, 'debug').hidden && !winOf(ids, 'paint').hidden && tabBtn(ids, 'Debug').classList.contains('on') && tabBtn(ids, 'Paint').classList.contains('on')); ok('another opens beside it: both stay open');
+  tabBtn(ids, 'Paint').fire('click');
+  assert(winOf(ids, 'paint').hidden && !winOf(ids, 'debug').hidden && !tabBtn(ids, 'Paint').classList.contains('on')); ok('clicking an open one closes just that window');
   assert.deepStrictEqual(seen, ['debug', 'debug,paint', 'debug']); ok('onWindows reports the open ones after each change (for remembering them)');
 }
 { const { ui, ids } = build(false, { windows: ['paint', 'info'] });
@@ -295,41 +297,112 @@ const winOf = (ids, key) => ids.hud.all(e => e.className === 'hud-tabstrip hud-w
   box.fire('click'); box.fire('click');
   assert.deepStrictEqual(located, ['fires:true', 'fires:false']); ok('its ring toggle calls onLocate(fires)');
 }
-// ---- the Radius slider: per-mode memory, defaults, keeping, the benchmark lock ----
+// ---- the Radius slider: one value for every mode, defaults, keeping, the benchmark lock ----
 { const { ui, ids } = build(false);
   const slider = ids.hud.all(e => e.className === 'hud-radius-input')[0], label = ids.hud.all(e => e.className === 'hud-radius-label')[0];
   const by = l => ids.hud.all(e => e.textContent === l && e.className.includes('hud-control'))[0];
   assert(slider && slider.disabled && label.textContent === 'Radius –'); ok('the Radius slider is off until a mode is armed');
   const MAXR = 75;
-  ui.setRadiusDefaults(75, 0);
-  assert.strictEqual(ui.radiusOf('nuke'), 75); assert.strictEqual(ui.radiusOf('grass'), 0); ok('defaults: NukeRadius for the nuke, BrushRadius (0) for the brushes');
+  ui.setRadiusDefaults(75, 4);
+  assert.strictEqual(ui.radiusOf('nuke'), 4); assert.strictEqual(ui.radiusOf('grass'), 4); ok('default: BrushRadius for every mode, the nuke included');
   by('NUKE MODE').fire('click');
-  assert(!slider.disabled && slider.value === '75' && label.textContent === 'Radius 75'); ok('NUKE MODE shows Radius 75');
+  assert(!slider.disabled && slider.value === '4' && label.textContent === 'Radius 4'); ok('NUKE MODE shows the one radius');
   slider.value = '40'; slider.listeners.input.forEach(f => f());
-  assert(ui.radiusOf('nuke') === 40 && label.textContent === 'Radius 40'); ok('moving the slider sets that mode\'s radius and the label');
+  assert(ui.radiusOf('nuke') === 40 && label.textContent === 'Radius 40'); ok('moving the slider sets the radius and the label');
   by('GRASS MODE').fire('click');
-  assert(slider.value === '0' && label.textContent === 'Radius 0' && ui.radiusOf('nuke') === 40); ok('switching modes switches the slider; the nuke keeps 40');
+  assert(slider.value === '40' && label.textContent === 'Radius 40' && ui.radiusOf('grass') === 40); ok('switching modes keeps it: the same 40 for GRASS');
   slider.value = '9'; slider.listeners.input.forEach(f => f());
   by('HUMAN MODE').fire('click');
-  assert(label.textContent === 'Radius 0' && ui.radiusOf('grass') === 9); ok('each brush mode has its own radius');
-  by('GRASS MODE').fire('click');
-  assert(slider.value === '9'); ok('coming back to a mode restores its radius');
+  assert(label.textContent === 'Radius 9' && ui.radiusOf('nuke') === 9 && ui.radiusOf('human') === 9); ok('a change in one mode is every mode\'s (nuke too)');
   slider.value = '250'; slider.listeners.input.forEach(f => f());
   assert(ui.radiusOf('grass') === MAXR && slider.max === String(MAXR)); ok(`the radius tops out at ${MAXR}`);
   ui.lock(true); assert(slider.disabled); slider.value = '5'; slider.listeners.input.forEach(f => f()); assert(ui.radiusOf('grass') === MAXR); ui.lock(false); assert(!slider.disabled); ok('disabled (and ignored) during the benchmark');
+  const seen = []; const r2 = build(false, { onRadius: (m, r) => seen.push(m + ':' + r) });
+  r2.ui.setRadiusDefaults(75, 2); r2.ids.hud.all(e => e.textContent === 'WATER MODE' || e.getAttribute('aria-label') === 'WATER MODE')[0].fire('click');
+  const sl2 = r2.ids.hud.all(e => e.className === 'hud-radius-input')[0]; sl2.value = '11'; sl2.listeners.input.forEach(f => f());
+  assert.deepStrictEqual(seen, ['water:11']); ok('the slider still tells main.js (for the fading size preview)');
 }
-{ // Remembered per mode in localStorage, and a stored value beats the default.
-  const mem = { 'life-radius-nuke': '12', 'life-radius-wolf': '3' };
+{ // One key in localStorage, and a stored value beats the default.
+  const mem = { 'life-radius': '12', 'life-radius-wolf': '3' };
   LS = { getItem: k => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = v; } };
   const { ui } = build(false);
   ui.setRadiusDefaults(75, 0);
-  assert(ui.radiusOf('nuke') === 12 && ui.radiusOf('wolf') === 3 && ui.radiusOf('bunny') === 0); ok('a radius chosen earlier is remembered per mode; the rest start at their defaults');
+  assert(ui.radiusOf('nuke') === 12 && ui.radiusOf('wolf') === 12 && ui.radiusOf('bunny') === 12); ok('a radius chosen earlier is remembered once, for every mode (the old per-mode keys are ignored)');
   ui.setRadius('bunny', 7);
-  assert(mem['life-radius-bunny'] === '7'); ok('a change is written to localStorage');
+  assert(mem['life-radius'] === '7' && ui.radiusOf('nuke') === 7 && !('life-radius-bunny' in mem)); ok('a change is written under the one key');
   LS = { getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); } };
-  const u2 = build(false).ui; u2.setRadiusDefaults(75, 0); u2.setRadius('wolf', 4);
-  assert(u2.radiusOf('wolf') === 4 && u2.radiusOf('nuke') === 75); ok('blocked storage just means no memory');
+  const u2 = build(false).ui; u2.setRadiusDefaults(75, 6); u2.setRadius('wolf', 4);
+  assert(u2.radiusOf('wolf') === 4 && u2.radiusOf('nuke') === 4); ok('blocked storage just means no memory');
   LS = undefined;
+}
+// ---- the armed banner and its Stop button ----
+{ const { ui, ids, body } = build(false);
+  const banner = ids.hud.all(e => e.className === 'paint-banner')[0];
+  const mode = l => ids.hud.all(e => e.getAttribute('aria-label') === l)[0];
+  assert(banner && banner.hidden && banner.parent === ids.hud); ok('the banner exists, hidden, in the HUD');
+  mode('FIRE MODE').fire('click');
+  assert(!banner.hidden && banner.textContent.includes('PAINTING: FIRE') && banner.textContent.includes('Stop') && body.classList.contains('paint-armed')); ok('arming FIRE shows "PAINTING: FIRE" with a Stop button (the colored edge is CSS on body.paint-armed)');
+  mode('NUKE MODE').fire('click');
+  assert(!banner.hidden && banner.textContent.includes('NUKE ARMED') && body.classList.contains('nuke-armed')); ok('NUKE shows "NUKE ARMED"');
+  const made = []; ui.setIcons((key, cv) => made.push(key));
+  mode('GRASS MODE').fire('click');
+  assert(made.includes('blades') && banner.all(e => e.className === 'paint-banner-icon')[0].children.length === 1); ok('with icons ready, the banner wears the mode\'s icon');
+  const stop = banner.all(e => e.className.includes('paint-stop'))[0];
+  ui.lock(true); stop.fire('click'); assert(ui.mode === 'grass'); ui.lock(false); ok('Stop does nothing during the benchmark');
+  stop.fire('click');
+  assert(ui.mode === '' && banner.hidden && !body.classList.contains('paint-armed') && !mode('GRASS MODE').classList.contains('on')); ok('Stop disarms: banner gone, edge class gone');
+  mode('WOLF MODE').fire('click'); assert(!banner.hidden);
+  ui.setWindow('paint', true); ui.setWindow('paint', false);
+  assert(banner.hidden && ui.mode === ''); ok('closing the Paint window takes the banner away too');
+  let swallowed = 0; banner.fire('pointerdown', { stopPropagation: () => swallowed++ }); assert(swallowed === 1); ok('taps on the banner stop there, not painting the map under it');
+}
+// ---- Info's hint, the bar's window buttons ----
+{ const { ids, calls, ui } = build(false);
+  const hint = ids.hud.all(e => e.className === 'hud-hint')[0];
+  assert(hint && hint.textContent === '(click to highlight on map)' && hint.parent === ids.hud.all(e => e.className === 'hud-sec-body' && e.parent.className.includes('hud-sec-counts'))[0]); ok('Info has the "(click to highlight on map)" hint in the Counts row');
+  const bar = ids.hud.all(e => e.className === 'hud-tabs')[0];
+  assert.deepStrictEqual(bar.children.map(b => b.textContent), ['Info', 'Paint', 'Graph', 'Map']); ok('Graph and Map are in the bar beside Info and Paint');
+  for (const b of bar.children) assert(b.children[0].className === 'hud-tab-icon' && b.children[0].innerHTML.startsWith('<svg')); ok('each of the four has an icon left of its label');
+  const [, , g, m] = bar.children;
+  g.fire('click'); m.fire('click'); assert.deepStrictEqual(calls, ['graph', 'map']); ok('Graph and Map toggle their windows through onGraph / onMinimap');
+  const miniEl = ids.minimap;
+  assert(miniEl === undefined); ui.hud(input); assert(!m.classList.contains('on')); ok('Map reads as off without a minimap window');
+  ui.lock(true); calls.length = 0; g.fire('click'); m.fire('click'); assert.strictEqual(calls.length, 0); assert(g.disabled && m.disabled); ui.lock(false); ok('both are inert while the benchmark runs');
+}
+// ---- resizable windows ----
+{ const mem = {};
+  LS = { getItem: k => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = v; }, removeItem: k => { delete mem[k]; } };
+  const { ctx, ids } = build(false, {}, { innerWidth: 1200, innerHeight: 800 });
+  const panel = new El('aside'); panel.rect = { left: 100, top: 80, width: 300, height: 200 };
+  let changes = 0, pinned = 0;
+  const r = ctx.AS.uiParts.Resizable(panel, { key: 'k-wh', minW: 200, minH: 120, pin: () => pinned++, onChange: () => changes++ });
+  const grip = panel.all(e => e.className === 'resize-grip')[0];
+  assert(grip && !grip.hidden); ok('a window gets a resize grip in its corner');
+  const ev = (x, y) => ({ pointerId: 1, pointerType: 'mouse', button: 0, clientX: x, clientY: y, preventDefault() {}, stopPropagation() {} });
+  grip.fire('pointerdown', ev(400, 280)); grip.fire('pointermove', ev(500, 330)); grip.fire('pointerup', ev(500, 330));
+  assert.deepStrictEqual(panel.style.width + ',' + panel.style.height, '400px,250px'); assert(pinned === 1 && mem['k-wh'] === '{"w":400,"h":250}'); ok('a simulated drag grows the window by the drag, pins it first, and keeps the size');
+  grip.fire('pointerdown', ev(500, 330)); grip.fire('pointermove', ev(0, 0)); grip.fire('pointerup', ev(0, 0));
+  assert(panel.style.width === '200px' && panel.style.height === '120px'); ok('it never shrinks below its minimum');
+  grip.fire('pointerdown', ev(200, 120)); grip.fire('pointermove', ev(9000, 9000)); grip.fire('pointerup', ev(9000, 9000));
+  assert(parseFloat(panel.style.width) <= 1200 - 100 && parseFloat(panel.style.height) <= 800 - 80); ok('it never grows past the viewport');
+  const p2 = new El('aside'); p2.rect = { left: 0, top: 0, width: 300, height: 200 };
+  ctx.AS.uiParts.Resizable(p2, { key: 'k-wh', minW: 200, minH: 120 });
+  assert(p2.style.width === parseFloat(panel.style.width) + 'px'); ok('a new page load starts at the remembered size');
+  const g2 = p2.all(e => e.className === 'resize-grip')[0]; g2.fire('dblclick', { stopPropagation() {} });
+  assert(p2.style.width === '' && !('k-wh' in mem)); ok('double-clicking the grip forgets the size');
+  LS = { getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); }, removeItem() { throw new Error('blocked'); } };
+  const p3 = new El('aside'); const { ctx: c3 } = build(false, {}, { innerWidth: 1200, innerHeight: 800 });
+  const r3 = c3.AS.uiParts.Resizable(p3, { key: 'x', minW: 100, minH: 100 }); const g3 = p3.all(e => e.className === 'resize-grip')[0];
+  g3.fire('pointerdown', { pointerId: 2, pointerType: 'touch', clientX: 0, clientY: 0, preventDefault() {}, stopPropagation() {} }); g3.fire('pointermove', { pointerId: 2, clientX: 50, clientY: 50 }); g3.fire('pointerup', { pointerId: 2 });
+  assert(p3.style.width === '350px'); ok('a touch drag works, and blocked storage just means no memory');
+  const { ctx: c4 } = build(false, {}, { innerWidth: 400, innerHeight: 800 }); const p4 = new El('aside');
+  c4.AS.uiParts.Resizable(p4, { key: 'y', minW: 100, minH: 100, enabled: () => false });
+  assert(p4.all(e => e.className === 'resize-grip')[0].hidden === true && p4.style.width === ''); ok('a window that cannot resize (a phone sheet) hides its grip');
+  LS = undefined;
+  // The tab windows and the properties window each get one.
+  const b = build(true, {}, { innerWidth: 1200, innerHeight: 800 });
+  for (const key of ['info', 'paint', 'debug']) assert(winOf(b.ids, key).all(e => e.className === 'resize-grip').length === 1);
+  assert(b.ids.inspector.all(e => e.className === 'resize-grip').length === 1); ok('Info, Paint, Debug and the properties window all have a grip');
 }
 // ---- the "That's a crowd" card ----
 { const { ui, body } = build(false);
@@ -348,7 +421,7 @@ const winOf = (ids, key) => ids.hud.all(e => e.className === 'hud-tabstrip hud-w
 { const { ui, ids, ctx } = build(false);
   const AS = ctx.AS, row = ids.hud.all(e => e.className === 'hud-sec hud-sec-wind')[0];
   const names = panelOf(ids, 'info').children.map(c => c.className);
-  assert(row && names.indexOf('hud-sec hud-sec-counts') + 1 === names.indexOf('hud-sec hud-sec-wind') && names.indexOf('hud-sec hud-sec-wind') + 1 === names.indexOf('hud-sec hud-sec-windows')); ok('Info has a Wind row after Counts and before Windows');
+  assert(row && names.indexOf('hud-sec hud-sec-counts') + 1 === names.indexOf('hud-sec hud-sec-wind') && names.indexOf('hud-sec hud-sec-wind') + 1 === names.indexOf('hud-sec hud-sec-overlays') && !names.includes('hud-sec hud-sec-windows')); ok('Info has a Wind row after Counts and before Overlays; no Windows row any more');
   assert(/wind/i.test(row.children[0]._title)); ok('the Wind row has a tooltip');
   const text = () => row.all(e => e.className === 'hud-wind-text')[0].textContent;
   const arrow = row.all(e => e.className === 'hud-wind-arrow')[0];

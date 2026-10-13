@@ -17,6 +17,8 @@
   const DOT_CSS_PX = 3;
   const BOX_COLOR = '#e8d9a0';   // the HUD's "on" color
   const OPEN_KEY = 'life-minimap', SIZE_KEY = 'life-minimap-size';
+  const SIZE_PX_KEY = 'life-minimap-wh';   // the window size dragged with the corner grip, { w, h } in CSS px
+  const MIN_CANVAS_PX = 80, PHONE_PX = 600;
   const SPECIES_OF = { bunnies: 'BUNNY', wolves: 'WOLF', humans: 'HUMAN' };
 
   function el(tag, cls, text) {
@@ -45,7 +47,20 @@
     const canvas = el('canvas', 'mini-canvas');
     panel.append(head, canvas);
     const ctx = canvas.getContext('2d');
-    if (AS.Draggable) { AS.Draggable(panel, head, 'life-minimap-pos'); head.title = 'Drag to move; double-click to put it back'; }
+    const drag = AS.Draggable ? AS.Draggable(panel, head, 'life-minimap-pos') : null;
+    if (drag) head.title = 'Drag to move; double-click to put it back';
+    // The corner grip (ui-parts.js). The window is its map, so a dragged size only says how big
+    // the map may be: it keeps the world's shape and the window follows it (draw()). On a phone
+    // the window hangs from the bar's right edge and can't be pinned, so there is no grip.
+    let custom = null;   // { w, h }: the most the window may take, or null for small / big
+    const sizer = AS.uiParts && AS.uiParts.Resizable
+      ? AS.uiParts.Resizable(panel, {
+          key: SIZE_PX_KEY, minW: 120, minH: 120,
+          enabled: () => (globalThis.innerWidth || 0) > PHONE_PX,
+          pin: () => { if (drag) { const b = panel.getBoundingClientRect(); drag.place(b.left, b.top); } },
+          apply: size => { custom = size; sized = null; },
+        })
+      : null;
     // Gestures on the panel are the panel's; the map under it never sees them.
     for (const t of ['pointerdown', 'pointerup', 'wheel']) panel.addEventListener(t, e => e.stopPropagation());
 
@@ -55,7 +70,7 @@
       panel.classList.toggle('mini-small', small);
       sized = null;
     }
-    sizeBtn.addEventListener('click', () => { small = !small; save(SIZE_KEY, small ? 'small' : 'big'); applySize(); sizeBtn.blur(); });
+    sizeBtn.addEventListener('click', () => { small = !small; if (sizer) sizer.reset(); save(SIZE_KEY, small ? 'small' : 'big'); applySize(); sizeBtn.blur(); });
     closeBtn.addEventListener('click', () => { toggle(); closeBtn.blur(); });
     function toggle() {
       m.open = !m.open;
@@ -101,8 +116,14 @@
       const dpr = Math.max(1, Math.round(globalThis.devicePixelRatio || 1));
       // CSS size: the world at MINI_SMALL tiles a pixel or one, kept inside the screen.
       const per = small ? MINI_SMALL : 1;
-      const maxW = Math.max(80, (globalThis.innerWidth || 800) - 32);
-      const cssW = Math.min(W.w / per, maxW), cssH = cssW * W.h / W.w;
+      const maxW = Math.max(MIN_CANVAS_PX, (globalThis.innerWidth || 800) - 32);
+      let cssW = Math.min(W.w / per, maxW);
+      if (custom) {
+        // What is left of the dragged window once the title bar, padding and border are taken out.
+        const room = (custom.w - (panel.offsetWidth - canvas.offsetWidth)), tall = (custom.h - (panel.offsetHeight - canvas.offsetHeight));
+        cssW = Math.max(MIN_CANVAS_PX, Math.min(room, tall * W.w / W.h, maxW));
+      }
+      const cssH = cssW * W.h / W.w;
       const key = cssW + 'x' + cssH + '@' + dpr;
       if (sized !== key) {
         sized = key;

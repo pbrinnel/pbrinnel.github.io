@@ -8,6 +8,8 @@
 (function (AS) {
   'use strict';
 
+  const PHONE_PX = 600;   // the CSS breakpoint where this window becomes a bottom sheet
+
   AS.PropertiesWindow = function (inspEl, { below, onClose }) {
     const { el, cachedText } = AS.uiParts;
 
@@ -24,9 +26,15 @@
     inspEl.append(inspHead, inspList);
     for (const t of ['pointerdown', 'pointerup', 'wheel']) inspEl.addEventListener(t, e => e.stopPropagation());
     // It drags by its title bar, like the graph.
-    if (AS.Draggable) {
-      AS.Draggable(inspEl, inspHead, 'life-insp-pos');
-      inspHead.title = 'Drag to move; double-click to put it back';
+    const drag = AS.Draggable ? AS.Draggable(inspEl, inspHead, 'life-insp-pos') : null;
+    if (drag) inspHead.title = 'Drag to move; double-click to put it back';
+    // The corner grip, on a computer only: on a phone it is a bottom sheet with CSS's own size.
+    if (AS.uiParts.Resizable) {
+      AS.uiParts.Resizable(inspEl, {
+        key: 'life-insp-wh', minW: 200, minH: 90,
+        enabled: () => (globalThis.innerWidth || 0) > PHONE_PX,
+        pin: () => { if (drag) { const b = inspEl.getBoundingClientRect(); drag.place(b.left, b.top); } },
+      });
     }
 
     const setInspTitle = cachedText(inspTitle);

@@ -3,10 +3,12 @@
 // viewport and its place is kept per viewer. On a phone (narrower than PHONE_PX) windows keep
 // their fixed sheets and don't drag.
 //
-//   AS.Draggable(panel, handle, key, onMoved?) → { moved, reset() }
+//   AS.Draggable(panel, handle, key, onMoved?) → { moved, reset(), place(x, y) }
 //     panel     the fixed-position window; handle: the part that drags it (its buttons don't)
 //     key       localStorage key for its place
 //     moved     whether it has been placed (false: CSS decides where it sits)
+//     place     puts it at x, y and keeps that (resizing pins a window this way before it
+//               grows, so its top-left corner stays put whichever corner CSS anchored it by)
 //     onMoved(moved) when that changes
 (function (AS) {
   'use strict';
@@ -15,7 +17,7 @@
   const EDGE_KEEP = 40;   // px of a dragged window kept on screen at any edge
 
   AS.Draggable = function (panel, handle, key, onMoved) {
-    const d = { moved: false, reset };
+    const d = { moved: false, reset, place };
     let pos = null, drag = null;
     const desktop = () => (globalThis.innerWidth || 0) > PHONE_PX;
     try {
@@ -38,6 +40,7 @@
       if (on !== d.moved) { d.moved = on; panel.classList.toggle('dragged', on); if (onMoved) onMoved(on); }
     }
     function save() { try { localStorage.setItem(key, JSON.stringify(pos)); } catch (e) { /* not kept */ } }
+    function place(x, y) { if (!desktop()) return; pos = { x, y }; apply(); save(); }
     function reset() { pos = null; try { localStorage.removeItem(key); } catch (e) { /* fine */ } apply(); }
 
     handle.classList.add('drag-handle');

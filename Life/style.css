@@ -80,11 +80,15 @@ html, body {
   border-top: 1px solid var(--hud-line);
   padding: 4px calc(env(safe-area-inset-right) + 8px) 4px calc(env(safe-area-inset-left) + 8px);
   max-height: 40vh;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  /* The panel inside scrolls, not the window, so the resize grip stays in the corner. */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   color: var(--hud-dim);
 }
+.hud-tabstrip .hud-panel { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; }
 .hud-tabstrip[hidden], .hud-panel[hidden] { display: none; }
+.hud-side-head { flex: none; }
 /* A tab is a stack of labeled rows: the row's name in a fixed column, its controls after,
    wrapping. On a phone the name sits above its controls. */
 .hud-panel { display: flex; flex-direction: column; gap: 4px; min-height: var(--hud-h); }
@@ -134,6 +138,25 @@ html, body {
 }
 .drag-handle { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
 .drag-handle:active { cursor: grabbing; }
+/* PAINT's seven mode buttons share one row, tight enough to fit the window's narrowest width. */
+.hud-sec-modes .hud-sec-body { flex-wrap: nowrap; gap: 4px; }
+/* The line under the counts that says they are buttons. */
+.hud-hint { flex: 0 0 100%; color: var(--hud-dim); font-size: 11px; margin-top: -2px; }
+/* The resize grip (ui-parts.js Resizable): a corner of two slanted strokes. It sits over the
+   window's corner, so it catches a finger without moving anything. */
+.resize-grip {
+  position: absolute;
+  right: 0; bottom: 0;
+  width: 18px; height: 18px;
+  cursor: nwse-resize;
+  touch-action: none;
+  z-index: 2;
+  background: linear-gradient(135deg, transparent 0 55%, var(--hud-dim) 55% 63%, transparent 63% 77%, var(--hud-dim) 77% 85%, transparent 85%);
+  opacity: 0.7;
+}
+.resize-grip:hover { opacity: 1; }
+.resize-grip[hidden] { display: none; }
+@media (pointer: coarse) { .resize-grip { width: 26px; height: 26px; } }
 /* A labeled slider in a row (the topo line spacing). */
 .hud-slider { display: inline-flex; align-items: center; gap: 8px; }
 .hud-slider-label { color: var(--fg); display: inline-block; min-width: 17ch; font-variant-numeric: tabular-nums; }
@@ -175,6 +198,46 @@ html, body {
 body.ui-off .hud-show { display: block; }
 body.ui-off #hud, body.ui-off #inspector, body.ui-off #graph, body.ui-off #minimap { display: none; }
 body.nuke-armed #map, body.paint-armed #map { cursor: crosshair; }
+/* A mode armed: a steady colored edge around the map, inside everything else and never moving
+   or changing. It takes no taps. */
+body.paint-armed::after, body.nuke-armed::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 3px var(--armed, #e6d9a8), inset 0 0 36px 4px color-mix(in srgb, var(--armed, #e6d9a8) 30%, transparent);
+}
+body.nuke-armed { --armed: #e0662f; }
+/* ...and a banner that names the mode, with Stop. Bottom center, clear of the bar; the
+   windows are at the sides. */
+.paint-banner {
+  position: fixed;
+  z-index: 11;
+  pointer-events: auto;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(env(safe-area-inset-bottom) + 12px);
+  box-sizing: border-box;
+  max-width: calc(100vw - 16px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 6px 4px 12px;
+  background: var(--insp-bg);
+  border: 2px solid var(--armed, #e6d9a8);
+  border-radius: 6px;
+  color: var(--hud-on);
+  font-size: 14px;
+  white-space: nowrap;
+}
+body.nuke-armed .paint-banner { color: #ffd9c4; }
+.paint-banner[hidden] { display: none; }
+.paint-banner-icon { display: inline-grid; place-items: center; }
+.paint-banner-icon .hud-icon { margin: 0; vertical-align: 0; width: 20px; height: 20px; }
+.paint-banner-icon:empty { display: none; }
+.paint-stop { min-width: 56px; }
+@media (max-width: 600px) { .paint-banner { font-size: 13px; gap: 8px; padding-left: 10px; } }
 .hud-glyph { color: var(--hud-dim); margin-right: 5px; }
 .hud-icon { width: 16px; height: 16px; margin-right: 5px; vertical-align: -3px; image-rendering: pixelated; }
 .hud-day { color: var(--fg); display: inline-block; min-width: 10ch; }
@@ -184,7 +247,9 @@ body.nuke-armed #map, body.paint-armed #map { cursor: crosshair; }
 .hud-num-blades, .hud-num-total { min-width: 7ch; }
 .hud-seednum { user-select: all; -webkit-user-select: all; color: var(--fg); cursor: text; }
 .hud-tools { display: inline-flex; gap: 4px; }
-.hud-tab { min-width: 0; }
+.hud-tab { min-width: 0; display: inline-flex; align-items: center; gap: 6px; }
+.hud-tab-icon { display: inline-grid; place-items: center; width: 14px; height: 14px; }
+.hud-tab-icon svg { display: block; }
 
 .hud-btn, .hud-warn {
   font: inherit;
@@ -216,7 +281,13 @@ body.nuke-armed #map, body.paint-armed #map { cursor: crosshair; }
   #hud { font-size: 12px; }
   .hud-strip { gap: 2px 8px; }
   .hud-speeds .hud-btn.hud-speed { min-width: 34px; height: 30px; }
-  .hud-tab, .hud-hide { padding: 0 8px; }
+  .hud-tab, .hud-hide { padding: 0 6px; }
+  .hud-tab { gap: 4px; }
+  /* Narrower speed and day readouts let the day join the speeds' row, so the four window
+     buttons and Hide UI fit one row under it. */
+  .hud-speedname { min-width: 8ch; }
+  .hud-day { min-width: 8ch; }
+  .hud-tabs { gap: 3px; }
   .hud-panel { gap: 2px; }
   .hud-sec { grid-template-columns: 1fr; gap: 0 8px; }
   .hud-sec-body { gap: 2px 8px; }
@@ -255,10 +326,10 @@ body.nuke-armed #map, body.paint-armed #map { cursor: crosshair; }
   color: var(--fg);
   font-size: 13px;
   line-height: 1.3;
-  overflow-y: auto;
-  overflow-x: hidden;   /* long text wraps (.insp-range); nothing should scroll sideways */
-  overscroll-behavior: contain;
-  touch-action: pan-y;
+  /* The list scrolls, not the window, so the resize grip stays in the corner. */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   top: calc(var(--hud-bottom, 40px) + 8px);
   right: calc(env(safe-area-inset-right) + 8px);
   width: 280px;
@@ -266,6 +337,7 @@ body.nuke-armed #map, body.paint-armed #map { cursor: crosshair; }
   padding: 4px 10px 8px;
 }
 #inspector[hidden] { display: none; }
+.insp-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; /* long text wraps (.insp-range) */ overscroll-behavior: contain; touch-action: pan-y; }
 .insp-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .insp-title { color: var(--hud-on); overflow-wrap: anywhere; }
 .insp-close { flex: none; min-width: var(--hud-h); padding: 0; font-size: 18px; }
@@ -290,7 +362,7 @@ body.nuke-armed #map, body.paint-armed #map { cursor: crosshair; }
   }
 }
 /* The close button stays in reach while the rows scroll. */
-.insp-head { position: sticky; top: -4px; background: var(--bg); padding-top: 4px; }
+.insp-head { flex: none; background: var(--bg); padding-top: 4px; }
 
 /* ---- Buttons inside the windows and cards (the bar's are .hud-btn) ---- */
 .hud-control {
@@ -493,3 +565,20 @@ body.nuke-armed #map, body.paint-armed #map { cursor: crosshair; }
   .ld-head { grid-template-columns: 2.9em 1fr auto; gap: 6px; }
   .ld-desc, .ld-res { padding-left: calc(2.9em + 6px); }
 }
+
+/* Scrollbars in the scrolling windows: thin, a muted thumb on no track, a little brighter
+   under the pointer, no arrow buttons. Both syntaxes: Firefox reads the first, Safari and
+   Chrome the second. */
+.hud-tabstrip .hud-panel, .insp-list, .hud-warnlist, #errors, .bench-panel, .bench-tablewrap {
+  scrollbar-width: thin;
+  scrollbar-color: #4a5046 transparent;
+}
+.hud-tabstrip .hud-panel::-webkit-scrollbar, .insp-list::-webkit-scrollbar, .hud-warnlist::-webkit-scrollbar,
+#errors::-webkit-scrollbar, .bench-panel::-webkit-scrollbar, .bench-tablewrap::-webkit-scrollbar { width: 7px; height: 7px; }
+.hud-tabstrip .hud-panel::-webkit-scrollbar-track, .insp-list::-webkit-scrollbar-track, .hud-warnlist::-webkit-scrollbar-track,
+#errors::-webkit-scrollbar-track, .bench-panel::-webkit-scrollbar-track, .bench-tablewrap::-webkit-scrollbar-track { background: transparent; }
+.hud-tabstrip .hud-panel::-webkit-scrollbar-thumb, .insp-list::-webkit-scrollbar-thumb, .hud-warnlist::-webkit-scrollbar-thumb,
+#errors::-webkit-scrollbar-thumb, .bench-panel::-webkit-scrollbar-thumb, .bench-tablewrap::-webkit-scrollbar-thumb { background: #4a5046; border-radius: 4px; }
+.hud-tabstrip .hud-panel::-webkit-scrollbar-thumb:hover, .insp-list::-webkit-scrollbar-thumb:hover, .hud-warnlist::-webkit-scrollbar-thumb:hover,
+#errors::-webkit-scrollbar-thumb:hover, .bench-panel::-webkit-scrollbar-thumb:hover, .bench-tablewrap::-webkit-scrollbar-thumb:hover { background: #6b7364; }
+.hud-tabstrip .hud-panel::-webkit-scrollbar-button, .insp-list::-webkit-scrollbar-button, .hud-warnlist::-webkit-scrollbar-button { display: none; }
