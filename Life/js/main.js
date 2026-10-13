@@ -31,6 +31,9 @@
   const INSPECT_EVERY_MS = 100;
   const LINES_KEY = 'life-intent-lines';
   const ELEV_KEY = 'life-elevation';
+  const LENS_HIDDEN_KEY = 'life-lens-hidden';   // JSON { lensId: [itemId…] }: what the viewer unticked
+  // The legend's counts walk the whole map, so they refresh a couple of times a second, and only while a lens is on.
+  const LENS_COUNT_EVERY_MS = 500;
   const INSPECT_KEY = 'life-inspect';
   const INSPECT_MODES = ['off', 'click', 'hover'];
   const INSPECT_EMPTY_KEY = 'life-inspect-empty';
@@ -169,6 +172,12 @@
   // Topo lines: on unless the viewer turned them off.
   let elevOn = true;
   try { elevOn = localStorage.getItem(ELEV_KEY) !== '0'; } catch (e) { /* stays on */ }
+  let lensHidden = {};
+  try { const v = JSON.parse(localStorage.getItem(LENS_HIDDEN_KEY)); if (v && typeof v === 'object') lensHidden = v; } catch (e) { /* nothing unticked */ }
+  let lensOn = false;     // a lens is showing: the legend wants its counts
+  let lensCountAt = 0;    // when they were last taken; 0 asks for them on the next frame
+  let lensCounts;         // the last { itemId: count }, handed to ui.hud
+  let lensReq = null;     // the lens or its ticks changed since the last frame: { id, hidden }
   let linesOn = false;
   try { linesOn = localStorage.getItem(LINES_KEY) === '1'; } catch (e) { /* stays off */ }
   // Which tab windows are open is also the viewer's choice. Nothing stored (or storage blocked): Info.
@@ -224,6 +233,14 @@
     onElevation: on => {
       elevOn = on;
       try { localStorage.setItem(ELEV_KEY, on ? '1' : '0'); } catch (e) { /* the choice just isn't kept */ }
+    },
+    lensHidden,
+    onLens: (id, hidden, all) => {
+      lensOn = !!id;
+      lensCountAt = 0;
+      lensCounts = undefined;
+      lensReq = { id, hidden };
+      try { localStorage.setItem(LENS_HIDDEN_KEY, JSON.stringify(all)); } catch (e) { /* the ticks just aren't kept */ }
     },
     lines: linesOn,
     onLines: on => {
@@ -492,6 +509,8 @@
     let top = 0;
     if (located.size && !document.body.classList.contains('ui-off')) { const hud = document.getElementById('hud'); if (hud) top = hud.getBoundingClientRect().bottom; }
     renderer.locate(located, top);
+    if (lensReq) { if (typeof renderer.setLens === 'function') renderer.setLens(lensReq.id, lensReq.hidden); lensReq = null; }
+    if (lensOn && typeof AS.lensCounts === 'function' && now - lensCountAt >= LENS_COUNT_EVERY_MS) { lensCountAt = now; lensCounts = AS.lensCounts(sim, renderer); }
     if (radiusReq) { renderer.radiusPreview(radiusReq.r, radiusReq.nuke, now); radiusReq = null; }
     renderer.draw(sim, cam, sheet, live, alpha, now, speed);
     const shown = live ? live.serial : 0;
@@ -507,6 +526,7 @@
       speedIndex, achieved, day: sim.day, seed: sim.seed, wind: sim.wind, weather: sim.weather, mapW: sim.W.w, mapH: sim.W.h,
       humansSeen: humansSeen || (humansSeen = W.humans > 0),
       firesSeen: firesSeen || (firesSeen = W.fCount > 0),
+      lensCounts: lensOn ? lensCounts : undefined,
       counts: { bunnies: W.bunnies, wolves: W.wolves, humans: W.humans, total: W.bunnies + W.wolves + W.humans, blades: W.gCount + W.sunkCount, corpses: W.cCount, fires: W.fCount },
     });
     // CPU time only: the browser's own compositing shows up in `interval`, not here.

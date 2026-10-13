@@ -30,7 +30,7 @@ class El {
   all(p, out = []) { if (p(this)) out.push(this); this.children.forEach(c => c.all(p, out)); return out; }
 }
 let LS;   // what the page sees as localStorage (undefined: none, which the page copes with)
-function build(debug, extra = {}, win = {}) {
+function build(debug, extra = {}, win = {}, asExtra = null) {
   const ids = { hud: new El('div'), errors: new El('div'), inspector: new El('aside'), graph: new El('aside') };
   ids.graph._hidden = true;
   ids.errors._hidden = true; ids.inspector._hidden = true;
@@ -43,6 +43,7 @@ function build(debug, extra = {}, win = {}) {
   vm.runInContext(fs.readFileSync(require('path').join(__dirname, '../js/world.js'), 'utf8'), ctx);
   for (const f of ['weather']) vm.runInContext(fs.readFileSync(require('path').join(__dirname, '../js/' + f + '.js'), 'utf8'), ctx);
   for (const f of ['ui-parts', 'cards', 'properties', 'paint-tab', 'ui']) vm.runInContext(fs.readFileSync(require('path').join(__dirname, '../js/' + f + '.js'), 'utf8'), ctx);
+  if (asExtra) Object.assign(ctx.AS, asExtra);   // lenses.js's AS.LENSES and AS.LENS_ITEMS, stubbed
   const calls = [], tools = [];
   const speeds = [0, 1, 2, 5, 20, Infinity];
   const ui = ctx.AS.UI({ debug, speeds, onSpeed: i => calls.push(i), onDebugTool: m => tools.push(m), onCloseInspector: () => calls.push('closed'), onBench: () => calls.push('bench'), onGraph: () => calls.push('graph'), onMinimap: () => calls.push('map'), ...extra });
@@ -434,7 +435,7 @@ const winOf = (ids, key) => ids.hud.all(e => e.className === 'hud-tabstrip hud-w
 // ---- the Info window's Wind row ----
 { const { ui, ids, ctx } = build(false);
   const AS = ctx.AS, row = ids.hud.all(e => e.className === 'hud-sec hud-sec-wind')[0];
-  const names = panelOf(ids, 'info').children.map(c => c.className);
+  const names = panelOf(ids, 'info').children.map(c => c.className.replace(' collapsed', ''));   // a folded section also wears `collapsed`
   assert(row && names.indexOf('hud-sec hud-sec-counts') + 1 === names.indexOf('hud-sec hud-sec-wind') && names.indexOf('hud-sec hud-sec-wind') + 1 === names.indexOf('hud-sec hud-sec-weather') && names.indexOf('hud-sec hud-sec-weather') + 1 === names.indexOf('hud-sec hud-sec-overlays') && !names.includes('hud-sec hud-sec-windows')); ok('Info has a Wind row after Counts, a Weather row after that, then Overlays; no Windows row any more');
   assert(/wind/i.test(row.children[0]._title)); ok('the Wind row has a tooltip');
   const text = () => row.all(e => e.className === 'hud-wind-text')[0].textContent;
@@ -529,5 +530,110 @@ const winOf = (ids, key) => ids.hud.all(e => e.className === 'hud-tabstrip hud-w
   LS = { getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); } };
   const blocked = build(false); blocked.ctx.AS.units.set('imperial'); assert.strictEqual(blocked.ctx.AS.units.system, 'imperial'); ok('blocked storage just means no memory');
   LS = undefined;
+}
+
+// ---- Info's foldable sections and the Lenses row ----
+// A stub shaped like lenses.js's AS.LENSES / AS.LENS_ITEMS (the checks must not depend on its real contents).
+const STUB = {
+  LENSES: [
+    { id: 'fire', name: 'Fire', accent: '#ff6a3d', icon: 'M8 2l4 8H4z', blurb: 'What is burning.', items: ['burn', 'ash', 'bolt'] },
+    { id: 'water', name: 'Water', accent: '#2de2e6', icon: 'M2 8h12', blurb: 'Where the water is.', items: ['pond', 'ash'] },
+    { id: 'cond', name: 'Condition', accent: '#ff8fd0', icon: 'M8 13l-6-6', blurb: 'How animals are doing.', items: ['hungry'] },
+  ],
+  LENS_ITEMS: {
+    burn: { name: 'burning tiles', color: '#ff3b3b', draw: 'tint', tip: 'On fire' },
+    ash: { name: 'ash', color: '#e2e2f0', draw: 'tint', tip: 'Ash' },
+    bolt: { name: 'recent strikes', color: '#ffffff', draw: 'ring', tip: 'Strikes' },
+    pond: { name: 'water', color: '#2de2e6', draw: 'tint', tip: 'Water' },
+    hungry: { name: 'hungry', color: '#c6ff3d', draw: 'ring', tip: 'Hungry animals' },
+  },
+};
+{ const mem = {}; LS = { getItem: k => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = v; } };
+  const reports = [];
+  const mk = (extra = {}) => build(false, { onLens: (id, hidden, all) => reports.push([id, [...hidden].sort(), JSON.parse(JSON.stringify(all))]), onLines() {}, onElevation() {}, onInspect() {}, ...extra }, {}, STUB);
+  let { ui, ids } = mk();
+  const bars = () => ids.hud.all(e => e.className === 'lens-bar')[0];
+  const lensBtn = i => bars().children[i];
+  const legend = () => ids.hud.all(e => e.className === 'lens-legend')[0];
+  const rows = () => ids.hud.all(e => e.className.split(' ').includes('lg-row'));
+  const rowNames = () => rows().map(r => r.all(e => e.className === 'lg-name')[0].textContent);
+  const section = t => ids.hud.all(e => e.className.split(' ').includes('hud-sec-' + t))[0];
+  const head = t => section(t).children[0];
+  const lensIn = counts => ({ ...input, lensCounts: counts });
+
+  assert.strictEqual(bars().children.length, 3); assert(bars().children.every(b => b.children.length === 0 && b.innerHTML.includes('<path d="'))); ok('the Lenses row has a button per lens, each with its icon');
+  assert(legend().hidden && !lensBtn(0).classList.contains('on')); ok('no lens is on at first, so no legend');
+  assert.strictEqual(section('counts').classList.contains('collapsed'), false); assert.strictEqual(section('lenses').classList.contains('collapsed'), false);
+  assert(section('overlays').classList.contains('collapsed') && section('properties').classList.contains('collapsed')); ok('Counts and Lenses start open; Overlays and Properties start folded');
+  assert.strictEqual(head('overlays').all(e => e.className === 'sum')[0].textContent, 'none');
+  assert.strictEqual(head('properties').all(e => e.className === 'sum')[0].textContent, 'click'); ok('a folded section carries a one-word summary');
+
+  lensBtn(0).fire('click');
+  assert(lensBtn(0).classList.contains('on') && !legend().hidden); ok('a click turns a lens on and shows its legend');
+  assert.deepStrictEqual(reports.pop(), ['fire', [], {}]); ok('onLens reports the lens and nothing unticked');
+  assert.deepStrictEqual(rowNames(), ['burning tiles', 'ash', 'recent strikes']); ok("the legend lists the lens's items");
+  const sw = rows().map(r => r.all(e => e.className.startsWith('lg-sw'))[0].className);
+  assert.deepStrictEqual(sw, ['lg-sw', 'lg-sw', 'lg-sw ring']); ok('a tinted item has a square swatch, a ringed one a ring');
+  assert(legend().textContent.includes('What is burning.') && legend().textContent.includes('tinted') && legend().textContent.includes('ringed')); ok('the blurb and the tinted / ringed key show');
+  assert.strictEqual(rows()[0].all(e => e.tagName === 'INPUT').length, 1); assert.strictEqual(rows()[0].tagName, 'LABEL'); ok('a row is one label around its checkbox, so the whole row clicks');
+  lensBtn(1).fire('click');
+  assert(!lensBtn(0).classList.contains('on') && lensBtn(1).classList.contains('on')); assert.deepStrictEqual(rowNames(), ['water', 'ash']); ok('only one lens is on at a time');
+  assert.strictEqual(reports.pop()[0], 'water');
+  lensBtn(1).fire('click');
+  assert(!lensBtn(1).classList.contains('on') && legend().hidden); assert.deepStrictEqual(reports.pop(), [null, [], {}]); ok('clicking the lens again turns it off');
+
+  lensBtn(0).fire('click'); reports.length = 0;
+  const cb = i => rows()[i].all(e => e.tagName === 'INPUT')[0];
+  cb(1).checked = false; cb(1).fire('change');
+  assert.deepStrictEqual(reports.pop(), ['fire', ['ash'], { fire: ['ash'] }]); assert(rows()[1].classList.contains('off')); ok('unticking reports the item and dims the row');
+  cb(1).checked = true; cb(1).fire('change');
+  assert.deepStrictEqual(reports.pop(), ['fire', [], {}]); assert(!rows()[1].classList.contains('off')); ok('ticking it again takes it back');
+  const bulk = n => legend().all(e => e.tagName === 'BUTTON' && e.textContent === n)[0];
+  bulk('none').fire('click');
+  assert.deepStrictEqual(reports.pop()[1], ['ash', 'bolt', 'burn']); assert(rows().every(r => r.classList.contains('off')) && cb(0).checked === false); ok('none unticks every item');
+  bulk('all').fire('click');
+  assert.deepStrictEqual(reports.pop()[1], []); assert(rows().every(r => !r.classList.contains('off')) && cb(2).checked === true); ok('all ticks every item');
+  cb(1).checked = false; cb(1).fire('change'); lensBtn(1).fire('click'); lensBtn(0).fire('click');
+  assert.strictEqual(cb(1).checked, false); ok("a lens's unticked items are remembered when it comes back");
+  lensBtn(0).fire('click');
+
+  lensBtn(0).fire('click');
+  const nOf = () => rows().map(r => r.all(e => e.className === 'lg-n')[0].textContent);
+  assert.deepStrictEqual(nOf(), ['–', '–', '–']); ok('counts wait for the first figures');
+  ui.hud(lensIn({ burn: 12, ash: 1234 })); assert.deepStrictEqual(nOf(), ['12', '1,234', '0']); ok('the legend shows the counts it is given');
+  const counts = { burn: 12, ash: 1234, bolt: 3 };
+  ui.hud(lensIn(counts)); const w1 = writes; ui.hud(lensIn(counts)); assert.strictEqual(writes, w1); ok('the same counts again write nothing');
+  ui.hud(lensIn({ ...counts, burn: 12, bolt: 4 }));
+  const els = rows().map(r => r.all(e => e.className === 'lg-n')[0]), before = els.map(e => e.textContent);
+  ui.hud({ ...input }); assert.deepStrictEqual(nOf(), ['12', '1,234', '4']); ok('a frame without counts leaves them be');
+  const kids = rows(); ui.hud(lensIn({ burn: 13, ash: 1234, bolt: 4 })); assert(rows().every((r, i) => r === kids[i])); assert.strictEqual(nOf()[0], '13'); ok('counts change without rebuilding the rows');
+  void before;
+
+  // Sections fold, and the viewer's choice is kept
+  head('counts').fire('click');
+  assert(section('counts').classList.contains('collapsed') && head('counts').getAttribute('aria-expanded') === 'false'); ok('a click folds a section');
+  head('overlays').fire('click');
+  assert(!section('overlays').classList.contains('collapsed')); ok('and opens a folded one');
+  assert.deepStrictEqual(JSON.parse(mem['life-info-folds']), { counts: true, overlays: false }); ok('the folds are kept per viewer');
+  const second = build(false, { onLens() {} }, {}, STUB).ids.hud.all(e => e.className.startsWith('hud-sec hud-sec-'));
+  const by = t => second.find(e => e.className.split(' ').includes('hud-sec-' + t));
+  assert(by('counts').classList.contains('collapsed') && !by('overlays').classList.contains('collapsed') && by('properties').classList.contains('collapsed') && !by('lenses').classList.contains('collapsed')); ok('a new page finds them as they were left');
+
+  // Remembered ticks come back through the option
+  const again = build(false, { onLens: (id, h) => reports.push([id, [...h]]), lensHidden: { fire: ['bolt'] } }, {}, STUB);
+  again.ids.hud.all(e => e.className === 'lens-bar')[0].children[0].fire('click');
+  assert.deepStrictEqual(reports.pop(), ['fire', ['bolt']]); assert(again.ids.hud.all(e => e.className.split(' ').includes('lg-row'))[2].classList.contains('off')); ok('lensHidden starts a lens with those items unticked');
+
+  // The Overlays summary follows the buttons
+  { const { ids: i2 } = build(false, { lines: false, elevation: false, onLines() {}, onElevation() {} }, {}, STUB);
+    const sum = () => i2.hud.all(e => e.className.split(' ').includes('hud-sec-overlays'))[0].all(e => e.className === 'sum')[0].textContent;
+    const btn = t => i2.hud.all(e => e.textContent === t && e.tagName === 'BUTTON')[0];
+    btn('Topo lines').fire('click'); assert.strictEqual(sum(), 'topo'); btn('Intent lines').fire('click'); assert.strictEqual(sum(), 'topo, intent'); ok('the Overlays summary names what is on'); }
+  LS = undefined;
+  const blocked = build(false, { onLens() {} }, {}, STUB); blocked.ids.hud.all(e => e.className === 'hud-sec-title fold')[0].fire('click'); ok('folding works without storage');
+}
+{ const { ui, ids } = build(false);   // lenses.js absent
+  assert.strictEqual(ids.hud.all(e => e.className === 'lens-bar').length, 0); assert.strictEqual(ids.hud.all(e => e.className.split(' ').includes('hud-sec-lenses')).length, 0);
+  ui.hud({ ...input, lensCounts: { burn: 1 } }); ok('without AS.LENSES there is no Lenses row and nothing breaks');
 }
 console.log('all passed');

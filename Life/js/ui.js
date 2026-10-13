@@ -16,11 +16,17 @@
 //         onRadius(mode, tiles): the Radius slider moved (for the preview),
 //         windows (the tab windows open at first: keys of 'info', 'paint', 'debug'; default ['info']),
 //         onWindows(keys): the open ones, after the viewer opens or closes one,
-//         onNuke(on), onLocate(key, on): a count's ring toggle ('bunnies', 'wolves', 'humans', 'blades', 'corpses', 'fires') }) → ui
+//         onNuke(on), onLocate(key, on): a count's ring toggle ('bunnies', 'wolves', 'humans', 'blades', 'corpses', 'fires'),
+//         lensHidden ({ lensId: [itemId…] }: the items the viewer unticked, per lens, kept by main.js),
+//         onLens(lensId | null, hidden: Set<itemId>, hiddenAll): the Lenses row (AS.LENSES, lenses.js; no row without it):
+//           the lens turned on or off, or one of its items ticked or unticked; hiddenAll is the whole
+//           lensHidden object, for keeping }) → ui
 //   ui.hud({ speedIndex, achieved, day, seed, humansSeen, firesSeen, counts: { bunnies, wolves, humans, total, blades, corpses, fires } })
 //                                 (humansSeen: this world has had a human, so their count shows; firesSeen: likewise a fire)
 //     optional wind: { from (radians, the bearing it blows from), kmh }: the Info window's Wind row, an arrow
 //     the way it blows and words ("breeze, 14 km/h from the west"); without it the row stays hidden
+//     optional lensCounts: { itemId: count } (AS.lensCounts), given while a lens is on and only now and
+//     then: the legend's counts follow it, and a frame without it leaves them be
 //     optional weather: sim.weather, with mapW, mapH (tiles): the Weather row, in words (AS.weatherWords);
 //     hidden without it, and in a world with no rain (weather.field is null there)
 //   ui.windows, ui.setWindow(key, on)  the tab windows open (each tab button toggles its own;
@@ -120,6 +126,8 @@
   // The smallest each window can be dragged to: wide enough that its widest control row
   // (Paint's seven mode buttons in one line) still fits, tall enough for a row or two.
   const TAB_MIN = { info: [240, 120], paint: [300, 120], debug: [240, 120] };
+  // Which Info sections the viewer folded (title slug -> true folded, false open), kept per viewer.
+  const FOLD_KEY = 'life-info-folds';
   const PHONE_PX = 600;   // style.css's breakpoint: below it the tab windows are sheets under the bar
   // Counts in HUD order: a label (empty: the sprite icon replaces it once the sheet exists, see
   // setIcons; the total keeps its word), key in the counts object, tooltip.
@@ -134,7 +142,7 @@
   ];
 
   AS.UI = function (opts) {
-    const { debug, speeds, onSpeed, onDebugTool, onCloseInspector, onBench, onGraph, onLines, onWater, onWindows, onNuke, onMode, onLocate, onElevation, onInspect, onInspectEmpty, onMinimap, onContourStep, onRadius } = opts;
+    const { debug, speeds, onSpeed, onDebugTool, onLens, onCloseInspector, onBench, onGraph, onLines, onWater, onWindows, onNuke, onMode, onLocate, onElevation, onInspect, onInspectEmpty, onMinimap, onContourStep, onRadius } = opts;
     const hudEl = document.getElementById('hud');
     const errorsEl = document.getElementById('errors');
     const inspEl = document.getElementById('inspector');
@@ -237,21 +245,53 @@
 
     // Every tab is a stack of labeled rows (Paul, 11 Oct 2026: the tabs keep growing): a row's
     // name, then its controls, wrapping as needed. A new control joins a row or starts one.
-    function section(tab, title, tip) {
-      const sec = el('div', 'hud-sec hud-sec-' + title.toLowerCase().replace(/[^a-z]+/g, '-'));
-      const head = el('span', 'hud-sec-title', title);
-      if (tip) head.title = tip;
+    //   fold: { collapsed?, summary? } makes the title a button that folds the row away (Paul, 13 Oct
+    //   2026: Info keeps growing). `collapsed` is the first-visit state; a viewer's own is kept under
+    //   FOLD_KEY. The summary is the word shown beside the title while it is folded (see foldSummary).
+    let folds = {};
+    try { const v = JSON.parse(globalThis.localStorage.getItem(FOLD_KEY)); if (v && typeof v === 'object') folds = v; } catch (e) { /* none kept */ }
+    const foldSums = {};
+    const foldSummary = (title, text) => { if (foldSums[title]) foldSums[title](text); };
+    function section(tab, title, tip, fold) {
+      const slug = title.toLowerCase().replace(/[^a-z]+/g, '-');
+      const sec = el('div', 'hud-sec hud-sec-' + slug);
       const body = el('div', 'hud-sec-body');
-      sec.append(head, body);
+      if (!fold) {
+        const head = el('span', 'hud-sec-title', title);
+        if (tip) head.title = tip;
+        sec.append(head, body);
+      } else {
+        const head = el('button', 'hud-sec-title fold');
+        head.type = 'button';
+        head.append(title);
+        const sum = el('span', 'sum', fold.summary || '');
+        head.appendChild(sum);
+        foldSums[title] = cachedText(sum);
+        if (tip) head.title = tip;
+        const set = folded => { sec.classList.toggle('collapsed', folded); head.setAttribute('aria-expanded', String(!folded)); };
+        set(typeof folds[slug] === 'boolean' ? folds[slug] : !!fold.collapsed);
+        head.addEventListener('click', () => {
+          const folded = !sec.classList.contains('collapsed');
+          set(folded);
+          folds[slug] = folded;
+          try { globalThis.localStorage.setItem(FOLD_KEY, JSON.stringify(folds)); } catch (e) { /* the fold just isn't kept */ }
+          head.blur();
+        });
+        sec.append(head, body);
+      }
       tabPanels[tab].appendChild(sec);
       return body;
     }
-    const showCounts = section('info', 'Counts', 'Tap a count to ring every one of that kind on the map');
-    const showWind = section('info', 'Wind', 'The world\'s wind: where it blows from and how hard');
-    const showWeather = section('info', 'Weather', 'Rain on the map today, storms, and how long it has been dry');
-    const showElev = section('info', 'Overlays', 'What is drawn over the world');
-    const showUnits = section('info', 'Units', 'Metric or imperial, everywhere a measure shows');
-    const showProps = section('info', 'Properties', 'The properties window: what something is and how it is doing');
+    // Counts and Lenses are what Info is mostly for, so they start open; Overlays and Properties are
+    // set once, so they start folded with a word to say what they hold.
+    const showCounts = section('info', 'Counts', 'Tap a count to ring every one of that kind on the map', {});
+    const haveLenses = Array.isArray(AS.LENSES) && AS.LENSES.length > 0 && !!AS.LENS_ITEMS;
+    const showLenses = haveLenses ? section('info', 'Lenses', 'Look at the map through one thing at a time: the rest dims and its items show in their own colors', {}) : null;
+    const showWind = section('info', 'Wind', 'The world\'s wind: where it blows from and how hard', {});
+    const showWeather = section('info', 'Weather', 'Rain on the map today, storms, and how long it has been dry', {});
+    const showElev = section('info', 'Overlays', 'What is drawn over the world', { collapsed: true, summary: 'none' });
+    const showUnits = section('info', 'Units', 'Metric or imperial, everywhere a measure shows', {});
+    const showProps = section('info', 'Properties', 'The properties window: what something is and how it is doing', { collapsed: true, summary: opts.inspect || 'click' });
     const showTables = section('info', 'Tables');
     const paintModes = section('paint', 'Modes');
     const paintSize = section('paint', 'Size');
@@ -294,6 +334,122 @@
     // Nothing about a count says it is a button, so the row says so.
     showCounts.appendChild(el('div', 'hud-hint', '(click to highlight on map)'));
 
+    // ---- Lenses (lenses.js owns the lenses and their items; the renderer draws them) ----
+    // One lens at a time. Its legend lists the lens's items: swatch (a square tints the tile, a ring
+    // rings it), name, live count and a checkbox. What the viewer unticks is kept per lens, so
+    // switching away and back finds the same picture (and main.js keeps it across visits). The lens
+    // itself is not kept: a page that opened already dimmed would look broken.
+    const lensBtns = {};
+    const hiddenBy = {};   // lensId -> Set of unticked itemIds
+    let lensNow = null;    // the lens on, or null
+    let lensRows = [];     // the legend's rows: { id, cb, row, n, shown }
+    let lensCounts = null; // the last counts given, to give a rebuilt legend
+    let lensLegend = null, lensTip = null;
+    const lensIconSvg = path => `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${path}"/></svg>`;
+    const lensHiddenAll = () => {
+      const out = {};
+      for (const k in hiddenBy) if (hiddenBy[k].size) out[k] = [...hiddenBy[k]];
+      return out;
+    };
+    function reportLens() {
+      if (onLens) onLens(lensNow ? lensNow.id : null, new Set(lensNow ? hiddenBy[lensNow.id] : []), lensHiddenAll());
+    }
+    function syncLensRows() {
+      if (!lensNow) return;
+      const off = hiddenBy[lensNow.id];
+      for (const r of lensRows) {
+        const hide = off.has(r.id);
+        if (r.cb.checked !== !hide) r.cb.checked = !hide;
+        if (r.row.classList.contains('off') !== hide) r.row.classList.toggle('off', hide);
+      }
+    }
+    function showLensCounts() {
+      if (!lensCounts) return;
+      for (const r of lensRows) {
+        const text = fmtInt(lensCounts[r.id] || 0);
+        if (text !== r.shown) { r.shown = text; r.n.textContent = text; }
+      }
+    }
+    function setLens(id) {
+      lensNow = id ? AS.LENSES.find(l => l.id === id) || null : null;
+      for (const l of AS.LENSES) {
+        const on = l === lensNow;
+        lensBtns[l.id].classList.toggle('on', on);
+        lensBtns[l.id].setAttribute('aria-pressed', String(on));
+      }
+      lensLegend.hidden = !lensNow;
+      lensTip.hidden = !!lensNow;
+      lensLegend.textContent = '';
+      lensRows = [];
+      lensCounts = null;   // the old lens's counts are not this one's
+      if (lensNow) buildLegend(lensNow);
+      reportLens();
+    }
+    function buildLegend(l) {
+      const off = hiddenBy[l.id];
+      lensLegend.style.setProperty('--acc', l.accent);
+      const head = el('div', 'lg-head');
+      head.appendChild(el('span', 'lg-title', l.name + ' lens'));
+      const bulk = el('span', 'lg-bulk');
+      const all = el('button', 'lg-all', 'all'), none = el('button', 'lg-none', 'none');
+      all.type = none.type = 'button';
+      all.title = 'Show every item';
+      none.title = 'Hide every item';
+      all.addEventListener('click', () => { if (locked) return; off.clear(); syncLensRows(); reportLens(); all.blur(); });
+      none.addEventListener('click', () => { if (locked) return; for (const id of l.items) off.add(id); syncLensRows(); reportLens(); none.blur(); });
+      bulk.append(all, none);
+      head.appendChild(bulk);
+      const rows = el('div', 'lg-rows');
+      for (const id of l.items) {
+        const it = AS.LENS_ITEMS[id];
+        if (!it) continue;
+        const row = el('label', 'lg-row');
+        row.title = it.tip || '';
+        row.style.setProperty('--c', it.color);
+        const cb = el('input');
+        cb.type = 'checkbox';
+        cb.setAttribute('aria-label', 'Show ' + it.name);
+        cb.addEventListener('change', () => {
+          if (locked) { syncLensRows(); return; }
+          if (cb.checked) off.delete(id); else off.add(id);
+          syncLensRows();
+          reportLens();
+        });
+        const n = el('span', 'lg-n', '–');
+        row.append(el('span', 'lg-sw' + (it.draw === 'ring' ? ' ring' : '')), el('span', 'lg-name', it.name), n, cb);
+        rows.appendChild(row);
+        lensRows.push({ id, cb, row, n, shown: '–' });
+      }
+      const key = el('div', 'lg-key');
+      const tint = el('span'), ring = el('span');
+      tint.append(el('i', 't'), 'tinted');
+      ring.append(el('i', 'r'), 'ringed');
+      key.append(tint, ring);
+      lensLegend.append(head, el('div', 'lg-blurb', l.blurb), rows, key);
+      syncLensRows();
+    }
+    if (haveLenses) {
+      const bar = el('div', 'lens-bar');
+      bar.setAttribute('role', 'group');
+      bar.setAttribute('aria-label', 'Lenses');
+      lensTip = el('div', 'lens-tip', '(pick one to see the map through it)');
+      lensLegend = el('div', 'lens-legend');
+      lensLegend.hidden = true;
+      for (const l of AS.LENSES) {
+        hiddenBy[l.id] = new Set((opts.lensHidden && opts.lensHidden[l.id]) || []);
+        const b = lensBtns[l.id] = el('button', 'lens-btn');
+        b.type = 'button';
+        b.innerHTML = lensIconSvg(l.icon);
+        b.style.setProperty('--acc', l.accent);
+        b.title = `${l.name} lens: ${l.blurb}`;
+        b.setAttribute('aria-label', l.name + ' lens');
+        b.setAttribute('aria-pressed', 'false');
+        b.addEventListener('click', () => { if (!locked) setLens(lensNow === l ? null : l.id); b.blur(); });
+        bar.appendChild(b);
+      }
+      showLenses.append(bar, lensTip, lensLegend);
+    }
+
     // The Wind row stays hidden until hud() is given a wind (the checks and older callers have none).
     const windArrow = el('span', 'hud-wind-arrow');
     windArrow.innerHTML = WIND_ARROW;
@@ -321,16 +477,19 @@
     showUnitsOn();
     AS.units.onChange(showUnitsOn);
 
+    // The folded Overlays row says which overlays are on.
+    let linesOn = false, elevOn = false;
+    const showOverlays = () => foldSummary('Overlays', [elevOn && 'topo', linesOn && 'intent'].filter(Boolean).join(', ') || 'none');
     // Unlike Graph and Map, the Lines button owns its state: nothing else changes it.
     let linesBtn = null;
     if (onLines) {
-      let linesOn = !!opts.lines;
+      linesOn = !!opts.lines;
       linesBtn = el('button', 'hud-control hud-lines', 'Intent lines');
       linesBtn.type = 'button';
       linesBtn.title = 'Show every animal\'s line to what it is after (the selected animal\'s always shows)';
       linesBtn.classList.toggle('on', linesOn);
       linesBtn.addEventListener('click', () => {
-        if (!locked) { linesOn = !linesOn; linesBtn.classList.toggle('on', linesOn); onLines(linesOn); }
+        if (!locked) { linesOn = !linesOn; linesBtn.classList.toggle('on', linesOn); onLines(linesOn); showOverlays(); }
         linesBtn.blur();
       });
       showElev.appendChild(linesBtn);
@@ -338,13 +497,13 @@
     // Topo lines (render.js): every few meters of the ground's height. Kept per viewer.
     let elevBtn = null;
     if (onElevation) {
-      let elevOn = !!opts.elevation;
+      elevOn = !!opts.elevation;
       elevBtn = el('button', 'hud-control hud-elev', 'Topo lines');
       elevBtn.type = 'button';
       elevBtn.title = 'Show topo lines: how high the ground is';
       elevBtn.classList.toggle('on', elevOn);
       elevBtn.addEventListener('click', () => {
-        if (!locked) { elevOn = !elevOn; elevBtn.classList.toggle('on', elevOn); onElevation(elevOn); }
+        if (!locked) { elevOn = !elevOn; elevBtn.classList.toggle('on', elevOn); onElevation(elevOn); showOverlays(); }
         elevBtn.blur();
       });
       showElev.appendChild(elevBtn);
@@ -386,6 +545,7 @@
       box.append(label, contourInput);
       showElev.appendChild(box);
     }
+    showOverlays();
     // The properties window: Off, Click (select to inspect) or Hover (what is under the
     // mouse). One of three, kept per viewer by main.js.
     const inspBtns = [];
@@ -402,6 +562,7 @@
             mode = key;
             for (const o of inspBtns) o.classList.toggle('on', o === b);
             onInspect(key);
+            foldSummary('Properties', key);
           }
           b.blur();
         });
@@ -594,6 +755,7 @@
       const showFires = !!s.firesSeen;
       if (countBoxes.fires.hidden === showFires) countBoxes.fires.hidden = !showFires;
       setSeed(String(s.seed));
+      if (s.lensCounts && s.lensCounts !== lensCounts) { lensCounts = s.lensCounts; showLensCounts(); }
       if (s.wind) {
         if (windRow.hidden) windRow.hidden = false;
         const words = AS.windWords(s.wind.kmh);
@@ -648,7 +810,7 @@
     // Disabling the buttons also dims them; the handlers check `locked` as well.
     function lock(on) {
       locked = !!on;
-      for (const b of [...buttons, benchBtn, graphBtn, miniBtn, linesBtn, elevBtn, contourInput, ...inspBtns, emptyBtn, waterBtn, ...toolButtons]) {
+      for (const b of [...buttons, ...Object.values(lensBtns), benchBtn, graphBtn, miniBtn, linesBtn, elevBtn, contourInput, ...inspBtns, emptyBtn, waterBtn, ...toolButtons]) {
         if (b) b.disabled = locked;
       }
       paint.lock(locked);

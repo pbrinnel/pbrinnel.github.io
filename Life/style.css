@@ -297,6 +297,56 @@ body.nuke-armed .paint-banner { color: #ffd9c4; }
   .hud-tools .hud-btn { min-width: 0; padding: 0 6px; }
 }
 
+/* ---- Info: folding sections and the Lenses row (Paul, 13 Oct 2026) ---- */
+/* A foldable title is a button: a triangle that turns, the name, and (folded only) a word on what is inside. */
+.hud-sec-title.fold { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 6px; width: 100%; min-height: 22px; color: var(--hud-dim); font: inherit; font-size: 12px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.hud-sec-title.fold:hover { color: var(--fg); }
+.hud-sec-title.fold:focus-visible { outline: 1px solid var(--hud-on); outline-offset: 1px; }
+.hud-sec-title.fold::before { content: ''; flex: none; width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid currentColor; transition: transform 0.15s; }
+.hud-sec.collapsed .hud-sec-title.fold::before { transform: rotate(-90deg); }
+.hud-sec.collapsed .hud-sec-body { display: none; }
+.hud-sec-title.fold .sum { margin-left: auto; font-size: 11px; opacity: 0; }
+.hud-sec.collapsed .hud-sec-title.fold .sum { opacity: 0.9; }
+.lens-bar { display: flex; gap: 4px; flex: 0 0 100%; }
+.lens-btn { --acc: var(--hud-on); flex: none; width: 36px; height: var(--hud-h); padding: 0; display: inline-grid; place-items: center; color: var(--hud-dim); background: transparent; border: 1px solid var(--hud-line); border-radius: 3px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.lens-btn svg { display: block; color: color-mix(in srgb, var(--acc) 62%, var(--hud-dim)); transition: color 0.2s; }
+.lens-btn:hover { border-color: #4a5046; }
+.lens-btn:hover svg { color: var(--acc); }
+.lens-btn:focus-visible { outline: 1px solid var(--hud-on); outline-offset: 2px; }
+.lens-btn.on, .lens-btn.on:hover { background: color-mix(in srgb, var(--acc) 16%, transparent); border-color: var(--acc); box-shadow: inset 0 0 0 1px var(--acc); }
+.lens-btn.on svg { color: var(--acc); }
+.lens-btn:disabled { opacity: 0.5; cursor: default; }
+.lens-tip { flex: 0 0 100%; color: var(--hud-dim); font-size: 11px; }
+.lens-legend { flex: 0 0 100%; margin-top: 2px; border-top: 1px dashed var(--hud-line); padding-top: 4px; }
+.lens-tip[hidden], .lens-legend[hidden] { display: none; }
+.lg-head { display: flex; align-items: baseline; gap: 8px; min-height: 22px; }
+.lg-title { color: var(--acc); font-size: 12px; }
+.lg-blurb { color: var(--hud-dim); font-size: 11px; margin: 0 0 2px; line-height: 1.35; }
+.lg-bulk { margin-left: auto; display: inline-flex; gap: 2px; font-size: 11px; }
+.lg-bulk button { all: unset; box-sizing: border-box; padding: 3px 5px; color: var(--hud-dim); cursor: pointer; border-radius: 3px; }
+.lg-bulk button:hover { color: var(--fg); background: rgba(232, 217, 160, 0.1); }
+.lg-bulk button:focus-visible { outline: 1px solid var(--hud-on); }
+.lg-rows { display: flex; flex-direction: column; }
+/* A row: swatch, name, live count, checkbox; the whole row is the click target (it is a label). */
+.lg-row { display: grid; grid-template-columns: 14px 1fr auto 18px; align-items: center; gap: 0 8px; min-height: 24px; padding: 0 4px; margin: 0 -4px; border-radius: 3px; cursor: pointer; color: var(--fg); -webkit-tap-highlight-color: transparent; transition: opacity 0.3s; }
+.lg-row:hover { background: rgba(232, 217, 160, 0.07); }
+.lg-row.off { opacity: 0.5; }
+.lg-row.off .lg-name { text-decoration: line-through; text-decoration-color: var(--hud-dim); }
+.lg-sw { width: 12px; height: 12px; border-radius: 2px; background: var(--c); }
+.lg-sw.ring { background: transparent; border: 2px solid var(--c); border-radius: 50%; }
+.lg-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lg-n { text-align: right; font-variant-numeric: tabular-nums; min-width: 4ch; }
+.lg-row input { margin: 0; width: 15px; height: 15px; accent-color: var(--hud-on); cursor: pointer; }
+.lg-key { display: flex; gap: 10px; color: var(--hud-dim); font-size: 11px; margin-top: 3px; }
+.lg-key i { display: inline-block; vertical-align: -1px; width: 9px; height: 9px; margin-right: 4px; }
+.lg-key .t { background: var(--hud-dim); border-radius: 1px; }
+.lg-key .r { border: 2px solid var(--hud-dim); border-radius: 50%; }
+@media (max-width: 600px) {
+  .lens-btn { width: 40px; height: 36px; }
+  .lg-row { min-height: 30px; }
+  .lg-bulk button { padding: 6px 8px; }
+}
+
 /* ---- Table errors: replaces the whole page ---- */
 #errors {
   position: fixed;
