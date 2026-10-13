@@ -29,8 +29,8 @@
 //   ui.nuke, ui.setNuke(on)          NUKE MODE armed (main.js reads it through onNuke)
 //   ui.mode, ui.setMode(name)        the PAINT tab's one armed mode: 'nuke', 'grass', 'bunny', 'wolf', 'human', 'water', 'fire' or ''
 //                                    (onMode(name) on every change; onNuke(on) when nuke flips)
-//   ui.setRadiusDefaults(nuke, brush)  the Radius slider's starting value (settings.csv): the brush's, for every
-//                                    mode (`nuke` is unused); a radius the viewer chose earlier (one value, in
+//   ui.setRadiusDefaults(brush)        the Radius slider's starting value (BrushRadius in settings.csv), for every
+//                                    mode; a radius the viewer chose earlier (one value, in
 //                                    localStorage) wins. Called once the tables load.
 //   ui.radiusOf(mode)                the radius in tiles every mode will use now (the mode is ignored)
 //   ui.setRadius(mode, r)            sets and keeps the one radius, as the slider does
@@ -68,7 +68,7 @@
       any = true;
       if (sh.storm && sh.storm[i]) storm = true;
     }
-    const mm = weather.rainToday, rained = mm >= RAIN_SHOWN_MM, today = `${Math.max(1, Math.round(mm))} mm today`;
+    const mm = weather.rainToday, rained = mm >= RAIN_SHOWN_MM, today = `${AS.units.rain(Math.max(1, Math.round(mm)))} today`;
     if (storm) return rained ? `storm, ${today}` : 'storm';
     if (rained) return `rain, ${today}`;
     if (any) return 'showers nearby';
@@ -250,6 +250,7 @@
     const showWind = section('info', 'Wind', 'The world\'s wind: where it blows from and how hard');
     const showWeather = section('info', 'Weather', 'Rain on the map today, storms, and how long it has been dry');
     const showElev = section('info', 'Overlays', 'What is drawn over the world');
+    const showUnits = section('info', 'Units', 'Metric or imperial, everywhere a measure shows');
     const showProps = section('info', 'Properties', 'The properties window: what something is and how it is doing');
     const showTables = section('info', 'Tables');
     const paintModes = section('paint', 'Modes');
@@ -306,6 +307,20 @@
     const weatherRow = showWeather.parentNode;
     weatherRow.hidden = true;
 
+    // Metric | Imperial: AS.units owns the choice (kept per viewer); the text that shows a measure
+    // reads it every frame, so only the buttons need to follow.
+    const unitBtns = {};
+    for (const [key, name] of [['metric', 'Metric'], ['imperial', 'Imperial']]) {
+      const b = unitBtns[key] = el('button', 'hud-control hud-units-' + key, name);
+      b.type = 'button';
+      b.title = 'Show measures in ' + name.toLowerCase() + ' units';
+      b.addEventListener('click', () => { AS.units.set(key); b.blur(); });
+      showUnits.appendChild(b);
+    }
+    const showUnitsOn = () => { for (const k in unitBtns) unitBtns[k].classList.toggle('on', AS.units.system === k); };
+    showUnitsOn();
+    AS.units.onChange(showUnitsOn);
+
     // Unlike Graph and Map, the Lines button owns its state: nothing else changes it.
     let linesBtn = null;
     if (onLines) {
@@ -334,25 +349,29 @@
       });
       showElev.appendChild(elevBtn);
     }
-    // How far apart the topo lines are, down to a line every CONTOUR_STEPS[0] m for every
-    // little rise. A slider over a few round spacings; kept per viewer by main.js.
+    // How far apart the topo lines are, down to a line every few feet or half a meter for every
+    // little rise. A slider over a few round spacings in the unit shown (AS.units.contourSteps);
+    // the renderer is always told meters. Kept per viewer by main.js.
     let contourInput = null;
     if (onContourStep) {
-      const CONTOUR_STEPS = [0.5, 1, 2, 5, 10, 20];
       const box = el('span', 'hud-slider');
       const label = el('span', 'hud-slider-label', '');
       contourInput = el('input', 'hud-slider-input');
       contourInput.type = 'range';
       contourInput.min = '0';
-      contourInput.max = String(CONTOUR_STEPS.length - 1);
+      contourInput.max = String(AS.units.contourSteps().length - 1);
       contourInput.step = '1';
-      const at = Math.max(0, CONTOUR_STEPS.indexOf(opts.contourStep));
-      contourInput.value = String(at < 0 ? 3 : at);
-      contourInput.setAttribute('aria-label', 'Meters between topo lines');
-      box.title = 'Meters between topo lines (every fifth is bolder)';
-      const show = () => { label.textContent = 'a line every ' + CONTOUR_STEPS[+contourInput.value] + ' m'; };
+      contourInput.value = String(AS.units.contourIndex(opts.contourStep || 5));
+      const word = () => AS.units.system === 'imperial' ? 'Feet' : 'Meters';
+      const show = () => {
+        label.textContent = 'a line every ' + AS.units.contourLabel(+contourInput.value);
+        contourInput.setAttribute('aria-label', word() + ' between topo lines');
+        box.title = word() + ' between topo lines (every fifth is bolder)';
+      };
       show();
-      contourInput.addEventListener('input', () => { show(); if (!locked) onContourStep(CONTOUR_STEPS[+contourInput.value]); });
+      contourInput.addEventListener('input', () => { show(); if (!locked) onContourStep(AS.units.contourMeters(+contourInput.value)); });
+      // The same notch means a slightly different spacing in the other unit; the map follows.
+      AS.units.onChange(() => { show(); onContourStep(AS.units.contourMeters(+contourInput.value)); });
       box.append(label, contourInput);
       showElev.appendChild(box);
     }
@@ -566,8 +585,8 @@
       setSeed(String(s.seed));
       if (s.wind) {
         if (windRow.hidden) windRow.hidden = false;
-        const kmh = Math.round(s.wind.kmh), words = AS.windWords(s.wind.kmh);
-        setWindText(words === 'calm' ? 'calm' : `${words}, ${kmh} km/h from the ${AS.windFromName(s.wind.from)}`);
+        const words = AS.windWords(s.wind.kmh);
+        setWindText(words === 'calm' ? 'calm' : `${words}, ${AS.units.speed(s.wind.kmh)} from the ${AS.windFromName(s.wind.from)}`);
         // It blows toward the bearing opposite the one it comes from.
         const deg = (((Math.round(s.wind.from * 180 / Math.PI) + 180) % 360) + 360) % 360;
         if (deg !== windDeg) { windDeg = deg; windArrow.style.transform = `rotate(${deg}deg)`; }

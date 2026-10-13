@@ -1,5 +1,5 @@
 'use strict';
-// The PAINT tab's nuke (js/paint.js): everything within NukeRadius goes (animals with no corpse
+// The PAINT tab's nuke (js/paint.js): everything within the radius goes (BrushRadius when none is given) (animals with no corpse
 // and no event, blades, corpses, holes) and nothing outside it; the grid and stores still
 // audit; the ground is scorched, longest at the center; nothing grows or is dug on it until
 // it cools, and then grass can return.
@@ -9,7 +9,7 @@ const { ok, done } = kit.tally();
 
 const RADIUS = 20, DAYS = 8;
 // The shipped world, with bunnies digging whenever they may.
-const { AS, T, sim, W, K } = stage({ bare: false, size: [150, 100], seed: 7, settings: { NukeRadius: RADIUS, ScorchDays: DAYS, Rain: 0 },
+const { AS, T, sim, W, K } = stage({ bare: false, size: [150, 100], seed: 7, settings: { BrushRadius: RADIUS, ScorchDays: DAYS, Rain: 0 },
   species: [[['DigChance', 'Bunny', '100%']]] });
 const DAY = AS.TICK_HZ * AS.DAY_SECONDS;
 const days = n => { for (let i = 0; i < n * DAY; i++) sim.tick(); };
@@ -153,7 +153,7 @@ W.scorch[t0] = 0;
 // ---- The Radius slider's values reach the sim: nuke(sim, tile, radius), paintCircle's r = 0, the animal cap ----
 {
   const sim3 = AS.Sim(T, 13), W3 = sim3.W, P = AS.SPECIES;
-  // A nuke of radius 0 is the one tile, and still scorches it; radius 6 takes a disc of that size, not NukeRadius.
+  // A nuke of radius 0 is the one tile, and still scorches it; radius 6 takes a disc of that size, not BrushRadius.
   const t0 = W3.tile(40, 40);
   if (W3.kind[t0] === K.GRASS) W3.removeGrass(t0);
   if (W3.kind[t0] === K.CORPSE) AS.corpseRemove(sim3, t0);
@@ -163,8 +163,10 @@ W.scorch[t0] = 0;
   ok(out0.tiles === 1 && out0.corpses === 1 && W3.scorch[t0] > 0 && W3.kind[t0] === K.EMPTY, `nuke radius 0 is one tile (${out0.tiles}), its corpse gone and the ground scorched (${W3.scorch[t0]} days)`);
   const out6 = AS.nuke(sim3, W3.tile(100, 60), 6);
   let discIn = 0; for (let y = 54; y <= 66; y++) for (let x = 94; x <= 106; x++) if ((x - 100) ** 2 + (y - 60) ** 2 <= 36) discIn++;
-  ok(out6.tiles === discIn && discIn < 200, `nuke radius 6 takes the ${discIn}-tile disc, not NukeRadius's`);
-  ok(AS.nuke(sim3, W3.tile(20, 20)).tiles > 1000, 'with no radius given the nuke uses NukeRadius');
+  ok(out6.tiles === discIn && discIn < 200, `nuke radius 6 takes the ${discIn}-tile disc, not BrushRadius's`);
+  const BR = sim3.T.world.BrushRadius; let brushDisc = 0;
+  for (let y = 20 - Math.ceil(BR); y <= 20 + Math.ceil(BR); y++) for (let x = 20 - Math.ceil(BR); x <= 20 + Math.ceil(BR); x++) if (x >= 0 && y >= 0 && (x - 20) ** 2 + (y - 20) ** 2 <= BR * BR) brushDisc++;
+  ok(AS.nuke(sim3, W3.tile(20, 20)).tiles === brushDisc, `with no radius given the nuke uses BrushRadius (${BR}): ${brushDisc} tiles`);
   // Brush at radius 0 is exactly one tile (an animal, or a blade).
   const sim4 = AS.Sim(T, 14), W4 = sim4.W;
   for (const kind of ['grass', 'bunny', 'wolf', 'human']) {

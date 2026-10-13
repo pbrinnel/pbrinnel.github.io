@@ -113,6 +113,8 @@ load time: every file reads other files' `AS.*` inside functions, at call time.
   `wNext`, `wShore`); see [Water](#water).
 - **Scorch**, by tile: `scorch` (Float32, days left); set by `nuke`, counted down by the
   hourly grass pass; `addGrass` and `addHole` refuse a scorched tile.
+- **Units**: `AS.units` (ui-parts.js), Metric or Imperial per viewer (`life-units`); every shown
+  measure formats through it, and the sim, tables and contour spacing stay metric.
 - **Flip log**: `W.flipLog`, a ring of the last `FLIP_LOG` tiles that turned wet or dry (world.js
   `setDepth`), so the topo-line cache re-checks only the squares those tiles touch.
 - **Sunk blades**, by tile: `sunk`, `sunkSize`, `sunkAge`, `sunkCount`, `soak` (hours wet or
@@ -413,7 +415,7 @@ never flash: see DESIGN.md, Photosensitivity.
     WOLF, HUMAN, WATER, FIRE: one at a time, `ui.mode`;
     icons once `setIcons` runs (main.js `ICON_SPRITE`), the name kept as `aria-label` and in
     the tooltip; the nuke icon is sprites.js `spriteNuke`) with a Radius slider (0–100; one
-    value for every mode, localStorage `life-radius`, default `BrushRadius`; `NukeRadius` is no longer used by the slider), an armed banner with Stop (`.paint-banner`; the colored edge is CSS on the body's `paint-armed`/`nuke-armed`) and
+    value for every mode, localStorage `life-radius`, default `BrushRadius`), an armed banner with Stop (`.paint-banner`; the colored edge is CSS on the body's `paint-armed`/`nuke-armed`) and
     the "That's a crowd" card (`ui.crowd`, cards.js).
   - **Debug:** the Water button (kept per viewer in localStorage `life-water`; starts a new
     world with `opts.water`), the seed, Benchmark and the debug tools.
@@ -424,7 +426,7 @@ never flash: see DESIGN.md, Photosensitivity.
   cx, cy, r, cap?)` is the brush (empty eligible tiles only; random ages, but a species
   with no `LitterSize` (humans) stays adult; radius 0 = one tile; `cap = { room, hit }`
   stops animals at the soft limit; `water` goes through `pourWater`, `fire` through `AS.ignite` alone). `nuke(sim, tile,
-  radius?)` destroys everything within the radius (the slider's, default `NukeRadius`):
+  radius?)` destroys everything within the radius (the slider's, default `BrushRadius`):
   animals with no corpse and no event, blades, corpses, holes, and scorches the ground
   (`W.scorch`, days left, `ScorchDays` at the center, shorter to the rim).
 - **main.js:** selection (`pickAt`, which with Inspect Empty Tiles returns bare ground as

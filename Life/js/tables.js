@@ -173,7 +173,6 @@
     ['HolesPerColony', 'count'],
     ['WarrenRadius', 'num'],
     ['CollapseDays', 'num'],
-    ['NukeRadius', 'pos'],
     ['ScorchDays', 'pos'],
     ['FireSpread', 'pos'],
     ['FireWind', 'num'],

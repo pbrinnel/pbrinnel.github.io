@@ -17,8 +17,8 @@
   const ALIGHT_DECIMALS = 1;   // hours of fire left
   const SIZE_DECIMALS = 2;
   const POINT_DECIMALS = 1;   // Fullness, Stamina, HP, Nutrient
-  const ELEV_DECIMALS = 1;    // meters
-  const DEPTH_DECIMALS = 2;   // meters of water
+  const ELEV_DECIMALS = 1;    // in the unit shown (AS.units: meters or feet)
+  const DEPTH_DECIMALS = 2;   // likewise, water depth
 
   // What "Applies to" may say. Anything else is a typo and matches nothing.
   const TOKENS = ['all', ...AS.SPECIES_KEY, 'grass', 'corpse', 'female', 'hole', 'tile', 'water'];
@@ -50,6 +50,9 @@
     const dot = s.indexOf('.');
     return dot < 0 ? commas(s) : commas(s.slice(0, dot)) + s.slice(dot);
   }
+  // A height or depth in the viewer's unit. ui-parts.js (AS.units) loads after this file, so it
+  // is looked up per call; without it (a script that loads only this file) the sim's meters show.
+  const length = (v, decimals) => !Number.isFinite(v) ? NONE : AS.units ? AS.units.length(v, decimals) : num(v, decimals) + ' m';
   const count = v => num(Math.round(v), 0);
   // Serials are names, not quantities, so no thousands separators: "#1,234" would read as two.
   const serial = v => String(v);
@@ -121,8 +124,8 @@
     },
     Target: targetText,
     Position: (sim, c) => position(sim.W, c.t),
-    Elevation: (sim, c) => num(sim.W.elev[c.t], ELEV_DECIMALS) + ' m',
-    Depth: (sim, c) => num(sim.W.wDepth[c.t], DEPTH_DECIMALS) + ' m',
+    Elevation: (sim, c) => length(sim.W.elev[c.t], ELEV_DECIMALS),
+    Depth: (sim, c) => length(sim.W.wDepth[c.t], DEPTH_DECIMALS),
     Ground: (sim, c) => {
       const W = sim.W, t = c.t;
       return W.flow[t] === AS.FLOW.FIRE ? 'On fire' : W.wDepth[t] > 0 ? 'Water' : W.hole[t] ? 'Warren hole' : W.beach[t] ? 'Beach' : 'Ground';

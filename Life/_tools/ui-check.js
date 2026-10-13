@@ -303,7 +303,7 @@ const winOf = (ids, key) => ids.hud.all(e => e.className === 'hud-tabstrip hud-w
   const by = l => ids.hud.all(e => e.textContent === l && e.className.includes('hud-control'))[0];
   assert(slider && slider.disabled && label.textContent === 'Radius –'); ok('the Radius slider is off until a mode is armed');
   const MAXR = 75;
-  ui.setRadiusDefaults(75, 4);
+  ui.setRadiusDefaults(4);
   assert.strictEqual(ui.radiusOf('nuke'), 4); assert.strictEqual(ui.radiusOf('grass'), 4); ok('default: BrushRadius for every mode, the nuke included');
   by('NUKE MODE').fire('click');
   assert(!slider.disabled && slider.value === '4' && label.textContent === 'Radius 4'); ok('NUKE MODE shows the one radius');
@@ -318,7 +318,7 @@ const winOf = (ids, key) => ids.hud.all(e => e.className === 'hud-tabstrip hud-w
   assert(ui.radiusOf('grass') === MAXR && slider.max === String(MAXR)); ok(`the radius tops out at ${MAXR}`);
   ui.lock(true); assert(slider.disabled); slider.value = '5'; slider.listeners.input.forEach(f => f()); assert(ui.radiusOf('grass') === MAXR); ui.lock(false); assert(!slider.disabled); ok('disabled (and ignored) during the benchmark');
   const seen = []; const r2 = build(false, { onRadius: (m, r) => seen.push(m + ':' + r) });
-  r2.ui.setRadiusDefaults(75, 2); r2.ids.hud.all(e => e.textContent === 'WATER MODE' || e.getAttribute('aria-label') === 'WATER MODE')[0].fire('click');
+  r2.ui.setRadiusDefaults(2); r2.ids.hud.all(e => e.textContent === 'WATER MODE' || e.getAttribute('aria-label') === 'WATER MODE')[0].fire('click');
   const sl2 = r2.ids.hud.all(e => e.className === 'hud-radius-input')[0]; sl2.value = '11'; sl2.listeners.input.forEach(f => f());
   assert.deepStrictEqual(seen, ['water:11']); ok('the slider still tells main.js (for the fading size preview)');
 }
@@ -326,12 +326,12 @@ const winOf = (ids, key) => ids.hud.all(e => e.className === 'hud-tabstrip hud-w
   const mem = { 'life-radius': '12', 'life-radius-wolf': '3' };
   LS = { getItem: k => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = v; } };
   const { ui } = build(false);
-  ui.setRadiusDefaults(75, 0);
+  ui.setRadiusDefaults(0);
   assert(ui.radiusOf('nuke') === 12 && ui.radiusOf('wolf') === 12 && ui.radiusOf('bunny') === 12); ok('a radius chosen earlier is remembered once, for every mode (the old per-mode keys are ignored)');
   ui.setRadius('bunny', 7);
   assert(mem['life-radius'] === '7' && ui.radiusOf('nuke') === 7 && !('life-radius-bunny' in mem)); ok('a change is written under the one key');
   LS = { getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); } };
-  const u2 = build(false).ui; u2.setRadiusDefaults(75, 6); u2.setRadius('wolf', 4);
+  const u2 = build(false).ui; u2.setRadiusDefaults(6); u2.setRadius('wolf', 4);
   assert(u2.radiusOf('wolf') === 4 && u2.radiusOf('nuke') === 4); ok('blocked storage just means no memory');
   LS = undefined;
 }
@@ -494,5 +494,37 @@ const winOf = (ids, key) => ids.hud.all(e => e.className === 'hud-tabstrip hud-w
   const w0 = writes;
   ui.hud({ ...input, weather: wx([], 5.7, 0.2), mapW: MAP[0], mapH: MAP[1] }); assert.strictEqual(writes, w0); ok('a second hud() showing the same words writes nothing');
   ui.hud({ ...input, weather: wx([], 0, 9.7), mapW: MAP[0], mapH: MAP[1] }); assert.strictEqual(text(), 'dry for 9 days'); ok('and it follows the weather');
+}
+
+// ---- Info's Units row: Metric | Imperial converts what the page shows, and is remembered ----
+{ const mem = {}; LS = { getItem: k => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = v; } };
+  const meters = [];
+  const { ui, ids, ctx } = build(false, { contourStep: 5, onContourStep: m => meters.push(m) });
+  const AS = ctx.AS, row = ids.hud.all(e => e.className === 'hud-sec hud-sec-units')[0];
+  const btn = n => row.all(e => e.textContent === n)[0];
+  assert(row && btn('Metric') && btn('Imperial') && btn('Metric').classList.contains('on') && !btn('Imperial').classList.contains('on')); ok('Info has a Units row: Metric on, Imperial off, by default');
+  const slider = ids.hud.all(e => e.className === 'hud-slider-input')[0], label = ids.hud.all(e => e.className === 'hud-slider-label')[0];
+  const windText = () => ids.hud.all(e => e.className === 'hud-wind-text')[0].textContent, weatherText = () => ids.hud.all(e => e.className === 'hud-weather-text')[0].textContent;
+  const sh = { n: 0 }, hudIn = () => ({ ...input, wind: { from: 0, kmh: 30 }, weather: { field: new Float32Array(1), showers: sh, rainToday: 5.6, dryDays: 0 }, mapW: 450, mapH: 300 });
+  ui.hud(hudIn());
+  assert(/30 km\/h/.test(windText()) && weatherText() === 'rain, 6 mm today' && label.textContent === 'a line every 5 m'); ok('metric: km/h, mm and meters');
+  btn('Imperial').fire('click'); ui.hud(hudIn());
+  assert(btn('Imperial').classList.contains('on') && !btn('Metric').classList.contains('on')); ok('the clicked button lights');
+  assert(/19 mph/.test(windText()) && !/km/.test(windText())); ok('imperial wind: 30 km/h is 19 mph');
+  assert.strictEqual(weatherText(), 'rain, 0.24 in today'); ok('imperial rain: 6 mm is 0.24 in');
+  assert.strictEqual(label.textContent, 'a line every 20 ft'); ok('the topo label reads in feet, on the same slider notch');
+  assert(Math.abs(meters[meters.length - 1] - 20 * 0.3048) < 1e-9); ok('the renderer is still told meters (20 ft = 6.096 m)');
+  assert.strictEqual(AS.units.contourSteps().join(), '2,5,10,20,50,100'); ok('imperial topo steps: 2, 5, 10, 20, 50, 100 ft');
+  assert.strictEqual(mem['life-units'], 'imperial'); ok('the choice is kept');
+  assert.strictEqual(AS.units.length(10, 1), '32.8 ft'); assert.strictEqual(AS.units.distance(6, 1), '3.7 mi'); assert.strictEqual(AS.units.rainRate(2.5, 2), '0.10 in/day'); ok('lengths, distances and rain rates convert');
+  btn('Metric').fire('click'); ui.hud(hudIn());
+  assert(/30 km\/h/.test(windText()) && label.textContent === 'a line every 5 m' && AS.units.length(10, 1) === '10.0 m'); ok('and back to metric');
+  assert.strictEqual(AS.units.contourIndex(6.096), 3, 'imperial 20 ft is the 4th notch'); ok('a kept spacing finds its nearest notch');
+  btn('Imperial').fire('click');
+  const again = build(false, { contourStep: 20 * 0.3048, onContourStep() {} });
+  assert(again.ctx.AS.units.system === 'imperial' && again.ids.hud.all(e => e.className === 'hud-slider-label')[0].textContent === 'a line every 20 ft'); ok('a new page starts in the remembered system');
+  LS = { getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); } };
+  const blocked = build(false); blocked.ctx.AS.units.set('imperial'); assert.strictEqual(blocked.ctx.AS.units.system, 'imperial'); ok('blocked storage just means no memory');
+  LS = undefined;
 }
 console.log('all passed');

@@ -4,9 +4,8 @@
 //
 // AS.PaintTab(modesRow, sizeRow, { onNuke, onMode, onRadius, isLocked, bannerParent }) → paint
 //   paint.mode, paint.setMode(name), paint.setNuke(on)
-//   paint.radiusOf(name), paint.setRadius(name, r), paint.setRadiusDefaults(nuke, brush)
-//     one Radius for every mode: the name is accepted and ignored, and `nuke` is unused (the
-//     slider is the brush's default, so main.js's call needs no change)
+//   paint.radiusOf(name), paint.setRadius(name, r), paint.setRadiusDefaults(brush)
+//     one Radius for every mode: the name is accepted and ignored; the slider starts at the brush's
 //   While a mode is armed a banner in bannerParent names it, with a Stop button (Paul, 12 Oct
 //   2026: it was too easy to forget a mode was on); the colored edge around the map is CSS
 //   on the body's `paint-armed` / `nuke-armed`.
@@ -84,7 +83,7 @@
       setRadius(mode, radiusInput.value);
       if (onRadius) onRadius(mode, radiusOf());   // main.js shows a fading preview of the size
     });
-    function setRadiusDefaults(nuke, brush) {
+    function setRadiusDefaults(brush) {
       radiusDefault = brush;
       radius = null;
       try {

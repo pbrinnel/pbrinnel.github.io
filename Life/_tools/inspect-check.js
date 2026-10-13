@@ -1,6 +1,6 @@
 'use strict';
 const { load } = require('./harness.js');
-const { AS: A, texts } = load({}, ['inspect']);
+const { AS: A, texts } = load({}, ['inspect', 'ui-parts']);
 const { T } = A.parseTables(texts);
 let bad = 0;
 const check = (c, m) => { console.log((c ? 'PASS: ' : 'FAIL: ') + m); if (!c) bad++; };
@@ -168,6 +168,16 @@ check(dd.rows.some(r => r.name === 'Foo' && r.value === '—') && !dd.rows.some(
 { let et = -1; for (let t = 0; t < W.n && et < 0; t++) if (W.isBare(t) && !W.hole[t]) et = t;
   const de = A.describe(sim, { tile: et, serial: 0, slot: -1, empty: true }); allValues.push(de);
   check(de.title === 'Tile ' + W.tx(et) + ', ' + W.ty(et) && names(de) === 'Position,Elevation,Ground,Ash,Roots' && /^\d+(\.\d)? m$/.test(val(de, 'Elevation')), 'empty tile: ' + de.title + ' / ' + names(de) + ' / ' + val(de, 'Elevation')); }
+// Units: Elevation and Depth follow AS.units (metric by default; the sim's meters, converted on the way out).
+{ const t0 = empties.find(t => W.kind[t] === K.EMPTY), el = W.elev[t0], se = { tile: t0, serial: 0, slot: -1, empty: true };
+  const metric = val(A.describe(sim, se), 'Elevation');
+  A.units.set('imperial');
+  const feet = val(A.describe(sim, se), 'Elevation');
+  W.wDepth[t0] = 1; W.flow[t0] = A.FLOW.WATER; const deep = val(A.describe(sim, { tile: t0, serial: 0, slot: -1 }), 'Depth'); W.wDepth[t0] = 0; W.flow[t0] = A.FLOW.NONE;
+  A.units.set('metric');
+  check(metric === A.units.length(el, 1) && /m$/.test(metric) && /^-?[\d,]+\.\d ft$/.test(feet), 'Elevation reads in m, then in ft: ' + metric + ' / ' + feet);
+  check(Math.abs(parseFloat(feet.replace(/,/g, '')) - el / 0.3048) < 0.06, 'the feet are the meters converted');
+  check(deep === '3.28 ft', 'Depth of 1 m reads 3.28 ft when imperial: ' + deep); }
 const bads = []; for (const x of allValues) for (const r of x.rows) if (!r.heading && (/NaN|undefined/.test(r.value + r.tip + r.range) || r.value === '')) bads.push(r.name);
 check(bads.length === 0, 'no NaN/undefined/empty values ' + bads);
 console.log(bad ? 'FAILED ' + bad : 'ALL PASS');

@@ -4,7 +4,7 @@
 //
 // AS.nuke(sim, tile, radius) → { tiles, animals, blades, corpses, holes }
 //   Destroys everything within `radius` tiles (a circle; the PAINT tab's Radius slider, whose
-//   default is NukeRadius in settings.csv; 0 = just that tile) of `tile`: animals
+//   default is BrushRadius in settings.csv; 0 = just that tile) of `tile`: animals
 //   vanish with no corpse and no DEATH event (nothing is left to act out), blades, corpses
 //   and warren holes go, and the ground is scorched (W.scorch, days left): ScorchDays at the
 //   center, shorter toward the rim, so the crater greens from its edges inward. Water is left
@@ -29,7 +29,7 @@
   const RIM_COOL_SHARE = 0.6;
 
   AS.nuke = function (sim, tile, radius) {
-    const { W, T } = sim, R = radius === undefined ? T.world.NukeRadius : radius, days = T.world.ScorchDays;
+    const { W, T } = sim, R = radius === undefined ? T.world.BrushRadius : radius, days = T.world.ScorchDays;
     const cx = W.tx(tile), cy = W.ty(tile), R2 = R * R, reach = Math.floor(R);
     const out = { tiles: 0, animals: 0, blades: 0, corpses: 0, holes: 0 };
     const y0 = Math.max(0, cy - reach), y1 = Math.min(W.h - 1, cy + reach);

@@ -261,7 +261,7 @@
   function terrainFigures(S, elev, H, G, water) {
     const { n0, n1 } = Loading;
     const out = [
-      `Relief ${n1(S.Relief)} m, ${S.RiverMouths} river mouths, rain ${n1(S.Rain, 2)} mm/day`,
+      `Relief ${AS.units.length(S.Relief, 1)}, ${S.RiverMouths} river mouths, rain ${AS.units.rainRate(S.Rain, 2)}`,
     ];
     if (water && H) {
       let wet = 0, soil = 0;
@@ -276,7 +276,7 @@
     Loading.reset(['params', 'terrain', 'lay']);
     Loading.start('params');
     Loading.set('params', 'done', [
-      `${n0(W0.WorldWidth)} x ${n0(W0.WorldHeight)} tiles (${(W0.WorldWidth * AS.TILE_M / 1000).toFixed(1)} x ${(W0.WorldHeight * AS.TILE_M / 1000).toFixed(1)} km), seed ${seed}`,
+      `${n0(W0.WorldWidth)} x ${n0(W0.WorldHeight)} tiles (${AS.units.distance(W0.WorldWidth * AS.TILE_M / 1000)} x ${AS.units.distance(W0.WorldHeight * AS.TILE_M / 1000)}), seed ${seed}`,
     ]);
     if (loadingEl) { loadingEl.hidden = false; Loading.start('terrain'); await nextFrame(); await nextFrame(); }
     try {
@@ -311,7 +311,7 @@
   if (allWarnings.length) ui.warnings(allWarnings);
 
   const seed = T.world.Seed ?? AS.newSeed();
-  ui.setRadiusDefaults(T.world.NukeRadius, T.world.BrushRadius);
+  ui.setRadiusDefaults(T.world.BrushRadius);
   sim = await makeWorld(seed);
   const canvas = document.getElementById('map');
   const cam = AS.Camera(canvas, sim.W);
@@ -340,7 +340,11 @@
   }
   ui.setIcons(drawIcon);
   const renderer = AS.Renderer(canvas);
-  graph = AS.Graph(T);
+  graph = AS.Graph(T, {
+    // A legend click gives a quick look: rings that ease in and fade out (render.js). Info's
+    // counts stay the toggles for a long look. Guarded so the page works before the renderer has it.
+    onPulse: kind => { if (typeof renderer.pulseLocate === 'function') renderer.pulseLocate(kind, performance.now()); },
+  });
   minimap = AS.Minimap(cam, canvas, renderer);
   graph.setIcons({ grass: drawIcon('blades', document.createElement('canvas')),
     bunnies: drawIcon('bunnies', document.createElement('canvas')),

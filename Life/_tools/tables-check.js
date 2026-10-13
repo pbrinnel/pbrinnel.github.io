@@ -45,6 +45,7 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
     ['human.GrassFood a number, bunny.GrassFood blank → null', T.human.GrassFood > 0 && T.bunny.GrassFood === null, [T.human.GrassFood, T.bunny.GrassFood]],
     ['human mating rows blank → null (humans never breed)', T.human.LitterSize === null && T.human.MateFullness === null, [T.human.LitterSize, T.human.MateFullness]],
     ['settings.AnimalWarnAt a positive number', T.world.AnimalWarnAt > 0, T.world.AnimalWarnAt],
+    ['settings has no NukeRadius any more (every mode shares BrushRadius)', T.world.NukeRadius === undefined, T.world.NukeRadius],
     ['settings.BrushRadius may be 0', parse({ settings: editCSV(se, 'BrushRadius', 'Value', '0') }).T.world.BrushRadius === 0, 0],
     ['grass states keep file order', eq(T.states.grass.map(s => s.name), ['GROW', 'SEED']), T.states.grass.map(s => s.name)],
   ];

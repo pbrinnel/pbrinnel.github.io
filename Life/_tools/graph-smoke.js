@@ -1,6 +1,6 @@
 const vm = require('vm'), fs = require('fs');
-const calls = {};
-const c2d = new Proxy({}, { get: (t, k) => k === 'measureText' ? () => ({ width: 40 }) : (...a) => { calls[k] = (calls[k] || 0) + 1; }, set: () => true });
+const calls = {}, drawn = [];   // drawn: every string fillText was given, since the last reset
+const c2d = new Proxy({}, { get: (t, k) => k === 'measureText' ? () => ({ width: 40 }) : (...a) => { calls[k] = (calls[k] || 0) + 1; if (k === 'fillText') drawn.push(a[0]); }, set: () => true });
 const mk = () => ({ children: [], style: { setProperty() {} }, classList: { toggle() {} }, listeners: {}, hidden: true, clientWidth: 420, clientHeight: 500, width: 0, height: 0,
   append(...c) { this.children.push(...c); }, appendChild(c) { this.children.push(c); }, addEventListener(t, f) { this.listeners[t] = f; },
   getContext() { return c2d; }, offsetWidth: 420, offsetHeight: 320, getBoundingClientRect() { return { left: this.style.left ? parseFloat(this.style.left) : 8, top: this.style.top ? parseFloat(this.style.top) : 48 }; } });
@@ -41,4 +41,26 @@ const g2 = ctx.AS.Graph({}); g2.toggle();
 assert.deepStrictEqual({ ...g2.position() }, { x: 580, y: 380 }, 'a remembered place is restored and clamped to the viewport');
 ctx.localStorage.m['life-graph-pos'] = 'garbage';
 assert.strictEqual(ctx.AS.Graph({}).position(), null, 'a damaged saved place is ignored');
+// The legend entries are buttons: a click gives a quick look on the map (onPulse), with a hint line saying so.
+{ h.length = N;   // the full run again (humans appear halfway through it)
+  const pulses = [], gp = ctx.AS.Graph({}, { onPulse: k => pulses.push(k) });
+  const cv = panel.children[panel.children.length - 1];   // gp's canvas, the last thing it appended
+  const at = (x, y) => ({ pointerId: 20, pointerType: 'mouse', button: 0, clientX: 8 + x, clientY: 48 + y });
+  gp.toggle(); drawn.length = 0; gp.draw(sim, 100);
+  assert(drawn.includes('(click to highlight on the map)'), 'the hint line is drawn under the legend');
+  // Legend order: grass, bunnies, wolves (humans once a world has had one); an entry is a 14 px line sample,
+  // a gap and the name (40 px in this fake), then a gap.
+  const entryW = 19 + 40 + 16, x = i => 40 + i * entryW + 25;
+  cv.listeners.pointerdown(at(x(0), 10)); assert.deepStrictEqual(pulses, ['blades'], 'grass is "blades" on the map');
+  cv.listeners.pointerdown(at(x(1), 12)); cv.listeners.pointerdown(at(x(2), 8)); cv.listeners.pointerdown(at(x(3), 10));
+  assert.deepStrictEqual(pulses, ['blades', 'bunnies', 'wolves', 'humans']);
+  cv.listeners.pointerdown(at(x(0), 30)); cv.listeners.pointerdown(at(x(4), 10)); cv.listeners.pointerdown(at(300, 100));
+  assert.strictEqual(pulses.length, 4, 'below the legend row, past the last entry, or on the plot is no click');
+  gp.draw(sim, 1000); calls.stroke = 0; gp.draw(sim, 2000); const idleStrokes = calls.stroke; calls.stroke = 0;
+  cv.listeners.pointermove({ pointerId: 21, clientX: 8 + x(1), clientY: 48 + 10 }); gp.draw(sim, 3000);
+  assert(calls.stroke > idleStrokes && cv.style.cursor === 'pointer', 'a hovered entry is underlined and the cursor is a pointer');
+  cv.listeners.pointerleave({ pointerId: 21 }); assert.strictEqual(cv.style.cursor, '', 'leaving drops the pointer cursor');
+  const quiet = ctx.AS.Graph({}); quiet.toggle(); quiet.draw(sim, 100);
+  panel.children[panel.children.length - 1].listeners.pointerdown(at(x(0), 10));   // no onPulse: nothing happens, nothing throws
+  gp.toggle(); quiet.toggle(); }
 g.toggle(); console.log('smoke ok, strokes', full, calls.stroke);

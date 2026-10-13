@@ -3,7 +3,9 @@
 // title bar (mouse or touch); it stays inside the viewport and its place is remembered. Its
 // +/− button switches it between big and small (style.css, .graph-small), remembered too.
 //
-// AS.Graph(T) → { open, toggle(), draw(sim, nowMs) }
+// AS.Graph(T, { onPulse(kind) }) → { open, toggle(), draw(sim, nowMs) }
+//   A click or tap on a legend entry (line sample, icon, name) calls onPulse with the kind
+//   the map knows it by ('blades', 'bunnies', 'wolves', 'humans'): a quick look, nothing toggled.
 //   open    whether the window is showing
 //   toggle  shows or hides the window (the Graph button calls it through main.js)
 //   draw    called every frame by main.js; redraws only while open, throttled unless the user
@@ -42,6 +44,11 @@
     { key: 'wolves', name: 'wolves' },
     { key: 'humans', name: 'humans' },
   ];
+  // The kind each series is on the map (renderer.pulseLocate's names).
+  const PULSE_KIND = { grass: 'blades', bunnies: 'bunnies', wolves: 'wolves', humans: 'humans' };
+  const LEGEND_Y = 10, READOUT_Y = 28;   // the legend's and the readout's text rows, CSS px
+  const LEGEND_HIT_H = 18;               // a legend entry's clickable height, centered on LEGEND_Y
+  const LEGEND_HINT = '(click to highlight on the map)';
   const SERIES_NO_HUMANS = SERIES.filter(s => s.key !== 'humans');
 
   // ---- pure math ----
@@ -138,7 +145,8 @@
     return e;
   }
 
-  AS.Graph = function (T) {
+  AS.Graph = function (T, opts) {
+    const onPulse = opts && opts.onPulse;
     const panel = document.getElementById('graph');
     const strip = document.querySelector('#hud .hud-top');
     const g = { open: false, toggle, draw };
@@ -164,6 +172,19 @@
     let simSeen = null, view = null;
     let dirty = true, lastDraw = -Infinity;
     let hoverX = null;                   // CSS px within the canvas, or null
+    let legendHits = [];                 // { x0, x1, key } of each legend entry as last drawn
+    let hoverKey = null;                 // the legend entry under the pointer
+    const legendAt = (x, y) => {
+      if (Math.abs(y - LEGEND_Y) > LEGEND_HIT_H / 2) return null;
+      for (const h of legendHits) if (x >= h.x0 && x < h.x1) return h.key;
+      return null;
+    };
+    const localY = e => e.clientY - canvas.getBoundingClientRect().top;
+    function setHoverKey(k) {
+      if (k === hoverKey) return;
+      hoverKey = k; dirty = true;
+      canvas.style.cursor = k ? 'pointer' : '';
+    }
     let stripH = -1;
     const pointers = new Map();          // id → { x, y, touch }
     let pinch = null;                    // previous { dist, midX } while two fingers are down
@@ -276,6 +297,9 @@
       dirty = true;
     }, { passive: false });
     canvas.addEventListener('pointerdown', e => {
+      // A legend entry is a button: the press is the click, and starts no pan.
+      const key = legendAt(localX(e), localY(e));
+      if (key) { if (onPulse) onPulse(PULSE_KIND[key]); return; }
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, touch: e.pointerType === 'touch' });
       if (canvas.setPointerCapture) { try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* not capturable */ } }
       if (pointers.size === 2) pinch = null;
@@ -285,7 +309,7 @@
     canvas.addEventListener('pointermove', e => {
       if (!simSeen) return;
       const p = pointers.get(e.pointerId), r = plotRect(), n = simSeen.history.length;
-      if (!p) { hoverX = localX(e); dirty = true; return; }       // mouse hover
+      if (!p) { hoverX = localX(e); setHoverKey(legendAt(hoverX, localY(e))); dirty = true; return; }       // mouse hover
       if (pointers.size === 2) {
         p.x = e.clientX; p.y = e.clientY;
         const [a, b] = [...pointers.values()];
@@ -314,7 +338,7 @@
     };
     canvas.addEventListener('pointerup', release);
     canvas.addEventListener('pointercancel', release);
-    canvas.addEventListener('pointerleave', e => { if (!pointers.has(e.pointerId)) { hoverX = null; dirty = true; } });
+    canvas.addEventListener('pointerleave', e => { if (!pointers.has(e.pointerId)) { hoverX = null; setHoverKey(null); dirty = true; } });
 
     // ---- drawing ----
     function sizeCanvas(dpr) {
@@ -432,34 +456,49 @@
       const legendNeed = series.reduce((w, s) => w + 19 + ICON_PX + ICON_GAP + ctx.measureText(s.name).width + 16, 0);
       const compact = MARGIN.left + legendNeed > r.w;
       let lx = MARGIN.left;
+      legendHits = [];
       for (const s of series) {
+        const lit = hoverKey === s.key;
         if (!compact) {
           ctx.strokeStyle = COLORS[s.key]; ctx.lineWidth = LINE_W;
-          ctx.beginPath(); ctx.moveTo(lx, 10); ctx.lineTo(lx + 14, 10); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(lx, LEGEND_Y); ctx.lineTo(lx + 14, LEGEND_Y); ctx.stroke();
         }
         const x0 = compact ? lx : lx + 19;
-        const ix = x0 + icon(s.key, x0, 10);
+        const ix = x0 + icon(s.key, x0, LEGEND_Y);
         ctx.fillStyle = TEXT;
-        ctx.fillText(s.name, ix, 10);
-        lx = ix + ctx.measureText(s.name).width + (compact ? 12 : 16);
+        ctx.fillText(s.name, ix, LEGEND_Y);
+        const end = ix + ctx.measureText(s.name).width;
+        // Hovered, the entry is underlined in its own color: it reads as the button it is.
+        if (lit) {
+          ctx.strokeStyle = COLORS[s.key]; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(lx, LEGEND_Y + 8.5); ctx.lineTo(end, LEGEND_Y + 8.5); ctx.stroke();
+        }
+        const gap = compact ? 12 : 16;
+        legendHits.push({ x0: lx, x1: end + gap / 2, key: s.key });
+        lx = end + gap;
       }
 
-      // Crosshair and readout of the hour under the pointer.
-      if (hoverX !== null && n > 0 && hoverX >= r.x0 && hoverX <= r.x1) {
+      // Crosshair and readout of the hour under the pointer; with none, the row says the legend is clickable.
+      const reading = hoverX !== null && !hoverKey && n > 0 && hoverX >= r.x0 && hoverX <= r.x1;
+      if (!reading) {
+        ctx.fillStyle = DIM; ctx.textAlign = 'left';
+        ctx.fillText(LEGEND_HINT, MARGIN.left, READOUT_Y);
+      }
+      if (reading) {
         const i = clamp(Math.round(hourAt(hoverX, r)), 0, n - 1), x = Math.round(X(i)) + 0.5;
         ctx.strokeStyle = DIM; ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(x, r.y0); ctx.lineTo(x, r.y1); ctx.stroke();
         let rx = MARGIN.left;
         ctx.fillStyle = TEXT; ctx.textAlign = 'left';
         const day = `day ${(i / HOURS_PER_DAY).toFixed(1)}`;
-        ctx.fillText(day, rx, 28); rx += ctx.measureText(day).width + 14;
+        ctx.fillText(day, rx, READOUT_Y); rx += ctx.measureText(day).width + 14;
         for (const s of series) {
           const v = hist[s.key][i];
           ctx.fillStyle = COLORS[s.key]; ctx.beginPath(); ctx.arc(x, Y(v), 3, 0, Math.PI * 2); ctx.fill();
           ctx.strokeStyle = COLORS[s.key]; ctx.lineWidth = LINE_W;
-          ctx.beginPath(); ctx.moveTo(rx, 28); ctx.lineTo(rx + 8, 28); ctx.stroke();
-          const t = fmtInt(v), ix = rx + 12 + icon(s.key, rx + 12, 28);
-          ctx.fillStyle = TEXT; ctx.fillText(t, ix, 28); rx = ix + ctx.measureText(t).width + 12;
+          ctx.beginPath(); ctx.moveTo(rx, READOUT_Y); ctx.lineTo(rx + 8, READOUT_Y); ctx.stroke();
+          const t = fmtInt(v), ix = rx + 12 + icon(s.key, rx + 12, READOUT_Y);
+          ctx.fillStyle = TEXT; ctx.fillText(t, ix, READOUT_Y); rx = ix + ctx.measureText(t).width + 12;
         }
       }
     }

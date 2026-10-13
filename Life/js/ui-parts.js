@@ -99,5 +99,59 @@
     return r;
   }
 
+  // Metric or imperial for everything the page shows (Paul, 13 Oct 2026). The sim and the
+  // tables stay metric; these functions only convert on the way to the screen. Kept per
+  // viewer. Every function takes metric numbers and returns text.
+  //
+  //   AS.units.system        'metric' | 'imperial'
+  //   AS.units.set(system)   changes it, keeps it, and calls every onChange listener
+  //   AS.units.onChange(fn)  fn(system) after a change
+  //   AS.units.speed(kmh)    "14 km/h" / "9 mph" (whole numbers)
+  //   AS.units.rain(mm)      "3 mm" / "0.12 in": a depth of rain
+  //   AS.units.rainRate(mmPerDay, d)  "2.50 mm/day" / "0.10 in/day"
+  //   AS.units.length(m, d)  "12.3 m" / "40.4 ft": heights and depths; d decimals
+  //   AS.units.distance(km, d)  "6.0 km" / "3.7 mi"
+  //   AS.units.contourSteps(), AS.units.contourLabel(i)  the topo slider's spacings, in the unit shown
+  const UNITS_KEY = 'life-units';
+  const MM_PER_IN = 25.4, FT_PER_M = 1 / 0.3048, MI_PER_KM = 1 / 1.609344, MPH_PER_KMH = MI_PER_KM;
+  const RAIN_IN_DECIMALS = 2;   // 0.01 in is about a quarter of a millimeter
+  // Round feet for the topo lines; the same count of steps as the metric list so the slider keeps its index.
+  const CONTOUR_METERS = [0.5, 1, 2, 5, 10, 20];
+  const CONTOUR_FEET = [2, 5, 10, 20, 50, 100];
+  const units = (function () {
+    const listeners = [];
+    let system = 'metric';
+    try { if (localStorage.getItem(UNITS_KEY) === 'imperial') system = 'imperial'; } catch (e) { /* metric */ }
+    const imp = () => system === 'imperial';
+    const fixed = (x, d) => x.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+    return {
+      get system() { return system; },
+      set(next) {
+        const v = next === 'imperial' ? 'imperial' : 'metric';
+        if (v === system) return;
+        system = v;
+        try { localStorage.setItem(UNITS_KEY, v); } catch (e) { /* the choice just isn't kept */ }
+        for (const f of listeners) f(v);
+      },
+      onChange(f) { listeners.push(f); },
+      speed: kmh => imp() ? Math.round(kmh * MPH_PER_KMH) + ' mph' : Math.round(kmh) + ' km/h',
+      rain: mm => imp() ? fixed(mm / MM_PER_IN, RAIN_IN_DECIMALS) + ' in' : Math.round(mm) + ' mm',
+      rainRate: (mm, d = 1) => imp() ? fixed(mm / MM_PER_IN, RAIN_IN_DECIMALS) + ' in/day' : fixed(mm, d) + ' mm/day',
+      length: (m, d = 1) => imp() ? fixed(m * FT_PER_M, d) + ' ft' : fixed(m, d) + ' m',
+      distance: (km, d = 1) => imp() ? fixed(km * MI_PER_KM, d) + ' mi' : fixed(km, d) + ' km',
+      // The topo slider: its i-th spacing as the number shown, and in meters for the renderer.
+      contourSteps: () => (imp() ? CONTOUR_FEET : CONTOUR_METERS).slice(),
+      contourMeters: i => imp() ? CONTOUR_FEET[i] / FT_PER_M : CONTOUR_METERS[i],
+      contourLabel: i => imp() ? CONTOUR_FEET[i] + ' ft' : CONTOUR_METERS[i] + ' m',
+      // The slider position whose spacing is nearest `m` meters, in the system shown.
+      contourIndex(m) {
+        let best = 0;
+        for (let i = 1; i < CONTOUR_METERS.length; i++) if (Math.abs(Math.log(this.contourMeters(i) / m)) < Math.abs(Math.log(this.contourMeters(best) / m))) best = i;
+        return best;
+      },
+    };
+  })();
+
+  AS.units = units;
   AS.uiParts = { el, cachedText, fmtInt, Resizable };
 })(globalThis.AS);

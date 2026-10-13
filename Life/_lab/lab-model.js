@@ -13,8 +13,8 @@
 
   const SPECIES_COLS = ['Bunny', 'Wolf', 'Human', 'Grass'];
   // Not tuning knobs: identity, size of the world and the seed are set in settings.csv
-  // for a reason (the benchmark and replays depend on them), Diet, Prey and EatsCarcass aren't numbers, and the God tab's numbers (NukeRadius, ScorchDays, BrushRadius, AnimalWarnAt) don't shape a run.
-  const SKIP_ROWS = new Set(['Diet', 'Seed', 'WorldWidth', 'WorldHeight', 'NukeRadius', 'ScorchDays', 'BrushRadius', 'AnimalWarnAt']);
+  // for a reason (the benchmark and replays depend on them), Diet, Prey and EatsCarcass aren't numbers, and the God tab's numbers (ScorchDays, BrushRadius, AnimalWarnAt) don't shape a run.
+  const SKIP_ROWS = new Set(['Diet', 'Seed', 'WorldWidth', 'WorldHeight', 'ScorchDays', 'BrushRadius', 'AnimalWarnAt']);
 
   LAB.parseValue = function (text) {
     const s = String(text).trim().replace(/[–—]/g, '-');
