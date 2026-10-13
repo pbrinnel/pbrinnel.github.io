@@ -67,6 +67,7 @@
     aWater: Float32Array,  // the water meter, like Fullness; drained and refilled by animals.js and DRINK
     aStamina: Float32Array,
     aHP: Float32Array,
+    aWellbeing: Float64Array, // 0 neutral, negative stressed, positive content; bunnies' scares and hunger lower it (bunny.js), it decays toward 0
     aAlight: Float64Array, // in-world hours of fire left on it (0 = not burning); fire.js sets it, animals.js counts it down
     aState: Uint8Array,    // index into T.states[species]
     aSprint: Uint8Array,

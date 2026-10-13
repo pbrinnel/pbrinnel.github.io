@@ -54,10 +54,9 @@
       m.awayFor = grow(m.awayFor, Uint32Array, 1); // the serial awayTo belongs to; another = not emigrating
       m.checkAt = grow(m.checkAt, Float64Array, 1); // sim.simSeconds of the last crowd check
       m.checkFor = grow(m.checkFor, Uint32Array, 1); // the serial checkAt belongs to
-      m.stress = grow(m.stress, Float64Array, 1);  // stress as of stressAt (it fades by StressHalfLife)
-      m.stressAt = grow(m.stressAt, Float64Array, 1);
+      m.wellbeingAt = grow(m.wellbeingAt, Float64Array, 1); // sim.simSeconds W.aWellbeing is as of (it fades by WellbeingHalfLife)
       m.scareAt = grow(m.scareAt, Float64Array, 1); // sim.simSeconds of the last scare counted
-      m.stressFor = grow(m.stressFor, Uint32Array, 1); // the serial these three belong to
+      m.wellbeingFor = grow(m.wellbeingFor, Uint32Array, 1); // the serial these two belong to
       m.tripMin = grow(m.tripMin, Float64Array, 1); // a natal trip's own length: no settling nearer its start
       m.awayFrom = grow(m.awayFrom, Int32Array, 1); // where this trip began (TravelMin is measured from it)
       m.natal = grow(m.natal, Uint8Array, 1);      // 1: this trip is its natal dispersal (settles on arrival)
@@ -263,30 +262,31 @@
   };
   const farFrom = (W, t, from, d) => Math.hypot(t % W.w - from % W.w, ((t / W.w) | 0) - ((from / W.w) | 0)) >= d;
 
-  // Stress (Paul): scares and hunger with nothing to eat add to it, and it halves every
-  // StressHalfLife days, so scares that come faster than they fade build up (repeated
-  // harassment, not one bad chase) and LeaveStress sets a bunny emigrating. Stored as a value
-  // and the time of it, and faded only when read or added to, so it costs nothing per tick.
-  function stressNow(sim, s, m) {
+  // Wellbeing (Paul): W.aWellbeing is 0 when neutral, negative when stressed. Scares and hunger
+  // with nothing to eat lower it, and it halves toward 0 every WellbeingHalfLife days, so
+  // scares that come faster than they fade build up (repeated harassment, not one bad chase)
+  // and at -LeaveStress a bunny sets off emigrating. Stored as a value and the time of it
+  // (wellbeingAt), and faded only when read or lowered, so it costs nothing per tick.
+  function wellbeingNow(sim, s, m) {
     const W = sim.W, now = sim.simSeconds, S = AS.speciesStats(sim, s);
-    if (m.stressFor[s] !== W.aSerial[s]) { m.stressFor[s] = W.aSerial[s]; m.stress[s] = 0; m.scareAt[s] = -Infinity; m.stressAt[s] = now; }
-    if (now > m.stressAt[s]) {
-      m.stress[s] *= Math.pow(0.5, (now - m.stressAt[s]) / (S.StressHalfLife * AS.DAY_SECONDS));
-      m.stressAt[s] = now;
+    if (m.wellbeingFor[s] !== W.aSerial[s]) { m.wellbeingFor[s] = W.aSerial[s]; W.aWellbeing[s] = 0; m.scareAt[s] = -Infinity; m.wellbeingAt[s] = now; }
+    if (now > m.wellbeingAt[s]) {
+      W.aWellbeing[s] *= Math.pow(0.5, (now - m.wellbeingAt[s]) / (S.WellbeingHalfLife * AS.DAY_SECONDS));
+      m.wellbeingAt[s] = now;
     }
-    return m.stress[s];
+    return W.aWellbeing[s];
   }
-  function addStress(sim, s, amount) {
+  function lowerWellbeing(sim, s, amount) {
     if (!(amount > 0) || !(AS.speciesStats(sim, s).LeaveStress > 0)) return;
     const m = mem(sim.W);
-    m.stress[s] = stressNow(sim, s, m) + amount;
+    sim.W.aWellbeing[s] = wellbeingNow(sim, s, m) - amount;
   }
-  // The inspector's view: stress now (faded to this moment), whether it is away (emigrating
+  // The inspector's view: wellbeing now (faded to this moment), whether it is away (emigrating
   // or leaving home), and which.
-  AS.bunnyStress = function (sim, s) {
+  AS.bunnyWellbeing = function (sim, s) {
     const m = mem(sim.W);
     const away = m.awayFor[s] === sim.W.aSerial[s];
-    return { stress: stressNow(sim, s, m), away, leavingHome: away && m.natal[s] === 1 };
+    return { wellbeing: wellbeingNow(sim, s, m), away, leavingHome: away && m.natal[s] === 1 };
   };
   // A scare: one per chase. Fleeing, hiding and fleeing again from the same wolf within
   // SCARE_GAP seconds is still the one chase.
@@ -294,10 +294,10 @@
     const S = AS.speciesStats(sim, s);
     if (!(S.LeaveStress > 0)) return;
     const m = mem(sim.W), now = sim.simSeconds;
-    stressNow(sim, s, m);
+    wellbeingNow(sim, s, m);
     if (now - m.scareAt[s] < SCARE_GAP) return;
     m.scareAt[s] = now;
-    m.stress[s] += S.ScareStress;
+    sim.W.aWellbeing[s] -= S.ScareStress;
   }
 
   // Leaving a crowd, with hysteresis (Paul): a wandering bunny, not yet elderly, with
@@ -335,13 +335,13 @@
         takeCompanion(sim, s, S, t, m);
         return false;   // the trip starts on its next step
       }
-      // Stressed past LeaveStress it goes; crowded, it goes with LeaveChance a day.
-      const stressed = S.LeaveStress > 0 && stressNow(sim, s, m) >= S.LeaveStress;
+      // Stressed to -LeaveStress or lower it goes; crowded, it goes with LeaveChance a day.
+      const stressed = S.LeaveStress > 0 && wellbeingNow(sim, s, m) <= -S.LeaveStress;
       if (!stressed) {
         if (!(S.LeaveCrowd > 0 && S.LeaveChance > 0) || crowdAt(W, t, r) < S.LeaveCrowd) return false;
         if (sim.rng.next() >= 1 - Math.pow(1 - Math.min(S.LeaveChance, 1 - 1e-9), since / AS.DAY_SECONDS)) return false;
       }
-      m.stress[s] = 0;   // a fresh start where it settles
+      W.aWellbeing[s] = 0;   // a fresh start where it settles
       m.awayFor[s] = serial;
       m.lead[s] = -1;
       m.natal[s] = 0;
@@ -713,7 +713,7 @@
       // Wandering hungry means SEEK_FOOD found no blade in sight: this land isn't feeding it.
       start(sim, s) {
         calmStart(sim, s);
-        if (AS.isHungry(sim, s)) addStress(sim, s, AS.speciesStats(sim, s).HungerStress);
+        if (AS.isHungry(sim, s)) lowerWellbeing(sim, s, AS.speciesStats(sim, s).HungerStress);
       },
       act: wanderStep,
     },

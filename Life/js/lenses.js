@@ -129,7 +129,7 @@
     if (stage === AS.STAGE.BABY) b |= BIT.babies; else if (stage === AS.STAGE.ELDER) b |= BIT.elders;
     const st = W.aState[s], act = stateBits[sp][st] || 0;
     // A bunny that is wandering off a crowd is leaving home; only a wanderer asks (it costs a lookup).
-    if (act === BIT.wandering && st === wanderIdx[sp] && sp === AS.SPECIES.BUNNY && AS.bunnyStress(sim, s).leavingHome) b |= BIT.leaving;
+    if (act === BIT.wandering && st === wanderIdx[sp] && sp === AS.SPECIES.BUNNY && AS.bunnyWellbeing(sim, s).leavingHome) b |= BIT.leaving;
     else b |= act;
     return b;
   }

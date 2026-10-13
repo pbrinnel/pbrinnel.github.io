@@ -305,11 +305,12 @@ graph, ui, bench) only reads.
   sight, takes a new destination when there or when going around gives up, shows it as the
   target line, and every `SETTLE_EVERY` s settles if near water with ≤ `SettleCrowd` in the
   `SettleRange` square. LeaveChance 0 draws nothing.
-- **Bunny stress** (bunny.js `stressNow`/`addStress`/`scared`): `stress`/`stressAt`/
-  `scareAt`/`stressFor` per bunny, faded by `StressHalfLife` only when read or added to.
-  FLEE's start adds `ScareStress` (not again within `SCARE_GAP` s), WANDER's start adds
-  `HungerStress` when hungry (SEEK_FOOD found no blade). `emigrateStep` leaves at
-  `LeaveStress` without the crowd roll, and zeroes stress.
+- **Wellbeing** (`W.aWellbeing`, every animal; bunny.js `wellbeingNow`/`lowerWellbeing`/`scared`,
+  `AS.bunnyWellbeing`): faded toward 0 by `WellbeingHalfLife` only when read or changed
+  (`wellbeingAt`/`wellbeingFor`). FLEE's start lowers it by `ScareStress` (not again within
+  `SCARE_GAP` s), WANDER's start by `HungerStress` when hungry (SEEK_FOOD found no blade).
+  `emigrateStep` leaves at −`LeaveStress` without the crowd roll, and zeroes it. Wolves and
+  humans have the field; nothing moves it yet.
 - **Natal dispersal** (`DisperseChance`, `DisperseRun`): decided once a life (`dispFor`, by
   serial) at the first wander (bunny, in `emigrateStep`) or prowl (wolf, `prowlStep`) as an
   adult, only for animals with a parent (`aParentA` ≠ 0). Bunnies travel as an emigrant

@@ -907,7 +907,7 @@ function rig(sim) {
       if (W.aStamina[s] === 0) want.exhausted++;
       if (W.aPregnant[s] > 0) want.pregnant++;
       const stage = AS.stageOf(S, W.aAge[s]); if (stage === AS.STAGE.BABY) want.babies++; if (stage === AS.STAGE.ELDER) want.elders++;
-      if (name === 'WANDER' && sp === AS.SPECIES.BUNNY && AS.bunnyStress(sim, s).leavingHome) want.leaving++; else if (ACT[name]) want[ACT[name]]++;
+      if (name === 'WANDER' && sp === AS.SPECIES.BUNNY && AS.bunnyWellbeing(sim, s).leavingHome) want.leaving++; else if (ACT[name]) want[ACT[name]]++;
     }
     const wrong = IDS.filter(id => c[id] !== want[id]);
     check(wrong.length === 0, `lensCounts matches a direct count for every item${wrong.map(id => ` (${id}: ${c[id]} vs ${want[id]})`).join('')}`);

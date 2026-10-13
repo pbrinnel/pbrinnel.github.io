@@ -63,7 +63,7 @@
     ['LeaveStress', 'num', []],      // blank = stress never sets one emigrating
     ['ScareStress', 'num', []],
     ['HungerStress', 'num', []],
-    ['StressHalfLife', 'pos', []],
+    ['WellbeingHalfLife', 'pos', []],
     ['DisperseChance', 'frac', []],
     ['DisperseRun', 'range', []],    // blank = never leaves home
     ['DisperseFar', 'frac', []],     // blank = DisperseRun tiles

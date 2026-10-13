@@ -260,10 +260,13 @@ For bunnies and wolves (humans differ: see [Humans](#humans)).
   gap between the two thresholds is the point: they don't stop at the colony's edge, they
   go until they find land nobody uses. Bunnies can't cross grass, so they path within sight
   toward a tile a few nearer the destination.
-- **Harassed or hungry bunnies leave too** (5 Oct 2026). Each bunny carries a stress level:
-  a scare (starting to flee a hunter, once per chase) adds `ScareStress`, and wandering
-  hungry with no grass in sight adds `HungerStress`. It halves every `StressHalfLife` days,
-  so one bad chase fades and scares coming faster than that build up. At `LeaveStress` the
+- **Harassed or hungry bunnies leave too** (5 Oct 2026). Every animal has a Wellbeing, 0
+  neutral, below stressed, above content (13 Oct 2026, Paul: stress made two-sided and given
+  to every species, ready for play and other sources and effects later; today only bunnies'
+  moves). A scare (starting to flee a hunter, once per chase) lowers it by `ScareStress`, and
+  wandering hungry with no grass in sight by `HungerStress`. It eases halfway back to 0 every
+  `WellbeingHalfLife` days, so one bad chase fades and scares coming faster than that build
+  up. At −`LeaveStress` the
   bunny emigrates exactly as a crowded one does, and starts fresh where it settles. Thirst
   adds none.
 - **Going around, and giving up** (12 Oct 2026: wolves stood staring at bunnies across a

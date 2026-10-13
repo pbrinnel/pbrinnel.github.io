@@ -87,9 +87,9 @@ const mk = (t, sp, sx) => {
 };
 const selA = s => ({ tile: W.aTile[s], serial: W.aSerial[s], slot: s });
 const bm = mk(empties[2], 0, 0), bf = mk(empties[3], 0, 1), wm = mk(empties[4], 1, 0), wf = mk(empties[5], 1, 1);
-const R = 'Fullness,Water,Stamina,HP,Alight,Age,Lifestage,Dead,State,Target,Sex,';
+const R = 'Fullness,Water,Wellbeing,Stamina,HP,Alight,Age,Lifestage,Dead,State,Target,Sex,';
 const TILE = ',Tile,Position,Elevation,Ground,Ash,Roots';   // every selection ends with the tile under it
-const RB = 'Fullness,Water,Stress,Stamina,HP,Alight,Age,Lifestage,Dead,State,Target,Sex,';   // bunnies also have Stress
+const RB = R;
 const dbm = A.describe(sim, selA(bm)), dbf = A.describe(sim, selA(bf)), dwm = A.describe(sim, selA(wm)), dwf = A.describe(sim, selA(wf));
 allValues.push(dbm, dbf, dwm, dwf);
 check(names(dbm) === RB + 'Parents,Children,InHole' + TILE, 'male bunny: ' + names(dbm));

@@ -99,10 +99,12 @@
     Fullness: (sim, c) => outOf(sim.W.aFullness[c.s], c.Tsp.FullnessMax),
     Water: (sim, c) => outOf(sim.W.aWater[c.s], c.Tsp.WaterMax),
     Stamina: (sim, c) => outOf(sim.W.aStamina[c.s], c.Tsp.StaminaMax),
-    // Bunnies only (variables.csv); the number it leaves at is LeaveStress.
-    Stress: (sim, c) => {
-      const b = AS.bunnyStress(sim, c.s);
-      return (c.Tsp.LeaveStress > 0 ? outOf(b.stress, c.Tsp.LeaveStress) : b.stress.toFixed(1)) + (b.leavingHome ? ', leaving home' : b.away ? ', emigrating' : '');
+    // Every animal has it; only bunnies' moves yet (a bunny leaves home at -LeaveStress).
+    Wellbeing: (sim, c) => {
+      const bunny = sim.W.aSpecies[c.s] === AS.SPECIES.BUNNY, b = bunny ? AS.bunnyWellbeing(sim, c.s) : null;
+      const w = b ? b.wellbeing : sim.W.aWellbeing[c.s];
+      return (w < 0 ? num(w, POINT_DECIMALS) + ', stressed' : w > 0 ? '+' + num(w, POINT_DECIMALS) + ', content' : num(0, POINT_DECIMALS))
+        + (b && b.leavingHome ? ', leaving home' : b && b.away ? ', emigrating' : '');
     },
     HP: (sim, c) => outOf(sim.W.aHP[c.s], c.Tsp.HPMax),
     // In-world hours left on fire, as Pregnant shows what is left rather than a share of AlightHours.
