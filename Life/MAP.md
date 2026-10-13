@@ -113,6 +113,8 @@ load time: every file reads other files' `AS.*` inside functions, at call time.
   `wNext`, `wShore`); see [Water](#water).
 - **Scorch**, by tile: `scorch` (Float32, days left); set by `nuke`, counted down by the
   hourly grass pass; `addGrass` and `addHole` refuse a scorched tile.
+- **Flip log**: `W.flipLog`, a ring of the last `FLIP_LOG` tiles that turned wet or dry (world.js
+  `setDepth`), so the topo-line cache re-checks only the squares those tiles touch.
 - **Sunk blades**, by tile: `sunk`, `sunkSize`, `sunkAge`, `sunkCount`, `soak` (hours wet or
   beach): a blade the water or beach reaches is taken off the tile and kept here, and comes
   back as it was if the tile dries within `DrownHours`; world.js, water.js.

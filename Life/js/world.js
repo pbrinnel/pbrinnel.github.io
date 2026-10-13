@@ -43,6 +43,7 @@
   const ANIMAL_START_CAPACITY = 1024;
   // wDist for a tile no water can be reached from.
   const WATER_NONE = AS.WATER_NONE = 0xFFFF;
+  const FLIP_LOG = AS.FLIP_LOG = 1 << 16;   // wetFlips the world remembers (a power of two); a cache that fell further behind rescans everything
   // Meters of water addWater lays when not told a depth.
   const LAID_DEPTH = 1;
   // Tiles across a block of the per-block animal lists (W.animalsNear, W.anyNear).
@@ -172,6 +173,7 @@
       // with Water off, whose water (laid by hand, in the checks) stays as laid.
       water: null,
       wetFlips: 0,      // tiles that have turned wet or dry (setDepth)
+      flipLog: new Int32Array(FLIP_LOG),   // the last FLIP_LOG of them: flip number f is tile flipLog[f % FLIP_LOG], so a cache can find what changed since the count it last saw
       wetMoved: false,  // a shore moved since water.js last rebuilt the way-to-water field
 
       // Height of the ground in meters (0 to settings.csv Relief), laid once at world build
@@ -390,6 +392,7 @@
       } else {
         W.waterCount--;
       }
+      W.flipLog[W.wetFlips & (FLIP_LOG - 1)] = t;
       W.wetFlips++;
       W.wetMoved = true;
       refreshBeach(t);
@@ -454,16 +457,18 @@
     // wading on it is water here too.
     W.buildWaterField = function () {
       W.waterStale = false;
-      if (!W.wDist) { W.wDist = new Uint16Array(n); W.wNext = new Int32Array(n); W.wShore = new Int32Array(n); }
-      const dist = W.wDist, next = W.wNext, shore = W.wShore, queue = new Int32Array(n), nb = new Int32Array(4);
+      if (!W.wDist) { W.wDist = new Uint16Array(n); W.wNext = new Int32Array(n); W.wShore = new Int32Array(n); W.wQueue = new Int32Array(n); }
+      const dist = W.wDist, next = W.wNext, shore = W.wShore, queue = W.wQueue, nb = new Int32Array(4);
       dist.fill(WATER_NONE); next.fill(-1); shore.fill(-1);
       let head = 0, tail = 0;
       const D = W.wDepth;
-      for (let t = 0; t < n; t++) {
-        if (D[t] > 0) continue;
-        const k = W.neighbors4(t, nb);
-        for (let i = 0; i < k; i++) {
-          if (D[nb[i]] > 0) { dist[t] = 0; shore[t] = t; queue[tail++] = t; break; }
+      // The shore: dry tiles with water on a side (the order of the sides doesn't matter here).
+      for (let y = 0, t = 0; y < h; y++) {
+        for (let x = 0; x < w; x++, t++) {
+          if (D[t] > 0) continue;
+          if ((y > 0 && D[t - w] > 0) || (x < w - 1 && D[t + 1] > 0) || (y < h - 1 && D[t + w] > 0) || (x > 0 && D[t - 1] > 0)) {
+            dist[t] = 0; shore[t] = t; queue[tail++] = t;
+          }
         }
       }
       while (head < tail) {

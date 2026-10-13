@@ -402,6 +402,14 @@ weather's next part comes next. Fire comes first of the weather systems, and win
   L1 bolt, at most one every `BOLT_GAP_MS`; Info's Weather row ("storm", "rain, 6 mm
   today", "showers nearby", "dry for 9 days", "clear"). A shower's swath shows plainly after
   a dry spell and hardly at all in a wet one (the soil is already damp); Paul to judge.
+- **Rain animation R5 without the haze** (Paul, 13 Oct 2026; the first streaks vibrated at
+  any speed but 1×): softer, sparser streaks plus ripples on water and splashes on ground,
+  all moving on real time so they look the same at every sim speed; only where it rains
+  follows the sim. Every shower leaves a visible swath: ground darkens where the soil is
+  wetter than it has been lately, then eases back.
+- **Lightning more dramatic, even if less realistic** (Paul, 13 Oct 2026: the first bolt was
+  barely perceptible): a bolder bolt with branches and a local glow and scorch where it
+  lands, still never a full-screen flash, still rate-limited.
 - **Order:** showers and spells; drought you can see; lightning.
 
 ## Looks
@@ -463,6 +471,16 @@ weather's next part comes next. Fire comes first of the weather systems, and win
     with a small icon each, no taller than the bar. Every window can be resized from its
     bottom-right corner, and keeps its size per viewer (desktop; on a phone the graph only).
     Scrollbars are thin and muted.
+  - **Lenses** (Paul, 13 Oct 2026; being mocked up, after Civilization VI's lenses and
+    RimWorld's overlays): a row of lens buttons in Info (Fire, Water, Weather, Ground,
+    Condition, Activity), one on at a time; the rest of the map dims a little and the
+    lens's items show in their colors, with a legend (swatch, name, live count, a checkbox
+    per item). Big sets tint, small sets and animals ring. Info is for deep dives; the
+    graph's legend icons give a quick look (rings that fade out over about 2 s).
+  - **Units** (Paul, 13 Oct 2026): a Metric / Imperial toggle in Info, kept per viewer.
+    Everywhere a measure shows (wind km/h or mph, rain mm or inches, elevation, water depth
+    and topo spacing m or ft, distances km or mi, the loading screen too) follows it; the
+    sim and the tables stay metric.
   - **PAINT:** see [PAINT](#paint).
   - **Debug**, only with `?debug` in the address (12 Oct 2026): **World** (Water, the
     seed), **Tools** (Benchmark, the debug tools).

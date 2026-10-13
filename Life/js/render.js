@@ -513,22 +513,26 @@
       }
       soil.pos = t;
       const d = dt / SOIL_FADE_MS;
-      for (let i = 0; i < soil.count; i++) {
-        const u = list[i];
-        let p = prog[u];
+      // Every moving tile, every frame, so each tile's levels are read once and the count is kept local.
+      let live = soil.count;
+      for (let i = 0; i < live; i++) {
+        const u = list[i], tg = tgt[u];
+        let p = prog[u], cu = cur[u];
         if (p === 0) {
           // Idle: begin a step toward the target, if it is still away from the screen.
-          if (tgt[u] === cur[u]) { act[u] = 0; list[i] = list[--soil.count]; i--; continue; }
-          nxt[u] = cur[u] + (tgt[u] > cur[u] ? 1 : -1);
+          if (tg === cu) { act[u] = 0; list[i] = list[--live]; i--; continue; }
+          nxt[u] = cu + (tg > cu ? 1 : -1);
         }
+        const nx = nxt[u];
         // Toward nxt while the target is that way, back toward cur when it is not.
-        const forward = (tgt[u] > cur[u]) === (nxt[u] > cur[u]) && tgt[u] !== cur[u];
+        const forward = (tg > cu) === (nx > cu) && tg !== cu;
         p += forward ? d : -d;
-        if (p >= 1) { cur[u] = nxt[u]; p = 0; }
+        if (p >= 1) { cu = nx; cur[u] = cu; p = 0; }
         else if (p <= 0) p = 0;
         prog[u] = p;
-        if (p === 0 && tgt[u] === cur[u]) { nxt[u] = cur[u]; act[u] = 0; list[i] = list[--soil.count]; i--; }
+        if (p === 0 && tg === cu) { nxt[u] = cu; act[u] = 0; list[i] = list[--live]; i--; }
       }
+      soil.count = live;
     }
     // The grass sprite for a blade at soil level l: dried (sprites.js) below 0, else the plain one.
     function grassId(third, lean, l) {
@@ -564,12 +568,14 @@
       const corpse = FAR_CORPSE, waters = FAR_WATERS, wtgt = water.tgt, wfade = water.fade, holeAt = W.hole, scorch = W.scorch, fullDays = scorchFadeDays(sim);
       const lo = 1 / 3, hi = 2 / 3;
       const flow = W.flow, ash = W.ash, fireDays = sim.T.world.FireScorchDays, emberDays = FIRE_EMBER_HOURS / 24;
+      // The soil's arrays, looked up once: a property read per tile adds up over the whole map.
+      const sCur = soil ? soil.cur : null, sAct = soil ? soil.act : null;
       for (let t = 0, n = W.n; t < n; t++) {
         const k = kind[t];
         if (flow[t] === FLOW.FIRE) px[t] = AS.fireLook(AS.fireStage(W, t)).flame >= AS.FLAME.MID ? FAR_FIRE_HIGH : FAR_FIRE_MID;
         else if (k === KIND.GRASS) {
           const z = size[t], third = z < lo ? 0 : z < hi ? 1 : 2;
-          px[t] = soil && (soil.cur[t] !== 0 || soil.act[t]) ? farSoil(t, third) : FAR_GRASS[third];
+          px[t] = sCur !== null && (sCur[t] !== 0 || sAct[t]) ? farSoil(t, third) : FAR_GRASS[third];
         }
         else if (k === KIND.CORPSE) px[t] = corpse;
         else if (wtgt[t] !== 0 && !wfade[t]) px[t] = waters[wtgt[t] - 1];   // under a wading animal too
@@ -580,7 +586,7 @@
             const ground = mixAbgr(bg, FAR_SCORCH, Math.min(1, scorch[t] / fullDays)), left = scorch[t];
             // Embers glow only where a fuel fire burnt out (it left ash), never on a nuke's crater.
             c = ash[t] > 0 && left > fireDays - emberDays && left <= fireDays ? mixAbgr(ground, FAR_EMBER, (left - (fireDays - emberDays)) / emberDays) : ground;
-          } else c = holeAt[t] ? FAR_HOLE : soil && (soil.cur[t] > 0 || soil.act[t]) ? farSoil(t, -1) : bg;   // empty ground (wet, or a hole), or an animal that the loop below paints
+          } else c = holeAt[t] ? FAR_HOLE : sCur !== null && (sCur[t] > 0 || sAct[t]) ? farSoil(t, -1) : bg;   // empty ground (wet, or a hole), or an animal that the loop below paints
           px[t] = wfade[t] ? farWaterMix(c, t) : c;
         }
       }
@@ -1112,7 +1118,25 @@
         for (let i = 0; i < m; i++) buildSquare(W, c, i);
         byStep.set(contourStep, c);
       }
-      if (c.flips !== W.wetFlips) { c.flips = W.wetFlips; c.check.fill(1); }
+      if (c.flips !== W.wetFlips) {
+        // Only the squares that read a tile that flipped can have changed: its own, and the one
+        // before it where it sits on the shared row or column. A cache too far behind looks at all.
+        if (W.wetFlips - c.flips > AS.FLIP_LOG) c.check.fill(1);
+        else {
+          const log = W.flipLog, mask = AS.FLIP_LOG - 1, check = c.check;
+          for (let f = c.flips; f < W.wetFlips; f++) {
+            const t = log[f & mask], x = t % W.w, y = (t / W.w) | 0;
+            const qx = (x / CONTOUR_CHUNK) | 0, qy = (y / CONTOUR_CHUNK) | 0;
+            const bx = x % CONTOUR_CHUNK === 0 && qx > 0, by = y % CONTOUR_CHUNK === 0 && qy > 0;
+            const i = qy * c.cw + qx;
+            if (qx < c.cw && qy < c.ch) check[i] = 1;
+            if (bx) check[i - 1] = 1;
+            if (by) check[i - c.cw] = 1;
+            if (bx && by) check[i - c.cw - 1] = 1;
+          }
+        }
+        c.flips = W.wetFlips;
+      }
       return c;
     }
     // The tiles a square's lines read: its own and the row and column after.

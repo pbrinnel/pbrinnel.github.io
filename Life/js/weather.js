@@ -88,6 +88,10 @@
   const POISSON_CHUNK = 30;           // births are drawn in chunks of at most this mean (Knuth's method underflows for large ones)
   const SHOWERS_START = 64;           // room for this many live showers; the arrays double when full
   const HOURS_PER_DAY = 24;
+  const INNER_MIN_V2 = 1e-4;          // deposit: below this speed squared the per-tile roots are too ill-conditioned to skip them
+  const INNER_SHRINK = 1 - 1e-6;      // ... and the disk the whole-piece shortcut trusts is this share of its area
+  const NARROW_MIN_VY = 1e-9;         // deposit: a path this close to horizontal isn't narrowed per row by its slope
+  const NARROW_ROW = 1.0001;          // ... only rows whose distance from the line clears the reach by this factor are skipped
 
   const CALM_BELOW_KMH = 2;           // windWords: under this, calm
   const WINDY_FROM_KMH = 20;          // ... from this, windy; between, a breeze
@@ -151,6 +155,34 @@
     return sum / mass;
   }
 
+  // Whether rowEdge rained on any tile (a second result; module-level so the call allocates nothing).
+  let edgeHit = false;
+  // Rain onto row `row` (the index of its first tile), tiles xa..xb, by the exact per-tile rule: a
+  // tile is rained on while its center is inside the disk, so mmh x the hours that is true. The disk's
+  // center is c + v t, and |q - v t| <= R (q: tile center minus c) is a quadratic in t whose roots
+  // bound the time inside, clipped to the piece [ta, tb]. qyvy and qy2 are the row's qy * vy and
+  // qy * qy, worked out once. `sum` is the step's running total; the new one is returned.
+  function rowEdge(field, row, xa, xb, qy, qyvy, qy2, cx, R2, mmh, vx, vy, v2, ta, tb, sum) {
+    let hit = false;
+    for (let x = xa, i = row + xa; x <= xb; x++, i++) {
+      const qx = x + 0.5 - cx;
+      const c = qx * qx + qy2 - R2;
+      let lo, hi;
+      if (v2 === 0) { if (c > 0) continue; lo = ta; hi = tb; }
+      else {
+        const b = qx * vx + qyvy, disc = b * b - v2 * c;
+        if (disc <= 0) continue;
+        const sq = Math.sqrt(disc);
+        lo = Math.max((b - sq) / v2, ta); hi = Math.min((b + sq) / v2, tb);
+        if (hi <= lo) continue;
+      }
+      const mm = mmh * (hi - lo);
+      field[i] += mm; sum += mm; hit = true;
+    }
+    edgeHit = hit;
+    return sum;
+  }
+
   // The wind model for a world: { wind, step() }. `every` is the update interval in ticks;
   // the check builds it at other values to prove the statistics don't depend on it.
   AS.Wind = function (T, seed, every = WEATHER_EVERY_TICKS) {
@@ -206,40 +238,65 @@
     // |q - v t| <= R (q: tile center minus c) is a quadratic in t whose roots bound the
     // time inside. Exact for any step length, which is why the rain doesn't depend on
     // WEATHER_EVERY_TICKS. The path is cut into pieces of at most PIECE_RADII radii and
-    // only the tiles in a piece's box are looked at: a long path across a wide map stays
-    // as cheap as the area it wets, not the box around the whole path.
+    // only the tiles in a piece's box, narrowed per row to the strip along the path, are
+    // looked at: a long path across a wide map stays as cheap as the area it wets, not the
+    // box around the whole path. rowEdge is the exact rule; the tiles that are inside the
+    // disk for a whole piece skip it (see the loop).
     function deposit(cx, cy, R, mmh, vx, vy, act) {
       const { w, h, field } = rain;
       const v2 = vx * vx + vy * vy, R2 = R * R;
       const pieces = Math.max(1, Math.ceil(Math.sqrt(v2) * act / (PIECE_RADII * R)));
       const dtp = act / pieces;
+      const sweeps = v2 === 0 || v2 > INNER_MIN_V2;
+      const reachPerp = R * Math.sqrt(v2), innerR2 = R2 * INNER_SHRINK;
+      // The mm of the whole map this step so far, added to in the order the tiles are visited
+      // (the sum's rounding depends on it).
+      let sum = rain.stepMm;
       for (let k = 0; k < pieces; k++) {
         const ta = k * dtp, tb = ta + dtp;
         const ax = cx + vx * ta, ay = cy + vy * ta, bx = cx + vx * tb, by = cy + vy * tb;
         const x0 = Math.max(0, Math.floor(Math.min(ax, bx) - R)), x1 = Math.min(w - 1, Math.ceil(Math.max(ax, bx) + R));
         const y0 = Math.max(0, Math.floor(Math.min(ay, by) - R)), y1 = Math.min(h - 1, Math.ceil(Math.max(ay, by) + R));
         if (x0 > x1 || y0 > y1) continue;
+        const full = mmh * (tb - ta);
         let touched = false;
         for (let y = y0; y <= y1; y++) {
           const qy = y + 0.5 - cy;
-          for (let x = x0, i = y * w + x0; x <= x1; x++, i++) {
-            const qx = x + 0.5 - cx;
-            const c = qx * qx + qy * qy - R2;
-            let lo, hi;
-            if (v2 === 0) { if (c > 0) continue; lo = ta; hi = tb; }
-            else {
-              const b = qx * vx + qy * vy, disc = b * b - v2 * c;
-              if (disc <= 0) continue;
-              const sq = Math.sqrt(disc);
-              lo = Math.max((b - sq) / v2, ta); hi = Math.min((b + sq) / v2, tb);
-              if (hi <= lo) continue;
-            }
-            const mm = mmh * (hi - lo);
-            field[i] += mm; rain.stepMm += mm; touched = true;
+          // Only tiles within R of the path's line can be rained on (disc > 0 in rowEdge means
+          // |qx vy - qy vx| < R |v|), so each row looks only between where the line, widened
+          // by that and a tile of slack, enters and leaves it.
+          let xs = x0, xe = x1;
+          if (v2 > 0) {
+            if (Math.abs(vy) > NARROW_MIN_VY) {
+              const m1 = (qy * vx - reachPerp) / vy, m2 = (qy * vx + reachPerp) / vy;
+              xs = Math.max(xs, Math.floor(Math.min(m1, m2) + cx - 0.5) - 1);
+              xe = Math.min(xe, Math.ceil(Math.max(m1, m2) + cx - 0.5) + 1);
+            } else if (qy * qy * vx * vx > reachPerp * reachPerp * NARROW_ROW) continue;
+            if (xs > xe) continue;
           }
+          // A tile inside the disk at both ends of the piece is inside for all of it (the disk
+          // is convex), so it gets the whole piece: mmh x its length, which is exactly what the
+          // per-tile rule works out for it. Those tiles are the bulk of a slow shower's disk;
+          // the shrink keeps every tile near the rim on the exact rule.
+          let ia = 1, ib = 0;
+          if (sweeps) {
+            const dA = y + 0.5 - ay, dB = y + 0.5 - by, sA = innerR2 - dA * dA, sB = innerR2 - dB * dB;
+            if (sA > 0 && sB > 0) {
+              const rA = Math.sqrt(sA), rB = Math.sqrt(sB);
+              ia = Math.max(xs, Math.ceil(Math.max(ax - rA, bx - rB) - 0.5));
+              ib = Math.min(xe, Math.floor(Math.min(ax + rA, bx + rB) - 0.5));
+            }
+          }
+          const row = y * w, qyvy = qy * vy, qy2 = qy * qy;
+          if (ia > ib) { sum = rowEdge(field, row, xs, xe, qy, qyvy, qy2, cx, R2, mmh, vx, vy, v2, ta, tb, sum); touched = touched || edgeHit; continue; }
+          sum = rowEdge(field, row, xs, ia - 1, qy, qyvy, qy2, cx, R2, mmh, vx, vy, v2, ta, tb, sum); touched = touched || edgeHit;
+          for (let i = row + ia, e = row + ib; i <= e; i++) { field[i] += full; sum += full; }
+          touched = true;
+          sum = rowEdge(field, row, ib + 1, xe, qy, qyvy, qy2, cx, R2, mmh, vx, vy, v2, ta, tb, sum); touched = touched || edgeHit;
         }
         if (touched) { if (y0 < rain.dirtyLo) rain.dirtyLo = y0; if (y1 > rain.dirtyHi) rain.dirtyHi = y1; }
       }
+      rain.stepMm = sum;
     }
 
     // A shower that has `act` hours of this step left to live: rain, move, age. Gone when its life is.
