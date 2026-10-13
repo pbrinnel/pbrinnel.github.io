@@ -272,7 +272,16 @@
   // page grows it itself, after giving the card two frames to paint.
   const loadingEl = document.getElementById('loading');
   const nextFrame = () => new Promise(r => requestAnimationFrame(() => r()));
-  function growInWorker(seed) {
+  // A world takes the screen's shape (Paul, 13 Oct 2026): on a screen taller than wide (a phone
+  // held upright) WorldWidth and WorldHeight swap, so the map fills it. Decided as each world is
+  // made, so turning the phone shapes the next one; a seed grows a different world in each shape.
+  function shapedTables() {
+    const w = T.world.WorldWidth, h = T.world.WorldHeight;
+    const portrait = innerHeight > innerWidth;
+    if (portrait === h > w) return T;
+    return Object.freeze({ ...T, world: Object.freeze({ ...T.world, WorldWidth: h, WorldHeight: w }) });
+  }
+  function growInWorker(seed, T) {
     return new Promise(resolve => {
       let wk;
       try { wk = new Worker(AS.BASE + 'js/terrain-worker.js?v=' + AS.V); } catch (e) { resolve(null); return; }
@@ -297,7 +306,7 @@
     return out;
   }
   async function makeWorld(seed) {
-    const { n0, n1 } = Loading, W0 = T.world;
+    const TW = shapedTables(), { n0, n1 } = Loading, W0 = TW.world;
     Loading.reset(['params', 'terrain', 'lay']);
     Loading.start('params');
     Loading.set('params', 'done', [
@@ -305,12 +314,12 @@
     ]);
     if (loadingEl) { loadingEl.hidden = false; Loading.start('terrain'); await nextFrame(); await nextFrame(); }
     try {
-      const grown = typeof Worker === 'function' ? await growInWorker(seed) : null;
+      const grown = typeof Worker === 'function' ? await growInWorker(seed, TW) : null;
       if (grown) Loading.set('terrain', 'done', terrainFigures(grown.S, grown.elev, grown.H, grown.G, grown.water));
       else Loading.set('terrain', 'skipped', ['No Web Worker here, so the ground is grown on the page, inside the next step.']);
       Loading.start('lay');
       await nextFrame(); await nextFrame();
-      const made = AS.Sim(T, seed, { water: waterOn, terrain: grown || undefined });
+      const made = AS.Sim(TW, seed, { water: waterOn, terrain: grown || undefined });
       const W = made.W;
       if (!grown) Loading.set('terrain', 'skipped', terrainFigures(made.terrain, W.elev, W.water && W.water.H, W.water && W.water.G, !!W.water));
       Loading.set('lay', 'done', [

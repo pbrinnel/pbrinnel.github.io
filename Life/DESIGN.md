@@ -41,6 +41,10 @@ tuning so far) is in HISTORY.md.
 - No day/night, no seasons.
 
 ## World
+- **The world takes the screen's shape** (Paul, 13 Oct 2026): on a screen taller than wide (a
+  phone held upright) `WorldWidth` and `WorldHeight` swap, so a portrait world fills it. It is
+  decided as each world is made, so turning the phone shapes the next one, and a seed grows a
+  different world in each shape.
 - A tile grid larger than the screen; drag to pan, scroll or pinch to zoom. On a
   keyboard, WASD or the arrow keys pan too (Shift for faster). Zoomed in, the view pans up
   to half a screen past the world's edge, so any edge or corner can be brought to the
