@@ -22,6 +22,7 @@
   const hourlyHazard = c => (c > 0 && c < 1 ? -Math.log(1 - c) / HOURS_PER_DAY : 0);
   function prepare(T) {
     cachedT = T;
+    seedReach = T.grass.SeedReach; seedFar = T.grass.SeedFar;
     const c = T.grass.SeedChance;
     seedsAlways = c >= 1;
     hourlyRate = hourlyHazard(c);
@@ -34,6 +35,43 @@
   }
 
   const nb = new Int32Array(4);
+
+  // A carried seed survives only where grass shelters it: it takes root on the best of
+  // SEED_TRIES landing spots, and only if at least SHELTER_MIN of that spot's 8 neighbors are
+  // grass. Alone in the open it is lost, so a carried seed extends a meadow and never sows a
+  // lone blade far from any.
+  const SEED_TRIES = 6;
+  const SHELTER_MIN = 2;
+  let seedReach = 0, seedFar = 0;
+  // Free bare ground fit for a seed: the test a seed dropping at the parent's feet uses too.
+  const seedable = (W, u) => W.isBare(u) && !W.hole[u] && W.scorch[u] === 0 && !W.beach[u];
+  function shelter(W, u) {
+    const w = W.w, x = u % w, y = (u / w) | 0;
+    let c = 0;
+    for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
+      if (!i && !j) continue;
+      const X = x + i, Y = y + j;
+      if (X >= 0 && Y >= 0 && X < w && Y < W.h && W.kind[Y * w + X] === AS.KIND.GRASS) c++;
+    }
+    return c;
+  }
+  // The tile a carried seed from blade t takes root on, or -1. A spot is 2..seedReach tiles
+  // away in a random direction (rounded to a tile); a spot off the map or not seedable is no
+  // chance at all, and the most sheltered of the rest wins.
+  function carriedTile(W, t, rng) {
+    const w = W.w, x = t % w, y = (t / w) | 0;
+    let best = -1, bestShelter = SHELTER_MIN - 1;
+    for (let n = 0; n < SEED_TRIES; n++) {
+      const d = 2 + rng.next() * (seedReach - 2), a = rng.next() * 2 * Math.PI;
+      const X = Math.round(x + Math.cos(a) * d), Y = Math.round(y + Math.sin(a) * d);
+      if (X < 0 || Y < 0 || X >= w || Y >= W.h) continue;
+      const u = Y * w + X;
+      if (!seedable(W, u)) continue;
+      const c = shelter(W, u);
+      if (c > bestShelter) { bestShelter = c; best = u; }
+    }
+    return best;
+  }
 
   AS.grassTick = function (sim) {
     const { T, W, rng } = sim;
@@ -121,9 +159,15 @@
         } else p = src >= 0 ? 1 - Math.exp(-hourlyRate * AS.corpseBoost(sim, t)) : seedP;
       }
       if (p < 1 && !rng.chance(p)) continue;
+      // SeedFar of the seeds are carried; one with no sheltered spot drops at the blade's feet
+      // like the rest.
+      if (seedFar > 0 && rng.chance(seedFar)) {
+        const u = carriedTile(W, t, rng);
+        if (u >= 0) { W.addGrass(u, g.SproutSize, 0); continue; }
+      }
       const k = W.neighbors4(t, nb);
       let free = 0;
-      for (let j = 0; j < k; j++) if (W.isBare(nb[j]) && !W.hole[nb[j]] && scorch[nb[j]] === 0 && !W.beach[nb[j]]) nb[free++] = nb[j];
+      for (let j = 0; j < k; j++) if (seedable(W, nb[j])) nb[free++] = nb[j];
       if (free) W.addGrass(nb[rng.int(free)], g.SproutSize, 0);
     }
   };

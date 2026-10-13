@@ -290,6 +290,11 @@ last only as long as their lives.
 - Each tile of grass is one blade. Its sprite shows its Size in thirds.
 - A blade grows from sprout to full Size, then can seed a new blade on an empty
   4-neighbor tile, and dies of old age at its `Lifespan`.
+- **Carried seeds fill gaps** (Paul, 13 Oct 2026, so meadows join up and fires run farther):
+  a share of seeds (`SeedFar`) is carried 2 to `SeedReach` tiles in a random direction and
+  takes root only where other grass shelters it (at least two grass neighbors), else drops
+  beside its blade as before. Measured: grass in clumps of 100+ tiles went from 14-18% to
+  34-41%, a painted fire burned about 3.5× as far, and the animals stayed in range.
 - **A blade seeds only while it's at full Size.** A bitten blade regrows at `GrowthRate`
   and seeds again once it's full, so grazing slows a meadow's spread. Grass
   `TimeToMature` only sets the Lifestage label.

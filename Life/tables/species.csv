@@ -81,7 +81,9 @@ RoamRun,tiles,90-150,40-120,40-120,,How far away a roaming wolf's or human's, or
 RoamHunger,× HungerRate,,5,,,Hunger while roaming (walking after RoamAfter days without seeing prey): a desperate hunter burns faster; blank = like walking
 GrowthRate,Size per day,,,,1,Grass Size runs 0 to 1
 SproutSize,Size,,,,0.1,Size a new blade starts at; above 0 so even a sprout feeds a little
-SeedChance,per day,,,,10%,Mature blade seeds one empty 4-neighbor tile
+SeedChance,per day,,,,10%,Mature blade seeds once: onto an empty 4-neighbor tile or (SeedFar) a carried seed
+SeedReach,tiles,,,,3,How far a carried seed can land (never closer than 2); it takes root only where grass shelters it
+SeedFar,share of seeds,,,,50%,Share of seeds that are carried instead of dropping at the blade's feet
 SproutChance,per day,,,,0.1%,Chance an empty tile grows a blade by itself (grass can return to bare land); 0% = off
 CorpseNutrient,per body,10,30,30,,How long and how hard a corpse feeds grass
 CorpseDecay,days,1,5,5,,Corpse disappears after this

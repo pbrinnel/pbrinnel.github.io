@@ -142,6 +142,46 @@ const day = AS => AS.TICK_HZ * AS.DAY_SECONDS;
   ok(Math.abs(got - want) <= want * 0.1, `sprout: ${got} blades on ${size * size} empty tiles in a day, expected ~${want} (SproutChance ${T.grass.SproutChance * 100}%)`);
 }
 
+// carried seeds: SeedFar of the seeds land 2..SeedReach tiles away, only on free ground with at
+// least two grass neighbors; the rest, and any carried seed with no such spot, drop on a free 4-neighbor
+{
+  const SHELTER = [[9, 7], [10, 7], [9, 8], [10, 8], [5, 5], [5, 6]];   // half-grown: sheltered, never seeding
+  // One full blade seeds once (an hour, SeedChance 100%); returns [world, parent tile].
+  const seedOnce = (far, n, sheltered) => {
+    const { AS, sim } = make(15, 5000 + n, tx => {
+      tx.species = editCSV(editCSV(editCSV(tx.species, 'SeedChance', 'Grass', '100%'), 'SeedFar', 'Grass', far), 'GrowthRate', 'Grass', '0');
+    });
+    const W = sim.W, parent = W.tile(7, 7);
+    W.addGrass(parent, 1, 0);
+    if (sheltered) for (const [x, y] of SHELTER) W.addGrass(W.tile(x, y), 0.5, 0);
+    for (let i = 0; i < AS.TICKS_PER_HOUR; i++) sim.tick();
+    return { AS, T: sim.T, W, parent };
+  };
+  const shelterOf = (W, u, K) => { let c = 0; for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) if ((i || j) && W.kind[W.tile(W.tx(u) + i, W.ty(u) + j)] === K) c++; return c; };
+  const trials = 300;
+  for (const [far, sheltered, label] of [['100%', true, 'SeedFar 100%'], ['0%', true, 'SeedFar 0%'], ['100%', false, 'SeedFar 100%, no shelter']]) {
+    let seeded = 0, carried = 0, bad = 0;
+    for (let n = 0; n < trials; n++) {
+      const { AS, T, W, parent } = seedOnce(far, n, sheltered);
+      const K = AS.KIND.GRASS, sheltering = new Set(SHELTER.map(([x, y]) => W.tile(x, y)));
+      sheltering.add(parent);
+      for (let u = 0; u < W.n; u++) {
+        if (W.kind[u] !== K || sheltering.has(u)) continue;
+        seeded++;
+        const dx = W.tx(u) - W.tx(parent), dy = W.ty(u) - W.ty(parent), d = Math.hypot(dx, dy);
+        if (d === 1) continue;   // dropped at the blade's feet
+        carried++;
+        // rounding the landing spot to a tile can move it by under a tile, so the bounds carry that slack
+        let under = 0; for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) if ((i || j) && sheltering.has(W.tile(W.tx(u) + i, W.ty(u) + j))) under++;
+        if (d < 2 - Math.SQRT1_2 || d > T.grass.SeedReach + Math.SQRT1_2 || under < 2) bad++;
+      }
+    }
+    if (far === '100%' && sheltered) ok(carried > trials * 0.3 && bad === 0, `carried: ${carried}/${seeded} seeds landed away, ${bad} outside 2..SeedReach or on fewer than 2 grass neighbors`);
+    else if (!sheltered) ok(seeded > trials * 0.9 && carried === 0, `carried: ${label}, nowhere sheltered: ${seeded} seeds, ${carried} carried (all drop at the feet)`);
+    else ok(seeded > trials * 0.9 && carried === 0, `carried: ${label}: ${seeded} seeds, ${carried} carried (SeedFar 0 seeds 4-neighbors only)`);
+  }
+}
+
 // stage label
 {
   const { AS, T, sim } = make(9);
