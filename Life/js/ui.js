@@ -369,9 +369,20 @@
         box.title = word() + ' between topo lines (every fifth is bolder)';
       };
       show();
-      contourInput.addEventListener('input', () => { show(); if (!locked) onContourStep(AS.units.contourMeters(+contourInput.value)); });
-      // The same notch means a slightly different spacing in the other unit; the map follows.
-      AS.units.onChange(() => { show(); onContourStep(AS.units.contourMeters(+contourInput.value)); });
+      let shownMeters = AS.units.contourMeters(+contourInput.value);
+      contourInput.addEventListener('input', () => {
+        show();
+        shownMeters = AS.units.contourMeters(+contourInput.value);
+        if (!locked) onContourStep(shownMeters);
+      });
+      // Switching units keeps the spacing as near as the new unit's steps allow (5 m → 20 ft,
+      // 2 m → 5 ft), not the slider's notch.
+      AS.units.onChange(() => {
+        contourInput.value = String(AS.units.contourIndex(shownMeters));
+        show();
+        shownMeters = AS.units.contourMeters(+contourInput.value);
+        onContourStep(shownMeters);
+      });
       box.append(label, contourInput);
       showElev.appendChild(box);
     }

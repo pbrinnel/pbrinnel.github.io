@@ -6,9 +6,17 @@
   // DESIGN.md "Time": pause, 1×, 2×, 5×, 20×, max.
   const SPEEDS = [0, 1, 2, 5, 20, Infinity];
   const START_SPEED = 1;
-  // Ticks may use this much of a frame; the rest is drawing. Past it a fixed speed falls
-  // behind (and the HUD says so) instead of piling up work and freezing the page.
+  // Ticks may use this much of a frame at least; the rest is drawing. Past it a fixed speed
+  // falls behind (and the HUD says so) instead of piling up work and freezing the page. The
+  // benchmark measures against this fixed figure.
   const TICK_BUDGET_MS = AS.TICK_BUDGET_MS = 12;
+  // The budget each frame actually gets: the display's frame time, less what drawing has been
+  // taking and FRAME_SLACK_MS for the browser's own compositing, never under TICK_BUDGET_MS.
+  // A fixed 12 ms left about 7% of each frame idle at Max (Paul, 13 Oct 2026: more speed).
+  const FRAME_SLACK_MS = 2;
+  const FRAME_EASE = 0.1;           // how fast the frame and draw estimates follow (per frame)
+  const FRAME_MIN_MS = 4, FRAME_MAX_MS = 50;   // frame times outside this aren't the display's
+  let frameMs = 1000 / 60, drawMs = 2;
   // A frame longer than this (a background tab, a debugger pause) counts as this long.
   const MAX_FRAME_S = 0.1;
   // The HUD's "running at" figure is measured over about this long.
@@ -448,15 +456,17 @@
     last = now;
     const ticksBefore = sim.tickCount;
     const speed = SPEEDS[speedIndex];
+    if (interval >= FRAME_MIN_MS && interval <= FRAME_MAX_MS) frameMs += (interval - frameMs) * FRAME_EASE;
+    const budget = Math.max(TICK_BUDGET_MS, frameMs - drawMs - FRAME_SLACK_MS);
     const t0 = performance.now();
 
     if (speed === Infinity) {
-      do sim.tick(); while (performance.now() - t0 < TICK_BUDGET_MS);
+      do sim.tick(); while (performance.now() - t0 < budget);
       acc = 0;
     } else if (speed > 0) {
       acc += realDt * speed;
       while (acc >= AS.DT) {
-        if (performance.now() - t0 >= TICK_BUDGET_MS) { acc = Math.min(acc, AS.DT); break; }
+        if (performance.now() - t0 >= budget) { acc = Math.min(acc, AS.DT); break; }
         sim.tick();
         acc -= AS.DT;
       }
@@ -500,8 +510,10 @@
       counts: { bunnies: W.bunnies, wolves: W.wolves, humans: W.humans, total: W.bunnies + W.wolves + W.humans, blades: W.gCount + W.sunkCount, corpses: W.cCount, fires: W.fCount },
     });
     // CPU time only: the browser's own compositing shows up in `interval`, not here.
+    const drewMs = performance.now() - t1;
+    drawMs += (drewMs - drawMs) * FRAME_EASE;
     if (app.onFrame) {
-      app.onFrame(interval, tickMs, performance.now() - t1, sim.tickCount - ticksBefore);
+      app.onFrame(interval, tickMs, drewMs, sim.tickCount - ticksBefore);
     }
     requestAnimationFrame(frame);
   }

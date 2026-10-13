@@ -512,13 +512,16 @@ const winOf = (ids, key) => ids.hud.all(e => e.className === 'hud-tabstrip hud-w
   assert(btn('Imperial').classList.contains('on') && !btn('Metric').classList.contains('on')); ok('the clicked button lights');
   assert(/19 mph/.test(windText()) && !/km/.test(windText())); ok('imperial wind: 30 km/h is 19 mph');
   assert.strictEqual(weatherText(), 'rain, 0.24 in today'); ok('imperial rain: 6 mm is 0.24 in');
-  assert.strictEqual(label.textContent, 'a line every 20 ft'); ok('the topo label reads in feet, on the same slider notch');
+  assert.strictEqual(label.textContent, 'a line every 20 ft'); ok('the topo label reads in feet: 5 m becomes the nearest step, 20 ft');
   assert(Math.abs(meters[meters.length - 1] - 20 * 0.3048) < 1e-9); ok('the renderer is still told meters (20 ft = 6.096 m)');
   assert.strictEqual(AS.units.contourSteps().join(), '2,5,10,20,50,100'); ok('imperial topo steps: 2, 5, 10, 20, 50, 100 ft');
   assert.strictEqual(mem['life-units'], 'imperial'); ok('the choice is kept');
   assert.strictEqual(AS.units.length(10, 1), '32.8 ft'); assert.strictEqual(AS.units.distance(6, 1), '3.7 mi'); assert.strictEqual(AS.units.rainRate(2.5, 2), '0.10 in/day'); ok('lengths, distances and rain rates convert');
   btn('Metric').fire('click'); ui.hud(hudIn());
   assert(/30 km\/h/.test(windText()) && label.textContent === 'a line every 5 m' && AS.units.length(10, 1) === '10.0 m'); ok('and back to metric');
+  slider.value = '2'; slider.fire('input'); btn('Imperial').fire('click');
+  assert.strictEqual(label.textContent, 'a line every 5 ft'); ok('switching keeps the spacing nearest, not the notch: 2 m becomes 5 ft');
+  btn('Metric').fire('click');
   assert.strictEqual(AS.units.contourIndex(6.096), 3, 'imperial 20 ft is the 4th notch'); ok('a kept spacing finds its nearest notch');
   btn('Imperial').fire('click');
   const again = build(false, { contourStep: 20 * 0.3048, onContourStep() {} });
