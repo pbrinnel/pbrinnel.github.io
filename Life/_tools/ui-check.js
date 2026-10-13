@@ -30,6 +30,8 @@ class El {
   all(p, out = []) { if (p(this)) out.push(this); this.children.forEach(c => c.all(p, out)); return out; }
 }
 let LS;   // what the page sees as localStorage (undefined: none, which the page copes with)
+// Most checks were written for metric; the Units block asks for the page's real default.
+let REAL_UNITS = false;
 function build(debug, extra = {}, win = {}, asExtra = null) {
   const ids = { hud: new El('div'), errors: new El('div'), inspector: new El('aside'), graph: new El('aside') };
   ids.graph._hidden = true;
@@ -37,7 +39,7 @@ function build(debug, extra = {}, win = {}, asExtra = null) {
   const body = new El('body');
   const doc = { createElement: t => new El(t), getElementById: i => ids[i], body, listeners: {},
     addEventListener(t, f) { (this.listeners[t] ||= []).push(f); } };
-  const ctx = { document: doc, globalThis: null, AS: {}, localStorage: LS, ...win }; ctx.globalThis = ctx;
+  const ctx = { document: doc, globalThis: null, AS: REAL_UNITS ? {} : { UNITS_DEFAULT: 'metric' }, localStorage: LS, ...win }; ctx.globalThis = ctx;
   vm.createContext(ctx);
   // ui.js builds its debug tools from the species list, which world.js owns.
   vm.runInContext(fs.readFileSync(require('path').join(__dirname, '../js/world.js'), 'utf8'), ctx);
@@ -499,11 +501,13 @@ const winOf = (ids, key) => ids.hud.all(e => e.className === 'hud-tabstrip hud-w
 
 // ---- Info's Units row: Metric | Imperial converts what the page shows, and is remembered ----
 { const mem = {}; LS = { getItem: k => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = v; } };
+  REAL_UNITS = true;
   const meters = [];
   const { ui, ids, ctx } = build(false, { contourStep: 5, onContourStep: m => meters.push(m) });
   const AS = ctx.AS, row = ids.hud.all(e => e.className === 'hud-sec hud-sec-units')[0];
   const btn = n => row.all(e => e.textContent === n)[0];
-  assert(row && btn('Metric') && btn('Imperial') && btn('Metric').classList.contains('on') && !btn('Imperial').classList.contains('on')); ok('Info has a Units row: Metric on, Imperial off, by default');
+  assert(row && btn('Metric') && btn('Imperial') && btn('Imperial').classList.contains('on') && !btn('Metric').classList.contains('on')); ok('Info has a Units row: Imperial on, Metric off, by default');
+  btn('Metric').fire('click');
   const slider = ids.hud.all(e => e.className === 'hud-slider-input')[0], label = ids.hud.all(e => e.className === 'hud-slider-label')[0];
   const windText = () => ids.hud.all(e => e.className === 'hud-wind-text')[0].textContent, weatherText = () => ids.hud.all(e => e.className === 'hud-weather-text')[0].textContent;
   const sh = { n: 0 }, hudIn = () => ({ ...input, wind: { from: 0, kmh: 30 }, weather: { field: new Float32Array(1), showers: sh, rainToday: 5.6, dryDays: 0 }, mapW: 450, mapH: 300 });

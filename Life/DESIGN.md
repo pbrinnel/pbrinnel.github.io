@@ -479,7 +479,8 @@ weather's next part comes next. Fire comes first of the weather systems, and win
     lens's items show in their colors, with a legend (swatch, name, live count, a checkbox
     per item). Big sets tint, small sets and animals ring. Info is for deep dives; the
     graph's legend icons give a quick look (rings that fade out over about 2 s).
-  - **Units** (Paul, 13 Oct 2026): a Metric / Imperial toggle in Info, kept per viewer.
+  - **Units** (Paul, 13 Oct 2026): a Metric / Imperial toggle in Info, kept per viewer;
+    Imperial by default.
     Everywhere a measure shows (wind km/h or mph, rain mm or inches, elevation, water depth
     and topo spacing m or ft, distances km or mi, the loading screen too) follows it; the
     sim and the tables stay metric.

@@ -99,7 +99,7 @@
     return r;
   }
 
-  // Metric or imperial for everything the page shows (Paul, 13 Oct 2026). The sim and the
+  // Imperial or metric for everything the page shows (Paul, 13 Oct 2026). The sim and the
   // tables stay metric; these functions only convert on the way to the screen. Kept per
   // viewer. Every function takes metric numbers and returns text.
   //
@@ -120,8 +120,11 @@
   const CONTOUR_FEET = [2, 5, 10, 20, 50, 100];
   const units = (function () {
     const listeners = [];
-    let system = 'metric';
-    try { if (localStorage.getItem(UNITS_KEY) === 'imperial') system = 'imperial'; } catch (e) { /* metric */ }
+    // Imperial until a viewer picks Metric (Paul, 13 Oct 2026); AS.UNITS_DEFAULT lets a page or
+    // a check start in metric instead.
+    const fallback = AS.UNITS_DEFAULT === 'metric' ? 'metric' : 'imperial';
+    let system = fallback;
+    try { const v = localStorage.getItem(UNITS_KEY); if (v === 'metric' || v === 'imperial') system = v; } catch (e) { /* the default */ }
     const imp = () => system === 'imperial';
     const fixed = (x, d) => x.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
     return {
