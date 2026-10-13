@@ -85,6 +85,8 @@ SeedChance,per day,,,,10%,Mature blade seeds once: onto an empty 4-neighbor tile
 SeedReach,tiles,,,,3,How far a carried seed can land (never closer than 2); it takes root only where grass shelters it
 SeedFar,share of seeds,,,,50%,Share of seeds that are carried instead of dropping at the blade's feet
 SproutChance,per day,,,,0.1%,Chance an empty tile grows a blade by itself (grass can return to bare land); 0% = off
+GrassWetEnough,% of the soil's room,,,,0.5%,Soil water at which grass grows, seeds and sprouts at full rate; drier soil slows all three in proportion (no effect where the world has no water rules)
+GrassDryFloor,% of full rate,,,,20%,Share of full rate grass keeps on bone-dry soil: a drought slows grass but never stops it
 CorpseNutrient,per body,10,30,30,,How long and how hard a corpse feeds grass
 CorpseDecay,days,1,5,5,,Corpse disappears after this
 MeatOnBody,Fullness,60,60,60,,Food on a body for whoever eats it (EatsCarcass); a carcass keeps it until eaten or until the corpse rots

@@ -31,8 +31,21 @@
     seedP = 1 - Math.exp(-hourlyRate);
     resproutRate = T.world.ResproutChance >= 1 ? Infinity : hourlyHazard(T.world.ResproutChance);
     ashBoost = T.world.AshBoost;
+    wetEnough = T.grass.GrassWetEnough; dryFloor = T.grass.GrassDryFloor;
     ashKeep = Math.pow(2, -1 / (HOURS_PER_DAY * T.world.AshHalfLife));
   }
+
+  // How wet the soil under t keeps grass (Paul, 13 Oct 2026): 1 once the soil holds GrassWetEnough
+  // of its room, falling linearly to GrassDryFloor on bone-dry soil, so a drought slows grass and
+  // never freezes it. A world without water rules has no soil to be dry: always 1, and the
+  // callers then skip the factor, so their rolls are the ones they always were.
+  let wetEnough = 1, dryFloor = 1;
+  function wetFactor(soil, t) {
+    const w = soil.G[t] / soil.room;
+    return w >= wetEnough ? 1 : dryFloor + (1 - dryFloor) * (w / wetEnough);
+  }
+  // A hazard rate scaled by the factor (an always-sprouting Infinity stays so unless the factor is 0).
+  const scaled = (rate, f) => f === 0 ? 0 : rate * f;
 
   const nb = new Int32Array(4);
 
@@ -44,7 +57,8 @@
   const SHELTER_MIN = 2;
   let seedReach = 0, seedFar = 0;
   // Free bare ground fit for a seed: the test a seed dropping at the parent's feet uses too.
-  const seedable = (W, u) => W.isBare(u) && !W.hole[u] && W.scorch[u] === 0 && !W.beach[u];
+  // (Not where a sunk blade waits to come back: the tile is its, and two blades can't share it.)
+  const seedable = (W, u) => W.isBare(u) && !W.hole[u] && W.scorch[u] === 0 && !W.beach[u] && !W.sunk[u];
   function shelter(W, u) {
     const w = W.w, x = u % w, y = (u / w) | 0;
     let c = 0;
@@ -80,6 +94,7 @@
     // A blade grows an hour's worth when the hourly pass reaches its tile (not a sliver every
     // tick: the same growth a day, a 25th of the work).
     const rate = g.GrowthRate * DAYS_PER_HOUR;
+    const soil = W.water;
 
     const phase = sim.tickCount % AS.TICKS_PER_HOUR;
     const firstNew = W.nextSerial;   // blades seeded in this pass wait for the next hour
@@ -102,20 +117,28 @@
       // land it has lost; a nearby corpse speeds that up like it speeds seeding. Ground with living
       // roots rolls its resprout instead (below).
       if (W.kind[t] === AS.KIND.EMPTY) {
-        const open = W.flow[t] === AS.FLOW.NONE && !W.hole[t] && burnt === 0 && !W.beach[t];   // where a blade may start
+        const open = W.flow[t] === AS.FLOW.NONE && !W.hole[t] && burnt === 0 && !W.beach[t] && !W.sunk[t];   // where a blade may start
         if (W.roots[t] && open) {
           // Living roots put up a small blade of the same plant (its age goes on) in place of the
           // plain sprout roll, boosted by the one larger boost on the tile like a sprout. With
           // ResproutChance 0 they simply wait.
           if (resproutRate > 0) {
+            const rr = soil ? scaled(resproutRate, wetFactor(soil, t)) : resproutRate;
             let boost = 1;
             if (cinder > 0) boost = ashBoost;
             if (boostSrc[t] >= 0) { const cb = AS.corpseBoost(sim, t); if (cb > boost) boost = cb; }
-            if (rng.chance(1 - Math.exp(-resproutRate * boost))) W.addGrass(t, g.SproutSize, W.rootAge[t]);   // (addGrass ends the roots)
+            if (rng.chance(1 - Math.exp(-rr * boost))) W.addGrass(t, g.SproutSize, W.rootAge[t]);   // (addGrass ends the roots)
           }
         } else if (sproutRate > 0 && open) {
           let ps;
-          if (cinder > 0) {
+          const sr = soil ? scaled(sproutRate, wetFactor(soil, t)) : sproutRate;
+          if (soil && sr !== sproutRate) {
+            // Dry ground: the same boosts on a smaller hazard rate.
+            let boost = 1;
+            if (cinder > 0) boost = ashBoost;
+            if (boostSrc[t] >= 0) { const cb = AS.corpseBoost(sim, t); if (cb > boost || cinder === 0) boost = cb; }
+            ps = 1 - Math.exp(-sr * boost);
+          } else if (cinder > 0) {
             // One boost per tile, the larger (a tie is the ash's), as corpse.js keeps overlap from stacking.
             let boost = ashBoost;
             if (boostSrc[t] >= 0) { const cb = AS.corpseBoost(sim, t); if (cb > boost) boost = cb; }
@@ -129,7 +152,8 @@
       if (W.kind[t] !== AS.KIND.GRASS || W.serial[t] >= firstNew || W.flow[t] === AS.FLOW.FIRE) continue;
       const s = gSize[t];
       if (s < 1) {
-        let grown = s + rate;
+        // The soil sets the base growth; a boost adds its extra on top, at the full rate.
+        let grown = s + (soil ? rate * wetFactor(soil, t) : rate);
         const src = boostSrc[t];
         if ((src >= 0 || cinder > 0) && grown < 1) {
           // Each unit of extra growth costs its source one unit: the corpse's Nutrient, or the
@@ -152,11 +176,12 @@
       else if (hourlyRate === 0) continue;
       else {
         const src = boostSrc[t], a = ash[t];   // (a: what growth left of it just now)
+        const hr = soil ? hourlyRate * wetFactor(soil, t) : hourlyRate;
         if (a > 0) {
           let boost = ashBoost;
           if (src >= 0) { const cb = AS.corpseBoost(sim, t); if (cb > boost) boost = cb; }
-          p = 1 - Math.exp(-hourlyRate * boost);
-        } else p = src >= 0 ? 1 - Math.exp(-hourlyRate * AS.corpseBoost(sim, t)) : seedP;
+          p = 1 - Math.exp(-hr * boost);
+        } else p = src >= 0 ? 1 - Math.exp(-hr * AS.corpseBoost(sim, t)) : hr === hourlyRate ? seedP : 1 - Math.exp(-hr);
       }
       if (p < 1 && !rng.chance(p)) continue;
       // SeedFar of the seeds are carried; one with no sheltered spot drops at the blade's feet

@@ -1,6 +1,9 @@
 'use strict';
 const { load } = require('./harness.js');
 const { AS: A, texts } = load({}, ['inspect', 'ui-parts']);
+// The page starts in imperial; these checks read metric, and the Units block below switches.
+const UNITS_DEFAULT = A.units.system;
+A.units.set('metric');
 const { T } = A.parseTables(texts);
 let bad = 0;
 const check = (c, m) => { console.log((c ? 'PASS: ' : 'FAIL: ') + m); if (!c) bad++; };
@@ -168,7 +171,8 @@ check(dd.rows.some(r => r.name === 'Foo' && r.value === '—') && !dd.rows.some(
 { let et = -1; for (let t = 0; t < W.n && et < 0; t++) if (W.isBare(t) && !W.hole[t]) et = t;
   const de = A.describe(sim, { tile: et, serial: 0, slot: -1, empty: true }); allValues.push(de);
   check(de.title === 'Tile ' + W.tx(et) + ', ' + W.ty(et) && names(de) === 'Position,Elevation,Ground,Ash,Roots' && /^\d+(\.\d)? m$/.test(val(de, 'Elevation')), 'empty tile: ' + de.title + ' / ' + names(de) + ' / ' + val(de, 'Elevation')); }
-// Units: Elevation and Depth follow AS.units (metric by default; the sim's meters, converted on the way out).
+// Units: Elevation and Depth follow AS.units (imperial by default; the sim's meters, converted on the way out).
+check(UNITS_DEFAULT === 'imperial', 'the page starts in imperial');
 { const t0 = empties.find(t => W.kind[t] === K.EMPTY), el = W.elev[t0], se = { tile: t0, serial: 0, slot: -1, empty: true };
   const metric = val(A.describe(sim, se), 'Elevation');
   A.units.set('imperial');

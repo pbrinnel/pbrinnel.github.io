@@ -104,6 +104,8 @@
     ['GrowthRate', 'num', ['Grass']],
     ['SproutSize', 'frac', ['Grass']],
     ['SproutChance', 'frac', ['Grass']],
+    ['GrassWetEnough', 'frac', ['Grass']],
+    ['GrassDryFloor', 'frac', ['Grass']],
     ['SeedChance', 'frac', ['Grass']],
     ['SeedReach', 'num', ['Grass']],
     ['SeedFar', 'frac', ['Grass']],

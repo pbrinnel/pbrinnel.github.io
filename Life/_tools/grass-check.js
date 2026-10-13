@@ -192,4 +192,64 @@ const day = AS => AS.TICK_HZ * AS.DAY_SECONDS;
   ok(st[0] === 'Sprout' && st[1] === 'Mature', `stage: ${st.join(' -> ')} (ElderAt ${T.grass.ElderAt})`);
 }
 
+// Soil wetness (GrassWetEnough, GrassDryFloor): the hourly pass is run by hand over a stand-in
+// soil, so only grass.js is under test. The factor is 1 at w >= GrassWetEnough, GrassDryFloor at
+// w = 0, linear between; growth, seeding and sprouting all scale with it.
+{
+  const hourPass = (sim, soil) => {
+    const W = sim.W;
+    W.water = soil;
+    for (let p = 0; p < sim.AS_TPH; p++) { sim.tickCount = p; sim.AS.grassTick(sim); }
+    W.water = null;
+  };
+  const wetSim = (seed, species) => {
+    const { AS, T, sim } = stage({ size: 9, seed, species: [[['SproutChance', 'Grass', '0%']], ...(species || [])] });
+    sim.AS = AS; sim.AS_TPH = AS.TICKS_PER_HOUR;
+    return { AS, T, sim, W: sim.W };
+  };
+  const soilAt = (W, w) => ({ G: new Float32Array(W.n).fill(w * 0.1), room: 0.1 });
+  const factorOf = (T, w) => { const g = T.grass; return w >= g.GrassWetEnough ? 1 : g.GrassDryFloor + (1 - g.GrassDryFloor) * w / g.GrassWetEnough; };
+
+  // growth: one blade, one hour, at several wetness levels
+  {
+    const { AS, T, sim, W } = wetSim(1, [[['SeedChance', 'Grass', '0%']]]);
+    const t = W.tile(4, 4), rate = T.grass.GrowthRate / 24, E = T.grass.GrassWetEnough;
+    const gain = soil => { W.gSize[t] = 0.2; const before = W.gSize[t]; hourPass(sim, soil); return W.gSize[t] - before; };
+    W.addGrass(t, 0.2, 0);
+    const levels = [0, E / 4, E / 2, E, 3 * E];
+    const got = levels.map(w => gain(soilAt(W, w)));
+    const none = (() => { W.gSize[t] = 0.2; hourPass(sim, null); return W.gSize[t] - 0.2; })();
+    ok(levels.every((w, i) => Math.abs(got[i] - rate * factorOf(T, w)) < 1e-6), `wet growth: gains ${got.map(x => (x / rate).toFixed(3)).join(', ')} of the dry-free rate at w = 0, 1/4, 1/2, 1, 3 x GrassWetEnough (expect ${levels.map(w => factorOf(T, w).toFixed(3)).join(', ')})`);
+    ok(Math.abs(got[3] - rate) < 1e-6 && Math.abs(got[0] - rate * T.grass.GrassDryFloor) < 1e-6, 'wet growth: full rate at GrassWetEnough, GrassDryFloor of it on bone-dry soil');
+    ok(Math.abs(none - rate) < 1e-6, 'wet growth: no water rules, the plain rate');
+  }
+  // seeding and sprouting: the chance of an event in an hour is 1 - exp(-hazard x factor)
+  for (const kind of ['seeding', 'sprouting']) {
+    const E = (kind === 'seeding' ? wetSim(5, [[['SeedChance', 'Grass', '60%'], ['SeedFar', 'Grass', '0%']]])
+                                  : wetSim(5, [[['SeedChance', 'Grass', '0%'], ['SproutChance', 'Grass', '40%']]]));
+    const { T, sim, W } = E, g = T.grass;
+    const haz = -Math.log(1 - (kind === 'seeding' ? g.SeedChance : g.SproutChance)) / 24;
+    const clear = () => { for (let u = W.gCount - 1; u >= 0; u--) W.removeGrass(W.gList[u]); };
+    const rateAt = w => {
+      const soil = soilAt(W, w), trials = kind === 'seeding' ? 4000 : 150;
+      let hit = 0, n = 0;
+      for (let i = 0; i < trials; i++) {
+        clear();
+        if (kind === 'seeding') { W.addGrass(W.tile(4, 4), 1, 0); n++; }
+        else n += W.n;
+        hourPass(sim, soil);
+        hit += kind === 'seeding' ? (W.gCount > 1 ? 1 : 0) : W.gCount;
+      }
+      return { p: hit / n, n };
+    };
+    for (const w of [0, g.GrassWetEnough / 2, 2 * g.GrassWetEnough]) {
+      const { p, n } = rateAt(w), want = 1 - Math.exp(-haz * factorOf(T, w));
+      ok(Math.abs(p - want) < 4 * Math.sqrt(want * (1 - want) / n) + 1e-4, `wet ${kind}: ${(p * 100).toFixed(2)}% an hour at w = ${(w * 100).toFixed(2)}% of room, expect ${(want * 100).toFixed(2)}%`);
+    }
+    const none = (() => { W.water = null; let hit = 0, n = 0; const trials = kind === 'seeding' ? 4000 : 150; for (let i = 0; i < trials; i++) { clear(); if (kind === 'seeding') { W.addGrass(W.tile(4, 4), 1, 0); n++; } else n += W.n; hourPass(sim, null); hit += kind === 'seeding' ? (W.gCount > 1 ? 1 : 0) : W.gCount; } return hit / n; })();
+    const want0 = 1 - Math.exp(-haz);
+    ok(Math.abs(none - want0) < 4 * Math.sqrt(want0 * (1 - want0) / (kind === 'seeding' ? 4000 : 150 * 81)) + 1e-4, `wet ${kind}: no water rules, ${(none * 100).toFixed(2)}% an hour, the plain ${(want0 * 100).toFixed(2)}%`);
+  }
+}
+
 done();

@@ -69,11 +69,12 @@ function audit(AS, sim, label) {
     }
     // A sunk blade (Paul, 12 Oct 2026: grass drowns only under standing water) is on no tile:
     // its tile is wet or beach, or it is dry and off the shore with the blade not yet back (an animal
-    // stood on it when the shore left; soakTick brings it back at the next step).
+    // stood on it when the shore left; soakTick brings it back at the next step). An animal that dies
+    // there leaves a body on it, and the blade is lost when it would surface (world.js).
     if (W.sunk[t]) {
       sunkN++;
-      check(k === K.EMPTY || k >= K.BUNNY, `${label}: sunk blade on tile ${t} holding kind ${k}`);
-      check(W.wDepth[t] > 0 || W.beach[t] || k >= K.BUNNY || W.soak[t] === 0, `${label}: sunk blade on dry open tile ${t}`);
+      check(k === K.EMPTY || k === K.CORPSE || k >= K.BUNNY, `${label}: sunk blade on tile ${t} holding kind ${k}`);
+      check(W.wDepth[t] > 0 || W.beach[t] || k >= K.BUNNY || k === K.CORPSE || W.soak[t] === 0, `${label}: sunk blade on dry open tile ${t}`);
     }
     if (W.wDepth[t] > 0) {
       wet++;

@@ -188,6 +188,8 @@ for (const [sp, name] of [[0, 'bunny'], [1, 'wolf'], [2, 'human']]) {
     for (const [f, k, c, v] of edits) texts[f] = editCSV(texts[f], k, c, v);
     texts.settings = editCSV(texts.settings, 'WorldWidth', 'Value', '200'); texts.settings = editCSV(texts.settings, 'WorldHeight', 'Value', '140');
     texts.settings = editCSV(texts.settings, 'StartBunnies', 'Value', '120'); texts.settings = editCSV(texts.settings, 'StartWolves', 'Value', '30');
+    // A Rain 0 world still has soil water, which grass growth reads; here only the water itself is compared.
+    texts.species = editCSV(texts.species, 'GrassDryFloor', 'Grass', '100%');
     const { T, errors } = AS.parseTables(texts); if (errors.length) throw new Error(errors.join('\n'));
     return { AS, T };
   };

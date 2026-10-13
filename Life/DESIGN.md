@@ -290,6 +290,10 @@ last only as long as their lives.
 - Each tile of grass is one blade. Its sprite shows its Size in thirds.
 - A blade grows from sprout to full Size, then can seed a new blade on an empty
   4-neighbor tile, and dies of old age at its `Lifespan`.
+- **Grass needs water** (Paul, 13 Oct 2026): on soil wetter than `GrassWetEnough` of its room
+  grass grows, seeds and sprouts at full rate; drier, it slows in step down to `GrassDryFloor`
+  on bone-dry soil, so a drought slows grass but never stops it, and reaches the animals
+  through their food. A world without water rules is unchanged.
 - **Carried seeds fill gaps** (Paul, 13 Oct 2026, so meadows join up and fires run farther):
   a share of seeds (`SeedFar`) is carried 2 to `SeedReach` tiles in a random direction and
   takes root only where other grass shelters it (at least two grass neighbors), else drops
