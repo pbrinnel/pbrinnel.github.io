@@ -17,7 +17,7 @@
     // only when the set of names changes (a different kind of thing was selected).
     const inspHead = el('div', 'insp-head');
     const inspTitle = el('span', 'insp-title', '');
-    const inspClose = el('button', 'hud-btn insp-close', '×');
+    const inspClose = el('button', 'win-close insp-close', '×');
     inspClose.type = 'button';
     inspClose.title = 'Close';
     inspClose.addEventListener('click', () => { show(null); if (onClose) onClose(); });

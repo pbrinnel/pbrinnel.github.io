@@ -340,7 +340,7 @@ body.nuke-armed .paint-banner { color: #ffd9c4; }
 .insp-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; /* long text wraps (.insp-range) */ overscroll-behavior: contain; touch-action: pan-y; }
 .insp-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .insp-title { color: var(--hud-on); overflow-wrap: anywhere; }
-.insp-close { flex: none; min-width: var(--hud-h); padding: 0; font-size: 18px; }
+.insp-close { flex: none; }
 .insp-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 2px 0; border-top: 1px solid var(--hud-line); }
 .insp-name { color: var(--hud-dim); }
 .insp-cell { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -471,7 +471,7 @@ body.nuke-armed .paint-banner { color: #ffd9c4; }
 .graph-head { display: flex; align-items: center; gap: 8px; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
 .graph-head:active { cursor: grabbing; }
 .graph-title { color: var(--hud-on); flex: 1; }
-.graph-close, .graph-size { min-width: var(--hud-h); padding: 0; font-size: 18px; }
+.graph-size { min-width: var(--hud-h); padding: 0; font-size: 18px; }
 .graph-whole { font-size: 12px; }
 .graph-canvas { flex: 1; min-height: 0; width: 100%; display: block; touch-action: none; }
 
@@ -499,7 +499,7 @@ body.nuke-armed .paint-banner { color: #ffd9c4; }
 #minimap[hidden] { display: none; }
 .mini-head { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
 .mini-title { color: var(--hud-on); flex: 1; }
-.mini-size, .mini-close { min-width: var(--hud-h); padding: 0; font-size: 18px; }
+.mini-size { min-width: var(--hud-h); padding: 0; font-size: 18px; }
 .mini-canvas { display: block; touch-action: none; cursor: pointer; image-rendering: pixelated; }
 @media (max-width: 600px) {
   #minimap { left: auto; bottom: auto; right: calc(env(safe-area-inset-right) + 8px); top: calc(var(--hud-bottom, 40px) + 8px); }
@@ -582,3 +582,24 @@ body.nuke-armed .paint-banner { color: #ffd9c4; }
 .hud-tabstrip .hud-panel::-webkit-scrollbar-thumb:hover, .insp-list::-webkit-scrollbar-thumb:hover, .hud-warnlist::-webkit-scrollbar-thumb:hover,
 #errors::-webkit-scrollbar-thumb:hover, .bench-panel::-webkit-scrollbar-thumb:hover, .bench-tablewrap::-webkit-scrollbar-thumb:hover { background: #6b7364; }
 .hud-tabstrip .hud-panel::-webkit-scrollbar-button, .insp-list::-webkit-scrollbar-button, .hud-warnlist::-webkit-scrollbar-button { display: none; }
+
+/* The × on every window: small and muted, brighter under the pointer, with no border or
+   minimum height so it never makes a title row taller. The tab windows hold theirs in the
+   top-right corner (their title row is hidden on a phone); the others sit in their title row. */
+.win-close {
+  flex: none;
+  width: 24px; height: 24px;
+  padding: 0;
+  display: inline-grid; place-items: center;
+  font: inherit; font-size: 18px; line-height: 1;
+  color: var(--hud-dim);
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.win-close:hover, .win-close:focus-visible { color: var(--fg); background: rgba(232, 217, 160, 0.12); }
+.hud-win-x { position: absolute; top: 3px; right: 4px; z-index: 3; }
+.hud-tabstrip { position: relative; }
+@media (min-width: 601px) { .hud-tabstrip { position: fixed; } .hud-win-x { top: 4px; } }
+@media (max-width: 600px) { .hud-tabstrip { padding-right: calc(env(safe-area-inset-right) + 30px); } .hud-win-x { right: calc(env(safe-area-inset-right) + 4px); } }

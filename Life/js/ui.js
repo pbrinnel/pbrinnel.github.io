@@ -187,7 +187,13 @@
       head.appendChild(el('span', 'hud-side-title', label));
       head.title = 'Drag to move; double-click to put it back';
       const panel = el('div', 'hud-panel hud-panel-' + key);
-      win.append(head, panel);
+      // The × does what the bar button does when it closes the window (setWindow), so the
+      // button's state, the remembered windows and Paint's disarming all follow.
+      const x = el('button', 'win-close hud-win-x', '×');
+      x.type = 'button';
+      x.title = 'Close';
+      x.addEventListener('click', () => { setWindow(key, false); });
+      win.append(head, panel, x);
       tabWins[key] = win; tabHeads[key] = head; tabPanels[key] = panel;
     }
     const hideBtn = el('button', 'hud-btn hud-hide', 'Hide UI');

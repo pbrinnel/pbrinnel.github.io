@@ -369,6 +369,20 @@ const winOf = (ids, key) => ids.hud.all(e => e.className === 'hud-tabstrip hud-w
   assert(miniEl === undefined); ui.hud(input); assert(!m.classList.contains('on')); ok('Map reads as off without a minimap window');
   ui.lock(true); calls.length = 0; g.fire('click'); m.fire('click'); assert.strictEqual(calls.length, 0); assert(g.disabled && m.disabled); ui.lock(false); ok('both are inert while the benchmark runs');
 }
+// ---- the × on each window ----
+{ const seen = [];
+  const { ui, ids, body } = build(true, { windows: ['info', 'paint', 'debug'], onWindows: k => seen.push(k.join(',')) });
+  const xOf = key => winOf(ids, key).all(e => e.className.includes('win-close'))[0];
+  for (const k of ['info', 'paint', 'debug']) assert(xOf(k) && xOf(k).textContent === '×' && xOf(k)._title === 'Close'); ok('Info, Paint and Debug each have a ×');
+  ids.hud.all(e => e.className.includes('paint-stop'));
+  ids.hud.all(e => e.getAttribute('aria-label') === 'FIRE MODE')[0].fire('click'); assert(ui.mode === 'fire');
+  xOf('paint').fire('click');
+  assert(winOf(ids, 'paint').hidden && !tabBtn(ids, 'Paint').classList.contains('on') && ui.mode === '' && !body.classList.contains('paint-armed') && seen[seen.length - 1] === 'info,debug'); ok('× closes Paint like its bar button: button off, remembered windows updated, mode disarmed');
+  xOf('info').fire('click');
+  assert(winOf(ids, 'info').hidden && !tabBtn(ids, 'Info').classList.contains('on') && !body.classList.contains('side-open') && seen[seen.length - 1] === 'debug'); ok('× closes Info and clears side-open');
+  tabBtn(ids, 'Info').fire('click'); assert(!winOf(ids, 'info').hidden); ok('the bar button reopens it');
+  assert(ids.inspector.all(e => e.className.includes('win-close')).length === 1); ok('the properties window has its ×');
+}
 // ---- resizable windows ----
 { const mem = {};
   LS = { getItem: k => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = v; }, removeItem: k => { delete mem[k]; } };

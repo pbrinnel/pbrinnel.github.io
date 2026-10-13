@@ -150,7 +150,7 @@
     wholeBtn.title = 'Fit the whole run';
     const sizeBtn = el('button', 'hud-btn graph-size');
     sizeBtn.type = 'button';
-    const closeBtn = el('button', 'hud-btn graph-close', '×');
+    const closeBtn = el('button', 'win-close graph-close', '×');
     closeBtn.type = 'button';
     closeBtn.title = 'Close';
     head.append(title, wholeBtn, sizeBtn, closeBtn);

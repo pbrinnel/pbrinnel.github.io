@@ -40,7 +40,7 @@
     const title = el('span', 'mini-title', 'Map');
     const sizeBtn = el('button', 'hud-btn mini-size');
     sizeBtn.type = 'button';
-    const closeBtn = el('button', 'hud-btn mini-close', '×');
+    const closeBtn = el('button', 'win-close mini-close', '×');
     closeBtn.type = 'button';
     closeBtn.title = 'Close';
     head.append(title, sizeBtn, closeBtn);
