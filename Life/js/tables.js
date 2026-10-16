@@ -180,6 +180,7 @@
     ['HillSoften', 'num'],
     ['RiverMouths', 'span', 'count'],
     ['MeadowSize', 'pos'],
+    ['MeadowWetness', 'frac'],
     ['BunnyColonies', 'count'],
     ['WolfPacks', 'count'],
     ['HolesPerColony', 'count'],

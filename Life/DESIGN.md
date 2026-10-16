@@ -79,7 +79,14 @@ tuning so far) is in HISTORY.md.
   there and reload; there's no settings panel in the sim.
 - **A lived-in world** (4 Oct 2026; `StartLayout` Meadows): grass in meadows of every size
   with open ground between, the way temperate grassland looks from the air (`StartGrass` is
-  the meadow share, `MeadowSize` the size of the largest). Meadows start partly filled with
+  the share of the land that is meadow, `MeadowSize` the size of the largest).
+- **Meadows lie on wet ground** (Paul, 16 Oct 2026): grass needs water, so the meadows start
+  where the soil can keep it: thick by lakes, rivers and low ground, thin or absent on dry high
+  ground, the shape the map settles into anyway. Placement reads the same soil wetness grass
+  growth does (the world's water at day 0, ranked over the land), pulled in by `MeadowWetness`
+  (100% = the `StartGrass` share of land that is wettest; 0% = anywhere). A world without water
+  or rain has no wetness to go by, so its meadows are placed by shape alone. Colonies still settle at
+  meadow edges, packs in the open. Meadows start partly filled with
   blades of every age, as a meadow that has been growing a while is, with a few lone
   seedlings in the open, so the start doesn't die back as one wave.
 - Bunnies live in `BunnyColonies` colonies just outside meadow edges; wolves run in

@@ -190,6 +190,15 @@ seeds and saves numbers back into `tables/`. What's been found, in order:
   died together); evenly spread ages and meadows 55% filled start near where grass
   settles (about 10,000 easing to 7,500 blades over 20 days, against 16,400 crashing to
   6,000).
+- **Meadows on wet ground** (16 Oct): with no animals, grass fell from 12-17k blades to 3.5-5.6k
+  by day 100-160. Placing meadows by soil wetness (day-0 soil ranks like its day 40-160
+  average, Spearman 0.94-0.98; distance to water only 0.24-0.30) did not change where grass
+  ended up: with the same weather it lands at the same 3.4-5.4k (seed 2 holds 8-9k to day
+  100) whether 12% of land is meadow wet-first or random. The fall is the weather's, so the
+  fix that worked was the count: `StartGrass` 18% starts ~6.3k blades, which holds 6-8k to
+  day 80 with no early fall. 3 seeds × 160 days with animals, bunnies alive at day 160:
+  67 and 149 (seeds 1, 2) and none from day 130 (seed 3); before, none at 150-160 on 2 of 3
+  and 32 on the third.
 - **Space and wolf territories:** a 450×300 world at the same density (340 bunnies in 13
   colonies, 112 wolves in 7 packs) kept all three species on 3 of 3 seeds for 30 days,
   against 1 of 3 in the 300×200 world; territories on top kept more bunnies and lost no

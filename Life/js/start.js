@@ -1,6 +1,8 @@
 // How the world looks on day 0 when settings.csv's StartLayout is Meadows: grass in
 // meadows of every size with open ground between (the look of temperate grassland from the
-// air), partly filled and of every age, as a settled meadow is; bunnies in a few colonies
+// air), laid on the wettest ground (lakeshores, rivers, low land: where the soil can keep
+// grass, grass.js GrassWetEnough) and thin or absent on dry high ground, partly filled and of
+// every age, as a settled meadow is; bunnies in a few colonies
 // just outside meadow edges, each colony with a few warren holes dug around it before its
 // bunnies settle; wolves in small packs out in the open, away from the colonies. The ground
 // and its water (terrain.js) go in first, so the meadows, the colonies and the packs are laid
@@ -25,6 +27,7 @@
   const PACK_FROM_COLONY = 22;  // tiles from a pack to the nearest colony, at least
   const EDGE_BAND = 0.08;       // field units just outside a meadow where colonies settle
   const BORDER = 6;             // tiles: no colony or pack centered this close to the wall
+  const WET_NONE = 1e-9;        // soil spread (share of its room) below which the soil tells wet ground from dry no better than chance
   const SPOT_TRIES = 4000;
   const UNLIKELY = 0.02;        // chance a spot that misses its preferred ground is taken anyway
 
@@ -41,16 +44,53 @@
       return a + (b - a) * v;
     };
   }
+  // How wet the soil is under each tile at day 0 (its share of its room), or null when the
+  // world has no water rules or no rain, so nothing tells wet ground from dry. This is the
+  // number grass.js reads for its growth (wetFactor). The pre-run settles the soil under the
+  // long-run mean rain, so play's showers dry it more than this, but the order of the tiles
+  // holds (measured: a tile's day-0 wetness and its average over days 40-160 rank alike,
+  // Spearman 0.94 to 0.98), and wetness is the only thing placement here uses it for. It is
+  // already in the grown terrain (terrain.js), so a world built in the worker places the same.
+  function soilWetness(sim) {
+    const W = sim.W, wat = W.water;
+    if (!wat || !(sim.terrain.Rain > 0)) return null;
+    const out = new Float32Array(W.n);
+    let lo = Infinity, hi = -Infinity;
+    for (let t = 0; t < W.n; t++) {
+      const v = wat.G[t] / wat.room;
+      out[t] = v;
+      if (W.flow[t] !== AS.FLOW.WATER) { if (v < lo) lo = v; if (v > hi) hi = v; }
+    }
+    return hi - lo > WET_NONE ? out : null;
+  }
+
+  // Each land tile's place in the land's order of wetness, 0 (driest) to 1 (wettest). Ranks,
+  // not the soil's own numbers, so the meadow share means the same in a wet world and a dry
+  // one, and a few swamp tiles can't stretch the scale.
+  function wetRank(W, wet) {
+    const land = [];
+    for (let t = 0; t < W.n; t++) if (W.flow[t] !== AS.FLOW.WATER) land.push(t);
+    land.sort((a, b) => wet[a] - wet[b] || a - b);
+    const rank = new Float32Array(W.n);
+    for (let i = 0; i < land.length; i++) rank[land[i]] = land.length > 1 ? i / (land.length - 1) : 1;
+    return rank;
+  }
+
+  // The meadow field: shaped noise (clumps of every size, MeadowSize across at most), pulled
+  // toward the wet ground by MeadowWetness. Where it is high a tile is meadow. With no soil
+  // water to go by it is the noise alone.
   function meadowField(sim) {
     const { W, rng } = sim, scale = sim.T.world.MeadowSize;
     const layers = [];
     for (let o = 0; o < OCTAVES; o++) layers.push(noise(rng, W.w, W.h, Math.max(1, scale / (1 << o))));
+    const wet = soilWetness(sim), rank = wet && wetRank(W, wet), pull = wet ? sim.T.world.MeadowWetness : 0;
     const vals = new Float32Array(W.n);
     for (let t = 0; t < W.n; t++) {
       const x = t % W.w, y = (t / W.w) | 0;
       let v = 0, amp = 1, sum = 0;
       for (const n of layers) { v += n(x, y) * amp; sum += amp; amp *= 0.5; }
-      vals[t] = v / sum;
+      v /= sum;
+      vals[t] = pull > 0 ? v + (rank[t] - v) * pull : v;
     }
     return vals;
   }
