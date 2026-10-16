@@ -281,7 +281,7 @@
     const pos = new Float64Array(2), pos2 = new Float64Array(2);   // scratch for animalPos: no per-frame allocation
     let curAlpha = 0;                  // this frame's alpha, for animalPos
     let clock = 0;                     // this frame's sim time in seconds, for the idle fidget
-    const play = new Float64Array(4);  // scratch for playPose
+    const play = new Float64Array(5);  // scratch for playPose
     const posed = new Float64Array(2); // scratch for spritePose: frame, lift
     const facing = AS.SpriteFacing();
     const gusts = AS.Gusts();          // the wind on the grass (sprites.js)
@@ -846,8 +846,10 @@
             if (tx !== 0) facing.turn(a, tx < 0 ? 1 : 0);
           }
           AS.playPose(pk, nowMs, serial, stage === AS.STAGE.BABY, which, play);
+          const left = play[4] ? !facing.left(a) : facing.left(a);   // a binky turning back the other way
+          if (play[4]) ux = -ux;
           bx += Math.round(play[0] * ux * s); by += Math.round(play[0] * uy * s) - Math.round(play[1] * s);
-          const fid = play[3] >= 0 ? AS.spriteIndex(sp, W.aSex[a], stage, facing.left(a), play[3]) : id;
+          const fid = play[3] >= 0 ? AS.spriteIndex(sp, W.aSex[a], stage, left, play[3]) : id;
           if (play[2] !== 0) {   // tilt about its feet; it leans into the way it faces
             ctx.save();
             ctx.translate(bx + px / 2, by + px);
