@@ -83,8 +83,8 @@ PlayJoy,wellbeing,1,1,,,Wellbeing a whole session with a partner raises (about o
 PlayJoyAlone,wellbeing,0.5,,,,Wellbeing a whole session alone (a binky) raises; blank = needs a partner (wolves)
 DisperseChance,%,50%,100%,,,Chance a bunny or wolf born in the world leaves home once it grows up (natal dispersal); the first generation never does
 DisperseRun,tiles,,50-150,,,How far from home a young wolf heads when it leaves (straight-line); it is home when it gets there; blank (and no DisperseFar) = never leaves
-DisperseFar,% of world size,15%,,,,A young bunny leaving home draws its own trip length from TravelMin to this share of the world's longer side, and doesn't settle short of it
-TravelMin,% of world size,5%,,,,A bunny leaving home or emigrating doesn't settle until it is at least this far (a share of the world's longer side) from where its trip began
+DisperseFar,% of world size,25%,,,,A young bunny leaving home draws its own trip length from TravelMin to this share of the world's longer side, and doesn't settle short of it
+TravelMin,% of world size,8%,,,,A bunny leaving home or emigrating doesn't settle until it is at least this far (a share of the world's longer side) from where its trip began
 RoamAfter,days,,3,1,,A wolf or human that hasn't seen prey this long roams: it heads for far destinations in any direction until it finds prey; blank = never
 RoamRun,tiles,90-150,40-120,40-120,,How far away a roaming wolf's or human's, or an emigrating bunny's, destinations are, straight-line
 RoamHunger,× HungerRate,,5,,,Hunger while roaming (walking after RoamAfter days without seeing prey): a desperate hunter burns faster; blank = like walking
