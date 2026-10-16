@@ -55,6 +55,7 @@ load time: every file reads other files' `AS.*` inside functions, at call time.
 | `drink.js` | the DRINK state every species shares | `drinkState` |
 | `escape.js` | the ESCAPE state every species shares (fire within `FireSense`, or alight: a bunny makes for a free hole nearer than the fire and sits in it, one alight for water it knows, the rest run straight away), the nearest burning tile, and the run-away step FLEE shares; draws nothing and costs nothing while no tile burns and nobody is alight | `escapeState`, `nearestFire`, `runFrom` |
 | `breed.js` | mating and births, shared by the species that breed (a species with no `LitterSize`, humans, never mates); the female's territory rule (`PackLimit`/`TerritoryRange`) in `canMate` | `canMate`, `mate`, `tryBirth` |
+| `play.js` | PLAY, the state bunnies and wolves share (`AS.playState(species, opts)`, which bunny.js and wolf.js register): the roll, the invitation, the session, the chase; `AS.playKind` and `AS.playPartner` are what render reads (see [Behavior](#behavior)). Loads before bunny.js | `playState`, `playKind`, `playPartner`, `PLAY` |
 | `bunny.js`, `wolf.js`, `human.js` | each species' states, by the names in `states.csv` ([Behavior](#behavior)). wolf.js's FEED, HUNT, GIVE_UP, REST and PROWL are the hunter states (`AS.hunterStates`), so human.js registers them too and adds FORAGE | (register via `AS.registerStates`) |
 | `glyphs.js` | ids (named for the font glyphs the map was first drawn with), the palette, and life stage (`stageOf`), shared by the sprites, the far view and the HUD | `GLYPH`, `COLORS`, `animalGlyph`, `grassGlyph`, `STAGE`, `stageOf` |
 
@@ -153,7 +154,7 @@ load time: every file reads other files' `AS.*` inside functions, at call time.
 the dense lists. Grass fields: grass.js. Hole fields: world.js (`addHole`/`removeHole`),
 `holeUsedAt` also warren.js. Corpse fields and `boostSrc`: corpse.js (`cMeat` also
 wolf.js, FEED). Water: water.js through world.js `setDepth`/`addWater`. Animal fields:
-animals.js, moving.js, drink.js, escape.js, breed.js, bunny.js, wolf.js, human.js. Everything else (render, inspect,
+animals.js, moving.js, drink.js, escape.js, breed.js, play.js, bunny.js, wolf.js, human.js. Everything else (render, inspect,
 graph, ui, bench) only reads.
 
 ## Time
@@ -306,11 +307,33 @@ graph, ui, bench) only reads.
   target line, and every `SETTLE_EVERY` s settles if near water with ≤ `SettleCrowd` in the
   `SettleRange` square. LeaveChance 0 draws nothing.
 - **Wellbeing** (`W.aWellbeing`, every animal; bunny.js `wellbeingNow`/`lowerWellbeing`/`scared`,
-  `AS.bunnyWellbeing`): faded toward 0 by `WellbeingHalfLife` only when read or changed
-  (`wellbeingAt`/`wellbeingFor`). FLEE's start lowers it by `ScareStress` (not again within
+  `AS.raiseWellbeing`, `AS.wellbeingInfo`): faded toward 0 by `WellbeingHalfLife` (bunnies and
+  wolves; blank never fades) only when read or changed (`wellbeingAt`/`wellbeingFor`, in
+  bunny.js's per-slot memory, which wolves share for this). FLEE's start lowers it by `ScareStress` (not again within
   `SCARE_GAP` s), WANDER's start by `HungerStress` when hungry (SEEK_FOOD found no blade).
-  `emigrateStep` leaves at −`LeaveStress` without the crowd roll, and zeroes it. Wolves and
-  humans have the field; nothing moves it yet.
+  PLAY raises it (`AS.raiseWellbeing`, to `WellbeingMax`). `emigrateStep` leaves at
+  −`LeaveStress` without the crowd roll, and zeroes it. Humans have the field; nothing moves it.
+- **PLAY** (play.js; states.csv: bunny between REST and WANDER, wolf between REST and PROWL;
+  humans have none, and wolf.js keeps it out of `hunterStates`). `enter` continues a live
+  session (not over, partner still in it, still fed and watered, no trip) or rolls a new
+  one: eligible first (fed, watered, Stamina ≥ `RestUntil`, `opts.onTrip` false), then the
+  Poisson hazard per decision from `PlayChance` (baby) or `PlayChanceAdult`, then
+  `nearestVisibleAnimal` within `PlayRange` for an idle (`WANDER`/`PROWL`/`REST`), content
+  same-species joiner (`isJoiner`). The inviter's `enter` puts the joiner in PLAY itself
+  (`join`); no partner and no `PlayJoyAlone` = no session. Per-slot session memory in
+  play.js's `mem` (`forSerial` marks it live for this serial; `left`, `len`, `partner`,
+  `anchor`, `startAt`, `lead`). `act`: counts the session down, spends `PlayStamina`, pays
+  `PlayJoy * DT / len`, and moves greedily (`stepAbout`) within `PlayRange` of `anchor`
+  (bunnies: `stayOk` keeps an at-home bunny at home) in a phase from the sim clock
+  (`roles`: swap every `PLAY_SWAP` s, chase the first `PLAY_CHASE_SHARE` of it, then stand
+  together). The species files pass `onTrip`, `stayOk` and `closeKind` to `AS.playState`.
+  **What render reads:** `AS.playKind(sim, s)` → `AS.PLAY.NONE | BINKY | CHASE | WRESTLE`
+  (alone: BINKY; a pair: CHASE while apart or chasing, else `closeKind`: BINKY for bunnies,
+  WRESTLE for wolves) and `AS.playPartner(sim, s)` → the partner's slot, or −1 when alone or
+  not playing. Both are derived from state and the clock, nothing is stored for them. The
+  Activity lens has a "playing" bit (`#ff9a2e`); the inspector's State row reads
+  `PLAY (binky|chase|wrestle)`. `kit.js` `stage()` zeroes both chances unless given
+  `play: true`, so other checks aren't interrupted by games; `play-check.js` covers it.
 - **Natal dispersal** (`DisperseChance`, `DisperseRun`): decided once a life (`dispFor`, by
   serial) at the first wander (bunny, in `emigrateStep`) or prowl (wolf, `prowlStep`) as an
   adult, only for animals with a parent (`aParentA` ≠ 0). Bunnies travel as an emigrant

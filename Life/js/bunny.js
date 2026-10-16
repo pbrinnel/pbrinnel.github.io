@@ -262,16 +262,18 @@
   };
   const farFrom = (W, t, from, d) => Math.hypot(t % W.w - from % W.w, ((t / W.w) | 0) - ((from / W.w) | 0)) >= d;
 
-  // Wellbeing (Paul): W.aWellbeing is 0 when neutral, negative when stressed. Scares and hunger
-  // with nothing to eat lower it, and it halves toward 0 every WellbeingHalfLife days, so
-  // scares that come faster than they fade build up (repeated harassment, not one bad chase)
-  // and at -LeaveStress a bunny sets off emigrating. Stored as a value and the time of it
-  // (wellbeingAt), and faded only when read or lowered, so it costs nothing per tick.
+  // Wellbeing (Paul): W.aWellbeing is 0 when neutral, negative when stressed, positive when content.
+  // Scares and hunger with nothing to eat lower it, play raises it (play.js), and it halves toward 0
+  // every WellbeingHalfLife days, so scares that come faster than they fade build up (repeated
+  // harassment, not one bad chase) and at -LeaveStress a bunny sets off emigrating. Stored as a
+  // value and the time of it (wellbeingAt), and faded only when read or changed, so it costs
+  // nothing per tick. Kept here, in the bunny's per-slot memory, but it works for any species
+  // with a WellbeingHalfLife (wolves play too); a blank one never fades.
   function wellbeingNow(sim, s, m) {
     const W = sim.W, now = sim.simSeconds, S = AS.speciesStats(sim, s);
     if (m.wellbeingFor[s] !== W.aSerial[s]) { m.wellbeingFor[s] = W.aSerial[s]; W.aWellbeing[s] = 0; m.scareAt[s] = -Infinity; m.wellbeingAt[s] = now; }
     if (now > m.wellbeingAt[s]) {
-      W.aWellbeing[s] *= Math.pow(0.5, (now - m.wellbeingAt[s]) / (S.WellbeingHalfLife * AS.DAY_SECONDS));
+      if (S.WellbeingHalfLife > 0) W.aWellbeing[s] *= Math.pow(0.5, (now - m.wellbeingAt[s]) / (S.WellbeingHalfLife * AS.DAY_SECONDS));
       m.wellbeingAt[s] = now;
     }
     return W.aWellbeing[s];
@@ -281,9 +283,16 @@
     const m = mem(sim.W);
     sim.W.aWellbeing[s] = wellbeingNow(sim, s, m) - amount;
   }
+  // Raises wellbeing by `amount` up to `cap`; one already above the cap is left alone. A blank
+  // cap means play can't make this species content.
+  AS.raiseWellbeing = function (sim, s, amount, cap) {
+    if (!(amount > 0) || !(cap > 0)) return;
+    const now = wellbeingNow(sim, s, mem(sim.W));
+    if (now < cap) sim.W.aWellbeing[s] = Math.min(cap, now + amount);
+  };
   // The inspector's view: wellbeing now (faded to this moment), whether it is away (emigrating
-  // or leaving home), and which.
-  AS.bunnyWellbeing = function (sim, s) {
+  // or leaving home), and which. Only bunnies are ever away.
+  AS.wellbeingInfo = function (sim, s) {
     const m = mem(sim.W);
     const away = m.awayFor[s] === sim.W.aSerial[s];
     return { wellbeing: wellbeingNow(sim, s, m), away, leavingHome: away && m.natal[s] === 1 };
@@ -694,6 +703,14 @@
         W.aDecideLeft[s] = 0;
       },
     },
+
+    // "Play": see play.js. Bunnies stay within HomeRange of their hole while they do, and
+    // a bunny on a trip (leaving home, emigrating) doesn't play.
+    PLAY: AS.playState(AS.SPECIES.BUNNY, {
+      onTrip: (sim, s) => mem(sim.W).awayFor[s] === sim.W.aSerial[s],
+      stayOk: (W, s, from, to) => !atHome(W, from) || atHome(W, to),
+      closeKind: AS.PLAY.BINKY,
+    }),
 
     // Hysteresis: it rests below RestBelow and stays down until RestUntil.
     REST: {

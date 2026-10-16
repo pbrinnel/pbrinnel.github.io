@@ -95,13 +95,17 @@
 
   const timeLeft = (v, zero) => !Number.isFinite(v) ? NONE : v > 0 ? days(v) + ' days left' : zero;
 
+  // How a PLAY state reads in the inspector, by AS.PLAY kind.
+  const PLAY_WORDS = ['', 'binky', 'chase', 'wrestle'];
+
   const READERS = {
     Fullness: (sim, c) => outOf(sim.W.aFullness[c.s], c.Tsp.FullnessMax),
     Water: (sim, c) => outOf(sim.W.aWater[c.s], c.Tsp.WaterMax),
     Stamina: (sim, c) => outOf(sim.W.aStamina[c.s], c.Tsp.StaminaMax),
-    // Every animal has it; only bunnies' moves yet (a bunny leaves home at -LeaveStress).
+    // Every animal has it; only bunnies' moves yet (a bunny leaves home at -LeaveStress). Those
+    // with a WellbeingHalfLife (bunnies, wolves) fade it, so read it through the faded view.
     Wellbeing: (sim, c) => {
-      const bunny = sim.W.aSpecies[c.s] === AS.SPECIES.BUNNY, b = bunny ? AS.bunnyWellbeing(sim, c.s) : null;
+      const b = c.Tsp.WellbeingHalfLife > 0 ? AS.wellbeingInfo(sim, c.s) : null;
       const w = b ? b.wellbeing : sim.W.aWellbeing[c.s];
       return (w < 0 ? num(w, POINT_DECIMALS) + ', stressed' : w > 0 ? '+' + num(w, POINT_DECIMALS) + ', content' : num(0, POINT_DECIMALS))
         + (b && b.leavingHome ? ', leaving home' : b && b.away ? ', emigrating' : '');
@@ -122,7 +126,9 @@
     Dead: (sim, c) => isCorpse(sim, c) ? 'Yes' : 'No',
     State: (sim, c) => {
       const st = sim.T.states[AS.SPECIES_KEY[sim.W.aSpecies[c.s]]][sim.W.aState[c.s]];
-      return st ? st.name : NONE;
+      if (!st) return NONE;
+      const play = st.name === 'PLAY' ? AS.playKind(sim, c.s) : 0;
+      return play ? st.name + ' (' + PLAY_WORDS[play] + ')' : st.name;
     },
     Target: targetText,
     Position: (sim, c) => position(sim.W, c.t),

@@ -63,7 +63,15 @@
     ['LeaveStress', 'num', []],      // blank = stress never sets one emigrating
     ['ScareStress', 'num', []],
     ['HungerStress', 'num', []],
-    ['WellbeingHalfLife', 'pos', []],
+    ['WellbeingHalfLife', 'pos', []],   // blank = never fades
+    ['WellbeingMax', 'num', BREEDERS],  // the most play can raise Wellbeing to
+    ['PlayChance', 'num', BREEDERS],    // young sessions a day (a rate, may exceed 1)
+    ['PlayChanceAdult', 'num', BREEDERS],
+    ['PlaySeconds', 'range', BREEDERS],
+    ['PlayRange', 'num', BREEDERS],
+    ['PlayStamina', 'num', BREEDERS],
+    ['PlayJoy', 'num', BREEDERS],
+    ['PlayJoyAlone', 'num', []],        // blank = needs a partner
     ['DisperseChance', 'frac', []],
     ['DisperseRun', 'range', []],    // blank = never leaves home
     ['DisperseFar', 'frac', []],     // blank = DisperseRun tiles

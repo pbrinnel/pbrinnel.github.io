@@ -23,6 +23,7 @@ const CHECKS = [
   { file: path.join(TOOLS, 'grass-check.js') },
   { file: path.join(TOOLS, 'sight-check.js'), flags: ['--expose-gc'] },
   { file: path.join(TOOLS, 'bunny-check.js') },
+  { file: path.join(TOOLS, 'play-check.js') },
   { file: path.join(TOOLS, 'breed-check.js'), slow: true },
   { file: path.join(TOOLS, 'wolf-check.js'), slow: true },
   { file: path.join(TOOLS, 'human-check.js') },

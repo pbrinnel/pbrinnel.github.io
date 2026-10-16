@@ -32,7 +32,7 @@
       items: ['hungry', 'thirsty', 'hurt', 'exhausted', 'pregnant', 'babies', 'elders', 'alight'] },
     { id: 'activity', name: 'Activity', accent: '#c6ff3d', blurb: 'What every animal is doing right now. The legend is the key.',
       icon: '<path fill="currentColor" stroke="none" d="M8 8.4c-2 0-3.8 1.9-3.8 3.3 0 1.2 1 1.6 2.1 1.4.6-.1 1-.3 1.7-.3s1.1.2 1.7.3c1.1.2 2.1-.2 2.1-1.4 0-1.4-1.8-3.3-3.8-3.3z"/><circle fill="currentColor" stroke="none" cx="3.2" cy="6.6" r="1.4"/><circle fill="currentColor" stroke="none" cx="6" cy="3.9" r="1.4"/><circle fill="currentColor" stroke="none" cx="10" cy="3.9" r="1.4"/><circle fill="currentColor" stroke="none" cx="12.8" cy="6.6" r="1.4"/>',
-      items: ['fleeFire', 'hiding', 'fleeing', 'drinking', 'eating', 'hunting', 'mating', 'digging', 'resting', 'wandering', 'leaving'] },
+      items: ['fleeFire', 'hiding', 'fleeing', 'drinking', 'eating', 'hunting', 'mating', 'digging', 'playing', 'resting', 'wandering', 'leaving'] },
   ];
   AS.LENSES = LENSES;
   AS.lensIconSvg = l => `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${l.icon}</svg>`;
@@ -69,6 +69,7 @@
     hunting:   { name: 'hunting', color: '#ffffff', kind: 'animals', tip: 'Hunting' },
     mating:    { name: 'mating', color: '#ffe14a', kind: 'animals', tip: 'Mating' },
     digging:   { name: 'digging', color: '#c98a4b', kind: 'animals', tip: 'Digging a hole' },
+    playing:   { name: 'playing', color: '#ff9a2e', kind: 'animals', tip: 'Playing: a binky, a chase or a wrestle' },
     resting:   { name: 'resting', color: '#8aa8ff', kind: 'animals', tip: 'Resting' },
     wandering: { name: 'wandering', color: '#8d9096', kind: 'animals', tip: 'Wandering' },
     leaving:   { name: 'leaving home', color: '#6dffc8', kind: 'animals', tip: 'Leaving home' },
@@ -96,7 +97,7 @@
   const ACTIVITY_OF = {
     ESCAPE: 'fleeFire', HIDE: 'hiding', FLEE: 'fleeing', DRINK: 'drinking',
     EAT: 'eating', FEED: 'eating', SEEK_FOOD: 'eating', FORAGE: 'eating',
-    HUNT: 'hunting', MATE: 'mating', DIG: 'digging', REST: 'resting', GIVE_UP: 'resting',
+    HUNT: 'hunting', MATE: 'mating', DIG: 'digging', PLAY: 'playing', REST: 'resting', GIVE_UP: 'resting',
     WANDER: 'wandering', PROWL: 'wandering',
   };
   const WANDER_STATE = 'WANDER';
@@ -129,7 +130,7 @@
     if (stage === AS.STAGE.BABY) b |= BIT.babies; else if (stage === AS.STAGE.ELDER) b |= BIT.elders;
     const st = W.aState[s], act = stateBits[sp][st] || 0;
     // A bunny that is wandering off a crowd is leaving home; only a wanderer asks (it costs a lookup).
-    if (act === BIT.wandering && st === wanderIdx[sp] && sp === AS.SPECIES.BUNNY && AS.bunnyWellbeing(sim, s).leavingHome) b |= BIT.leaving;
+    if (act === BIT.wandering && st === wanderIdx[sp] && sp === AS.SPECIES.BUNNY && AS.wellbeingInfo(sim, s).leavingHome) b |= BIT.leaving;
     else b |= act;
     return b;
   }

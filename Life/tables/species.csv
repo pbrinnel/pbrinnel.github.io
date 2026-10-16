@@ -71,7 +71,15 @@ SettleRange,tiles,20,,,,How far (a square) an emigrating bunny looks for other b
 LeaveStress,wellbeing,4,,,,A bunny whose Wellbeing falls to minus this sets off for new land the same way (crowds aside); blank = stress never does
 ScareStress,wellbeing,1,,,,Wellbeing one scare lowers by (starting to flee a hunter; once per chase)
 HungerStress,wellbeing,0.5,,,,Wellbeing lowered each time a hungry bunny can see no grass and wanders instead
-WellbeingHalfLife,days,1,,,,Wellbeing (either side of 0) halves toward 0 this often, so only scares or hunger coming faster than that build up
+WellbeingHalfLife,days,1,1,,,Wellbeing (either side of 0) halves toward 0 this often, so only scares or hunger coming faster than that build up
+WellbeingMax,wellbeing,3,3,,,The most play can raise Wellbeing to (stress goes down to minus LeaveStress)
+PlayChance,per day,4,6,,,"Sessions a day a young (baby) animal starts, counted over the decisions it is free to play (fed, watered, rested, not on a trip, a rate: it may exceed 1)"
+PlayChanceAdult,per day,0.5,1,,,As PlayChance for a grown animal (an elder too)
+PlaySeconds,s,3-8,3-8,,,How long a play session lasts (sim seconds; a day is 20 s)
+PlayRange,tiles,5,10,,,How far from a playing animal its invited partner may be; both also stay this near where the session began (a bunny's is inside HomeRange)
+PlayStamina,per s,9,5,,,Stamina a playing animal spends a second on top of the usual refill (set a little above StaminaRefill, so a session costs a net drain)
+PlayJoy,wellbeing,1,1,,,Wellbeing a whole session with a partner raises (about one scare's ScareStress)
+PlayJoyAlone,wellbeing,0.5,,,,Wellbeing a whole session alone (a binky) raises; blank = needs a partner (wolves)
 DisperseChance,%,50%,100%,,,Chance a bunny or wolf born in the world leaves home once it grows up (natal dispersal); the first generation never does
 DisperseRun,tiles,,50-150,,,How far from home a young wolf heads when it leaves (straight-line); it is home when it gets there; blank (and no DisperseFar) = never leaves
 DisperseFar,% of world size,15%,,,,A young bunny leaving home draws its own trip length from TravelMin to this share of the world's longer side, and doesn't settle short of it

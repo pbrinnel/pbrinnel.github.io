@@ -29,6 +29,8 @@ const quiet = {
 //   bare        false to keep the shipped starting animals, grass and water (default true)
 //   settings    { Name: value } settings rows
 //   species     lists of [row, column, value] (e.g. quiet.grass), applied in order
+//   play        true to keep PLAY (play-check.js); by default nobody plays, so a test about
+//               walking, resting or wandering isn't interrupted by a game
 //   edit(texts) any other change to the CSV texts, last
 //   seed        default 1
 //   events      true to record every sim.emit as [type, tile, tick] in `events`
@@ -41,6 +43,7 @@ function stage(o = {}) {
     settings.WorldWidth = w; settings.WorldHeight = h;
   }
   for (const k in settings) texts.settings = editCSV(texts.settings, k, 'Value', String(settings[k]));
+  if (!o.play) for (const sp of ['Bunny', 'Wolf']) for (const col of ['PlayChance', 'PlayChanceAdult']) texts.species = editCSV(texts.species, col, sp, '0');
   for (const list of o.species || []) for (const [row, col, v] of list) texts.species = editCSV(texts.species, row, col, String(v));
   if (o.edit) o.edit(texts);
   const { T, errors } = AS.parseTables(texts);

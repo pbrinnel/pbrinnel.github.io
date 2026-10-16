@@ -513,6 +513,16 @@
       act(sim, s) { AS.setSprint(sim, s, false); },
     },
 
+    // "Play": see play.js. Never while dispersing or roaming.
+    PLAY: AS.playState(AS.SPECIES.WOLF, {
+      onTrip: (sim, s) => {
+        const W = sim.W, m = mem(W), serial = W.aSerial[s];
+        return (m.dispOn[s] === 1 && m.dispFor[s] === serial) || (m.roaming[s] === 1 && m.roamingFor[s] === serial);
+      },
+      stayOk: () => true,
+      closeKind: AS.PLAY.WRESTLE,
+    }),
+
     PROWL: {
       enter() { return true; },
       start: calmStart,
@@ -521,9 +531,9 @@
   };
   AS.registerStates('wolf', STATES);
 
-  // What human.js builds on: the states every hunter shares (everything but MATE, which is
-  // for breeders) and the helpers FORAGE moves with.
-  const { MATE, ...SHARED } = STATES;
+  // What human.js builds on: the states every hunter shares (everything but MATE and PLAY,
+  // which are for wolves) and the helpers FORAGE moves with.
+  const { MATE, PLAY, ...SHARED } = STATES;
   AS.hunterStates = Object.freeze(SHARED);
   // Whether hunter s is roaming (animals.js charges RoamHunger for it). Only PROWL sets it,
   // so a hunter that has left PROWL to hunt, feed or rest isn't roaming.

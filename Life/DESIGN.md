@@ -268,7 +268,23 @@ For bunnies and wolves (humans differ: see [Humans](#humans)).
   `WellbeingHalfLife` days, so one bad chase fades and scares coming faster than that build
   up. At −`LeaveStress` the
   bunny emigrates exactly as a crowded one does, and starts fresh where it settles. Thirst
-  adds none.
+  adds none. Play (below) raises it, up to `WellbeingMax`; wolves fade it too.
+- **Play** (15 Oct 2026, Paul; the look is a separate decision). A bunny or wolf that is fed,
+  watered, rested (Stamina at `RestUntil`) and on no trip (leaving home, emigrating,
+  dispersing, roaming) may play instead of wandering or prowling: it rolls `PlayChance` a day
+  while a baby and `PlayChanceAdult` once grown (an elder too), counted over the decisions it
+  is free, and a win starts a session of `PlaySeconds`. It invites the nearest animal of its
+  kind within `PlayRange` that is only wandering, prowling or resting (and itself fed,
+  watered and not on a trip); that one joins at once, so a baby can pull in an adult. A bunny
+  with nobody near plays alone (a binky, `PlayJoyAlone`); a wolf needs a partner (no
+  `PlayJoyAlone`). Anything higher in the list ends a session: hunger, thirst, tiredness
+  (play spends `PlayStamina` a second on top of the usual refill), a hunter, fire, a trip, the
+  partner leaving. A session raises Wellbeing by `PlayJoy` over its whole length
+  (`PlayJoyAlone` alone), so a cut-short one pays in part, up to `WellbeingMax`. Partners
+  chase each other, swapping who chases every few seconds, then stand together; each stays
+  within `PlayRange` of where the session began and a bunny at home stays within `HomeRange`
+  of its hole. No breeding effect, no packs, no wellbeing-scaled chance (later steps, each
+  Paul's call).
 - **Going around, and giving up** (12 Oct 2026: wolves stood staring at bunnies across a
   river). An animal's path search looks only as far as it can see. When it finds no way to
   where it is going, the animal walks straight at it, and when something is in the way (a

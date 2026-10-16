@@ -873,7 +873,7 @@ function rig(sim) {
   const stIdx = (sp, name) => sim.T.states[AS.SPECIES_KEY[sp]].findIndex(x => x.name === name);
   const jobs = [s => { W.aAlight[s] = 5; }, s => { W.aFullness[s] = 0; }, s => { W.aWater[s] = 0; }, s => { W.aHP[s] = 1; }, s => { W.aStamina[s] = 0; }, s => { W.aPregnant[s] = 3; }, s => { W.aAge[s] = 0; }];
   slots.slice(0, 7 * 3).forEach((s, i) => jobs[i % 7](s));
-  const NAMES = ['ESCAPE', 'HIDE', 'FLEE', 'DRINK', 'EAT', 'HUNT', 'MATE', 'DIG', 'REST', 'WANDER', 'PROWL', 'FEED', 'GIVE_UP'];
+  const NAMES = ['ESCAPE', 'HIDE', 'FLEE', 'DRINK', 'EAT', 'HUNT', 'MATE', 'DIG', 'PLAY', 'REST', 'WANDER', 'PROWL', 'FEED', 'GIVE_UP'];
   slots.slice(30, 30 + 40).forEach((s, i) => { const k = stIdx(W.aSpecies[s], NAMES[i % NAMES.length]); if (k >= 0) W.aState[s] = k; });
   // Soil: a few dry and wet tiles once the renderer has its first look.
   frame(16);
@@ -896,7 +896,7 @@ function rig(sim) {
     for (let t = 0; t < W.n; t++) { if (W.flow[t] === AS.FLOW.FIRE) want.burn++; if (W.hole[t]) want.holes++; }
     const st = sim.weather.strikes; for (let k = 0; k < Math.min(st.n, 32); k++) if ((sim.simSeconds - st.atSec[k]) / AS.DAY_SECONDS < sim.T.world.FireScorchDays) want.strikes++;
     want.showers = sh.n;
-    const ACT = { ESCAPE: 'fleeFire', HIDE: 'hiding', FLEE: 'fleeing', DRINK: 'drinking', EAT: 'eating', FEED: 'eating', SEEK_FOOD: 'eating', FORAGE: 'eating', HUNT: 'hunting', MATE: 'mating', DIG: 'digging', REST: 'resting', GIVE_UP: 'resting', WANDER: 'wandering', PROWL: 'wandering' };
+    const ACT = { ESCAPE: 'fleeFire', HIDE: 'hiding', FLEE: 'fleeing', DRINK: 'drinking', EAT: 'eating', FEED: 'eating', SEEK_FOOD: 'eating', FORAGE: 'eating', HUNT: 'hunting', MATE: 'mating', DIG: 'digging', PLAY: 'playing', REST: 'resting', GIVE_UP: 'resting', WANDER: 'wandering', PROWL: 'wandering' };
     for (let s = 0; s < W.aHigh; s++) {
       if (!W.aAlive[s]) continue;
       const sp = W.aSpecies[s], S = sim.T[AS.SPECIES_KEY[sp]], name = sim.T.states[AS.SPECIES_KEY[sp]][W.aState[s]]?.name;
@@ -907,7 +907,7 @@ function rig(sim) {
       if (W.aStamina[s] === 0) want.exhausted++;
       if (W.aPregnant[s] > 0) want.pregnant++;
       const stage = AS.stageOf(S, W.aAge[s]); if (stage === AS.STAGE.BABY) want.babies++; if (stage === AS.STAGE.ELDER) want.elders++;
-      if (name === 'WANDER' && sp === AS.SPECIES.BUNNY && AS.bunnyWellbeing(sim, s).leavingHome) want.leaving++; else if (ACT[name]) want[ACT[name]]++;
+      if (name === 'WANDER' && sp === AS.SPECIES.BUNNY && AS.wellbeingInfo(sim, s).leavingHome) want.leaving++; else if (ACT[name]) want[ACT[name]]++;
     }
     const wrong = IDS.filter(id => c[id] !== want[id]);
     check(wrong.length === 0, `lensCounts matches a direct count for every item${wrong.map(id => ` (${id}: ${c[id]} vs ${want[id]})`).join('')}`);
