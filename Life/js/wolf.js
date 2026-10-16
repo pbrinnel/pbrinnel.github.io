@@ -521,6 +521,7 @@
       },
       stayOk: () => true,
       closeKind: AS.PLAY.WRESTLE,
+      canWrestle: true,
     }),
 
     PROWL: {

@@ -65,9 +65,11 @@ for (const [species, name] of [['BUNNY', 'bunny'], ['WOLF', 'wolf']]) {
       }
       kinds.add(AS.playKind(sim, a));
     }
-    ok(moved, `${name} pair: they move around each other`);
+    // A wolf pair that picked a wrestle closed in during the first half second, before start.
+    const wrestled = kinds.has(AS.PLAY.WRESTLE);
+    ok(moved || wrestled, `${name} pair: they move around each other`);
     ok(far <= S.PlayRange + 1, `${name} pair: they stay within PlayRange of where they began (${far.toFixed(1)})`);
-    ok(![...kinds].includes(AS.PLAY.NONE) && kinds.has(AS.PLAY.CHASE), `${name} pair: kinds seen ${[...kinds]}`);
+    ok(![...kinds].includes(AS.PLAY.NONE) && (kinds.has(AS.PLAY.CHASE) || wrestled), `${name} pair: kinds seen ${[...kinds]}`);
     ok(W.aStamina[a] < S.StaminaMax, `${name} pair: playing spent Stamina (${W.aStamina[a].toFixed(1)})`);
     ok(W.aWellbeing[a] > 0 && W.aWellbeing[a] <= S.WellbeingMax + 1e-9, `${name} pair: wellbeing rose (${W.aWellbeing[a].toFixed(2)})`);
   }

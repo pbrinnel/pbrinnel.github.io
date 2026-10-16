@@ -25,6 +25,11 @@
   // both read the same phase.
   const PLAY_SWAP = 6;
   const PLAY_CHASE_SHARE = 0.6;
+  // Whether a wolf pair's session is a wrestle (the pair stays together) rather than a chase
+  // (swapping), picked once per session: adults mostly wrestle, pups mostly chase (Paul's pick,
+  // 15 Oct 2026). Only species whose opts.canWrestle is set (wolves) roll it.
+  const PLAY_WRESTLE_ADULT = 0.7;
+  const PLAY_WRESTLE_PUP = 0.3;
   // Only these states are "not busy": an animal in any other ignores an invitation.
   const IDLE_STATES = ['WANDER', 'PROWL', 'REST'];
   // A session timer within this of 0 is over (DT has no exact binary value).
@@ -46,6 +51,7 @@
       m.anchor = grow(m.anchor, Int32Array);         // where it was when the session began
       m.startAt = grow(m.startAt, Float64Array);     // sim.simSeconds the pair's clock started (the inviter's start)
       m.lead = grow(m.lead, Uint8Array);             // 1 = the inviter (chases first)
+      m.wrestle = grow(m.wrestle, Uint8Array);       // 1 = the pair wrestles all session (the inviter's pick)
       m.cap = W.aCap;
     }
     return m;
@@ -104,14 +110,14 @@
     return content(mSim, p, S, mOpts, S.RestBelow);
   };
 
-  function begin(m, s, serial, len, partner, anchor, startAt, lead) {
+  function begin(m, s, serial, len, partner, anchor, startAt, lead, wrestle) {
     m.forSerial[s] = serial; m.left[s] = len; m.len[s] = len; m.partner[s] = partner;
-    m.anchor[s] = anchor; m.startAt[s] = startAt; m.lead[s] = lead;
+    m.anchor[s] = anchor; m.startAt[s] = startAt; m.lead[s] = lead; m.wrestle[s] = wrestle;
   }
 
-  function join(sim, j, inviter, len, startAt) {
+  function join(sim, j, inviter, len, startAt, wrestle) {
     const W = sim.W, m = mem(W);
-    begin(m, j, W.aSerial[j], len, inviter, W.aTile[j], startAt, 0);
+    begin(m, j, W.aSerial[j], len, inviter, W.aTile[j], startAt, 0, wrestle);
     W.aState[j] = playIdx[W.aSpecies[j]];
     W.aTargetTile[j] = -1; W.aTargetSlot[j] = -1;
     AS.edgeReset(W, j);
@@ -154,6 +160,7 @@
     const p = m.partner[s];
     if (p < 0) return KINDS.BINKY;
     const close = adjacent(W, W.aTile[s], W.aTile[p]);
+    if (m.wrestle[s]) return close ? KINDS.WRESTLE : KINDS.CHASE;
     if (close && !roles(sim, s, m).chasing) return OPTS_OF[W.aSpecies[s]].closeKind;
     return KINDS.CHASE;
   };
@@ -166,7 +173,8 @@
 
   // ---- the state ------------------------------------------------------------------------------
   // opts: onTrip(sim, s) → bool (the species' own trips); stayOk(W, s, from, to) → bool (a
-  // bunny already at home stays home); closeKind: the look of a pair standing together.
+  // bunny already at home stays home); closeKind: the look of a pair standing together;
+  // canWrestle: the pair may pick a wrestle session.
   const OPTS_OF = [];
   AS.playState = function (species, opts) {
     OPTS_OF[species] = opts;
@@ -185,8 +193,11 @@
         if (t < 0 && !(S.PlayJoyAlone > 0)) return false;
         const len = S.PlaySeconds.min + sim.rng.next() * (S.PlaySeconds.max - S.PlaySeconds.min);
         const j = t < 0 ? -1 : W.aSlot[t];
-        begin(m, s, serial, len, j, W.aTile[s], sim.simSeconds, 1);
-        if (j >= 0) join(sim, j, s, len, sim.simSeconds);
+        // A pair of a species that wrestles picks chase or wrestle for the whole session.
+        const wrestle = j >= 0 && opts.canWrestle &&
+          sim.rng.chance(AS.stageOfSlot(sim, s) === AS.STAGE.BABY ? PLAY_WRESTLE_PUP : PLAY_WRESTLE_ADULT) ? 1 : 0;
+        begin(m, s, serial, len, j, W.aTile[s], sim.simSeconds, 1, wrestle);
+        if (j >= 0) join(sim, j, s, len, sim.simSeconds, wrestle);
         return true;
       },
       start(sim, s) {
@@ -209,7 +220,9 @@
         if (W.aStepLeft[s] > 0) return;
         const r = roles(sim, s, m), close = adjacent(W, W.aTile[s], pt);
         // The chaser closes in; the chased runs while the chase lasts; together they stand.
-        if (r.chaser) { if (!close) stepAbout(sim, s, pt, true, S, opts, m); }
+        // A wrestle never chases: the inviter closes in and both stay close.
+        if (m.wrestle[s]) { if (m.lead[s] === 1 && !close) stepAbout(sim, s, pt, true, S, opts, m); }
+        else if (r.chaser) { if (!close) stepAbout(sim, s, pt, true, S, opts, m); }
         else if (r.chasing) stepAbout(sim, s, pt, false, S, opts, m);
       },
     };

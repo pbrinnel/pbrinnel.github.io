@@ -285,6 +285,12 @@ For bunnies and wolves (humans differ: see [Humans](#humans)).
   within `PlayRange` of where the session began and a bunny at home stays within `HomeRange`
   of its hole. No breeding effect, no packs, no wellbeing-scaled chance (later steps, each
   Paul's call).
+  **The look** (15 Oct 2026, Paul's picks): a lone bunny, or a bunny pair standing together,
+  does a binky: 0-2 small lead-in hops, then one bigger hop with a twist in the air, varied
+  each time. Bunnies chasing just run. A wolf pair picks chase or wrestle once per session
+  (adults wrestle 70%, pups 30%) and keeps it: a wrestle has the pair stay together, nudging,
+  with short lunges at each other, pups bouncier. All of it is drawn on real time so it reads
+  at 50x, only moving and tilting the sprite (no flashing or brightness change).
 - **Going around, and giving up** (12 Oct 2026: wolves stood staring at bunnies across a
   river). An animal's path search looks only as far as it can see. When it finds no way to
   where it is going, the animal walks straight at it, and when something is in the way (a

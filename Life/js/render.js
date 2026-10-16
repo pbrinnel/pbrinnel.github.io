@@ -281,6 +281,7 @@
     const pos = new Float64Array(2), pos2 = new Float64Array(2);   // scratch for animalPos: no per-frame allocation
     let curAlpha = 0;                  // this frame's alpha, for animalPos
     let clock = 0;                     // this frame's sim time in seconds, for the idle fidget
+    const play = new Float64Array(4);  // scratch for playPose
     const posed = new Float64Array(2); // scratch for spritePose: frame, lift
     const facing = AS.SpriteFacing();
     const gusts = AS.Gusts();          // the wind on the grass (sprites.js)
@@ -301,6 +302,7 @@
     let statesFor = null;
     const restState = AS.SPECIES_KEY.map(() => new Uint8Array(256));
     const mateState = AS.SPECIES_KEY.map(() => new Uint8Array(256));
+    const playIdx = [];   // per species, the PLAY state's index (-1: none)
 
     function growSlots(W) {
       if (holdKind.length >= W.aCap) return;
@@ -324,6 +326,7 @@
           if (list[i].name === 'REST' || list[i].name === 'GIVE_UP') restState[sp][i] = 1;
           if (list[i].name === 'MATE') mateState[sp][i] = 1;
         }
+        playIdx[sp] = list.findIndex(x => x.name === 'PLAY');
       }
     }
 
@@ -829,7 +832,32 @@
           ? AS.spritePeek(W.aSex[a])
           : AS.spriteIndex(sp, W.aSex[a], stage, facing.left(a), posed[0]);
         // Lift in whole sprite pixels, so the body hops in the art's own grid.
-        const bx = Math.round(ax * s - ox), by = Math.round(ay * s - oy) - Math.round((peeking ? 0 : posed[1]) * unit);
+        let bx = Math.round(ax * s - ox), by = Math.round(ay * s - oy) - Math.round((peeking ? 0 : posed[1]) * unit);
+        const pk = playIdx[sp] === st ? AS.playKind(sim, a) : 0;
+        if (pk === AS.PLAY.BINKY || pk === AS.PLAY.WRESTLE) {
+          // Play is drawn over real time (AS.playPose): an offset, lift, tilt and sometimes a frame.
+          let ux = facing.left(a) ? -1 : 1, uy = 0, which = 0;
+          const pa = pk === AS.PLAY.WRESTLE ? AS.playPartner(sim, a) : -1;
+          if (pa >= 0) {
+            const pp = W.aTile[pa], tx = pp % W.w - W.aTile[a] % W.w, ty = ((pp / W.w) | 0) - ((W.aTile[a] / W.w) | 0);
+            const len = Math.hypot(tx, ty) || 1;
+            ux = tx / len; uy = ty / len;
+            which = serial < W.aSerial[pa] ? 0 : 1;
+            if (tx !== 0) facing.turn(a, tx < 0 ? 1 : 0);
+          }
+          AS.playPose(pk, nowMs, serial, stage === AS.STAGE.BABY, which, play);
+          bx += Math.round(play[0] * ux * s); by += Math.round(play[0] * uy * s) - Math.round(play[1] * s);
+          const fid = play[3] >= 0 ? AS.spriteIndex(sp, W.aSex[a], stage, facing.left(a), play[3]) : id;
+          if (play[2] !== 0) {   // tilt about its feet; it leans into the way it faces
+            ctx.save();
+            ctx.translate(bx + px / 2, by + px);
+            ctx.rotate(play[2] * (ux < 0 ? -1 : 1));
+            ctx.drawImage(img, sh.sx(fid), sh.sy(fid), px, px, -px / 2, -px, px, px);
+            ctx.restore();
+          } else ctx.drawImage(img, sh.sx(fid), sh.sy(fid), px, px, bx, by, px, px);
+          if (W.aAlight[a] > 0) drawAlight(sim, a, img, sh, px, stage, bx, by, nowMs);
+          continue;
+        }
         ctx.drawImage(img, sh.sx(id), sh.sy(id), px, px, bx, by, px, px);
         if (W.aAlight[a] > 0 && !peeking) drawAlight(sim, a, img, sh, px, stage, bx, by, nowMs);
       }

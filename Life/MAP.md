@@ -327,9 +327,14 @@ graph, ui, bench) only reads.
   (bunnies: `stayOk` keeps an at-home bunny at home) in a phase from the sim clock
   (`roles`: swap every `PLAY_SWAP` s, chase the first `PLAY_CHASE_SHARE` of it, then stand
   together). The species files pass `onTrip`, `stayOk` and `closeKind` to `AS.playState`.
+  A wolf pair also picks chase or wrestle at session start from `sim.rng`
+  (`PLAY_WRESTLE_ADULT`, `PLAY_WRESTLE_PUP`, by the inviter's stage; `opts.canWrestle`),
+  kept in `mem.wrestle` for both: a wrestle never swaps, the inviter just closes in.
+  render.js draws BINKY and WRESTLE through `AS.playPose` (sprites.js, real-time offset, lift,
+  tilt, frame; a tilt is a canvas rotation about the feet), CHASE as ordinary running.
   **What render reads:** `AS.playKind(sim, s)` → `AS.PLAY.NONE | BINKY | CHASE | WRESTLE`
-  (alone: BINKY; a pair: CHASE while apart or chasing, else `closeKind`: BINKY for bunnies,
-  WRESTLE for wolves) and `AS.playPartner(sim, s)` → the partner's slot, or −1 when alone or
+  (alone: BINKY; a wrestle pair: WRESTLE when adjacent, else CHASE; other pairs: CHASE while
+  apart or chasing, else `closeKind`, BINKY for bunnies) and `AS.playPartner(sim, s)` → the partner's slot, or −1 when alone or
   not playing. Both are derived from state and the clock, nothing is stored for them. The
   Activity lens has a "playing" bit (`#ff9a2e`); the inspector's State row reads
   `PLAY (binky|chase|wrestle)`. `kit.js` `stage()` zeroes both chances unless given

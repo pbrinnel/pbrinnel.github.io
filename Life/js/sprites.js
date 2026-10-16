@@ -237,6 +237,59 @@
     out[0] = clock % IDLE_PERIOD < IDLE_LEN ? a.idle : FRAME.STAND;
   };
 
+  // ---- play (binky and wrestle) ---------------------------------------------------------
+  // How a playing animal is drawn on top of where the sim has it: an offset in tiles, a lift,
+  // a tilt, and sometimes a frame. All of it runs on REAL time (nowMs), never the sim's, so it
+  // reads the same at 50x as at 1x, and it only moves and tilts the sprite: never a flash or
+  // a change of brightness (photosensitive players). The sim's PLAY states (play.js) choose
+  // the kind; CHASE needs nothing here, the animals just run.
+  // A binky is 0-2 small lead-in hops, then one bigger hop with a twist in the air, then a
+  // rest. Slots are fixed-length so any moment can be found without replaying the past; what
+  // a slot holds is hashed from its index and the animal's serial, so binkies vary.
+  const BINKY_HOP_S = 0.5, BINKY_TWIST_S = 0.7, BINKY_MAX_HOPS = 2, BINKY_REST_S = 1;
+  const BINKY_SLOT_S = BINKY_MAX_HOPS * BINKY_HOP_S + BINKY_TWIST_S + BINKY_REST_S;
+  const BINKY_HOP_LIFT = 0.4, BINKY_HOP_LIFT_STEP = 0.1, BINKY_TWIST_LIFT = 0.85, BINKY_TWIST_TILT = 0.55;
+  const BINKY_DRIFT = 0.55, BINKY_RETURN_S = 0.4;   // tiles forward per hop; the glide back
+  // A wrestle: both animals nudge at each other, and every WRESTLE_LUNGE_EVERY_S one of them
+  // (alternating) lunges for WRESTLE_LUNGE_S while the other recoils a little.
+  const WRESTLE_LUNGE_EVERY_S = 1.7, WRESTLE_LUNGE_S = 0.3, WRESTLE_LUNGE_REACH = 0.45, WRESTLE_RECOIL = 0.12;
+  const WRESTLE_NUDGE = 0.07, WRESTLE_WOBBLE = 0.25, WRESTLE_LUNGE_TILT = 0.35, WRESTLE_LUNGE_LIFT = 0.25;
+  const WRESTLE_PUP_BOUNCE = 0.32;   // pups are bouncier (tiles of lift)
+  const PLAY_HASH = (a, b) => (((Math.imul(a + 11, 73856093) ^ Math.imul(b - 7, 19349663)) >>> 0) % 10000) / 10000;
+  const hopArc = p => Math.sin(Math.PI * Math.max(0, Math.min(1, p)));
+  // out[0] = along (tiles, toward the way it faces for a binky, toward the partner for a
+  // wrestle), out[1] = lift (tiles), out[2] = tilt (radians, clockwise when facing right),
+  // out[3] = frame, or -1 for the ordinary pose. which: 0 or 1, the two partners' order.
+  AS.playPose = function (kind, nowMs, serial, baby, which, out) {
+    const t = nowMs / 1000 + serial * 0.37;
+    out[0] = 0; out[1] = 0; out[2] = 0; out[3] = -1;
+    if (kind === AS.PLAY.BINKY) {
+      const slot = Math.floor(t / BINKY_SLOT_S), u = t - slot * BINKY_SLOT_S;
+      const n = Math.floor(PLAY_HASH(slot, serial) * (BINKY_MAX_HOPS + 1));
+      const lead = n * BINKY_HOP_S, span = (n + 1) * BINKY_DRIFT, x0 = -span / 2;
+      if (u < lead) {
+        const k = Math.floor(u / BINKY_HOP_S), q = u / BINKY_HOP_S - k;
+        out[0] = x0 + (k + q) * BINKY_DRIFT; out[1] = hopArc(q) * (BINKY_HOP_LIFT + BINKY_HOP_LIFT_STEP * k); out[3] = FRAME.RUN_B;
+      } else if (u < lead + BINKY_TWIST_S) {
+        const p = (u - lead) / BINKY_TWIST_S;
+        out[0] = x0 + n * BINKY_DRIFT + p * BINKY_DRIFT; out[1] = hopArc(p) * BINKY_TWIST_LIFT;
+        out[2] = Math.sin(p * 2 * Math.PI) * BINKY_TWIST_TILT; out[3] = FRAME.RUN_B;
+      } else {
+        // At rest it glides back to where the next binky starts.
+        const back = Math.min(1, (u - lead - BINKY_TWIST_S) / BINKY_RETURN_S);
+        out[0] = (x0 + span) * (1 - back * back * (3 - 2 * back)) + x0 * back * back * (3 - 2 * back);
+      }
+    } else if (kind === AS.PLAY.WRESTLE) {
+      const tt = t + which * 0.4, lu = tt % WRESTLE_LUNGE_EVERY_S;
+      const lp = lu < WRESTLE_LUNGE_S ? hopArc(lu / WRESTLE_LUNGE_S) : 0;
+      const lunger = Math.floor(tt / WRESTLE_LUNGE_EVERY_S) % 2 === which;
+      out[0] = WRESTLE_NUDGE * Math.sin(t * 5.2 + which * 2) + (lunger ? WRESTLE_LUNGE_REACH : -WRESTLE_RECOIL) * lp;
+      out[1] = (baby ? WRESTLE_PUP_BOUNCE * Math.abs(Math.sin(t * 2 * Math.PI * 1.4 + which * 2.1)) : 0) + (lunger ? WRESTLE_LUNGE_LIFT * lp : 0);
+      out[2] = WRESTLE_WOBBLE * Math.sin(t * 3.1 + which) + (lunger ? WRESTLE_LUNGE_TILT * lp : 0);
+      out[3] = lunger && lp > 0 ? FRAME.RUN_A : FRAME.STAND;
+    }
+  };
+
   // ---- in the water ------------------------------------------------------------------
   // Swimming (Paul's pick, 12 Oct 2026, option B of four): an animal in water deeper than it
   // wades sits low, the water meeting it at sprite row SWIM_CUT of its cell, with its head
