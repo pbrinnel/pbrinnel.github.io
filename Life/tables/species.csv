@@ -57,6 +57,7 @@ MateCost,% of FullnessMax,30,30,,,Fullness each parent loses at mating
 MateRange,tiles,,80,,,A ready wolf hears and scents a ready mate this far away (howling, scent) and travels to it; blank = only mates in sight
 PackLimit,count,,8,,,A female wolf breeds only if no more than this many other adult wolves are within TerritoryRange; blank = no limit
 TerritoryRange,tiles,,15,,,Square (Chebyshev) distance for PackLimit
+BreedGap,days,,15,,,One breeding female per territory: a female wolf does not breed while another female within TerritoryRange is pregnant or has a pup younger than this (set to the baby stage); blank = no such rule
 HoleRange,tiles,8,,,,A bunny that sees a wolf runs for a free warren hole this close; also how far from any hole it must be to found a new warren
 DigChance,per day,50%,,,,Chance per day that a fed adult with no wolf in sight digs a warren hole; 0% = never
 DigSeconds,s,8,,,,How long a digging bunny stands still before the hole opens

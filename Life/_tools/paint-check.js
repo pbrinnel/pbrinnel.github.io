@@ -9,7 +9,7 @@ const { ok, done } = kit.tally();
 
 const RADIUS = 20, DAYS = 8;
 // The shipped world, with bunnies digging whenever they may.
-const { AS, T, sim, W, K } = stage({ bare: false, size: [150, 100], seed: 7, settings: { BrushRadius: RADIUS, ScorchDays: DAYS, Rain: 0 },
+const { AS, T, sim, W, K } = stage({ bare: false, size: [150, 100], seed: 8, settings: { BrushRadius: RADIUS, ScorchDays: DAYS, Rain: 0 },
   species: [[['DigChance', 'Bunny', '100%']]] });
 const DAY = AS.TICK_HZ * AS.DAY_SECONDS;
 const days = n => { for (let i = 0; i < n * DAY; i++) sim.tick(); };

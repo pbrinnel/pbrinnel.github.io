@@ -218,6 +218,9 @@ For bunnies and wolves (humans differ: see [Humans](#humans)).
   square). Nothing else about territories exists: wolves still go anywhere and never fight.
   Real packs hold territories and few pairs breed, which keeps wolf numbers at what the land
   can feed instead of overshooting.
+- **One breeding female per territory** (16 Oct 2026): a female wolf also doesn't breed while
+  another female within `TerritoryRange` is pregnant or has pups younger than `BreedGap` days
+  (the baby stage). Blank `BreedGap` (bunnies, humans) turns it off. `PackLimit` stays.
 
 ## Warrens
 - **Warren holes** (4 Oct 2026): bunnies' refuge from wolves, keeping one animal per tile.

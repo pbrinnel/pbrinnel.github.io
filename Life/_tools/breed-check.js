@@ -66,11 +66,35 @@ const M = 0, F = 1;
   for (let i = 0; i < L + 1; i++) wolf(10 + R + 1, 50 - R + i, M);
   ok(AS.canMate(sim, g), 'territory: wolves just outside TerritoryRange do not count');
   const h = wolf(50, 8, F);
-  for (let i = 0; i < L + 1; i++) wolf(50 - (i % 7) * 2, 8 + 2 * ((i / 7) | 0) + 2, M, { age: 0.1 });
+  for (let i = 0; i < L + 1; i++) W.aParentA[wolf(50 - (i % 7) * 2, 8 + 2 * ((i / 7) | 0) + 2, M, { age: 0.1 })] = W.aSerial[h];   // her own litter
   ok(AS.canMate(sim, h), 'territory: babies do not count');
   const b = bunny(AS, sim, 5, 5, F);
   for (let i = 0; i < L + 3; i++) bunny(AS, sim, 6 + i, 5, M);
   ok(AS.canMate(sim, b), 'territory: a crowd of bunnies is not gated');
+}
+
+// --- one breeding female per territory (BreedGap), in an empty world ---
+{
+  const { AS, sim, W, T } = make(60, 5);
+  const wolf = (x, y, sex, o = {}) => {
+    const s = AS.spawnStarting(sim, AS.SPECIES.WOLF, at(W, x, y));
+    W.aSex[s] = sex; W.aAge[s] = o.age ?? 20; W.aFullness[s] = 100; W.aDecideLeft[s] = 0;
+    return s;
+  };
+  const R = T.wolf.TerritoryRange;
+  ok(T.wolf.BreedGap != null && T.bunny.BreedGap == null, 'gap: wolves have the rule, bunnies are blank');
+  const f1 = wolf(10, 10, F), f2 = wolf(10 + R, 10 + R, F), far = wolf(10 + R + 2, 10, F);
+  ok(AS.canMate(sim, f2), 'gap: nobody pregnant, she can mate');
+  W.aPregnant[f1] = 1;
+  ok(!AS.canMate(sim, f2), 'gap: another female in range is pregnant, she cannot');
+  ok(AS.canMate(sim, far), 'gap: the pregnant one is out of range, she can');
+  W.aPregnant[f1] = 0;
+  const pup = wolf(11, 10, M, { age: 0.1 }); W.aParentA[pup] = W.aSerial[f1] + 1000;
+  ok(!AS.canMate(sim, f2), 'gap: a pup of another mother in range, she cannot');
+  W.aParentA[pup] = W.aSerial[f2];
+  ok(AS.canMate(sim, f2), 'gap: her own pup does not count');
+  W.aParentA[pup] = W.aSerial[f1] + 1000; W.aAge[pup] = T.wolf.BreedGap + 1;
+  ok(AS.canMate(sim, f2), 'gap: no longer a pup, she can');
 }
 
 // --- a male next to each ineligible female never mates ---

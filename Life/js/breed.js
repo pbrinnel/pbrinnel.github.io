@@ -25,18 +25,28 @@
   // Territory: a female breeds only while no more than PackLimit other adults of her species
   // stand within TerritoryRange tiles (Chebyshev, so a square scan of aSlot, stopping as soon as
   // she is over the limit). Keeps a thriving pack from outgrowing its range. Blank PackLimit
-  // (bunnies) turns the rule off.
+  // (bunnies) turns the rule off. The same scan enforces one breeding female per territory
+  // (blank BreedGap = off): another female of her species in range who is pregnant, or a pup of
+  // another mother younger than BreedGap days (a pup carries its birth in its age, so no birth
+  // time is stored), shuts her out.
   function crowded(sim, s, S) {
     const W = sim.W, t = W.aTile[s], sp = W.aSpecies[s], r = Math.floor(S.TerritoryRange);
     const cx = W.tx(t), cy = W.ty(t);
     const x0 = Math.max(0, cx - r), x1 = Math.min(W.w - 1, cx + r);
     const y0 = Math.max(0, cy - r), y1 = Math.min(W.h - 1, cy + r);
+    const gap = S.BreedGap != null, mine = W.aSerial[s];
     let n = 0;
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) {
         const o = W.aSlot[y * W.w + x];
         if (o < 0 || o === s || W.aSpecies[o] !== sp || !W.aAlive[o]) continue;
-        if (AS.stageOfSlot(sim, o) !== AS.STAGE.ADULT) continue;
+        const stage = AS.stageOfSlot(sim, o);
+        if (stage === AS.STAGE.BABY) {
+          if (gap && W.aAge[o] < S.BreedGap && W.aParentA[o] !== mine) return true;
+          continue;
+        }
+        if (gap && W.aSex[o] === AS.SEX.FEMALE && (W.aPregnant[o] > 0 || W.aLitter[o] > 0)) return true;
+        if (stage !== AS.STAGE.ADULT) continue;
         if (++n > S.PackLimit) return true;
       }
     }

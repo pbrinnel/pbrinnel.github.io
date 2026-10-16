@@ -107,6 +107,7 @@
     ['MateRange', 'num', []],        // blank = a mate must be in sight
     ['PackLimit', 'num', []],        // blank = no territory rule
     ['TerritoryRange', 'num', []],
+    ['BreedGap', 'num', []],         // blank = more than one female may breed in a territory
     ['BabySpeed', 'ratio', ANIMALS],
     ['ElderSpeed', 'ratio', ANIMALS],
     ['GrowthRate', 'num', ['Grass']],
