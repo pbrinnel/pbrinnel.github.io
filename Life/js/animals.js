@@ -268,6 +268,15 @@
       if (deep && W.aStamina[s] === 0) hp -= S.DrownDamage * dt;
       W.aHP[s] = hp;
       if (hp <= 0 || W.aAge[s] >= S.Lifespan) { AS.killAnimal(sim, s, bodyCause(sim, s, burning)); continue; }
+      // Lean days: a species with LeanBelow loses condition while underfed and regains it at the
+      // same pace while fed, so a predator that outlives its prey starves within LeanDays of
+      // the prey thinning out rather than living on a trickle of kills for weeks.
+      if (S.LeanBelow != null && S.LeanDays > 0) {
+        if (full < S.LeanBelow * S.FullnessMax) W.aLean[s] += AS.DT_DAYS;
+        else if (W.aLean[s] > 0) W.aLean[s] = Math.max(0, W.aLean[s] - AS.DT_DAYS);
+        const baby = S.LeanDaysBaby != null && AS.stageOf(S, W.aAge[s]) === AS.STAGE.BABY;
+        if (W.aLean[s] >= (baby ? S.LeanDaysBaby : S.LeanDays)) { AS.killAnimal(sim, s, AS.CAUSE.STARVED); continue; }
+      }
 
       if (deep) {
         W.aSprint[s] = 0;

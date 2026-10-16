@@ -82,6 +82,7 @@
     aPregnant: Float32Array,   // days left; 0 = not pregnant
     aLitter: Uint8Array,       // babies waiting to be born
     aMateCd: Float32Array,     // days left
+    aLean: Float32Array,       // days spent underfed (below LeanBelow), net of recovery; at the species' lean limit it starves (animals.js)
     aParentA: Uint32Array,     // serials; 0 = first generation
     aParentB: Uint32Array,
     aChildren: Uint16Array,

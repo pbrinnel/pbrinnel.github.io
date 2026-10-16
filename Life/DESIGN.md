@@ -183,6 +183,12 @@ For bunnies and wolves (humans differ: see [Humans](#humans)).
   `HungerRate`. Animals that find no food rest more and so starve slower.
 - **Starving:** at Fullness 0 an animal loses `StarveDamage` HP each second and dies when HP
   reaches 0.
+- **Lean days** (16 Oct 2026; wolves only): a wolf that stays below `LeanBelow` of
+  `FullnessMax` loses condition: its lean days count up while it is underfed and back down
+  at the same pace while it isn't. At `LeanDays` it starves (cause Starved), a pup at
+  `LeanDaysBaby`. Why: a wolf born at the bunny peak kept hunting a thinning herd for weeks
+  and starved long after the bunnies were gone; now wolf numbers fall soon after bunnies do.
+  A blank `LeanBelow` or `LeanDays` (bunnies, humans) turns it off.
 - **Thirst** (5 Oct 2026; only in worlds with water): every animal has a water meter that
   drains at `ThirstRate` (scaled by activity like hunger). Below `ThirstyAt` it goes to
   drink, ranked just under fleeing and hiding and above food and mating: it heads for the

@@ -542,4 +542,38 @@ function realRun() {
   }
   ok(W.aTargetTile[born[0]] < 0 && W.aTargetTile[born[1]] < 0, 'disperse: both are home, with no destination left');
 }
+
+// --- lean days: a wolf kept underfed starves after LeanDays, a fed one recovers, blank = off ---
+{
+  const LEAN_DAYS = 3, BABY_DAYS = 1, BELOW = 50;
+  const lean = (below, d, baby) => tx => {
+    tx.species = editCSV(tx.species, 'LeanBelow', 'Wolf', below);
+    tx.species = editCSV(tx.species, 'LeanDays', 'Wolf', d);
+    tx.species = editCSV(tx.species, 'LeanDaysBaby', 'Wolf', baby);
+  };
+  const { AS, sim, W, Wf } = make(200, 1, false, lean(String(BELOW), String(LEAN_DAYS), String(BABY_DAYS)));
+  const under = Wf.FullnessMax * BELOW / 100 * 0.5, fed = Wf.FullnessMax;
+  // Far apart so nobody mates or meets; no hunger, so only the lean rule can kill them.
+  const starving = wolf(AS, sim, 30, 30, { full: under }), eats = wolf(AS, sim, 100, 30, { full: under });
+  const pup = wolf(AS, sim, 30, 100, { full: under, age: 0 });
+  const serials = [starving, eats, pup].map(s => W.aSerial[s]);
+  const alive = s => W.aAlive[s] && W.aSerial[s] === serials[[starving, eats, pup].indexOf(s)];
+  const dayTicks = secs(AS, AS.DAY_SECONDS);
+  const dead = {};
+  for (let d = 0; d < LEAN_DAYS + 2; d++) {
+    tick(sim, dayTicks);
+    // The fed-in-time wolf eats at the end of day LEAN_DAYS-1 (before its limit), then stays full.
+    if (d === LEAN_DAYS - 2 && alive(eats)) W.aFullness[eats] = fed;
+    for (const [n, s] of [['starving', starving], ['eats', eats], ['pup', pup]]) if (!alive(s) && dead[n] == null) dead[n] = d + 1;
+  }
+  ok(dead.pup != null && dead.pup <= BABY_DAYS + 1 && dead.pup < LEAN_DAYS, `lean: an underfed pup starves by its LeanDaysBaby (day ${dead.pup})`);
+  ok(dead.starving === LEAN_DAYS || dead.starving === LEAN_DAYS + 1, `lean: a wolf kept underfed starves after LeanDays (day ${dead.starving})`);
+  ok(dead.eats == null && alive(eats) && W.aLean[eats] < LEAN_DAYS * 0.5, `lean: a wolf that eats in time lives and recovers (lean ${W.aLean[eats]?.toFixed(2)})`);
+}
+{
+  const { AS, sim, W } = make(120, 1, false, tx => { tx.species = editCSV(tx.species, 'LeanBelow', 'Wolf', ''); });
+  const w = wolf(AS, sim, 30, 30, { full: 1 });
+  tick(sim, secs(AS, AS.DAY_SECONDS * 8));
+  ok(W.aAlive[w] && W.aLean[w] === 0, 'lean: blank LeanBelow switches it off (an underfed wolf is untouched)');
+}
 done();

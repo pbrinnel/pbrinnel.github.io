@@ -165,7 +165,7 @@ graph, ui, bench) only reads.
 - **Grass:** growth/age/seed/sprout/old-age once per in-world hour, spread over
   `TICKS_PER_HOUR` ticks by tile (`t % TICKS_PER_HOUR`).
 - **Water:** a step every `STEP_TICKS` ticks ([Water](#water)).
-- **Animals:** body every tick (age, hunger, thirst, starve/heal, stamina + winded,
+- **Animals:** body every tick (age, hunger, thirst, starve/heal, lean days (`aLean`, `LeanBelow`), stamina + winded,
   swimming, timers), decide every 1/`DecidePerSec` s (random phase per animal), then the
   current state's `act` every tick. Timers are Float64 and snap to 0 within 1e-9 so
   cooldowns last exactly their CSV value.

@@ -29,6 +29,9 @@
     ['FullnessMax', 'pos', ANIMALS],
     ['HungerRate', 'num', ANIMALS],
     ['StarveDamage', 'num', ANIMALS],
+    ['LeanBelow', 'frac', []],       // blank = no lean-day starvation
+    ['LeanDays', 'num', []],
+    ['LeanDaysBaby', 'num', []],     // blank = a baby uses LeanDays
     ['RestHunger', 'num', ANIMALS],
     ['SprintHunger', 'num', ANIMALS],
     ['WaterMax', 'pos', ANIMALS],

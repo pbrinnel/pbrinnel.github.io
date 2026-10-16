@@ -100,6 +100,13 @@
 
   const READERS = {
     Fullness: (sim, c) => outOf(sim.W.aFullness[c.s], c.Tsp.FullnessMax),
+    // Days underfed out of the days that starve it (a pup's limit is its own); blank LeanBelow = off.
+    Lean: (sim, c) => {
+      const S = c.Tsp;
+      if (S.LeanBelow == null || !(S.LeanDays > 0)) return NONE;
+      const lim = S.LeanDaysBaby != null && AS.stageOf(S, sim.W.aAge[c.s]) === AS.STAGE.BABY ? S.LeanDaysBaby : S.LeanDays;
+      return days(sim.W.aLean[c.s]) + ' of ' + days(lim) + ' days';
+    },
     Water: (sim, c) => outOf(sim.W.aWater[c.s], c.Tsp.WaterMax),
     Stamina: (sim, c) => outOf(sim.W.aStamina[c.s], c.Tsp.StaminaMax),
     // Every animal has it; only bunnies' moves yet (a bunny leaves home at -LeaveStress). Those

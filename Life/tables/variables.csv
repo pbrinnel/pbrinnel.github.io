@@ -1,5 +1,6 @@
 Variable,Kind,Applies to,Range,Goes up when,Goes down when,At the limit
 Fullness,Dynamic,Bunny Wolf Human,0 – FullnessMax,Eats (BiteFood; a wolf or human from a carcass; GrassFood per bite of grass for a human),Every tick (HungerRate); mating (MateCost),0 → loses StarveDamage HP per s
+Lean,Dynamic,Wolf,0 – LeanDays (LeanDaysBaby for a pup),Every tick it is below LeanBelow of FullnessMax,Every tick it is at or above LeanBelow (same pace),LeanDays → starves (cause Starved)
 Water,Dynamic,Bunny Wolf Human,0 – WaterMax,Drinks at a lake or river (DrinkRate; spawns full),Every tick (ThirstRate; scaled like hunger by activity),0 → loses ThirstDamage HP per s
 Wellbeing,Dynamic,Bunny Wolf Human,−LeaveStress (leaves home) … 0 … WellbeingMax,"Play: a session raises it, PlayJoy with a partner or PlayJoyAlone alone, up to WellbeingMax","A scare: starting to flee a hunter, once per chase (ScareStress); wandering hungry with no grass in sight (HungerStress). Halves toward 0 every WellbeingHalfLife days; back to 0 when it sets off","−LeaveStress → sets off for new land with a companion (emigrating)"
 Stamina,Dynamic,Bunny Wolf Human,0 – StaminaMax,Not sprinting (StaminaRefill),Sprinting (SprintCost),0 → walk only until Stamina is full again

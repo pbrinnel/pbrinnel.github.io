@@ -19,6 +19,9 @@ ForgetSeconds,s,,60,60,,How long a wolf or human ignores a bunny or carcass or m
 FullnessMax,points,100,100,100,,
 HungerRate,per s,0.667,0.3,0.2,,Bunny empty in ~7.5 days; wolf in ~17 (walking; standing still takes RestHunger of it)
 StarveDamage,HP per s,1,2,0.4,,HP lost while Fullness = 0; a wolf lasts ~1.5 days on an empty stomach
+LeanBelow,% of FullnessMax,,70,,,Below this a wolf is underfed and loses condition (its lean days count up; fed again, they count back down); blank = no lean-day starvation
+LeanDays,days,,6,,,Lean days that starve a wolf (cause Starved): how long it can stay underfed; blank = no lean-day starvation
+LeanDaysBaby,days,,3,,,The same for a wolf pup (a starving pack's pups die first); blank = a pup uses LeanDays
 RestHunger,× HungerRate,0.5,0.5,0.5,,Hunger while standing still (resting, hiding, eating in place)
 SprintHunger,× HungerRate,1.5,1.5,1.5,,Hunger while sprinting; walking burns HungerRate
 HungryAt,% of FullnessMax,70,80,70,,Below this an animal looks for food

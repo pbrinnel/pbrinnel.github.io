@@ -90,12 +90,13 @@ const bm = mk(empties[2], 0, 0), bf = mk(empties[3], 0, 1), wm = mk(empties[4], 
 const R = 'Fullness,Water,Wellbeing,Stamina,HP,Alight,Age,Lifestage,Dead,State,Target,Sex,';
 const TILE = ',Tile,Position,Elevation,Ground,Ash,Roots';   // every selection ends with the tile under it
 const RB = R;
+const RW = R.replace('Fullness,', 'Fullness,Lean,');   // wolves also show their lean days
 const dbm = A.describe(sim, selA(bm)), dbf = A.describe(sim, selA(bf)), dwm = A.describe(sim, selA(wm)), dwf = A.describe(sim, selA(wf));
 allValues.push(dbm, dbf, dwm, dwf);
 check(names(dbm) === RB + 'Parents,Children,InHole' + TILE, 'male bunny: ' + names(dbm));
 check(names(dbf) === RB + 'Pregnant,MateCooldown,Parents,Children,InHole' + TILE, 'female bunny: ' + names(dbf));
-check(names(dwm) === R + 'Parents,Children,Kills' + TILE, 'male wolf: ' + names(dwm));
-check(names(dwf) === R + 'Pregnant,MateCooldown,Parents,Children,Kills' + TILE, 'female wolf: ' + names(dwf));
+check(names(dwm) === RW + 'Parents,Children,Kills' + TILE, 'male wolf: ' + names(dwm));
+check(names(dwf) === RW + 'Pregnant,MateCooldown,Parents,Children,Kills' + TILE, 'female wolf: ' + names(dwf));
 check(dbf.title.startsWith('Female bunny #') && dwm.title.startsWith('Male wolf #'), 'titles ' + dbf.title + ' / ' + dwm.title);
 const TB = T.bunny, maxText = m => String(m % 1 ? m.toFixed(1) : m);
 check(val(dbm, 'Fullness') === `62.3 / ${maxText(TB.FullnessMax)}` && val(dbm, 'HP') === `${TB.HPMax.toFixed(1)} / ${maxText(TB.HPMax)}`,

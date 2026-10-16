@@ -121,6 +121,16 @@ three seeds kept every species (day 60: bunnies 173-1,262, wolves 73-81). Wolves
 a little weak (Paul), so wolf `RoamAfter` went to 3 days: day 60 wolves 71-111 and rising,
 bunnies 322-648.
 
+### Underfed wolves starve sooner: lean days (16 Oct 2026)
+Over 200 days (seeds 1-3, shipped world) wolves born at the bunny peak kept hunting a
+thinning herd for weeks, caught the last bunnies, then starved. Tried: wolves roam off after
+days without a kill (worse; dropped). Kept: `LeanBelow`/`LeanDays`/`LeanDaysBaby` (wolf
+only). Day-200 bunnies/wolves, seeds 1 / 2 / 3: before 19/3, 70/11, extinct (d140). Values
+(LeanBelow %, LeanDays, LeanDaysBaby): 70/6/3 shipped: 969/4, 111/24, extinct (wolf peaks
+167-182 against 121-288); 60/10/5: 251/24, extinct, 373/10; 75/6/3: 308/38, extinct, extinct;
+50/5/3 and 30/4/2 killed every wolf in some seed; 50/8/4, 70/12/6, 80/20/10 about as before.
+Seed 3 still collapses at day ~100 either way: the bunny crash is faster than a wolf can starve.
+
 ---
 
 ## Milestones
