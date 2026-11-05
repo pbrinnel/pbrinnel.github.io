@@ -1831,7 +1831,7 @@
     const MC_ARCS = 6;               // bolts crawling over one while he changes
     const MC_ARC_TAIL = 0.6;         // ...and seconds they keep crawling once he has
     const MC_SHOUT = [16.9, 19.3];
-    const MC_CUT = 19.8;
+    const MC_CUT = 21.8;             // the last shot holds a couple of seconds past the shout, then black
     const MC_INK = '#080504';
     const MC_RIM = '#8a3f22';        // the hall's ember, round every one of them
     const MC_RIM_PX = 2;

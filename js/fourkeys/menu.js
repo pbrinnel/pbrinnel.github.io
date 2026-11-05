@@ -2804,7 +2804,7 @@
         text('UNLOCKED', LW / 2, 160, 34, '#f2efe9', 'center');
         ctx.globalAlpha = e;
         text('BRANDONS', LW / 2, 280 + (1 - e) * 30, 54, ink, 'center');
-        text('every paddle you own, on one rack, to pick from', LW / 2, 328 + (1 - e) * 30, 15, '#c9c4ba', 'center');
+        text('pick a Brandon', LW / 2, 328 + (1 - e) * 30, 15, '#c9c4ba', 'center');
         ctx.globalAlpha = 1;
         const own = menuOwned(), step = Math.min(M_RACK_CARD_W * 1.1, (LW - 80) / own.length);
         own.forEach((k, i) => labPadIcon(k, LW / 2 + (i - (own.length - 1) / 2) * step, M_RACK_CARD_Y + (1 - e) * 40,
