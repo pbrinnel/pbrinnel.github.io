@@ -260,10 +260,10 @@
         if (!MENU_ALL.every(l => menu.best[l.n] > 0)) return 0;
         return MENU_ALL.reduce((s, l) => s + menu.best[l.n], 0);
     }
-    // what the HUD calls the best it is showing. A player calls each of the
-    // six a STAGE -- never a level, so the walls inside one are not mistaken
-    // for more of them. BOSS RUSH keeps its own, and it is not one of the six.
-    function menuBestLabel() { return menu && menu.run && menu.run.n === M_RUSH ? 'RUSH BEST' : 'STAGE BEST'; }
+    // what the HUD calls the best it is showing. Plain BEST, as in
+    // brandon.html: under SCORE it is plainly this stage's. BOSS RUSH keeps its
+    // own name, since that best is not one of the six.
+    function menuBestLabel() { return menu && menu.run && menu.run.n === M_RUSH ? 'RUSH BEST' : 'BEST'; }
 
     // ---- the leaderboards -------------------------------------------------------------
     // The shared tables are the engine's (its `the leaderboard`); the town says
