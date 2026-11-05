@@ -53,8 +53,8 @@ touches it.
 - Its code is in `js/fourkeys/`: `engine.js` (brandon.html's game, forked 22 Sep 2026 and
   edited here from now on), `runtime.js` (the seam the bosses plug into), a file per boss,
   mini-boss and paddle, `powers.js` (the sequel's eight capsules, KATAMARI to WILD),
-  `levels.js` (each level's three screens: a wall, a second
-  wall a mini-boss makes an entrance on, then the boss), `dark.js` (the VOLCANO fight's
+  `levels.js` (each level's four screens: a wall, a second
+  wall a mini-boss makes an entrance on, the easiest wall as a breather, then the boss), `dark.js` (the VOLCANO fight's
   dark room: lit only by what burns, the rest flat silhouettes), `storm.js` (the VOID
   fight's storm: silhouette and lightning, his cracked red sky in the last part; it only
   draws, and every flash in it is rationed for photosensitive players), `menu.js` (the town), `debug.js` (what the konami code and

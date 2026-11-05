@@ -1,9 +1,10 @@
 'use strict';
 
     // ---- FOUR KEYS: the levels ---------------------------------------------------------
-    // Each of the five buildings in the town is three screens, walked in order:
+    // Each of the five buildings in the town is four screens, walked in order:
     // a wall, a second wall that a mini-boss makes his entrance on partway
-    // through (see labMiniStart), then the level's boss. The VOID is not here -- it is one fight and nothing else,
+    // through (see labMiniStart), a third that is the easiest of the level and
+    // a breather before the boss, then the level's boss. The VOID is not here -- it is one fight and nothing else,
     // and it keeps the engine's own stages.
     //
     // The rows are the engine's (see `stages` in engine.js): . empty, Y G O R
@@ -56,6 +57,15 @@
                      'GGG.GGG',
                      '.......',
                      'OOO.OOO'] },
+            // the breather before the boss: the easiest screen of the level, a
+            // haystack either side of the open track, gold bales in the stacks
+            // and silver posts flanking the lane at the foot of the fence
+            { dbg: 'FARM 3', pace: 1, silverHp: 2,
+              rows: ['.Y...Y.',
+                     'YOY.YOY',
+                     'OAO.OAO',
+                     'Y.....Y',
+                     'S.O.O.S'] },
             LV_BOSS
         ],
         // an old wall in running bond with a breach knocked into it, the
@@ -81,6 +91,15 @@
                      'O.S.S.O',
                      '.......',
                      '...X...'] },
+            // the breather: the wall has slid into a rubble slope in running
+            // bond, a gold keystone buried in it, and the right edge open all
+            // the way up. Nothing comes off a staircase square
+            { dbg: 'RUINS 3', pace: 1, silverHp: 2,
+              rows: ['YOYOYO.',
+                     '>OSYOY.',
+                     'OYAY...',
+                     '>OYO...',
+                     'SY.....'] },
             LV_BOSS
         ],
         // towers of every height with streets between them running all the
@@ -103,6 +122,14 @@
                      '.RSOSG.',
                      'YR.A.GY',
                      'YR.O.GY'] },
+            // the breather: towers with every street open to the top and no
+            // bridges, silver spires, and a gold plug in the tallest
+            { dbg: 'CITY 3', pace: 1, silverHp: 2,
+              rows: ['..S.S..',
+                     'Y.G.O.R',
+                     'Y.A.O.R',
+                     'Y.G.O.R',
+                     'Y.G.O.R'] },
             LV_BOSS
         ],
         // the mountain: a staircase on both sides and a shaft of lava up the
@@ -123,6 +150,13 @@
                      '.XRORX.',
                      'OSY.YSO',
                      'OYY.YYO'] },
+            // the breather: twin peaks with a lava shaft between them, gold
+            // vents at the tips and silver at the foot, and not a stone
+            { dbg: 'VOLCANO 3', pace: 1, silverHp: 2,
+              rows: ['.A...A.',
+                     'ROR.ROR',
+                     'OYO.OYO',
+                     'SYS.SYS'] },
             LV_BOSS
         ],
         // silver battlements and towers, a gold keep, arrow slits, the
@@ -147,6 +181,14 @@
                      'R.OOO.R',
                      'R.O.O.R',
                      'Y.YYY.Y'] },
+            // the breather: the curtain wall with the gate open down the
+            // middle, silver crenels and gold gate posts. It keeps CASTLE 2's
+            // pace, so the ball does not speed up
+            { dbg: 'CASTLE 3', pace: 3, silverHp: 2,
+              rows: ['S.S.S.S',
+                     'ROA.AOR',
+                     'ROO.OOR',
+                     'YOO.OOY'] },
             LV_BOSS
         ]
     };
