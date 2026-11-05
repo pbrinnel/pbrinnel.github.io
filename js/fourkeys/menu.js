@@ -261,9 +261,9 @@
         return MENU_ALL.reduce((s, l) => s + menu.best[l.n], 0);
     }
     // what the HUD calls the best it is showing. Plain BEST, as in
-    // brandon.html: under SCORE it is plainly this stage's. BOSS RUSH keeps its
-    // own name, since that best is not one of the six.
-    function menuBestLabel() { return menu && menu.run && menu.run.n === M_RUSH ? 'RUSH BEST' : 'BEST'; }
+    // brandon.html: under SCORE it is plainly the best of what you are playing,
+    // BOSS RUSH included.
+    function menuBestLabel() { return 'BEST'; }
 
     // ---- the leaderboards -------------------------------------------------------------
     // The shared tables are the engine's (its `the leaderboard`); the town says
