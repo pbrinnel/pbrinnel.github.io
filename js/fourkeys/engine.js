@@ -1183,8 +1183,7 @@
             ini: String((r && r.ini) || '???').toUpperCase()
                      .replace(/[^A-Z]/g, '').slice(0, 3).padEnd(3, '?'),
             score: Math.max(0, Math.min(cap || SCORE_CAP, parseInt(r && r.score, 10) || 0)),
-            pad: r && typeof r.pad === 'string' && Object.hasOwn(LAB_PAD, padNow(r.pad)) ? padNow(r.pad) : null,
-            at: Math.max(0, Number(r && r.at) || 0)
+            pad: r && typeof r.pad === 'string' && Object.hasOwn(LAB_PAD, padNow(r.pad)) ? padNow(r.pad) : null
         })).sort((a, b) => b.score - a.score).slice(0, TOP_N);
     }
 
@@ -5197,13 +5196,6 @@
     // on a desktop, where the table is the whole point of the screen, and at
     // phone scale it ran the tenth row straight through the game-over clock.
     const BOARD_PITCH = 32;       // row to row at full size
-    // when a row was posted, as MM/DD/YY in the viewer's own time, or nothing
-    // for a row that carries no time
-    function boardDate(at) {
-        if (!(at > 0)) return '';
-        const d = new Date(at), p2 = v => String(v).padStart(2, '0');
-        return p2(d.getMonth() + 1) + '/' + p2(d.getDate()) + '/' + p2(d.getFullYear() % 100);
-    }
     function drawBoard(top, bottom, hudU) {
         // title baseline to the foot of the tenth row is 10.5 pitches
         const pitch = Math.min(BOARD_PITCH * Math.min(hudU, 1.25), (bottom - top) / 10.5);
@@ -5225,14 +5217,11 @@
             // right-aligned, so 9 and 10 end in the same column
             text(String(i + 1), LW / 2 - 128 * k, y, size, col, 'right');
             text(r.ini, LW / 2 - 60 * k, y, size, col);
-            // the score and the paddle sit in from where they were so the date
-            // can be the last column
-            text(fmtScore(r.score), LW / 2 + 100 * k, y, size, col, 'right');
-            text(boardDate(r.at), LW - 20, y, size * 0.72, '#6d685f', 'right');
+            text(fmtScore(r.score), LW / 2 + 160 * k, y, size, col, 'right');
             // the paddle the run was played with, level with the row's letters,
             // dark if it is not yours yet (menuBoardPadIcon)
             if (r.pad) {
-                const px = LW / 2 + 146 * k, py = y - size * 0.33, a = mine || i === 0 ? 1 : 0.75;
+                const px = LW / 2 + 215 * k, py = y - size * 0.33, a = mine || i === 0 ? 1 : 0.75;
                 if (typeof menuBoardPadIcon === 'function') menuBoardPadIcon(r.pad, px, py, 64 * k, a);
                 else labPadIcon(r.pad, px, py, 64 * k, false, a);
             }
