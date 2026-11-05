@@ -1,7 +1,7 @@
 'use strict';
 
     // ==== FOUR KEYS: the new capsules ===============================================
-    // The eight capsules the sequel adds to brandon.html's eight, tried out in
+    // The capsules the sequel adds to brandon.html's eight, tried out in
     // the powerup lab (.claude/powerlab/, on Paul's Mac) and brought in whole.
     // Loaded before the engine like every module, reading nothing of its at
     // load time; the engine reaches in through the pow* calls, one for each
@@ -19,8 +19,8 @@
     //    along whatever line it had been hitting bricks on and ended up a
     //    stick; drawn in, it stays a ball.
     //
-    // The others each have their own section below: LASER, PORTAL, MIRROR,
-    // CROWD, MIDAS, LUCKY and WILD.
+    // The others each have their own section below: LASER, PORTAL, MIDAS
+    // and WILD.
     //
     // Every number is a let so the lab's panel can reach it and Paul can tune
     // it live.
@@ -59,7 +59,7 @@
                    'KAT_ROLL', 'KAT_TURN_MAX', 'KAT_DRAG', 'KAT_PAD', 'KAT_SHED', 'KAT_FALL');
 
     // the capsules this file adds, the rest of CAPS being the game's own
-    const POW_KEYS = ['K', 'L', 'T', 'I', 'C', 'A', 'U', '?'];
+    const POW_KEYS = ['K', 'L', 'T', 'A', '?'];
 
     let katLoose = [];      // what fell off, falling
     let katOn = new Set();  // the heads carrying anything
@@ -136,7 +136,6 @@
     // hitBrick has just killed one. If a head on KATAMARI did it, the brick
     // goes onto that head where it was, and powUpdate draws it in from there.
     function powBrickGone(br) {
-        crSpawn(br);
         const b = labHitBy;
         if (!(fx.K > 0) || !b || !balls.includes(b)) return;
         if (!b.kat) { b.kat = []; b.katA = 0; b.katWas = b.angle; }
@@ -202,8 +201,6 @@
     // the head, so whatever it hits turns the head, pushed off the way the
     // head's middle lies from where it struck.
     function powBallStep(b) {
-        mrStep(b);
-        crStep(b);
         if (!b.kat || !b.kat.length) return;
         const s = effSpeed() * (b.boost || 1);
 
@@ -299,9 +296,7 @@
     function powUpdate(dt) {
         CAPS.K.secs = KAT_SECS;
         CAPS.T.secs = PT_SECS;
-        CAPS.I.secs = MR_SECS; CAPS.C.secs = CR_SECS;
         CAPS.A.secs = MD_SECS;
-        CAPS.U.secs = LK_SECS;
 
         // a new stage: nothing carries over
         if (bricks !== katField) { katField = bricks; katLoose = []; katOn.clear(); }
@@ -321,10 +316,8 @@
         katLoose = katLoose.filter(p => p.y - p.w < LH);
 
         lzUpdate(dt);
-        lkUpdate();
         mdUpdate(dt);
         wdUpdate();
-        crUpdate(dt);
     }
 
     // ==== LASER ====================================================================
@@ -557,129 +550,6 @@
         ctx.globalAlpha = 1;
     }
 
-    // ==== MIRROR and CROWD ==========================================================
-    // I  MIRROR (I for mIrror): a copy of him on the ceiling, upside down,
-    //    right above you and moving as you move, as a reflection does. A head that reaches it comes back down at an
-    //    angle set by where it hit, the way he sends them up.
-    // C  CROWD: every brick broken while it is on drops a small brandon who
-    //    runs along the floor. Each one bounces a head that reaches him, once.
-
-    let MR_SECS  = 10;
-    let MR_Y     = 12;      // px from the top to his middle
-    let MR_SCALE = 0.75;    // his size, as a share of yours
-    let CR_SECS  = 20;
-    let CR_MAX   = 8;       // most on the floor at once
-    let CR_SIZE  = 36;      // px tall
-    let CR_SPEED = 90;      // px/s they run at
-    let CR_LIFE  = 30;      // seconds each one lasts
-    LAB_KNOBS.push('MR_SECS', 'MR_Y', 'MR_SCALE',
-                   'CR_SECS', 'CR_MAX', 'CR_SIZE', 'CR_SPEED', 'CR_LIFE');
-
-    // A head's real ellipse against one of him lying at cx, cy, turned upside
-    // down if `flip`: touching() in engine.js, for a brandon that is not the
-    // paddle. null if it is not on him.
-    function powTouch(b, cx, cy, hw, flip) {
-        let lx = b.x - cx, ly = b.y - cy;
-        if (flip) { lx = -lx; ly = -ly; }
-        const tc = Math.cos(b.angle), ts = Math.sin(b.angle);
-        const lrx = Math.hypot(bRX() * tc, bRY() * ts), lry = Math.hypot(bRX() * ts, bRY() * tc);
-        if (Math.abs(lx) >= hw + lrx || Math.abs(ly) >= bodyHalfH(hw * 2) + lry) return null;
-        const rest = restOn(lx, hw, lrx, lry);
-        if (rest === null || ly < rest) return null;
-        const under = bodyUnder(lx, lrx, hw);
-        if (under === null || ly - lry > under) return null;
-        return { lx, rest };
-    }
-
-    // him drawn anywhere: the photograph, turned `rot` more than level
-    function powArt(cx, cy, w, rot, alpha) {
-        if (!ready(paddleImg)) return;
-        const artW = w / BODY_LEN_PER_W, artH = artW / PADDLE_ASPECT;
-        ctx.save();
-        ctx.globalAlpha = alpha;
-        ctx.translate(cx, cy);
-        ctx.rotate(rot + PADDLE_LEVEL);
-        ctx.drawImage(paddleImg, -artW / 2 - ART_OFF_X * artW, -artH / 2 - ART_OFF_Y * artH, artW, artH);
-        ctx.restore();
-    }
-
-    // ---- mirror
-    function mrSegs() {
-        return segs().map(sg => ({ cx: sg.cx, cy: MR_Y, hw: sg.w / 2 * MR_SCALE, sg }));
-    }
-    function mrStep(b) {
-        if (!(fx.I > 0) || b.vy >= 0) return;
-        for (const m of mrSegs()) {
-            const c = powTouch(b, m.cx, m.cy, m.hw, true);
-            if (!c) continue;
-            b.y = m.cy - c.rest;
-            const off = Math.max(-1, Math.min(1, (b.x - m.cx) / m.hw));
-            const a = Math.max(-STEER_CAP, Math.min(STEER_CAP, off * MAX_ANGLE));
-            const sp = Math.hypot(b.vx, b.vy);
-            b.vx = Math.sin(a) * sp; b.vy = Math.cos(a) * sp;
-            return;
-        }
-    }
-    function mrDraw() {
-        if (!(fx.I > 0)) return;
-        for (const m of mrSegs()) powArt(m.cx, m.cy, m.hw * 2, Math.PI, Math.min(1, fx.I / 0.6));
-    }
-
-    // ---- crowd
-    let crowd = [];
-    const crFloor = () => LH - CR_SIZE / 2 - 2;
-    function crSpawn(br) {
-        if (!(fx.C > 0) || crowd.filter(r => !r.pop).length >= CR_MAX) return;
-        crowd.push({ x: br.x + bw / 2, y: br.y + bh / 2, vy: -80, dir: Math.random() < 0.5 ? -1 : 1,
-                     t: 0, pop: 0, ph: Math.random() * 6 });
-    }
-    function crUpdate(dt) {
-        if (bricks !== crUpdate.field) { crUpdate.field = bricks; crowd = []; }
-        for (const r of crowd) {
-            r.t += dt;
-            if (r.pop) { r.pop += dt; r.y -= 120 * dt; continue; }
-            if (r.y < crFloor()) {
-                r.vy += 900 * dt;
-                r.y = Math.min(crFloor(), r.y + r.vy * dt);
-            } else {
-                r.x += r.dir * CR_SPEED * dt;
-                if (r.x < CR_SIZE / 2) { r.x = CR_SIZE / 2; r.dir = 1; }
-                if (r.x > LW - CR_SIZE / 2) { r.x = LW - CR_SIZE / 2; r.dir = -1; }
-            }
-            if (r.t > CR_LIFE) r.pop = 1e-6;
-        }
-        crowd = crowd.filter(r => r.pop < 0.4);
-    }
-    function crStep(b) {
-        if (b.vy <= 0) return;
-        const hw = CR_SIZE * 0.25, hh = CR_SIZE / 2;
-        for (const r of crowd) {
-            if (r.pop) continue;
-            const ex = extX(b), ey = extY(b);
-            if (Math.abs(b.x - r.x) >= hw + ex || Math.abs(b.y - r.y) >= hh + ey) continue;
-            b.y = r.y - hh - ey;
-            aim(b, Math.max(-1, Math.min(1, (b.x - r.x) / (hw + ex))) * MAX_ANGLE * 0.7);
-            combo = 0;
-            b.pierced.clear();
-            r.pop = 1e-6;
-            return;
-        }
-    }
-    // stood up, waddling, facing the way he runs
-    function crDraw() {
-        if (!ready(paddleImg)) return;
-        for (const r of crowd) {
-            const artW = CR_SIZE / BODY_LEN_PER_W, artH = artW / PADDLE_ASPECT;
-            ctx.save();
-            ctx.globalAlpha = r.pop ? Math.max(0, 1 - r.pop / 0.4) : 1;
-            ctx.translate(r.x, r.y - Math.abs(Math.sin(r.t * 12 + r.ph)) * 3);
-            ctx.scale(r.dir, 1);
-            ctx.rotate(PADDLE_LEVEL - Math.PI / 2 + Math.sin(r.t * 12 + r.ph) * 0.12);
-            ctx.drawImage(paddleImg, -artW / 2 - ART_OFF_X * artW, -artH / 2 - ART_OFF_Y * artH, artW, artH);
-            ctx.restore();
-        }
-    }
-
     // ==== MIDAS ===================================================================
     // A  MIDAS BRANDON (A for Au, as gold bricks are): any brick hit while it
     //    is on turns to gold instead of taking the hit. Gold takes MD_HP more
@@ -901,34 +771,6 @@
         ctx.restore();
     }
 
-    // ==== LUCKY ===================================================================
-    // U  LUCKY BRANDON (U for lUcky, L being LASER's): while it is on, a
-    //    broken brick is LK_MUL times as likely to drop a capsule. Still only
-    //    one falling at a time -- that rule is what keeps capsules readable,
-    //    so LUCKY fills the gaps between them rather than stacking them up.
-    //    It does nothing on a boss, whose capsules come by hits, not chance.
-    //    Whatever the rolls do, it pays at least one: the first brick broken
-    //    after catching it with nothing falling drops one for certain.
-    let LK_SECS = 13;
-    let LK_MUL  = 2;
-    LAB_KNOBS.push('LK_SECS', 'LK_MUL');
-    let lkOwed = false, lkWas = 0;
-
-    // what a brick's chance of a capsule is multiplied by, in labCapRoll
-    function powCapMul() { return fx.U > 0 ? LK_MUL : 1; }
-    // ...and whether this one is LUCKY's promised drop, which it spends
-    function powCapSure() {
-        if (!lkOwed) return false;
-        lkOwed = false;
-        return true;
-    }
-    // once a frame, so a capsule that runs out before any brick breaks still owes
-    function lkUpdate() {
-        const now = Math.max(0, fx.U || 0);
-        if (now > lkWas + 1e-6) lkOwed = true;         // a capsule just caught
-        lkWas = now;
-    }
-
     // ==== WILD ====================================================================
     // ? WILD BRANDON: a capsule that will not settle. Falling, it turns into
     //   each of the others in turn, WD_RATE a second, and is whichever one it
@@ -981,7 +823,6 @@
     }
 
     function powDrawLoose() {
-        mrDraw();
         for (const p of katLoose) {
             ctx.globalAlpha = Math.max(0, 1 - p.t / 1.2);
             powDrawPiece(p.x, p.y, p.a, p);
@@ -989,13 +830,12 @@
         ctx.globalAlpha = 1;
     }
 
-    // over him: PORTAL's edges, LASER's guns and bolts, the CROWD, MIDAS's sparks,
+    // over him: PORTAL's edges, LASER's guns and bolts, MIDAS's sparks,
     // WILD's ring, then the lab's overlay: every point the lump collides with, and the room
     // each piece packs to
     function powDrawOver() {
         ptDraw();
         lzDraw();
-        crDraw();
         mdDraw();
         wdDraw();
         if (!powShow) return;

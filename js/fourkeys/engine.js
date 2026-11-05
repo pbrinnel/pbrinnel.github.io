@@ -932,20 +932,16 @@
         // back the other way and ENGLISH comes round after it, at ENG_ACCEL.
         E: { name: 'ENGLISH BRANDON',   short: 'ENGLISH', color: '#cf6b4e', secs: 9 },
         // the sequel's, which live in powers.js. Letters that were taken went
-        // to one inside the name: T for porTal, I for mIrror, A for Au, U for
-        // lUcky. WILD is never caught as itself -- it turns into each of the
+        // to one inside the name: T for porTal, A for Au. WILD is never caught as itself -- it turns into each of the
         // others as it falls (see wdUpdate). Each timed one's secs is kept in
         // step with its own let in powers.js.
         K: { name: 'KATAMARI BRANDON',  short: 'KATAMARI', color: '#a8c64e', secs: 6, noBoss: true },
         L: { name: 'LASER BRANDON',     short: 'LASER',   color: '#ff5f6d', secs: 6 },
         T: { name: 'PORTAL BRANDON',    short: 'PORTAL',  color: '#ff9a3c', secs: 10, noBoss: true },
-        I: { name: 'MIRROR BRANDON',    short: 'MIRROR',  color: '#7fe3e0', secs: 10, noBoss: true },
-        C: { name: 'CROWD BRANDON',     short: 'CROWD',   color: '#f5a0c0', secs: 20, noBoss: true },
         A: { name: 'MIDAS BRANDON',     short: 'MIDAS',   color: '#efb920', secs: 8, noBoss: true },
-        U: { name: 'LUCKY BRANDON',     short: 'LUCKY',   color: '#5fbf6a', secs: 13, noBoss: true },
         '?': { name: 'WILD BRANDON',    short: 'WILD',    color: '#f2efe9', secs: 0 }
     };
-    const TIMED = ['B', 'D', 'S', 'R', 'P', 'W', 'E', 'K', 'L', 'T', 'I', 'C', 'A', 'U'];     // M and WILD are not
+    const TIMED = ['B', 'D', 'S', 'R', 'P', 'W', 'E', 'K', 'L', 'T', 'A'];     // M and WILD are not
     const CAP_KEYS = Object.keys(CAPS);
     // the four brick colors, for the gauntlet's army to wear
     const TIER_KEYS = ['R', 'O', 'G', 'Y'];
@@ -956,13 +952,10 @@
     // through, which is a straight downgrade during the only fight where being
     // hit costs you something. Neither needs a special case in the collision
     // code -- they just never drop on his stage. KATAMARI and MIDAS sit it out
-    // too, having no bricks there to work on, as does CROWD, whose runners come
-    // out of broken bricks; and LUCKY, since his capsules come by hits rather
-    // than chance. PORTAL stays off them by choice (CHELL's own is still on
-    // there: a head wrapping round the IDOL while he walls you off is a head
-    // gone over him, and sends him back up -- idolCrossed), MIRROR's copy lies
-    // along the ceiling right where the bosses hang, and WIGGLY has no wall to
-    // sway, only you.
+    // too, having no bricks there to work on. PORTAL stays off them by choice
+    // (CHELL's own is still on there: a head wrapping round the IDOL while he
+    // walls you off is a head gone over him, and sends him back up --
+    // idolCrossed), and WIGGLY has no wall to sway, only you.
     // PORTAL never drops for a paddle that has it on already (CHELL): it
     // would be a capsule that does nothing.
     function capsulePool() {
@@ -1065,7 +1058,7 @@
     const ready = img => img.complete && img.naturalWidth > 0;
 
     // WIGGLY sways every brandon on the screen, not only him and the wall:
-    // the crowd, the mirror, the capsules, the mini-bosses, the bosses --
+    // the capsules, the mini-bosses, the bosses --
     // anything drawn from his photograph (brandonArt: the photo itself and
     // every tinted copy shapeSprite makes). The bricks and he already lean by
     // their own wiggle, which their hitboxes follow, so while either is being
@@ -2499,7 +2492,7 @@
     // ---- capsules ----------------------------------------------------------
     function maybeDropCapsule(x, y) {
         if (capsule) return;                       // only one falling at a time
-        if (!labCapRoll(powCapMul(), powCapSure())) return;      // LUCKY raises it, and promises one
+        if (!labCapRoll()) return;
         capsule = { x, y, kind: labCapKind() };
     }
 
@@ -2636,13 +2629,13 @@
             if (b.kind === 'A') { round.golden++; goldBurst(b); }
             award(b.midas ? MD_PAY : 25 * b.maxHp, b.x + bw / 2, b.y);
             labBrickGone(b);
-            powBrickGone(b);      // KATAMARI keeps it, CROWD drops one
+            powBrickGone(b);      // KATAMARI keeps it
         } else {
             b.alive = false;
             shockwave(b);
             award(TIERS[b.kind].pts, b.x + bw / 2, b.y);
             labBrickGone(b);
-            powBrickGone(b);      // KATAMARI keeps it, CROWD drops one
+            powBrickGone(b);      // KATAMARI keeps it
             if (!tierSeen[b.kind] && (b.kind === 'O' || b.kind === 'R')) {
                 tierSeen[b.kind] = true;
                 bumpSpeed(1.1);
@@ -3412,7 +3405,7 @@
         // and either of which may have an end dipped (see DIP_MAX). each is
         // met in his own frame, where he lies level -- see bodyAt.
         labBallStep(b);
-        powBallStep(b);      // KATAMARI's lump, MIRROR, the CROWD
+        powBallStep(b);      // KATAMARI's lump
         const py = padY();
         // BLUR spins all the way round, so a head can meet any side of
         // him going any way, and none of what follows holds: he has his own

@@ -255,15 +255,15 @@
     // reaches certainty one has come. CAP_BASE is kept above zero so two
     // close together still happen now and then. Bricks broken while one is
     // falling are not asked (maybeDropCapsule stops first), so they do not
-    // count, or a second would follow the first down almost at once. `mul`
-    // is LUCKY's. The count carries across screens and lives.
+    // count, or a second would follow the first down almost at once. The count
+    // carries across screens and lives. `mul` is the powerup lab's DROPS tab;
+    // the game leaves it at 1.
     let CAP_BASE = 0.1;
     let CAP_RAMP = 0.066;
     LAB_KNOBS.push('CAP_BASE', 'CAP_RAMP');
     let labCapDry = 0;            // bricks asked since the last drop
-    // `sure` skips the roll: LUCKY's promised drop (powCapSure)
-    function labCapRoll(mul, sure) {
-        if (!sure && Math.random() >= (CAP_BASE + CAP_RAMP * labCapDry++) * mul) return false;
+    function labCapRoll(mul = 1) {
+        if (Math.random() >= (CAP_BASE + CAP_RAMP * labCapDry++) * mul) return false;
         labCapDry = 0;
         return true;
     }
