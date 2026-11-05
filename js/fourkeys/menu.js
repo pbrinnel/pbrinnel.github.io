@@ -3235,12 +3235,12 @@
         // not earned is not on it at all, but its place is kept empty, so
         // the gaps hint at what is still to come. Under each is its title.
         // There is no way out but forward: year 0 is the town, so it is also
-        // the way back to it, and says so under its title.
+        // the way back to it, and says only so, with no title of its own.
         const tl = menuTimeline();
         const hs = halfSpan(), step = (LW - hs * 2) / (tl.length - 1);
         return tl.map((m, i) => ({ id: 'mem' + m.id, stop: true, cx: hs + step * i, ink: m.ink, got: m.got,
                                    label: menuYear(m.year),
-                                   under: m.id === 'now' ? [m.title, 'BACK'] : [m.title],
+                                   under: m.id === 'now' ? ['BACK'] : [m.title],
                                    act: m.id === 'now' ? menuReturn : () => menuShow('memory', m.id) }))
             .filter(c => c.got);
     }
