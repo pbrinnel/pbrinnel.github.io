@@ -25,7 +25,7 @@
     // turns square where the front turned, and never cuts a corner across a
     // lane or through the stone the front went round.
     let CONGA_AT    = 8;       // bricks left when they get up
-    let CONGA_N     = 8;       // how many walk on to an open field, or onto a level
+    let CONGA_N     = 6;       // how many walk on to an open field, or onto a level
     let CONGA_SPEED = 80;      // px/s the front one walks at
     let CONGA_RUSH  = 0.12;    // ...and this share faster for every one knocked out
     let CONGA_DROP  = 46;      // px, a notch
