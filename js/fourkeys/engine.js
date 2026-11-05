@@ -5877,15 +5877,14 @@
             ctx.globalAlpha = 1;
         }
 
-        // This stage's score, this stage's best, and every stage's best added
-        // up, all the way through the level, its end included. None of it in
-        // the town, which has no score and nothing to lose.
+        // This stage's score and its best, all the way through the level, its
+        // end included. None of it in the town, which has no score and nothing
+        // to lose. The all-stages total stays in the town and on the
+        // leaderboard: it is clutter mid-level.
         const hud = !menuUp();
         if (hud) {
             text('SCORE ' + score, 15 * u, 27 * u, 15 * u, '#f2efe9');
             text(menuBestLabel() + ' ' + best, 15 * u, 46 * u, 13 * u, '#8d877d');
-            const total = menuBestTotal();
-            if (total > 0) text('TOTAL HIGH SCORE ' + total, 15 * u, 63 * u, 13 * u, '#6d685f');
         }
 
         // no lives counter over the ending -- it is meaningless by then, and it
