@@ -1,5 +1,5 @@
 {
- "version": "20261109.2121+3bced64",
+ "version": "20261109.2133+af17621",
  "files": [
   {
    "path": "LICENSE.txt",
@@ -163,8 +163,8 @@
   },
   {
    "path": "game/shared/dsui/msgwin.js",
-   "size": 1617,
-   "sha256": "db0ed379d89fee8d044b115318c775bb2415b5b9f49a8769b8cd0a1e08ed5a69"
+   "size": 1630,
+   "sha256": "5af0637d40cbda0f6c9780196e80c2cbf9a649afb51c40bf88f914d4e1f7bcc1"
   },
   {
    "path": "game/shared/dsui/scale.js",
@@ -180,6 +180,11 @@
    "path": "game/shared/dsui/text.js",
    "size": 1962,
    "sha256": "0442bc1fdb93282f00192e939c921cb173245d1f6a778e79d467d96404334da2"
+  },
+  {
+   "path": "game/shared/errorbox.js",
+   "size": 4002,
+   "sha256": "472afcdaa85257d4ee5dd143f2d52dd7269bd91d9d6d49f91eadf3c9dd44a6f8"
   },
   {
    "path": "game/shared/mapgroups.js",
@@ -208,8 +213,8 @@
   },
   {
    "path": "game/shared/touchGuard.js",
-   "size": 342,
-   "sha256": "a1ae71817c31666ad98d9c5d5f908e89590cf2b4af93627b79aaa50e4babfa62"
+   "size": 1155,
+   "sha256": "048ae0aa916e5785ff878ca22ff2c5bc78fdd52999e71088ff3e51ca2bf27234"
   },
   {
    "path": "game/shared/typeicons.js",
@@ -268,8 +273,8 @@
   },
   {
    "path": "game/singleplayer/index.html",
-   "size": 6264,
-   "sha256": "e2fa53edf7b04121cc4433b543237ba2738912dc461cbdb43a6ed7b421190050"
+   "size": 6309,
+   "sha256": "54b2838e71ed57082440035a18cfba4dafae0fba7517debd1924927ea01164df"
   },
   {
    "path": "game/singleplayer/lines.js",
@@ -283,8 +288,8 @@
   },
   {
    "path": "game/singleplayer/main.js",
-   "size": 5342,
-   "sha256": "794e8e144ad34f43886d5c7d6c918fb2c5ac0227e376653dc3db95c2b2769281"
+   "size": 6228,
+   "sha256": "184119db07f5e3a1e6dcb9ba80ae38eaaa051fdf2996d6fc2dda70aa3ea62a4f"
   },
   {
    "path": "game/singleplayer/map.js",
@@ -303,8 +308,8 @@
   },
   {
    "path": "game/singleplayer/mapui.js",
-   "size": 9386,
-   "sha256": "d34b92d731c43e89102a205f2f6c9aa81e3be392122dcd38b37992cdcab70a94"
+   "size": 9399,
+   "sha256": "f8ac113a2cce9018ff90d7d4b9d5e9f9e6ad7ac465617dbde2d4c964f809b4f7"
   },
   {
    "path": "game/singleplayer/nodeart.js",
@@ -463,8 +468,8 @@
   },
   {
    "path": "game/skirmish/index.html",
-   "size": 17654,
-   "sha256": "01198947fbf3dcbbc20a7ec4b6ce794e6033ee3014b28d419d62ba0a280fd694"
+   "size": 17699,
+   "sha256": "2fd686887075d55931545f274942dc7bbd77cefc8d3dc6c1b2195fe6e5f5950d"
   },
   {
    "path": "game/skirmish/inforoster.js",
@@ -603,13 +608,13 @@
   },
   {
    "path": "index.html",
-   "size": 5784,
-   "sha256": "1c2f354333bcde2f83d93b978e25e6b9575805ba335e17078034b0e1c0061392"
+   "size": 6076,
+   "sha256": "837db40a599a0228fc2852d25658225f6ad39d34d48f9cbc329109597cf45cac"
   },
   {
    "path": "shell.css",
-   "size": 2963,
-   "sha256": "b5c48d0ed0ca141df32b24974a617faf1ccc25c7541b257085b84010ff068f82"
+   "size": 3484,
+   "sha256": "24aa07056a4c1a92df8da0910d0fd0450e6e8c334c56058b93edacfa09b268a0"
   },
   {
    "path": "shell.js",
@@ -618,8 +623,8 @@
   },
   {
    "path": "start.html",
-   "size": 4257,
-   "sha256": "ee1434ab888022d99d29776717d78751d04ea8a51265163c123c627d7c3a4194"
+   "size": 4615,
+   "sha256": "65b0b4af6e04659e0659da8faa657223c921323cd379ec3b8d08f1ae236f72be"
   },
   {
    "path": "start.js",

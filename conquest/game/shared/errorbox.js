@@ -1,0 +1,20 @@
+(()=>{if(window.__errorbox)return;const seen=new Set,lines=[];let box=null,body=null,head=null;const harmless=m=>/ResizeObserver loop|^Script error\.?$|AbortError|The operation was aborted|The user aborted|Load failed$/i.test(m)&&!/\.(js|json)/.test(m),urlOf=a=>{try{return String(a?.url||a)}catch{return""}},ignoreUrl=u=>/favicon|apple-touch-icon|\/__log|google-analytics|googletagmanager|\/\.well-known\//i.test(u),fmt=r=>{try{return r instanceof Error?r.name+": "+r.message+(r.stack?`
+`+r.stack.split(`
+`).slice(0,4).join(`
+`):""):typeof r=="string"?r:JSON.stringify(r)}catch{return String(r)}},text=()=>`CONQUEST ERROR REPORT
+`+location.href+`
+`+navigator.userAgent+`
+sw controller: `+(navigator.serviceWorker&&navigator.serviceWorker.controller?"yes":"no")+`
+
+`+lines.join(`
+
+`),build=()=>{if(box||!document.body)return;box=document.createElement("div"),box.dataset.dsFontOk="error reporter: shown when the page itself may have failed to load",box.style.cssText="position:fixed;left:0;right:0;top:0;z-index:2147483000;max-height:55vh;overflow:auto;background:#10204e;color:#fff;border-bottom:3px solid #c04040;padding:8px 10px;font:12px/1.35 ui-monospace,Menlo,monospace;-webkit-user-select:text;user-select:text;box-sizing:border-box",head=document.createElement("div"),head.style.cssText="display:flex;gap:8px;align-items:center;margin-bottom:6px";const title=document.createElement("b");title.textContent="Something failed. Tap Copy and send this text.",title.dataset.dsFontOk="error reporter title",title.style.flex="1";const mk=(l,f2)=>{const b=document.createElement("button");return b.textContent=l,b.dataset.dsFontOk="error reporter button",b.style.cssText="font:12px ui-monospace,Menlo,monospace;padding:6px 12px;background:#2a4a9a;color:#fff;border:2px solid #8fb0ff;border-radius:4px;touch-action:manipulation",b.onclick=f2,b},copy=mk("Copy",async()=>{try{await navigator.clipboard.writeText(text()),copy.textContent="Copied"}catch{const r=document.createRange();r.selectNodeContents(body);const s=getSelection();s.removeAllRanges(),s.addRange(r),copy.textContent="Selected: copy it"}setTimeout(()=>{copy.textContent="Copy"},2e3)});head.append(title,copy,mk("Close",()=>{box.remove(),box=null,seen.clear(),lines.length=0})),body=document.createElement("pre"),body.style.cssText="margin:0;white-space:pre-wrap;word-break:break-all",box.append(head,body),document.body.appendChild(box);const f=window.__dsFonts&&window.__dsFonts.small;if(f)try{const c=f.draw("Something failed. Tap Copy and send this text.","#ffffff","#303030"),o=document.createElement("canvas");o.width=c.width,o.height=c.height,o.getContext("2d").drawImage(c,0,0),o.style.cssText="display:block;image-rendering:pixelated;width:"+c.width*2+"px;height:"+c.height*2+"px",title.textContent="",delete title.dataset.dsFontOk,title.append(o)}catch{}},report=msg=>{if(!msg||harmless(msg))return;const key=msg.slice(0,200);if(seen.has(key))return;seen.add(key),lines.length<12&&lines.push(msg);const go=()=>{build(),body&&(body.textContent=lines.join(`
+
+`))};document.body?go():addEventListener("DOMContentLoaded",go)};addEventListener("error",e=>{const t=e.target;if(t&&t!==window&&(t.src||t.href)){const u=t.src||t.href;ignoreUrl(u)||report("resource failed to load: "+u);return}report("error: "+e.message+`
+  at `+(e.filename||"?")+":"+(e.lineno||0)+":"+(e.colno||0)+(e.error&&e.error.stack?`
+`+String(e.error.stack).split(`
+`).slice(0,4).join(`
+`):""))},!0),addEventListener("unhandledrejection",e=>{const m=fmt(e.reason);/AbortError/.test(m)||report("unhandled rejection: "+m)});const of=window.fetch.bind(window);window.fetch=async(...a)=>{const u=urlOf(a[0]);try{const r=await of(...a);if(!r.ok&&!ignoreUrl(u)){let b="";try{b=(await r.clone().text()).slice(0,160)}catch{}report("fetch failed: HTTP "+r.status+`
+  url: `+u+(b&&!/^\s*</.test(b)?`
+  `+b:""))}return r}catch(e){throw!(e&&e.name==="AbortError")&&!ignoreUrl(u)&&report("fetch failed: "+(e&&e.message||e)+`
+  url: `+u),e}},window.__errorbox={report,text}})();
