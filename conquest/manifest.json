@@ -1,6 +1,11 @@
 {
- "version": "20261109.1326+1778a24",
+ "version": "20261109.1343+6a99cc3",
  "files": [
+  {
+   "path": "LICENSE.txt",
+   "size": 1212,
+   "sha256": "b5065838cbac452dfc855ba6e6e031481ad2c68406f70d21ead9321374653e6c"
+  },
   {
    "path": "builder/dist/builder.js",
    "size": 153613,
@@ -583,8 +588,8 @@
   },
   {
    "path": "index.html",
-   "size": 4982,
-   "sha256": "5394082f07dbc26ce1f64645cfbba77ab362750e6c59d0689668245d1513d3a1"
+   "size": 5311,
+   "sha256": "60c90226396fb51c90a0ab659f987daad00f2a3c099ebc395293e1ff40167d30"
   },
   {
    "path": "shell.css",
@@ -598,8 +603,8 @@
   },
   {
    "path": "start.html",
-   "size": 3385,
-   "sha256": "0fdfb3006a248215c41429fc1d67978c20f8c8de2cd5ff5a70a573fe4d5bb67a"
+   "size": 3428,
+   "sha256": "052a7a8b8c13ba046394319d852e8741ca64b5fda14acace83542b7a1e9234ed"
   },
   {
    "path": "start.js",
