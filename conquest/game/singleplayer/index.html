@@ -20,7 +20,7 @@
   .card{width:236px;box-sizing:border-box;max-width:100%;cursor:default;display:flex;flex-direction:column;align-items:center;gap:5px}
   /* RULE (docs/formats/ui_text.md): only clickable things react to the mouse. Cards that pick something carry data-ds-click; every other card / row is static (.ds-static). */
   .card[data-ds-click]{cursor:pointer;transition:transform .08s}
-  .card[data-ds-click]:hover,.card[data-ds-click]:focus-visible{transform:translateY(-3px);outline-color:#ffd24a}
+  .card[data-ds-click]:focus-visible{transform:translateY(-3px);outline-color:#ffd24a}@media (hover:hover) and (pointer:fine){.card[data-ds-click]:hover{transform:translateY(-3px);outline-color:#ffd24a}}
   .ds-static{cursor:default}
   .statgrid{display:grid;grid-template-columns:1fr 1fr;gap:2px 18px;width:100%}.statgrid>.line{justify-content:flex-start}.armygrid{max-width:min(940px,96vw)}
   .line{display:flex;align-items:center;gap:6px;min-height:20px;flex-wrap:wrap;justify-content:center;max-width:100%;min-width:0}
@@ -32,7 +32,7 @@
   canvas.t{image-rendering:pixelated;display:block}
   i.info{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:#e8eef8;color:#1c2c66;font:bold 12px/1 serif;cursor:help;font-style:italic;border:1px solid #4a6ab8}
   button,input,select,textarea{font:inherit;color:#fff;background:#10204e;border:2px solid #4a6ab8;border-radius:4px;padding:4px 8px}
-  button{cursor:pointer;max-width:100%;box-sizing:border-box}button:hover{border-color:#ffd24a}
+  button{cursor:pointer;max-width:100%;box-sizing:border-box}@media (hover:hover) and (pointer:fine){button:hover{border-color:#ffd24a}}button{touch-action:manipulation}
   button.go{background:#e8eef8;color:#1c2c66;font-weight:700;padding:6px 18px}
   .note{position:fixed;z-index:70;pointer-events:none;max-width:280px}
   .err{color:#ffb0a0;text-align:center}

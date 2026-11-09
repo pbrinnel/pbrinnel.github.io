@@ -1,0 +1,1 @@
+let last=0;const stamp=e=>{e.pointerType!=="mouse"&&(last=performance.now())};addEventListener("pointerdown",stamp,!0),addEventListener("touchstart",()=>{last=performance.now()},{capture:!0,passive:!0});for(const t of["mouseover","mouseenter","mousemove"])addEventListener(t,e=>{performance.now()-last<1e3&&e.stopImmediatePropagation()},!0);

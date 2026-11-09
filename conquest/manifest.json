@@ -1,5 +1,5 @@
 {
- "version": "20261109.2113+d44172b",
+ "version": "20261109.2121+3bced64",
  "files": [
   {
    "path": "LICENSE.txt",
@@ -138,8 +138,8 @@
   },
   {
    "path": "game/shared/dsui/domButton.js",
-   "size": 4088,
-   "sha256": "8967a783cfb797e5d2119e5d23ee2fdd3fa77aeedde8b279c2e25ec30af7a1af"
+   "size": 4325,
+   "sha256": "6374e0d4b8b018a3fbb252eec5c1575eedf8d6a3046abdc67f25b7c7da20d227"
   },
   {
    "path": "game/shared/dsui/dsAudit.js",
@@ -207,6 +207,11 @@
    "sha256": "825c593501cdf8b854981685f1108c80413b8c49644199190abd626045652b89"
   },
   {
+   "path": "game/shared/touchGuard.js",
+   "size": 342,
+   "sha256": "a1ae71817c31666ad98d9c5d5f908e89590cf2b4af93627b79aaa50e4babfa62"
+  },
+  {
    "path": "game/shared/typeicons.js",
    "size": 756,
    "sha256": "5f4e4aaf4eb3280f835871049cf430327403661dab64aaeae7a6f17f2d5d3e76"
@@ -258,13 +263,13 @@
   },
   {
    "path": "game/singleplayer/flow.js",
-   "size": 2494,
-   "sha256": "8033fb2483b8ef150091c82689187d349591f58e3f9e001b01ce68aa3d397057"
+   "size": 2522,
+   "sha256": "6edb39bc91ad31a8d53ea60cd39065fc6b70105c8861b5f8272764c5f8cd5821"
   },
   {
    "path": "game/singleplayer/index.html",
-   "size": 6100,
-   "sha256": "682799824195d7595f788dfa26a2c7708e621afdd0145ebeba794be7e3e0b1cd"
+   "size": 6264,
+   "sha256": "e2fa53edf7b04121cc4433b543237ba2738912dc461cbdb43a6ed7b421190050"
   },
   {
    "path": "game/singleplayer/lines.js",
@@ -278,8 +283,8 @@
   },
   {
    "path": "game/singleplayer/main.js",
-   "size": 5254,
-   "sha256": "c79aac0a44b6d30e6823cb52fcda50e2465adee33316084ca43a1da3af480be0"
+   "size": 5342,
+   "sha256": "794e8e144ad34f43886d5c7d6c918fb2c5ac0227e376653dc3db95c2b2769281"
   },
   {
    "path": "game/singleplayer/map.js",
@@ -558,8 +563,8 @@
   },
   {
    "path": "game/skirmish/tip.js",
-   "size": 11006,
-   "sha256": "1e19984dce01791c6fd67b3197b6321267ba10c83326bfcb5c226e8e02bfcc41"
+   "size": 11034,
+   "sha256": "977f7f9fcabd5fd96679c856df4ec7a7cb73a1a62778863a4fde4958a72ae270"
   },
   {
    "path": "game/skirmish/ui.css",
