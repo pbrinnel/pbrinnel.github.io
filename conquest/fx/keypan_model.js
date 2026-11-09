@@ -1,0 +1,1 @@
+const SMOOTH=[[0,0],[.12,.15],[.2,.28]],smoothMode=()=>{try{const v=localStorage.getItem("skirmish.ctl.camSmooth");return v===null?1:Math.max(0,Math.min(2,+v|0))}catch{return 1}};function stepVel(v,target,dt,mode=1){const tau=SMOOTH[mode][target>v?0:1];return tau?v+(target-v)*(1-Math.exp(-dt/tau)):target}export{SMOOTH,smoothMode,stepVel};

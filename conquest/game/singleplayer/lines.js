@@ -1,0 +1,1 @@
+let LINES={};try{LINES=await(await fetch(new URL("./lines.json",import.meta.url),{cache:"no-cache"})).json()}catch(e){console.warn("lines.json not loaded",e)}import{debugOn}from"../shared/debugmode.js";const debug=debugOn,line=id=>{const t=LINES[id]?.text;return t||(debug()?`(line: ${id})`:"")};export{line};

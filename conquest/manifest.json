@@ -1,0 +1,695 @@
+{
+ "version": "20261109.1326+1778a24",
+ "files": [
+  {
+   "path": "builder/dist/builder.js",
+   "size": 153613,
+   "sha256": "b4a197c0ce4bf767824ffae97c2a7f9093ec36b7f6b85436d87ef287d2bcaecf"
+  },
+  {
+   "path": "core/dist/core.js",
+   "size": 219220,
+   "sha256": "5168fa6443b743fe97174c93cf7783711d44be3ddd54d906e46c02e2a7b86da5"
+  },
+  {
+   "path": "fx/atmosphere.js",
+   "size": 4163,
+   "sha256": "708282fca41cd6047ee237c52833254a2552c7ca9791fa75d4748b08b7c64e8c"
+  },
+  {
+   "path": "fx/dof.js",
+   "size": 9607,
+   "sha256": "d9ec0cd613d5711c1ae0cbbe14c6af385bc9589fe525e914aca81dd71c07d015"
+  },
+  {
+   "path": "fx/dsmaterial.js",
+   "size": 516,
+   "sha256": "32a69658faff9c8fb240255f2ee9fc7e1f0b22a518d1a2fb2db6e07a54895a8e"
+  },
+  {
+   "path": "fx/gamefont.js",
+   "size": 1643,
+   "sha256": "f14b2c3cad3f3221ea3f1056660e93ef3645e7ab4079d1f572c8a64ca1737c3a"
+  },
+  {
+   "path": "fx/ground.js",
+   "size": 5834,
+   "sha256": "203296b4f85fbff5848e7d5cb8b23549dfdc2939522756a9d0f57a4345d0df26"
+  },
+  {
+   "path": "fx/keypan.js",
+   "size": 2108,
+   "sha256": "4e06983d87da37869450ea57130bf5573143fd736de8afb4806fbc3d319a9b91"
+  },
+  {
+   "path": "fx/keypan_model.js",
+   "size": 341,
+   "sha256": "7020077e4e54ed961399e7937bd98a5d2085f7d20160bd8fa95aa7578194ffe7"
+  },
+  {
+   "path": "fx/lighting.js",
+   "size": 8294,
+   "sha256": "9cbb1239865577c104aa4f491103e444bae4ade8a331efb3d340f87d4e3a34d2"
+  },
+  {
+   "path": "fx/look.js",
+   "size": 13500,
+   "sha256": "6e814736ae5fb8e81378f26405792bd87d250802edd6b216128e7cdc07a281ff"
+  },
+  {
+   "path": "fx/lookpref.js",
+   "size": 695,
+   "sha256": "b635226b821b17c25b11deb0ec8838a669a8866e7c4dabd939314cccfdaa8f21"
+  },
+  {
+   "path": "fx/pixelfilter.js",
+   "size": 10022,
+   "sha256": "9f810475d99a9c66ac01828f83f8b98af21a4a35bab73f95217d68912ea58b9d"
+  },
+  {
+   "path": "fx/post.js",
+   "size": 7526,
+   "sha256": "9ba5b4ba1d5f9bf4e83bbcdf84e53e6884e64cfb994b621294ccca8422bd64ab"
+  },
+  {
+   "path": "fx/presets.js",
+   "size": 2729,
+   "sha256": "f7e65020aceb2704d1996a1c895bbd91f9a3bf52663259b20244ef761985c4f2"
+  },
+  {
+   "path": "fx/projection.js",
+   "size": 2231,
+   "sha256": "3328fd2e495a430f16225e28d8d12ffb7ca16a54f6f98f7f0182f61bb140b8f1"
+  },
+  {
+   "path": "fx/spriteanim.js",
+   "size": 2356,
+   "sha256": "e8f248b4f3fcb91e1ab5848f722714b0e9f449f8f4dfa64876e34c493caba31f"
+  },
+  {
+   "path": "fx/spritedepth.js",
+   "size": 3598,
+   "sha256": "60c12ad5c20e8bdcb9b8355d01f74744593e24bb2e5e9dfb59c9c5301d327f4f"
+  },
+  {
+   "path": "fx/uitoggle.js",
+   "size": 944,
+   "sha256": "e3a196bf4dd936688211c3458c8c8f663b8b188b5475ee3b8ce7c0433c28436b"
+  },
+  {
+   "path": "game/shared/bigart.js",
+   "size": 1542,
+   "sha256": "1e92ae3bc3ebac443d89163a92b579cf5e234710eed41def90ff4a1258e0f647"
+  },
+  {
+   "path": "game/shared/debuglog.js",
+   "size": 3733,
+   "sha256": "9851437af374eb08e4438dcfc14400eb8631175f2a3331ba363465e786775b95"
+  },
+  {
+   "path": "game/shared/debugmode.js",
+   "size": 4705,
+   "sha256": "cf0c968c4d1efb2293fc7e1e467c98a70c06810fc4e7fd741729a9bb26434566"
+  },
+  {
+   "path": "game/shared/dsui/atlas.js",
+   "size": 1495,
+   "sha256": "4881916d3b16e28df842a8b1ae3e81bf5ab60e81cf08155b1090f6eed4baa818"
+  },
+  {
+   "path": "game/shared/dsui/button.js",
+   "size": 917,
+   "sha256": "8bf1d1d214c3aeef122a5d8627a109e3295d558429c048d6c13917d04002d860"
+  },
+  {
+   "path": "game/shared/dsui/dock.js",
+   "size": 645,
+   "sha256": "4fa159f1e35f950997dadf242a614d78997d8030c63ab05a0f4f7bdf548ced65"
+  },
+  {
+   "path": "game/shared/dsui/domButton.js",
+   "size": 4088,
+   "sha256": "8967a783cfb797e5d2119e5d23ee2fdd3fa77aeedde8b279c2e25ec30af7a1af"
+  },
+  {
+   "path": "game/shared/dsui/dsAudit.js",
+   "size": 6768,
+   "sha256": "bb9711440fdb89194e033923834dff6a0c6251364459970ba142bb8b5cbe6f21"
+  },
+  {
+   "path": "game/shared/dsui/dsField.js",
+   "size": 5018,
+   "sha256": "c25b8bf2923efceb5d321dfd38a97f913049aa958b4a91d2e9f54f6d358130e9"
+  },
+  {
+   "path": "game/shared/dsui/dsText.js",
+   "size": 3665,
+   "sha256": "ac05ddbed763194e693a36a2e9a5bf17fefda87ae2a4667fd71b44c4c32e730c"
+  },
+  {
+   "path": "game/shared/dsui/listwin.js",
+   "size": 2842,
+   "sha256": "21f657ddd5dc41ff6d9af3c42e41ab5ee626d006d985220e186298cf3441d028"
+  },
+  {
+   "path": "game/shared/dsui/msgwin.js",
+   "size": 1617,
+   "sha256": "db0ed379d89fee8d044b115318c775bb2415b5b9f49a8769b8cd0a1e08ed5a69"
+  },
+  {
+   "path": "game/shared/dsui/scale.js",
+   "size": 953,
+   "sha256": "4672272a9fb15a73546539b4b9966fbe7564a76ba596e4ea1adb3255b242f7db"
+  },
+  {
+   "path": "game/shared/dsui/scene.js",
+   "size": 1128,
+   "sha256": "55503b79efe8ab2d462b7e177fb30fcf105a2f219d9f7bcffc831e91ec58fa47"
+  },
+  {
+   "path": "game/shared/dsui/text.js",
+   "size": 1962,
+   "sha256": "0442bc1fdb93282f00192e939c921cb173245d1f6a778e79d467d96404334da2"
+  },
+  {
+   "path": "game/shared/mapgroups.js",
+   "size": 1508,
+   "sha256": "b90e0bec9126e1ad0d278fe55849eb56332fb904eb3930fe4d11e62659a17b63"
+  },
+  {
+   "path": "game/shared/movestars.js",
+   "size": 833,
+   "sha256": "cf514d957ccacced133b8787e3791441f2d327f6e62ddcbd0185180515fde756"
+  },
+  {
+   "path": "game/shared/msgurl.js",
+   "size": 203,
+   "sha256": "6405f4f91db4224697ce5d8e7aa37fac369bfde20552c8123481fc3ffaed1a9a"
+  },
+  {
+   "path": "game/shared/props.js",
+   "size": 14086,
+   "sha256": "41c5ac795d489afbb26196433834f1c5bb5ba5fb4ca5fe0d52ae00435264f3bb"
+  },
+  {
+   "path": "game/shared/tiptext.js",
+   "size": 423,
+   "sha256": "825c593501cdf8b854981685f1108c80413b8c49644199190abd626045652b89"
+  },
+  {
+   "path": "game/shared/typeicons.js",
+   "size": 756,
+   "sha256": "5f4e4aaf4eb3280f835871049cf430327403661dab64aaeae7a6f17f2d5d3e76"
+  },
+  {
+   "path": "game/shared/warlordpicker.js",
+   "size": 4253,
+   "sha256": "c6225fa3e799109ca8313a18b9d158af95c82c675d289d9e768c841b6c97ffee"
+  },
+  {
+   "path": "game/shared/warlords.js",
+   "size": 4604,
+   "sha256": "c2bfe523a39910ada0b8093dcde5f50c5342c3276d4a024b414cc9f19e792f8c"
+  },
+  {
+   "path": "game/singleplayer/army.js",
+   "size": 3923,
+   "sha256": "5b60096e95e26e30fe80e41d4afdef82e62f6f5df7baca17603b9aba8d7bbabb"
+  },
+  {
+   "path": "game/singleplayer/backdrops.js",
+   "size": 1461,
+   "sha256": "d87e477340c4e9376d9313da658fc03facee17564811aecf24f758ffcc61f7b9"
+  },
+  {
+   "path": "game/singleplayer/battle.js",
+   "size": 3292,
+   "sha256": "f421aed2b6a6f4170f7654e2256386655ce25b00630f01631016786be25fb77c"
+  },
+  {
+   "path": "game/singleplayer/end.js",
+   "size": 1024,
+   "sha256": "c712591472bdf038b8d9aca87b0ba0c03de88142cdda815fc397e7363e827ded"
+  },
+  {
+   "path": "game/singleplayer/event.js",
+   "size": 1298,
+   "sha256": "15dbfe3e01201a2ff9bb1fc427496eaa867a3e9205e45dcddd9cefc4e639eac5"
+  },
+  {
+   "path": "game/singleplayer/events.js",
+   "size": 466,
+   "sha256": "7db22197b4c630d73882e2eee28cd98045fedc86da3bec39a1d2333a54c9b151"
+  },
+  {
+   "path": "game/singleplayer/evolution.js",
+   "size": 1538,
+   "sha256": "a244479a143595f93192f11b6ef000ceadba41d5d8cb7f7ce2f41ef2efe454e8"
+  },
+  {
+   "path": "game/singleplayer/flow.js",
+   "size": 2494,
+   "sha256": "8033fb2483b8ef150091c82689187d349591f58e3f9e001b01ce68aa3d397057"
+  },
+  {
+   "path": "game/singleplayer/index.html",
+   "size": 6100,
+   "sha256": "682799824195d7595f788dfa26a2c7708e621afdd0145ebeba794be7e3e0b1cd"
+  },
+  {
+   "path": "game/singleplayer/lines.js",
+   "size": 310,
+   "sha256": "534d3d4352f9ef85bf80f15dcd2da555b7e5debf12f4e05bfaa30fc855a30b47"
+  },
+  {
+   "path": "game/singleplayer/lines.json",
+   "size": 10204,
+   "sha256": "8ac0a3b7944763b50eb90b8cff5f173706925c4834c6cb45ced04b71c8183a69"
+  },
+  {
+   "path": "game/singleplayer/main.js",
+   "size": 5254,
+   "sha256": "c79aac0a44b6d30e6823cb52fcda50e2465adee33316084ca43a1da3af480be0"
+  },
+  {
+   "path": "game/singleplayer/map.js",
+   "size": 5140,
+   "sha256": "a1ef9cef94e381847f045986bf8f9dce9017c464aa45948d8e7cbc73a4f385c2"
+  },
+  {
+   "path": "game/singleplayer/maplab_variants.js",
+   "size": 1148,
+   "sha256": "77b982efc6c73a43f900dd197df1d10047c483c10135693516ab1fc23a4e0853"
+  },
+  {
+   "path": "game/singleplayer/mapui.css",
+   "size": 6403,
+   "sha256": "5fca65c309929421f0e3d807ce4dc7eb1849ae67899a4cab2da4eec845ce1504"
+  },
+  {
+   "path": "game/singleplayer/mapui.js",
+   "size": 9386,
+   "sha256": "d34b92d731c43e89102a205f2f6c9aa81e3be392122dcd38b37992cdcab70a94"
+  },
+  {
+   "path": "game/singleplayer/nodeart.js",
+   "size": 2571,
+   "sha256": "54f98bab706a467eafaca73b78a03432eda46ad2d4c6765b21380c2cadd276ab"
+  },
+  {
+   "path": "game/singleplayer/recruit.js",
+   "size": 2896,
+   "sha256": "cc93504a013fdf6c2f081774266281c3fa60fca610f6a7d25bc68cfdcbcee0e7"
+  },
+  {
+   "path": "game/singleplayer/rest.js",
+   "size": 747,
+   "sha256": "254279e96e6dbd45465ddf3c43d5292f47b0531a86090ba3830f5e50d5d1a594"
+  },
+  {
+   "path": "game/singleplayer/reward.js",
+   "size": 1665,
+   "sha256": "7da46266397d40a6250e5312e9ca63929e3dbcb73b2f0fb737c1bbbf6e63076c"
+  },
+  {
+   "path": "game/singleplayer/rival.js",
+   "size": 2771,
+   "sha256": "d889cbfaa8de699171548de14c58c35163c4ab27f8e627ab09c0def366d86dce"
+  },
+  {
+   "path": "game/singleplayer/save.js",
+   "size": 3569,
+   "sha256": "93dddbf93f86cb845d15a187ec50fa200dce460be451240288e0f86828f9dd0b"
+  },
+  {
+   "path": "game/singleplayer/shop.js",
+   "size": 1417,
+   "sha256": "56c875e0ca81b0208535242216390ffaaee5d1736a9e678920b396532fd3a2b9"
+  },
+  {
+   "path": "game/singleplayer/squad.js",
+   "size": 2461,
+   "sha256": "00cdc46dd511b3245c2fbc633b7e4bf1c7f5332d4bf260cc4bc0e889eeee0027"
+  },
+  {
+   "path": "game/singleplayer/starter.js",
+   "size": 1908,
+   "sha256": "8a42760a5152d562efbb307757d286a7215f0d7005d1dfc8bac02f5548566626"
+  },
+  {
+   "path": "game/singleplayer/stress.js",
+   "size": 464,
+   "sha256": "d0393a3280cce7b7b06da8a6407be6b31502fd017462fbc6f4ede87e56a341f0"
+  },
+  {
+   "path": "game/singleplayer/summary.js",
+   "size": 3885,
+   "sha256": "89b4561b92307e929cf5567e20d0f40c2eae1006e350f7d63465434db682d383"
+  },
+  {
+   "path": "game/singleplayer/title.js",
+   "size": 3322,
+   "sha256": "c8f169ebb51a185672629e73c40c2f811df3843130896a5de6c22cfc4f65092b"
+  },
+  {
+   "path": "game/singleplayer/trainers.json",
+   "size": 413,
+   "sha256": "4ca82e59befdb42e77a2203ae9176fd9c510895286527eeb455a22cfc84e1791"
+  },
+  {
+   "path": "game/singleplayer/typechart.js",
+   "size": 205,
+   "sha256": "72bb6e2c89eff025dda5ed9372c66840654f38bfc40f65c10eff54563fdf282d"
+  },
+  {
+   "path": "game/singleplayer/warrior.js",
+   "size": 2064,
+   "sha256": "f42634434a54ebdd9bb797ba2c10f3d38aa1f9f35c6dd7da8c40e639f135abdc"
+  },
+  {
+   "path": "game/singleplayer/wild.js",
+   "size": 1264,
+   "sha256": "5d50add826b1b98ecf7eedb8022b1ec8ff3ae34144b9b4c21b6c1c045f16895a"
+  },
+  {
+   "path": "game/skirmish/armies.js",
+   "size": 2606,
+   "sha256": "7c6c3bcd4bf326e917f06625e329532b3ce4784402e2389d85b571f8de050dcb"
+  },
+  {
+   "path": "game/skirmish/army.js",
+   "size": 414,
+   "sha256": "f9121ec70bb7a3be84d440147e2bd4366b535f733bbe6444998aac77fa305fce"
+  },
+  {
+   "path": "game/skirmish/autobattle.js",
+   "size": 1110,
+   "sha256": "1771591b25d1740b695a137ee12bac1d9b258f818a89999db9fe9f12e1dcab80"
+  },
+  {
+   "path": "game/skirmish/banner.js",
+   "size": 4806,
+   "sha256": "437f66a9a5e8ab463f0b9041d4843314fa4cf293b3522ec158e7efb24a3b02fe"
+  },
+  {
+   "path": "game/skirmish/battlemsg.js",
+   "size": 1901,
+   "sha256": "b73c86820af309bc36ad21f176e7e3cb6a85a115c4cb1ecf157204f4d5d25b7c"
+  },
+  {
+   "path": "game/skirmish/battlestrip.js",
+   "size": 3493,
+   "sha256": "ac523d405a6e82f97b28dcff3c8e4653ca165f3d4eee7ffd9637bec65219d968"
+  },
+  {
+   "path": "game/skirmish/clarity.js",
+   "size": 841,
+   "sha256": "6a512671e1ff628224e8f7109895cbec65d6ba53862d507e7a0ef0baa33ad076"
+  },
+  {
+   "path": "game/skirmish/controls.js",
+   "size": 3158,
+   "sha256": "ae3e209b35d09936078f714c3f46a149bd38eeb0f928791d7b3279e7d10b3875"
+  },
+  {
+   "path": "game/skirmish/cutin.js",
+   "size": 7167,
+   "sha256": "1b3e1ceba8460a9be98cff0a03aa4ce02141f02d9c4621675832bc2014e3f73d"
+  },
+  {
+   "path": "game/skirmish/datapack.js",
+   "size": 5438,
+   "sha256": "c45050ea924819f789fdb51f21c3daa58967662ba82a1b83157965e3dacd44c6"
+  },
+  {
+   "path": "game/skirmish/docks.js",
+   "size": 10543,
+   "sha256": "95c2771f57df31ed8fe6bf63b423a20cc3b23d897d7fee5fb16268149c29cae5"
+  },
+  {
+   "path": "game/skirmish/game.js",
+   "size": 38792,
+   "sha256": "7f7ce2c93c55d1d1dbafae03cd509f123526057dd89f4c9821517c14ea23c89e"
+  },
+  {
+   "path": "game/skirmish/gimmickfx.js",
+   "size": 5914,
+   "sha256": "bd9aa8ad5c2e33932ab3d747bdc5f9969abdb4d3764d216abce23b901d8d20c8"
+  },
+  {
+   "path": "game/skirmish/hud.js",
+   "size": 18200,
+   "sha256": "2851091d4c40784c843e6b6aca8e3c7344c16bc83b6df7b2debd2b1e8c15a91e"
+  },
+  {
+   "path": "game/skirmish/index.html",
+   "size": 16907,
+   "sha256": "d1e397a878a91be7b3c80f9bae19689a3a884ea3f466fc3651cafea2db1b7242"
+  },
+  {
+   "path": "game/skirmish/inforoster.js",
+   "size": 13228,
+   "sha256": "7b46a12e2f2239a030899d0349e5778b2a840f89a889b8c6bfc7441ad70ae222"
+  },
+  {
+   "path": "game/skirmish/infoscreen.js",
+   "size": 15884,
+   "sha256": "5c4563fd21440e0ee744ed1e9de3e97258ddf2224b5c7a13da29eadd2682f5f3"
+  },
+  {
+   "path": "game/skirmish/listlayer.js",
+   "size": 4542,
+   "sha256": "f270b2a2dcb59e0500750f488284e133e90078f69a63e6e580d8e12d180d1354"
+  },
+  {
+   "path": "game/skirmish/lowerdock.js",
+   "size": 10326,
+   "sha256": "586a2ad2fc5fda07dd157e25627b7ddbe22119ea5b8b35225750a9b47d64779d"
+  },
+  {
+   "path": "game/skirmish/main.js",
+   "size": 22757,
+   "sha256": "a24fb6803374fee7aa09a0b840e44e7c575d5a37576317b49dfcbf87f1683df6"
+  },
+  {
+   "path": "game/skirmish/minimap.js",
+   "size": 2324,
+   "sha256": "f0af8a9182d9c897f26aeade4b9212e84e0168af7840f53acc2d71ff0a27ef19"
+  },
+  {
+   "path": "game/skirmish/movefx.js",
+   "size": 13045,
+   "sha256": "ec1c99cfd112c835a425fe683e0fad3be57f62033e1a57510befbb9f24626062"
+  },
+  {
+   "path": "game/skirmish/objects.js",
+   "size": 671,
+   "sha256": "deb875b0ec0fea06cf4874be54812a673b3557ff51154ab73b4449730ad687a8"
+  },
+  {
+   "path": "game/skirmish/particles.js",
+   "size": 9807,
+   "sha256": "b7c84c2fcc58f07f5f96763a0ac8164e92e21ec3465d2e2bfb186e6cc292d937"
+  },
+  {
+   "path": "game/skirmish/pathmark.js",
+   "size": 3698,
+   "sha256": "fbe7d460c28a6a0a79b97eb040c5ac4a8b84718f75c550df74cbb189626fee41"
+  },
+  {
+   "path": "game/skirmish/preview.js",
+   "size": 1312,
+   "sha256": "848ddbc26067a9f0ae7de7a26df6e7b34a461adfa52e493c67e79ab58f251d9c"
+  },
+  {
+   "path": "game/skirmish/reach.js",
+   "size": 4436,
+   "sha256": "f453f7c977ae1bf6bad85770b7f37c12aa28c2904bfa76cbcad137fd1df358b5"
+  },
+  {
+   "path": "game/skirmish/runmode.js",
+   "size": 3101,
+   "sha256": "a8b9d790dd9027bdf952c172b1fd15d85b3fc360a4f131e632909c1a95616fe9"
+  },
+  {
+   "path": "game/skirmish/scenes.js",
+   "size": 7709,
+   "sha256": "214fbb048d8bfc2426db7b04e221e0c8b8b5ed021e19e163ebd680c2c4c7bf38"
+  },
+  {
+   "path": "game/skirmish/settings.js",
+   "size": 12974,
+   "sha256": "01340c5807e39ea534740545a1407f3adc006e64c0c908dc74e6474211c57901"
+  },
+  {
+   "path": "game/skirmish/speed.js",
+   "size": 775,
+   "sha256": "6f3b0115a9a55f54f5dbbf49be3043a0dab08316705615e06948204381e26313"
+  },
+  {
+   "path": "game/skirmish/stage.js",
+   "size": 34495,
+   "sha256": "6f67d630827d69fbffc4f77dfb2bfbedea9e0ffb22b7be7470549605f3fd7a56"
+  },
+  {
+   "path": "game/skirmish/status.js",
+   "size": 1139,
+   "sha256": "fb9b5519ebabb370d62a3ec03e814ff72d6b16c7a2a778ce7d72b7f37aa3e532"
+  },
+  {
+   "path": "game/skirmish/statuslab.js",
+   "size": 1349,
+   "sha256": "cc4514a06da8ce71f47c3ff0d2184c5d0500093d9e0cb66e2b53f3bb1f84b05d"
+  },
+  {
+   "path": "game/skirmish/tip.js",
+   "size": 11006,
+   "sha256": "1e19984dce01791c6fd67b3197b6321267ba10c83326bfcb5c226e8e02bfcc41"
+  },
+  {
+   "path": "game/skirmish/ui.css",
+   "size": 12039,
+   "sha256": "880a041e8e7c2202371e1385777ce9925b246c6bc1ac5d1b1d5508f6fbb92483"
+  },
+  {
+   "path": "game/skirmish/ui.js",
+   "size": 11255,
+   "sha256": "f174e7d67e8aec914d48b0332b1065ba76481ed54fc123a11558d42c98911bdb"
+  },
+  {
+   "path": "game/skirmish/warlordfig.js",
+   "size": 3286,
+   "sha256": "cf3b7f5c1e2e51d813d9ca5d1263866b74bae99257d87b4123dcd475f2d487d2"
+  },
+  {
+   "path": "game/viewer/clarity-test.js",
+   "size": 3902,
+   "sha256": "499a080c4ef6449f5f8e902c29490cb64eeecb63566559bd3ef76512c1cdfdd0"
+  },
+  {
+   "path": "game/viewer/grid.js",
+   "size": 7004,
+   "sha256": "63de4ac9df6dfaa6a8f04e0f33ee340e1ba95ba24e80bd083fcd53653cea0777"
+  },
+  {
+   "path": "game/viewer/mapanim.js",
+   "size": 4719,
+   "sha256": "4a8bebcc94bd4a16db22cb35f84e3ba402633a1bf051b90294974354eb2b4592"
+  },
+  {
+   "path": "game/viewer/meshload.js",
+   "size": 3453,
+   "sha256": "79c8128db83aa8a62081de6c33281cfa5d91eb1f43261f953b37284bb13ec7ca"
+  },
+  {
+   "path": "index.html",
+   "size": 4982,
+   "sha256": "5394082f07dbc26ce1f64645cfbba77ab362750e6c59d0689668245d1513d3a1"
+  },
+  {
+   "path": "shell.css",
+   "size": 2730,
+   "sha256": "736d561aa416b0afebbe88c1e1153de7d2e72efb0b9a0df6ddbbc14caf082ee4"
+  },
+  {
+   "path": "shell.js",
+   "size": 1600,
+   "sha256": "a09e1037abafae48872fa5eb0c6da2f0a5ae265b15a53d1478718e44b7ed2f42"
+  },
+  {
+   "path": "start.html",
+   "size": 3385,
+   "sha256": "0fdfb3006a248215c41429fc1d67978c20f8c8de2cd5ff5a70a573fe4d5bb67a"
+  },
+  {
+   "path": "start.js",
+   "size": 6788,
+   "sha256": "3e8c1a602c098d651a1b379e842f2be6fa18d3e2c8bd46da8d01bfb542ded86e"
+  },
+  {
+   "path": "sw.js",
+   "size": 928,
+   "sha256": "4d1137152a5c32117fb2ff01264aec80ea9239b5e7f8c1ed5a429530bc7efa60"
+  },
+  {
+   "path": "vendor/three/LICENSE.txt",
+   "size": 1081,
+   "sha256": "852e0e8699169bf9f6fdc6bda3e682d078dcbc738b5d33e74df594721bff271d"
+  },
+  {
+   "path": "vendor/three/build/three.module.js",
+   "size": 1272972,
+   "sha256": "76dea8151bc9352aef3528b4262e249b2604f62543828328db978d060d61a495"
+  },
+  {
+   "path": "vendor/three/examples/jsm/controls/OrbitControls.js",
+   "size": 29868,
+   "sha256": "5a44a9e86a2a0fb11933eed69bc2cd33c76a496854c1aed6ed776efa87d7b064"
+  },
+  {
+   "path": "vendor/three/examples/jsm/loaders/MTLLoader.js",
+   "size": 10580,
+   "sha256": "990757029142686fdcbbaded27207234151a9942469a1aa5417842b302565174"
+  },
+  {
+   "path": "vendor/three/examples/jsm/loaders/OBJLoader.js",
+   "size": 21175,
+   "sha256": "022e0334f837c60506276e136faf3e54b21b20aea672eed4a0c50651d4fc0a5d"
+  },
+  {
+   "path": "vendor/three/examples/jsm/postprocessing/EffectComposer.js",
+   "size": 4651,
+   "sha256": "d234e578618fa816955ebdc059c049c577e203e650e33cf22bde3f232c29e669"
+  },
+  {
+   "path": "vendor/three/examples/jsm/postprocessing/MaskPass.js",
+   "size": 2231,
+   "sha256": "328cf7db0da5d9be83ffe39d54b01d5ac1fddf108cc98182ddbb056f5c8b537f"
+  },
+  {
+   "path": "vendor/three/examples/jsm/postprocessing/OutputPass.js",
+   "size": 2398,
+   "sha256": "13817fc7a87f662d29d2c5e00f44d3a4588c9afac4a372de0cacb0e44e368ffd"
+  },
+  {
+   "path": "vendor/three/examples/jsm/postprocessing/Pass.js",
+   "size": 1706,
+   "sha256": "b3c6128340eaa37e40a6a2f1b738e894c855239417d50959759b34a2b5e89f92"
+  },
+  {
+   "path": "vendor/three/examples/jsm/postprocessing/SMAAPass.js",
+   "size": 49467,
+   "sha256": "f3508e3e17f40c1358921b5c7eb3ab60460d97b06fdadf6b0d40b52d3842c44a"
+  },
+  {
+   "path": "vendor/three/examples/jsm/postprocessing/ShaderPass.js",
+   "size": 1576,
+   "sha256": "3b28a1ee27e0eb96c0eab137a1f442ccf127a926904eced2d51e125ec44af781"
+  },
+  {
+   "path": "vendor/three/examples/jsm/postprocessing/UnrealBloomPass.js",
+   "size": 12406,
+   "sha256": "8f09315c0cec117a0ca2494d3e3586035b3c4323d6dcb037537cc51b04c3cdba"
+  },
+  {
+   "path": "vendor/three/examples/jsm/shaders/CopyShader.js",
+   "size": 571,
+   "sha256": "4e3346db194db56a596cd074e9bdb39fb5eb52040c333e0d29dc4eb1324d3b1d"
+  },
+  {
+   "path": "vendor/three/examples/jsm/shaders/LuminosityHighPassShader.js",
+   "size": 1192,
+   "sha256": "3d841cc594a0c1767d1b0185720b32761a0133c5f1b70b56658e28f2fb9b7900"
+  },
+  {
+   "path": "vendor/three/examples/jsm/shaders/OutputShader.js",
+   "size": 1393,
+   "sha256": "53a52e430c27bc36ceaab8ae90a2b4af7b02672d7ee4b29d6ba3c28e09c92c2a"
+  },
+  {
+   "path": "vendor/three/examples/jsm/shaders/SMAAShader.js",
+   "size": 14628,
+   "sha256": "3c7e942a25cb09dd431e395e6e91904715a834b2a6e62ec0b9b77c2f8655c369"
+  }
+ ]
+}

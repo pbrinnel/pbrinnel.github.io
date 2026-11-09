@@ -1,0 +1,149 @@
+/* Skirmish battle UI: panels, unit card, roster, preview, summary. Colours/vars come from index.html. */
+kbd { font: 10px/1 ui-monospace, Menlo, monospace; background:#262b38; border:1px solid #3a4152; border-bottom-width:2px; border-radius:3px; padding:1px 4px; color:var(--dim); }
+button.primary kbd { background:rgba(0,0,0,.18); border-color:rgba(0,0,0,.3); color:#3a2a08; }
+.row { display:flex; gap:6px; margin:8px 0; } .row > * { flex:1; }
+.sep { color:var(--dim); }
+
+/* layout */
+#top { top:10px; left:calc(var(--lw) + (100vw - var(--lw) - var(--rw)) / 2); transform:translateX(-50%); display:flex; gap:12px; align-items:center;
+  padding:6px 14px; white-space:nowrap; max-width:calc(100vw - var(--lw) - var(--rw) - 20px); }
+#t-banner { font-size:15px; } #t-banner b { font-weight:700; }
+.narrowonly { display:none; }
+#left { top:10px; left:10px; width:calc(var(--lw) - 20px); max-height:calc(100vh - 44px); overflow:auto; }
+#right { top:10px; right:10px; width:calc(var(--rw) - 20px); bottom:34px; display:flex; flex-direction:column; gap:8px; overflow:hidden; }
+#logwrap { flex:1; min-height:24px; display:flex; flex-direction:column; border-top:1px solid var(--line); padding-top:8px; }
+#logwrap.collapsed { flex:none; } #logwrap.collapsed #log { display:none; }
+#logh { cursor:pointer; user-select:none; margin-bottom:4px; } #logh:hover { color:var(--fg); }
+#log { flex:1; overflow:auto; font-size:12px; min-height:0; }
+#log div { padding:1px 0; border-bottom:1px solid #1d212b; }
+#log .turn { color:var(--acc); margin-top:4px; font-weight:600; }
+#hints { margin:8px 0 0; font-size:11px; line-height:1.9; }
+#settings { margin-top:8px; border-top:1px solid var(--line); padding-top:6px; }
+#settings summary { cursor:pointer; color:var(--dim); font-size:11px; letter-spacing:.08em; text-transform:uppercase; font-weight:600; }
+#settings h3 { margin-top:8px; }
+#left h3 { margin-top:10px; }
+
+/* narrow: the right column becomes a strip along the bottom; the log floats above it when opened */
+@media (max-width: 1100px) {
+  :root { --lw:250px; --rw:0px; --bh:112px; }
+  body.setup { --bh:24px; }
+  .narrowonly { display:inline-block; }
+  #right { left:calc(var(--lw) + 0px); width:auto; top:auto; bottom:34px; height:auto; flex-direction:row; align-items:flex-end; overflow:visible; padding:6px 10px; }
+  #roster { display:flex; gap:14px; flex:1; flex-wrap:wrap; }
+  #roster .rside { flex:1; min-width:150px; }
+  #logwrap { position:absolute; right:0; bottom:calc(100% + 6px); width:min(320px, 70vw); height:220px; flex:none; background:var(--panel);
+    border:1px solid var(--line); border-radius:8px; padding:8px 10px; }
+  #logwrap.collapsed { display:none; }
+  #logh { cursor:default; }
+  #t-banner { font-size:13px; } #sidepills { display:none; }
+}
+@media (max-width: 820px) { #top .badge { display:none; } #hints { display:none; } }
+
+/* unit card */
+.ucard { border:1px solid var(--line); border-radius:7px; padding:8px; background:rgba(12,14,19,.55); min-height:100px; }
+.ucard.side0 { border-left:3px solid var(--s0); } .ucard.side1 { border-left:3px solid var(--s1); }
+.ucard.side2 { border-left:3px solid var(--s2); } .ucard.side3 { border-left:3px solid var(--s3); }
+.uhead { display:flex; gap:8px; align-items:center; }
+.portrait { flex:none; image-rendering:pixelated; background-repeat:no-repeat; background-color:#10131a; border:1px solid var(--line); border-radius:4px; }
+.uname { font-size:15px; font-weight:700; line-height:1.2; } .uname small { font-weight:500; font-size:11px; margin-left:4px; }
+.chips { display:flex; gap:4px; flex-wrap:wrap; margin-top:3px; }
+.chip { font-size:10px; font-weight:700; letter-spacing:.03em; padding:0 6px; border-radius:8px; color:#0c0e12; background:#9aa3b5; line-height:15px; }
+.ustate { font-size:11px; margin-top:3px; }
+.hpbar { position:relative; height:16px; background:#06080b; border:1px solid #20242e; border-radius:3px; margin:7px 0 5px; overflow:hidden; }
+.hpbar i { position:absolute; left:0; top:0; bottom:0; display:block; }
+.hpbar span { position:absolute; inset:0; text-align:center; font-size:11px; line-height:14px; font-weight:600; text-shadow:0 1px 2px #000; }
+.stats { display:grid; grid-template-columns:repeat(4,1fr); gap:4px; text-align:center; margin-bottom:5px; }
+.stats div { background:#10131a; border-radius:4px; padding:2px 0; } .stats small { display:block; font-size:9px; color:var(--dim); letter-spacing:.08em; text-transform:uppercase; }
+.stats b { font-size:14px; }
+.kv { display:grid; grid-template-columns:50px 1fr; gap:2px 6px; font-size:12px; align-items:start; margin:0; }
+.kv dt { color:var(--dim); } .kv dd { margin:0; min-width:0; }
+.shape { display:inline-grid; gap:1px; vertical-align:middle; margin-right:5px; }
+.shape i { width:7px; height:7px; background:#1d2230; display:block; } .shape i.hit { background:#ef4444; } .shape i.me { background:#4aa3ff; }
+
+/* attack list & preview */
+.opt { display:block; width:100%; text-align:left; margin:3px 0; padding:4px 8px; }
+.opt small { color:var(--dim); }
+.opt.hot { border-color:#ef4444; }
+.prow { border:1px solid var(--line); border-radius:6px; padding:5px 7px; margin:4px 0; background:rgba(12,14,19,.55); }
+.prow.focus { border-color:#ef4444; }
+.prow .top { display:flex; justify-content:space-between; gap:6px; align-items:baseline; }
+.prow .dmg { font-size:15px; font-weight:700; } .prow .dmg small { font-size:11px; font-weight:500; color:var(--dim); }
+.prow .meter { position:relative; height:9px; background:#06080b; border:1px solid #20242e; border-radius:2px; margin:4px 0 3px; overflow:hidden; }
+.prow .meter i { position:absolute; top:0; bottom:0; display:block; }
+.eff { font-size:11px; font-weight:700; } .eff.up { color:#ffa94d; } .eff.down { color:#9aa4b2; } .eff.none { color:#ff6b6b; }
+.ko { color:#ff6b6b; font-weight:800; }
+
+/* roster */
+.rside { margin-bottom:8px; }
+.rhead { font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; display:flex; justify-content:space-between; margin-bottom:4px; }
+.rhead.active { text-shadow:0 0 8px currentColor; }
+.rtiles { display:flex; gap:4px; flex-wrap:wrap; }
+.rtile { position:relative; width:68px; padding:2px; border-radius:5px; text-align:center; background:#141821; }
+.rtile .portrait { display:block; margin:0 auto; border:0; background-color:transparent; }
+.rtile .mini { display:block; height:5px; background:#06080b; margin-top:2px; border-radius:1px; overflow:hidden; }
+.rtile .mini i { display:block; height:100%; }
+.rtile .mark { position:absolute; top:0; right:2px; font-size:11px; font-weight:800; line-height:1.1; }
+.rtile.ready { box-shadow:inset 0 0 0 1px #5ae06e; } .rtile.ready .mark { color:#5ae06e; }
+.rtile.acted .portrait { opacity:.45; } .rtile.acted .mark { color:var(--dim); }
+.rtile.ko { opacity:.35; filter:grayscale(1); } .rtile.ko .mark { color:#ff6b6b; opacity:1; }
+.rtile.sel { box-shadow:0 0 0 2px var(--acc); }
+.rtile:disabled { opacity:.35; }
+
+/* labels over targets */
+#labels { position:fixed; inset:0; pointer-events:none; z-index:3; overflow:hidden; }
+.tlabel { position:absolute; transform:translate(-50%,-100%); background:rgba(10,12,16,.92); border:1px solid #ef4444; border-radius:6px; padding:1px 6px;
+  font-size:12px; font-weight:700; white-space:nowrap; text-align:center; line-height:1.3; }
+.tlabel small { display:block; font-weight:500; font-size:10px; color:var(--dim); }
+
+/* modals & summary */
+#confirm { z-index:7; }
+#end { background:none; align-items:flex-end; padding-bottom:8px; pointer-events:none; } #endcard { width:min(720px, 96vw); max-height:45vh; overflow:auto; text-align:left; padding:8px 14px; pointer-events:auto; }
+#endtitle { font-size:34px; font-weight:800; margin:0; text-align:center; } #endsub { text-align:center; margin:2px 0 12px; }
+.sumgrid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
+.sumside { border:1px solid var(--line); border-radius:8px; padding:8px 10px; background:rgba(12,14,19,.55); }
+.sumside.win { box-shadow:0 0 0 1px #ffd34a inset; }
+.sumside .big { font-size:12px; color:var(--dim); } .sumside b { font-size:15px; }
+table.units { width:100%; border-collapse:collapse; font-size:12px; margin-bottom:10px; }
+table.units th { text-align:right; color:var(--dim); font-weight:600; font-size:10px; letter-spacing:.06em; text-transform:uppercase; padding:2px 6px; }
+table.units th:first-child, table.units td:first-child { text-align:left; }
+table.units td { padding:2px 6px; text-align:right; border-top:1px solid #1d212b; vertical-align:middle; }
+table.units td:first-child { display:flex; align-items:center; gap:6px; }
+table.units tr.dead td { opacity:.55; } table.units tr.mvp td { background:rgba(255,211,74,.08); }
+.mvptag { background:#ffd34a; color:#1a1306; font-size:9px; font-weight:800; padding:0 5px; border-radius:7px; margin-left:4px; }
+.endbtns { display:flex; gap:8px; } .endbtns > * { flex:1; }
+@media (max-width: 640px) { .sumgrid { grid-template-columns:1fr; } }
+
+/* status / stages / turn banner */
+.stage.up { color:#ffa94d; font-weight:600; } .stage.down { color:#7fb2ff; font-weight:600; }
+.rtile.cant .portrait { opacity:.4; filter:grayscale(1); } .rtile.cant .mark { color:#c9a227; }
+.rtile .rst { position:absolute; left:2px; top:0; font-size:8px; font-weight:800; background:#4b2a6b; color:#f0dcff; border-radius:3px; padding:0 3px; line-height:11px; }
+
+/* warlords: unit card block, roster corner badge */
+.wlbox { display:flex; gap:8px; align-items:flex-end; }
+.wlbox .wlp { flex:none; background-color:#10131a; border-radius:4px; }
+.wlinfo { min-width:0; flex:1; }
+.wlname { display:block; font-size:13px; margin-bottom:3px; }
+.wlstats { margin:5px 0 3px; } .wlstats small { font-size:8px; }
+.wlskill { font-size:11px; line-height:1.35; } .wldesc { font-size:11px; line-height:1.35; }
+.rtile .wbadge { position:absolute; left:2px; bottom:9px; line-height:0; }
+.rtile .wbadge .wlbadge { border:1px solid rgba(0,0,0,.6); border-radius:3px; box-shadow:0 0 0 1px rgba(255,255,255,.35); }
+.rtile.ko .wbadge, .rtile.cant .wbadge { opacity:.7; }
+.wlcard { margin-top:6px; padding-top:5px; border-top:1px solid var(--line); }
+.wlhead { font-size:10px; letter-spacing:.08em; text-transform:uppercase; margin-bottom:3px; }
+.rsk { position:absolute; left:2px; bottom:8px; font:700 9px/1 system-ui; color:#ffd34a; background:rgba(0,0,0,.55); border-radius:6px; padding:1px 3px; }
+.skillbadge { white-space:nowrap; }
+
+/* UI-2: the board fills the window; the web panels that remain (buttons until UI-3, lab chips, optional log / roster) float in the corners */
+#top { top:76px; left:50%; padding:4px 10px; max-width:none; }
+#left { top:auto; bottom:calc(10px + var(--ldock, 0px)); left:auto; right:10px; width:250px; max-height:calc(60vh - var(--ldock, 0px)); }
+button[title^="Show / hide the rings"] { bottom:calc(30px + var(--ldock, 0px)) !important; }   /* above the lower dock's button row (lowerdock.js sets --ldock) */
+#right { top:150px; right:10px; left:auto; bottom:auto; width:250px; max-height:40vh; flex-direction:column; align-items:stretch; padding:8px 10px; }
+#logwrap { position:static; width:auto; height:auto; flex:1; background:none; border:0; border-top:1px solid var(--line); border-radius:0; padding:8px 0 0; }
+#logwrap.collapsed { display:none; }
+#left { display:none !important; }   /* brief 8: the web panel is gone; its hidden form controls stay as the Settings window backing store */
+/* brief 8: the top strip held only the status badge on wide windows; hide it while nothing in it is visible (no Summary, Log button / badge off) */
+@media (min-width: 1101px) { #top:not(:has(#b-summary:not([hidden]))):not(:has(#badge:not([hidden]))) { display:none !important; } }
+
+/* banner objective strip (ROM goal messages 36..39, game.js objectiveHint) */
+#objective { position:fixed; top:8px; left:50%; transform:translateX(-50%); z-index:5; padding:4px 12px; border-radius:6px; background:rgba(20,20,30,.78); color:#f4efe0; font:600 14px system-ui,sans-serif; pointer-events:none; white-space:nowrap; }
+#objective b { color:#ffd86a; }

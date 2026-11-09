@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en"><head>
+<script>if(/(^|\.)paulbrinnel\.com$/.test(location.hostname)){const s=document.createElement('script');s.async=true;s.src='https://www.googletagmanager.com/gtag/js?id=G-2ZPJKVJDMD';document.head.appendChild(s);window.dataLayer=window.dataLayer||[];window.gtag=function(){dataLayer.push(arguments)};gtag('js',new Date());gtag('config','G-2ZPJKVJDMD',{page_title:'Conquest (single-player)'})}</script>
+<meta name="robots" content="noindex, nofollow">
+
+<script src="../shared/debuglog.js"></script><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conquest Single-player Lab</title>
+<style>
+  [hidden]{display:none!important}
+  html,body{margin:0;height:100%;background:#101a3a;color:#fff;overflow:auto;font:13px/1.4 system-ui,sans-serif}
+  /* ROM background (uiart bg_usual_lo), tiled and pixelated */
+  body{background:#2a3c78 url(../../_out/viewer/uiart/bg_usual_lo.png) 0 0/512px auto;image-rendering:pixelated}
+  /* world backdrop layer (backdrops.js): a ROM event backdrop, whole-number scale, behind #app */
+  #bg{position:fixed;inset:0;z-index:0;background:center/auto no-repeat;image-rendering:pixelated;pointer-events:none}
+  #app{position:relative;z-index:1;min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px;box-sizing:border-box}
+  /* DS window: blue frame palette of the Tip (labs/skirmish/tip.js PANELS.blue) */
+  .win{background:#1c2c66;border:3px solid #e8eef8;outline:3px solid #4a6ab8;border-radius:6px;padding:10px 12px;box-shadow:0 4px 14px #0008}
+  .win.cream{background:#f4ecd0;border-color:#6a5a3a;outline-color:#c9b27a;color:#2a2010}
+  .row{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;align-items:stretch}
+  .card{width:236px;box-sizing:border-box;max-width:100%;cursor:default;display:flex;flex-direction:column;align-items:center;gap:5px}
+  /* RULE (docs/formats/ui_text.md): only clickable things react to the mouse. Cards that pick something carry data-ds-click; every other card / row is static (.ds-static). */
+  .card[data-ds-click]{cursor:pointer;transition:transform .08s}
+  .card[data-ds-click]:hover,.card[data-ds-click]:focus-visible{transform:translateY(-3px);outline-color:#ffd24a}
+  .ds-static{cursor:default}
+  .statgrid{display:grid;grid-template-columns:1fr 1fr;gap:2px 18px;width:100%}.statgrid>.line{justify-content:flex-start}.armygrid{max-width:min(940px,96vw)}
+  .line{display:flex;align-items:center;gap:6px;min-height:20px;flex-wrap:wrap;justify-content:center;max-width:100%;min-width:0}
+  .card>*,.optbody,.optbody>*{min-width:0;max-width:100%;box-sizing:border-box}.optbody{width:100%}
+  .pick{opacity:.65}.pick.cur{opacity:1;background:#2a3c78;border-color:#ffd24a}.pick .ck{font-size:16px;width:18px;text-align:center}.pick.cur .ck{color:#7fe08f}
+  .dstext{overflow-wrap:anywhere}
+  .grid{display:grid;grid-template-columns:auto auto;gap:1px 14px;justify-content:center}
+  .grid>span:nth-child(odd){opacity:.75}
+  canvas.t{image-rendering:pixelated;display:block}
+  i.info{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:#e8eef8;color:#1c2c66;font:bold 12px/1 serif;cursor:help;font-style:italic;border:1px solid #4a6ab8}
+  button,input,select,textarea{font:inherit;color:#fff;background:#10204e;border:2px solid #4a6ab8;border-radius:4px;padding:4px 8px}
+  button{cursor:pointer;max-width:100%;box-sizing:border-box}button:hover{border-color:#ffd24a}
+  button.go{background:#e8eef8;color:#1c2c66;font-weight:700;padding:6px 18px}
+  .note{position:fixed;z-index:70;pointer-events:none;max-width:280px}
+  .err{color:#ffb0a0;text-align:center}
+  textarea{width:100%;box-sizing:border-box;font:11px monospace;min-height:70px}
+  .hdr{width:min(900px,96vw);box-sizing:border-box}.sp{flex:1}
+  .overlay{position:fixed;inset:0;background:#000a;display:flex;align-items:center;justify-content:center;z-index:60}
+  .strip{gap:4px;flex-wrap:wrap;justify-content:center}.chip{min-width:26px;text-align:center;padding:3px 4px;border:2px solid #4a6ab8;border-radius:4px;opacity:.6}
+  .chip.done{background:#4a6ab8;opacity:1}.chip.cur{border-color:#ffd24a;opacity:1;background:#2a3c78}
+  .nodes{min-width:300px}.node{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:4px;margin-top:3px;border:2px solid transparent}
+  .node.done{opacity:.5}.node.cur{border-color:#ffd24a;background:#2a3c78}.glyph{width:22px;height:22px;border-radius:50%;background:#e8eef8;display:flex;align-items:center;justify-content:center}
+  .nodeinfo{min-width:300px;max-width:420px;display:flex;flex-direction:column;gap:6px}
+  .list{width:min(430px,92vw);max-height:60vh;overflow:auto}.ln{display:flex;align-items:center;gap:8px;padding:2px 0;border-bottom:1px solid #4a6ab8}.top{align-items:flex-start}
+  button:disabled{opacity:.4;cursor:default}
+  .optbody{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center}.scene{display:flex;gap:14px;align-items:center;width:min(760px,92vw);box-sizing:border-box}
+  img.ev{width:128px;height:128px;image-rendering:pixelated;background:#2a3c78;border-radius:4px}
+.wrap{display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center}
+  .dbg label{display:flex;gap:6px;align-items:center;margin:3px 0}
+  .dbg input[type=number]{width:70px}
+  .splash{width:max-content;max-width:96vw;display:flex;flex-direction:column;align-items:center;gap:6px;margin:8px 0 4px;filter:drop-shadow(0 4px 0 #000a);animation:splashIn .7s cubic-bezier(.2,.9,.3,1) both}
+  @keyframes splashIn{from{opacity:0;transform:translateY(-24px) scale(.96)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){.splash{animation:none}}
+  .menu{display:flex;flex-direction:column;align-items:center;gap:6px;max-width:100%}
+  .dsbtn:focus-visible{outline:none}
+</style><link rel="stylesheet" href="mapui.css"></head>
+<body><div id="bg"></div><div id="app"><div class="win" id="boot">Loading...</div></div>
+<script type="module" src="main.js"></script></body></html>

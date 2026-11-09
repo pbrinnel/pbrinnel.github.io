@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en"><head>
+<script>
+  // Google Analytics (page views + 3 milestones), only on paulbrinnel.com: local tests must not count. No cookies banner needed: see the notice on the pages.
+  if (/(^|\.)paulbrinnel\.com$/.test(location.hostname)) {
+    const s = document.createElement('script'); s.async = true; s.src = 'https://www.googletagmanager.com/gtag/js?id=G-2ZPJKVJDMD'; document.head.appendChild(s);
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = function () { dataLayer.push(arguments); };
+    gtag('js', new Date());
+    gtag('config', 'G-2ZPJKVJDMD', { page_title: 'Conquest (landing)' });
+  }
+</script>
+<meta name="robots" content="noindex, nofollow">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conquest League Challenge (unofficial fan project, WIP)</title>
+<link rel="stylesheet" href="shell.css">
+<script src="shell.js"></script>
+</head><body><main>
+<div class="win">
+  <h1>Pokémon Conquest League Challenge</h1>
+  <p class="dim">An unofficial fan project &middot; work in progress &middot; testers wanted</p>
+  <p>A browser port of Pokémon Conquest's battle engine with a new single-player roguelite mode: build a squad, climb the map through trainers, wild Pokémon, shops and rests, beat eight Gym leaders, then face the Elite Four and the Champion.</p>
+  <div class="row"><a class="btn" href="start.html">Set up and play</a><span class="dim">You need your own ROM (see below)</span></div>
+</div>
+
+<div class="win">
+  <h2>No game files here</h2>
+  <p>This site contains <b>only original code</b>. It contains no ROM, no graphics, no text, no models, no music and no data taken from the game, and it never will. Everything you see in the game is generated <b>inside your own browser</b> from a ROM file that <b>you</b> provide.</p>
+  <ul>
+    <li><b>Browser:</b> a current Chrome or Edge on a desktop is the tested setup. Firefox is not supported yet; phones are untested.</li>
+    <li><b>Bring your own ROM:</b> Pokémon Conquest, USA / Australia release, <b>Rev 1</b> (game code <code>VPYT</code>), dumped from a cartridge you own. This site does not tell you where to get one.</li>
+    <li><b>Your ROM never leaves your device.</b> It is read by a script on the page and never uploaded. There is no server-side code. The one exception to "nothing leaves your browser" is Google Analytics: this site uses it for page views and three milestone events (legal box ticked, build finished, game launched), which contain nothing from your ROM or your game data. No consent banner is shown because no ROM data is involved; block analytics in your browser if you prefer.</li>
+    <li>The data built from your ROM is kept in <b>your browser's storage</b> only, and you can delete it any time from the setup page.</li>
+  </ul>
+</div>
+
+<div class="win">
+  <h2>Status of this test build</h2>
+  <ul>
+    <li><b>Works now:</b> this page, ROM validation (header, game code, revision, checksum), and the in-browser build of battlefield maps and meshes, Pokémon sprite sheets, text, game data tables and the battle rule tables. A service worker already serves them to the game the way the original tools do.</li>
+    <li><b>Not yet:</b> the rest of the in-browser build (gimmicks, fonts, HUD and interface art, portraits and stills, battle effects, a few map and sprite formats). The <b>Launch</b> button lists what is still missing and stays disabled until the build is complete, so the single-player mode cannot be started from this site yet.</li>
+  </ul>
+  <p class="dim">Developer notes: the playable lab runs locally from the private project today; this deployment is the shell that testers will use once the build is complete.</p>
+</div>
+
+<div class="win cream" id="legal">
+  <h2>Legal</h2>
+  <p>This is an unofficial, non-commercial fan project. It is <b>not affiliated with, endorsed by or sponsored by</b> Nintendo, Game Freak, Creatures, TECMO KOEI, The Pokémon Company or any related company. Pokémon, Pokémon Conquest and all related names, characters and trademarks belong to their respective owners.</p>
+  <p>You must own a legal copy of the game and make the ROM dump yourself. Do not send ROM files, extracted game assets or save data to anyone through this project. No ROM or game asset is included or linked here. The data built from your ROM stays on your device. Distribution of the game itself is not permitted here and not needed to use this site.</p>
+  <p>The project's source code license: <i>[to be decided before the public release]</i>. This is a project policy statement, not legal advice.</p>
+</div>
+
+<footer class="foot"><span>Build <span id="stamp">…</span></span> &middot; <a href="index.html#legal">Legal</a> &middot; <button class="linkbtn" id="deleteLocal" type="button">Delete my local data</button><br><small>Google Analytics counts page views and three milestones; your ROM never leaves this browser.</small></footer>
+</main>
+</body></html>

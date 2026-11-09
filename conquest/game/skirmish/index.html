@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<script>if(/(^|\.)paulbrinnel\.com$/.test(location.hostname)){const s=document.createElement('script');s.async=true;s.src='https://www.googletagmanager.com/gtag/js?id=G-2ZPJKVJDMD';document.head.appendChild(s);window.dataLayer=window.dataLayer||[];window.gtag=function(){dataLayer.push(arguments)};gtag('js',new Date());gtag('config','G-2ZPJKVJDMD',{page_title:'Conquest (battle)'})}</script>
+<meta name="robots" content="noindex, nofollow">
+
+<script src="../shared/debuglog.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conquest Skirmish Lab</title>
+<style>
+  [hidden] { display:none !important; }
+  :root { --bg:#0e1015; --panel:rgba(22,25,33,.9); --line:#2b303d; --fg:#d9dde8; --dim:#8a91a3; --acc:#ffb347;
+          --s0:#00c5ff; --s1:#ff4100; --s2:#52ff00; --s3:#ff9400; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--fg); overflow:hidden;
+    font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  :root { --lw:0px; --rw:0px; --bh:0px; }
+  #view { position:fixed; inset:0; }
+  #view canvas { display:block; width:100%; height:100%; }
+  .panel { position:fixed; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px 12px;
+    backdrop-filter: blur(6px); }
+  h3 { margin:0 0 6px; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--dim); font-weight:600; }
+  select, button, input { font:inherit; color:var(--fg); background:#1b1f2a; border:1px solid var(--line); border-radius:5px; padding:4px 8px; }
+  button { cursor:pointer; } button:hover:not(:disabled), select:hover { border-color:var(--acc); }
+  button:disabled { opacity:.4; cursor:default; }
+  button.primary { background:var(--acc); color:#1a1306; border-color:var(--acc); font-weight:600; }
+  .dim { color:var(--dim); } .s0{color:var(--s0)} .s1{color:var(--s1)} .s2{color:var(--s2)} .s3{color:var(--s3)}
+  .badge { background:#5b2d0a; color:#ffcf9a; border:1px solid #a4571a; border-radius:10px; padding:1px 8px; font-size:11px; }
+  .badge.real { background:#10361f; color:#a6f0c0; border-color:#2f8f57; }
+  #status { position:fixed; left:0; right:0; bottom:0; height:24px; display:flex; gap:18px; align-items:center;
+    padding:0 12px; background:#0a0c10; border-top:1px solid var(--line); color:var(--dim); font-size:12px; white-space:nowrap; overflow:hidden; }
+  #status b { color:var(--fg); font-weight:500; }
+  #tip { position:fixed; pointer-events:none; background:rgba(10,12,16,.95); border:1px solid var(--acc); border-radius:6px;
+    padding:5px 8px; font-size:12px; z-index:4; max-width:260px; display:none; }
+  .overlay { position:fixed; inset:0; z-index:6; display:flex; align-items:center; justify-content:center; background:rgba(10,12,16,.82); }
+  .overlay[hidden] { display:none; }
+  .card { background:#181b24; border:1px solid var(--line); border-radius:12px; padding:20px 24px; width:min(560px, 94vw);
+    max-height:94vh; overflow:auto; }
+  .card h1 { margin:0 0 2px; font-size:22px; } .card p { margin:2px 0 12px; color:var(--dim); }
+  .field { display:flex; align-items:center; gap:10px; margin:8px 0; } .field > label { width:90px; color:var(--dim); }
+  .field select, .field input[type=text] { flex:1; min-width:0; }
+  .armies { display:grid; grid-template-columns:1fr 1fr; gap:4px 12px; }
+  .armies .slot { display:flex; align-items:center; gap:4px; margin:1px 0; }
+  .armies .slot select { width:100%; min-width:0; padding:2px 4px; }
+  .armies .slot .wcol { flex:1; min-width:0; }
+  .armies .slot .wl { display:flex; align-items:center; gap:4px; font-size:10px; line-height:16px; white-space:nowrap; overflow:hidden; background:none; border:1px solid transparent; border-radius:4px; color:inherit; font-family:inherit; padding:1px 3px; margin:0 -3px; cursor:pointer; text-align:left; max-width:100%; }
+  .armies .slot .wl:hover { border-color:var(--line, #444); background:rgba(255,255,255,.05); }
+  .armies .slot .wl span:first-of-type { overflow:hidden; text-overflow:ellipsis; }
+  .wlbadge { flex:none; border-radius:3px; }
+  .armies .slot .bigart { flex:none; }
+  #setup { background:none; justify-content:flex-start; padding-left:10px; pointer-events:none; }
+  #setup .card { pointer-events:auto; width:min(520px, 94vw); background:rgba(24,27,36,.94); padding:14px 18px; }
+  #error { flex-direction:column; text-align:center; font-size:15px; z-index:9; }
+  #error code { background:#1b1f2a; padding:2px 8px; border-radius:4px; color:var(--acc); }
+  @media (min-width: 900px) { body.setup { --lw:540px; --rw:0px; } }
+  body:not(.opt-statusbar) #status { display:none; }
+  body:not(.opt-log):not(.opt-roster) #right { display:none; }
+  body:not(.opt-log) #logwrap { display:none; }
+  body:not(.opt-logbtn) #b-logtoggle { display:none !important; }   /* Log button: off by default, the L key still toggles the log */
+  body:not(.opt-logbtn) #top:not(:has(#b-summary:not([hidden]), #badge:not([hidden]))) { display:none !important; }   /* no empty panel left behind */
+  body:not(.opt-roster) #roster { display:none; }
+</style>
+<link rel="stylesheet" href="ui.css">
+<script type="importmap">
+{ "imports": {
+  "three": "../../vendor/three/build/three.module.js",
+  "three/addons/": "../../vendor/three/examples/jsm/" } }
+</script>
+</head>
+<body>
+<div id="view"></div>
+
+<div id="labels"></div>
+
+<div id="objective" hidden></div>
+<div id="top" class="panel" hidden>
+  <button id="b-summary" hidden>Summary</button>
+  <button id="b-logtoggle" class="narrowonly" title="Show or hide the battle log (L)">Log</button>
+  <span class="badge" id="badge" hidden title="Stats, moves, types and the damage formula are real; warlords come from the decoded data; warlord items / trained stats are not modelled">Placeholder stats</span>
+</div>
+
+<div id="left" class="panel" hidden>
+  <div id="prevbox" hidden><h3>Attack preview</h3><div id="preview"></div></div>
+  <div id="settings" hidden><!-- UI-7: the controls stay as the Settings window's "Lab options" backing store (labs/skirmish/settings.js) -->
+    <h3>Battle speed (F / + / -)</h3>
+    <select id="speed" style="width:100%"><option value="1">1x (original pace)</option><option value="2">2x</option><option value="4">4x</option></select>
+    <h3>Look</h3>
+    <select id="look" style="width:100%" title="Clarity: sharp pixels plus sun shadows. DS Original: plain nearest-filtered rendering."></select>
+    <h3>Sprite projection</h3>
+    <select id="proj" style="width:100%" title="Blend: sprites tilt mildly toward the original camera angle when you raise the camera. Flat: always screen-parallel."></select>
+    <h3>Info screen style</h3>
+    <select id="infostyle" style="width:100%" title="DS pages: the original two-screen Info (3 pages). Roster: the new modal roster + detail view."><option value="ds">DS pages</option><option value="roster">Roster (new)</option></select>
+    <h3>Board HUD</h3>
+    <select id="hudmode" style="width:100%" title="DS: HP numbers + thin bars under each unit and a Fight / Wait menu beside the selected one, drawn from the ROM's HUD graphics. Modern: rings and HP bars."></select>
+    <h3>HUD size <span id="hudscale-val" class="dim"></span></h3>
+    <input type="range" id="hudscale" min="1" max="3" step="0.25" value="1.5" style="width:100%" title="Size of the on-board HUD in CSS px per DS pixel: HP numbers and bars, damage digits, battle texts, Fight / Wait menu, target bubbles, move banner. Rounded to whole device pixels so the art stays crisp.">
+    <label style="display:flex;gap:6px;align-items:center;margin-top:8px"><input type="checkbox" id="manim" checked> Map animations</label>
+    <h3>Game option</h3>
+    <label style="display:flex;gap:6px;align-items:center" title="Mirrors the game's flag mgr+0x4c[0x17a].0 (ov2 0x2100918): with it set the original shows neither the move bubble nor the super-effective cut-in, only a 45-frame pause. In the game it is an internal flag set while status effects are applied, not a menu entry."><input type="checkbox" id="opt-nocutin"> No move bubble / cut-in (flag 0x17a.0)</label>
+    <label style="display:flex;gap:6px;align-items:center" title="The original shows no move bubble or cut-in for a Pokemon without a warlord (ov2 0x2100960), just a 45-frame wait. Skirmish units have no warlords, so this is off by default."><input type="checkbox" id="opt-needwl"> Original: no bubble without a warlord</label>
+    <label style="display:none"><input type="checkbox" id="opt-hideui"></label>
+    <h3>Lab aids <span class="dim">(not in the original)</span></h3>
+    <label style="display:flex;gap:6px;align-items:center" title="Battle log side panel."><input type="checkbox" id="opt-log"> Battle log</label>
+    <label style="display:flex;gap:6px;align-items:center" title="Web-style Log button on the board (narrow windows). The L key toggles the log either way."><input type="checkbox" id="opt-logbtn"> Show battle log button</label>
+    <label style="display:flex;gap:6px;align-items:center" title="Army roster tiles (click to select a unit)."><input type="checkbox" id="opt-roster"> Army roster</label>
+    <label style="display:flex;gap:6px;align-items:center" title="Bottom strip: map, seed, state hash, action count."><input type="checkbox" id="opt-statusbar"> Status bar</label>
+    <label style="display:flex;gap:6px;align-items:center" title="Also list the debug / placeholder battle maps (docs/maps_catalog.md) in the stage picker. Off: only real stages."><input type="checkbox" id="opt-debugstages"> Show debug stages</label>
+    <label style="display:flex;gap:6px;align-items:center" title="Per-unit damage / KOs / MVP table under the result screen. Not in the original."><input type="checkbox" id="opt-sumstats"> Result stats table</label>
+    <label style="display:flex;gap:6px;align-items:center" title="A small shape (circle, square, triangle, diamond) per army beside each HP number, so armies are not told by colour alone (modern addition)."><input type="checkbox" id="opt-armyicon"> Army icons</label>
+    <label style="display:flex;gap:6px;align-items:center" title="Small i badge on the unit plate move / ability rows; click a row for its description (modern addition)."><input type="checkbox" id="opt-infocue" checked> Show info cues</label>
+    <label style="display:flex;gap:6px;align-items:center" title="Upper-screen docks: no backdrop (default) or a parchment strip behind each dock, cut from the upper BG art."><input type="checkbox" id="opt-dockbg"> Parchment behind docks</label>
+    <label style="display:flex;gap:6px;align-items:center" title="Side-coloured ring and facing arrow under every unit (always shown in the Modern HUD mode)."><input type="checkbox" id="opt-rings"> Unit rings + facing arrows</label>
+    <label style="display:flex;gap:6px;align-items:center" title="Faint outline of every cell."><input type="checkbox" id="opt-grid"> Grid lines</label>
+    <label style="display:flex;gap:6px;align-items:center" title="White fill on the hovered cell and a yellow outline on the selected one, instead of the corner-bracket cursor."><input type="checkbox" id="opt-hlfill"> Highlight fill</label>
+    <label style="display:flex;gap:6px;align-items:center" title="A warlord still slides in beside the attacker with the move bubble on it (ROM battle_ui.md 6c). Skirmish units use their drafted warlord. On by default."><input type="checkbox" id="opt-warfig"> Warlord figure on attacks</label>
+    <label style="display:flex;gap:6px;align-items:center" title="The move banner punches in with a shake and snaps out; the original just appears."><input type="checkbox" id="opt-pop"> Banner pop</label>
+    <label style="display:flex;gap:6px;align-items:center" title="Warrior Skill cut-in: also show the user's Pokemon in the lower strip (modern addition; the original shows the warlord only)."><input type="checkbox" id="opt-skillpoke" checked> Show Pokemon in skill cut-in</label>
+    <label style="display:flex;gap:6px;align-items:center" title="While a unit is selected, tint every cell that any of its attack options covers. The original shows only the hovered option's range."><input type="checkbox" id="opt-atktint"> All attack cells</label>
+    <label style="display:flex;gap:6px;align-items:center" title="Translucent front-only props (Hot Spring steam, gate leaves) also draw from behind. The original hides them."><input type="checkbox" id="opt-steamboth"> Steam visible from behind</label>
+    <label style="display:flex;gap:6px;align-items:center" title="Hot Spring steam planes turn to face the camera. Off = the original's fixed planes."><input type="checkbox" id="opt-steambb"> Steam faces the camera</label>
+    <label style="display:flex;gap:6px;align-items:center" title="Starts every battle in Auto battle (the only way Auto starts on), default off (U or Esc takes control): play a whole run as an auto-battler."><input type="checkbox" id="opt-autoalways"> Always auto in battles</label>
+    <label style="display:flex;gap:6px;align-items:center" title="Selecting an enemy unit on your turn shows the tiles it can move to and hit. The original shows none."><input type="checkbox" id="opt-enemyrange"> Show enemy range when selecting an enemy</label>
+    <label style="display:flex;gap:6px;align-items:center" title="Darken units that already acted this turn. The original shows a small marker left of the HP number instead (it is always shown)."><input type="checkbox" id="opt-dimacted"> Dim acted units</label>
+    <label style="display:flex;gap:6px;align-items:center" title="Bright border around the move range. The original has none."><input type="checkbox" id="opt-routline"> Range outline</label>
+    <label style="display:flex;gap:6px;align-items:center" title="The move range fades out over 6 frames on confirm. The original removes it in one step."><input type="checkbox" id="opt-rfade"> Range fade</label>
+  </div>
+</div>
+
+<div id="right" class="panel" hidden>
+  <div id="roster"></div>
+  <div id="logwrap"><h3 id="logh" title="Click to collapse (L)"><span id="logcaret">&#9662;</span> Battle log</h3><div id="log"></div></div>
+</div>
+
+
+<div id="status">
+  <span>Map <b id="st-map">-</b></span><span>Seed <b id="st-seed">-</b></span><span>Turns <b id="st-turn">-</b></span>
+  <span>Hash <b id="st-hash">-</b></span><span>Actions <b id="st-acts">0</b></span><span id="st-badge"></span>
+  <span id="st-hints"></span><span style="margin-left:auto" id="st-msg"></span>
+</div>
+<div id="tip"></div>
+
+<div id="setup" class="overlay" hidden>
+  <div class="card">
+    <h1>Skirmish Lab</h1>
+    <p>Unofficial fan port test bed. Pick a battlefield and fight.</p>
+    <div class="field"><label>Map</label><select id="s-map"></select><button id="s-randmap" title="Pick a random battlefield">Random map</button></div>
+    <div class="field"><label>Army size</label><input id="s-size" type="range" min="2" max="6" value="4"><b id="s-sizev">4</b></div>
+    <div class="field"><label title="Each unit starts at max(1, min(this, the warlord-Pokemon pair's max Link)). Default 70 = a Pokemon that joins by event in the game [G]">Starting Link %</label><input id="s-link" type="number" min="1" max="100" value="70"> <button type="button" id="s-linkmax" title="Set 100 (a perfect-Link warlord then gives the ROM's perfect Link)">Max</button></div>
+    <div class="field"><label title="Grade 0-4, stats x (grade + 18) / 20. Default 2 = x1.0">Grade</label><input id="s-grade" type="number" min="0" max="4" value="2"></div>
+    <div class="field"><label>Mode</label><select id="s-mode">
+      <option value="ai">vs AI</option><option value="aivai">AI vs AI (watch)</option><option value="hotseat">Hotseat (2 players)</option></select></div>
+    <div class="field"><label title="In the game, running out of turns ends the battle in favour of the second army. Lab aid (not in the original): call it a draw instead.">Time-up</label><label style="width:auto;color:var(--fg)"><input id="s-timedraw" type="checkbox"> draw instead of the original result (lab aid)</label></div>
+    <div class="field"><label>Seed</label><input id="s-seed" type="text" inputmode="numeric">
+      <label style="width:auto"><input id="s-lock" type="checkbox"> lock</label></div>
+    <div class="field"><label></label><button id="s-reroll">Random armies</button><span class="dim" id="s-note"></span></div>
+    <div id="s-armies" class="armies"></div>
+    <div class="row" style="margin-top:14px"><button class="primary" id="s-start">Start battle</button></div>
+    <p id="s-src" style="margin:8px 0 0;font-size:11px"></p>
+  </div>
+</div>
+
+<div id="end" class="overlay" hidden>
+  <div class="card" id="endcard"></div>
+</div>
+
+<div id="error" class="overlay" hidden><div class="card" id="errbody"></div></div>
+<script type="module" src="main.js"></script>
+<script type="module" src="../shared/dsui/dsAudit.js"></script>
+</body>
+</html>

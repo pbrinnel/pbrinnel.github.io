@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en"><head>
+<script>
+  // Google Analytics (page views + 3 milestones), only on paulbrinnel.com: local tests must not count. No cookies banner needed: see the notice on the pages.
+  if (/(^|\.)paulbrinnel\.com$/.test(location.hostname)) {
+    const s = document.createElement('script'); s.async = true; s.src = 'https://www.googletagmanager.com/gtag/js?id=G-2ZPJKVJDMD'; document.head.appendChild(s);
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = function () { dataLayer.push(arguments); };
+    gtag('js', new Date());
+    gtag('config', 'G-2ZPJKVJDMD', { page_title: 'Conquest (setup)' });
+  }
+</script>
+<meta name="robots" content="noindex, nofollow">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Set up: Conquest League Challenge</title>
+<link rel="stylesheet" href="shell.css">
+<script src="shell.js"></script>
+</head><body><main>
+<div class="win">
+  <h1>Set up</h1>
+  <p>Give the page your own <b>Pokémon Conquest (USA / Australia) Rev 1</b> ROM (<code>.nds</code>). It is read in this tab and never uploaded; nothing from it is sent anywhere (Google Analytics only counts page views and three milestones, with no ROM data). <a href="index.html">About this project and the legal note</a>.</p>
+</div>
+
+<div class="win" id="legalGate">
+  <label class="check"><input type="checkbox" id="ownIt"> <span><b>I own the game and this is my own legal dump.</b> I understand this is an unofficial fan project, not affiliated with Nintendo, Game Freak, Creatures, TECMO KOEI or The Pokémon Company, and that no game files are provided here. <a href="index.html#legal">Legal note</a></span></label>
+</div>
+
+<div class="win" id="pick">
+  <div id="drop" tabindex="0" role="button" aria-label="Drop your ROM here or press Enter to choose a file">
+    <b>Drop your .nds file here</b><br><span class="dim">or click to choose it</span>
+  </div>
+  <input id="file" type="file" accept=".nds,.srl,.bin" hidden>
+  <p id="error" class="err" role="alert" hidden></p>
+</div>
+
+<div class="win" id="rom" hidden>
+  <h2>ROM accepted</h2>
+  <dl id="romInfo"></dl>
+  <div class="row"><button class="btn" id="buildBtn">Build game data in this browser</button><span class="dim" id="buildNote"></span></div>
+</div>
+
+<div class="win" id="progress" hidden>
+  <h2 id="stepName">Working…</h2>
+  <div class="bar"><i id="fill"></i></div>
+  <p class="dim" id="detail"></p>
+  <ol class="steps" id="steps"></ol>
+</div>
+
+<div class="win" id="done" hidden>
+  <h2>The build is stored in this browser</h2>
+  <dl id="doneInfo"></dl>
+</div>
+
+<div class="win">
+  <h2>Play</h2>
+  <div class="row"><button class="btn" id="launchBtn" disabled>Launch single-player</button></div>
+  <p class="dim" id="launchNote">Checking what is stored in this browser…</p>
+  <ul class="dim" id="missing"></ul>
+  <div class="row" id="manage" hidden><button class="btn alt" id="clearBtn">Delete the data stored in this browser</button></div>
+</div>
+<footer class="foot"><span>Build <span id="stamp">…</span></span> &middot; <a href="index.html#legal">Legal</a> &middot; <button class="linkbtn" id="deleteLocal" type="button">Delete my local data</button><br><small>Google Analytics counts page views and three milestones; your ROM never leaves this browser.</small></footer>
+</main>
+<script type="module" src="start.js"></script>
+</body></html>

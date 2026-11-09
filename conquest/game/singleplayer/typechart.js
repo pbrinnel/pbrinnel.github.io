@@ -1,0 +1,1 @@
+async function ensureTypeEff(S){if(!S.D.typeEff)try{const r=await fetch("../../_out/data/rules.json");r.ok&&(S.D.typeEff=S.core.typeEffFromRules((await r.json()).typeChart))}catch{}}export{ensureTypeEff};

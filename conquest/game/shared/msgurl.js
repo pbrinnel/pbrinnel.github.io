@@ -1,0 +1,1 @@
+function msgUrl(dir,block){if(!Number.isInteger(block))throw new TypeError(`msgUrl: block must be an integer, got ${typeof block}`);return`${dir}msg_${String(block).padStart(2,"0")}.txt`}export{msgUrl};

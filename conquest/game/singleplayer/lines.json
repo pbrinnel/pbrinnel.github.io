@@ -1,0 +1,326 @@
+{
+ "rival.challenge.0": {
+  "speaker": "Rival",
+  "context": "Rival pre-battle screen, meeting 1",
+  "text": "Let us see which of us is stronger!",
+  "source": "invented (editable)"
+ },
+ "rival.challenge.1": {
+  "speaker": "Rival",
+  "context": "Rival pre-battle screen, meeting 2",
+  "text": "Still going? I have been training too!",
+  "source": "invented (editable)"
+ },
+ "rival.challenge.2": {
+  "speaker": "Rival",
+  "context": "Rival pre-battle screen, meeting 3",
+  "text": "I will not fall behind you!",
+  "source": "invented (editable)"
+ },
+ "rival.challenge.3": {
+  "speaker": "Rival",
+  "context": "Rival pre-battle screen, meeting 4",
+  "text": "My team is stronger than ever!",
+  "source": "invented (editable)"
+ },
+ "rival.challenge.4": {
+  "speaker": "Rival",
+  "context": "Rival pre-battle screen, meeting 5",
+  "text": "This is where I pull ahead!",
+  "source": "invented (editable)"
+ },
+ "rival.challenge.5": {
+  "speaker": "Rival",
+  "context": "Rival pre-battle screen, meeting 6",
+  "text": "The Elite Four wait for no one. Neither will I!",
+  "source": "invented (editable)"
+ },
+ "rival.win.0": {
+  "speaker": "Rival",
+  "context": "Rival result screen after the player wins, meeting 1",
+  "text": "Not bad... but I will win next time!",
+  "source": "invented (editable)"
+ },
+ "rival.win.1": {
+  "speaker": "Rival",
+  "context": "Rival result screen after the player wins, meeting 2",
+  "text": "You got lucky. I will get stronger!",
+  "source": "invented (editable)"
+ },
+ "rival.win.2": {
+  "speaker": "Rival",
+  "context": "Rival result screen after the player wins, meeting 3",
+  "text": "Hm. You are good. Very good.",
+  "source": "invented (editable)"
+ },
+ "rival.win.3": {
+  "speaker": "Rival",
+  "context": "Rival result screen after the player wins, meeting 4",
+  "text": "Tch... next time, I will not lose.",
+  "source": "invented (editable)"
+ },
+ "rival.win.4": {
+  "speaker": "Rival",
+  "context": "Rival result screen after the player wins, meeting 5",
+  "text": "I did not expect that...",
+  "source": "invented (editable)"
+ },
+ "rival.win.5": {
+  "speaker": "Rival",
+  "context": "Rival result screen after the player wins, meeting 6",
+  "text": "You have earned your place. Go on!",
+  "source": "invented (editable)"
+ },
+ "rival.lose.0": {
+  "speaker": "Rival",
+  "context": "Rival result screen after the player loses, meeting 1",
+  "text": "Ha! Better luck next time.",
+  "source": "invented (editable)"
+ },
+ "rival.lose.1": {
+  "speaker": "Rival",
+  "context": "Rival result screen after the player loses, meeting 2",
+  "text": "I told you I was getting stronger!",
+  "source": "invented (editable)"
+ },
+ "rival.lose.2": {
+  "speaker": "Rival",
+  "context": "Rival result screen after the player loses, meeting 3",
+  "text": "You are not ready for this.",
+  "source": "invented (editable)"
+ },
+ "rival.lose.3": {
+  "speaker": "Rival",
+  "context": "Rival result screen after the player loses, meeting 4",
+  "text": "Too easy! Come back when you are stronger.",
+  "source": "invented (editable)"
+ },
+ "rival.lose.4": {
+  "speaker": "Rival",
+  "context": "Rival result screen after the player loses, meeting 5",
+  "text": "The champion road ends here for you.",
+  "source": "invented (editable)"
+ },
+ "rival.lose.5": {
+  "speaker": "Rival",
+  "context": "Rival result screen after the player loses, meeting 6",
+  "text": "Too slow!",
+  "source": "invented (editable)"
+ },
+ "event.chest.title": {
+  "speaker": "Narrator",
+  "context": "Event \"chest\": heading",
+  "text": "A treasure chest",
+  "source": "invented (editable)"
+ },
+ "event.chest.text": {
+  "speaker": "Narrator",
+  "context": "Event \"chest\": scene text",
+  "text": "A weathered chest sits at the roadside, its lock long rusted away.",
+  "source": "invented (editable)"
+ },
+ "event.chest.choice.item": {
+  "speaker": "Narrator",
+  "context": "Event \"chest\": label of the item choice",
+  "text": "Open the chest: something useful inside",
+  "source": "invented (editable)"
+ },
+ "event.chest.choice.money": {
+  "speaker": "Narrator",
+  "context": "Event \"chest\": label of the money choice",
+  "text": "Take the coins on top",
+  "source": "invented (editable)"
+ },
+ "event.chest.choice.link": {
+  "speaker": "Narrator",
+  "context": "Event \"chest\": label of the link choice",
+  "text": "Share the find: your Pokémon bond over it",
+  "source": "invented (editable)"
+ },
+ "event.chest.choice.pokemon": {
+  "speaker": "Narrator",
+  "context": "Event \"chest\": label of the pokemon choice",
+  "text": "A Pokémon was sleeping inside",
+  "source": "invented (editable)"
+ },
+ "event.spring.title": {
+  "speaker": "Narrator",
+  "context": "Event \"spring\": heading",
+  "text": "A hot spring",
+  "source": "invented (editable)"
+ },
+ "event.spring.text": {
+  "speaker": "Narrator",
+  "context": "Event \"spring\": scene text",
+  "text": "Steam rises from a quiet spring in the rocks. Your Pokémon look hopeful.",
+  "source": "invented (editable)"
+ },
+ "event.spring.choice.link": {
+  "speaker": "Narrator",
+  "context": "Event \"spring\": label of the link choice",
+  "text": "Soak together",
+  "source": "invented (editable)"
+ },
+ "event.spring.choice.item": {
+  "speaker": "Narrator",
+  "context": "Event \"spring\": label of the item choice",
+  "text": "Fish a lost item out of the water",
+  "source": "invented (editable)"
+ },
+ "event.spring.choice.money": {
+  "speaker": "Narrator",
+  "context": "Event \"spring\": label of the money choice",
+  "text": "Sell the spring water to travellers",
+  "source": "invented (editable)"
+ },
+ "event.spring.choice.pokemon": {
+  "speaker": "Narrator",
+  "context": "Event \"spring\": label of the pokemon choice",
+  "text": "A Pokémon is already bathing there",
+  "source": "invented (editable)"
+ },
+ "event.grass.title": {
+  "speaker": "Narrator",
+  "context": "Event \"grass\": heading",
+  "text": "Rustling grass",
+  "source": "invented (editable)"
+ },
+ "event.grass.text": {
+  "speaker": "Narrator",
+  "context": "Event \"grass\": scene text",
+  "text": "The tall grass moves. Something is in there.",
+  "source": "invented (editable)"
+ },
+ "event.grass.choice.pokemon": {
+  "speaker": "Narrator",
+  "context": "Event \"grass\": label of the pokemon choice",
+  "text": "Part the grass",
+  "source": "invented (editable)"
+ },
+ "event.grass.choice.item": {
+  "speaker": "Narrator",
+  "context": "Event \"grass\": label of the item choice",
+  "text": "Search the grass for dropped items",
+  "source": "invented (editable)"
+ },
+ "event.grass.choice.link": {
+  "speaker": "Narrator",
+  "context": "Event \"grass\": label of the link choice",
+  "text": "Play in the grass together",
+  "source": "invented (editable)"
+ },
+ "event.grass.choice.money": {
+  "speaker": "Narrator",
+  "context": "Event \"grass\": label of the money choice",
+  "text": "Pick the valuable berries",
+  "source": "invented (editable)"
+ },
+ "event.oasis.title": {
+  "speaker": "Narrator",
+  "context": "Event \"oasis\": heading",
+  "text": "An oasis",
+  "source": "invented (editable)"
+ },
+ "event.oasis.text": {
+  "speaker": "Narrator",
+  "context": "Event \"oasis\": scene text",
+  "text": "Clear water and shade: travellers have left things here.",
+  "source": "invented (editable)"
+ },
+ "event.oasis.choice.item": {
+  "speaker": "Narrator",
+  "context": "Event \"oasis\": label of the item choice",
+  "text": "Check the travellers' packs",
+  "source": "invented (editable)"
+ },
+ "event.oasis.choice.link": {
+  "speaker": "Narrator",
+  "context": "Event \"oasis\": label of the link choice",
+  "text": "Rest by the water",
+  "source": "invented (editable)"
+ },
+ "event.oasis.choice.money": {
+  "speaker": "Narrator",
+  "context": "Event \"oasis\": label of the money choice",
+  "text": "Trade stories for coin",
+  "source": "invented (editable)"
+ },
+ "event.oasis.choice.pokemon": {
+  "speaker": "Narrator",
+  "context": "Event \"oasis\": label of the pokemon choice",
+  "text": "A thirsty Pokémon asks to come along",
+  "source": "invented (editable)"
+ },
+ "event.ball.title": {
+  "speaker": "Narrator",
+  "context": "Event \"ball\": heading",
+  "text": "A lone Poké Ball",
+  "source": "invented (editable)"
+ },
+ "event.ball.text": {
+  "speaker": "Narrator",
+  "context": "Event \"ball\": scene text",
+  "text": "A Poké Ball lies in the dirt, still warm.",
+  "source": "invented (editable)"
+ },
+ "event.ball.choice.pokemon": {
+  "speaker": "Narrator",
+  "context": "Event \"ball\": label of the pokemon choice",
+  "text": "Open the ball",
+  "source": "invented (editable)"
+ },
+ "event.ball.choice.item": {
+  "speaker": "Narrator",
+  "context": "Event \"ball\": label of the item choice",
+  "text": "Look for what its trainer dropped",
+  "source": "invented (editable)"
+ },
+ "event.ball.choice.money": {
+  "speaker": "Narrator",
+  "context": "Event \"ball\": label of the money choice",
+  "text": "Hand it in for a reward",
+  "source": "invented (editable)"
+ },
+ "event.ball.choice.link": {
+  "speaker": "Narrator",
+  "context": "Event \"ball\": label of the link choice",
+  "text": "Ask your Pokémon what they feel",
+  "source": "invented (editable)"
+ },
+ "event.bucket.title": {
+  "speaker": "Narrator",
+  "context": "Event \"bucket\": heading",
+  "text": "A water bucket",
+  "source": "invented (editable)"
+ },
+ "event.bucket.text": {
+  "speaker": "Narrator",
+  "context": "Event \"bucket\": scene text",
+  "text": "A farmer's bucket and a little stall: a quiet bargain.",
+  "source": "invented (editable)"
+ },
+ "event.bucket.choice.money": {
+  "speaker": "Narrator",
+  "context": "Event \"bucket\": label of the money choice",
+  "text": "Take payment for the water",
+  "source": "invented (editable)"
+ },
+ "event.bucket.choice.link": {
+  "speaker": "Narrator",
+  "context": "Event \"bucket\": label of the link choice",
+  "text": "Cool off together",
+  "source": "invented (editable)"
+ },
+ "event.bucket.choice.item": {
+  "speaker": "Narrator",
+  "context": "Event \"bucket\": label of the item choice",
+  "text": "Barter for an item",
+  "source": "invented (editable)"
+ },
+ "event.bucket.choice.pokemon": {
+  "speaker": "Narrator",
+  "context": "Event \"bucket\": label of the pokemon choice",
+  "text": "The farmer's Pokémon likes you",
+  "source": "invented (editable)"
+ }
+}

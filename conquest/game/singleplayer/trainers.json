@@ -1,0 +1,4 @@
+{
+  "note": "Plain trainer battles have no warlord of their own. Each one borrows the name and portrait of a minor warlord (Warlord.json index, ids only: nothing from the ROM is stored here). Edit the list to change who can appear. A warlord already on the field (either army) is skipped.",
+  "warlords": [79, 80, 81, 82, 83, 84, 88, 89, 90, 92, 93, 94, 95, 96, 99, 100, 101, 102, 103, 104, 107, 108, 109, 110]
+}
