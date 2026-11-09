@@ -26,10 +26,13 @@
 </div>
 
 <div class="win" id="pick">
-  <div id="drop" tabindex="0" role="button" aria-label="Drop your ROM here or press Enter to choose a file">
-    <b>Drop your .nds file here</b><br><span class="dim">or click to choose it</span>
+  <div id="drop">
+    <button class="btn big" id="chooseBtn" type="button">Choose your ROM file</button><br>
+    <span class="dim">or drop the .nds file here (computer)</span>
   </div>
-  <input id="file" type="file" accept=".nds,.srl,.bin" hidden>
+  <input id="file" type="file" hidden>
+  <p class="dim" id="hashNote" role="status" hidden></p>
+  <p class="dim help"><b>On a phone or tablet:</b> put your own dump on the device first (the Files app, Downloads or the device storage), then tap <b>Choose your ROM file</b> and pick it. Any file can be picked; the page checks the content, not the name. A .zip must be unpacked first.</p>
   <p id="error" class="err" role="alert" hidden></p>
 </div>
 

@@ -1,5 +1,5 @@
 {
- "version": "20261109.1859+06f66f1",
+ "version": "20261109.1916+3e7498d",
  "files": [
   {
    "path": "LICENSE.txt",
@@ -8,8 +8,8 @@
   },
   {
    "path": "builder/dist/builder.js",
-   "size": 154240,
-   "sha256": "07985f0126210cbf898a16a9d6e333ce8766e7b0403512bbe20e97338bc59165"
+   "size": 158748,
+   "sha256": "0cc273cfb06e9fd1adcbb3c52d4459a70d4665f463049a3192965046d3bd7f28"
   },
   {
    "path": "core/dist/core.js",
@@ -103,8 +103,8 @@
   },
   {
    "path": "game/shared/bigart.js",
-   "size": 1542,
-   "sha256": "1e92ae3bc3ebac443d89163a92b579cf5e234710eed41def90ff4a1258e0f647"
+   "size": 1655,
+   "sha256": "918195938937f8a8434d1bcd0e9cccae91743ac2098218281204faf66a08926c"
   },
   {
    "path": "game/shared/debuglog.js",
@@ -583,8 +583,8 @@
   },
   {
    "path": "game/skirmish/warlordfig.js",
-   "size": 5618,
-   "sha256": "77ab48c0608e40c400322e67d3060e3b66e5670adbc23692bed521678149000a"
+   "size": 5763,
+   "sha256": "64a01fe99b53bff7ed6ce0163f4b5ab49a9d2afacd2c1315626b4763577d738b"
   },
   {
    "path": "game/skirmish/warlordfig3d.js",
@@ -618,8 +618,8 @@
   },
   {
    "path": "shell.css",
-   "size": 2730,
-   "sha256": "736d561aa416b0afebbe88c1e1153de7d2e72efb0b9a0df6ddbbc14caf082ee4"
+   "size": 2963,
+   "sha256": "b5c48d0ed0ca141df32b24974a617faf1ccc25c7541b257085b84010ff068f82"
   },
   {
    "path": "shell.js",
@@ -628,13 +628,13 @@
   },
   {
    "path": "start.html",
-   "size": 3428,
-   "sha256": "052a7a8b8c13ba046394319d852e8741ca64b5fda14acace83542b7a1e9234ed"
+   "size": 3733,
+   "sha256": "2f620a422285cf70f11720b0c93d3bd73bb299a1c2427d455154350d70250fde"
   },
   {
    "path": "start.js",
-   "size": 6788,
-   "sha256": "3e8c1a602c098d651a1b379e842f2be6fa18d3e2c8bd46da8d01bfb542ded86e"
+   "size": 7796,
+   "sha256": "940cfcd7650c10dd3ed0e10f645f42c00fb213995cc0e7514bf92c6655190acc"
   },
   {
    "path": "sw.js",
