@@ -1,6 +1,10 @@
 <!doctype html>
 <html lang="en"><head>
 <script>
+  // Plain http on a real host: go to https (GitHub Pages serves both). Never on localhost / loopback / file:, so no loops.
+  if (location.protocol === 'http:' && !/^(localhost|127\.\d+\.\d+\.\d+|\[::1\]|.*\.localhost)$/.test(location.hostname) && !/^\d+\.\d+\.\d+\.\d+$/.test(location.hostname)) location.replace('https://' + location.host + location.pathname + location.search + location.hash);
+</script>
+<script>
   // Google Analytics (page views + 3 milestones), only on paulbrinnel.com: local tests must not count. No cookies banner needed: see the notice on the pages.
   if (/(^|\.)paulbrinnel\.com$/.test(location.hostname)) {
     const s = document.createElement('script'); s.async = true; s.src = 'https://www.googletagmanager.com/gtag/js?id=G-2ZPJKVJDMD'; document.head.appendChild(s);
