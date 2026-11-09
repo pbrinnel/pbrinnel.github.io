@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head>
+<html lang="en"><head><link rel="icon" type="image/svg+xml" href="favicon.svg">
 <script>
   // Plain http on a real host: go to https (GitHub Pages serves both). Never on localhost / loopback / file:, so no loops.
   if (location.protocol === 'http:' && !/^(localhost|127\.\d+\.\d+\.\d+|\[::1\]|.*\.localhost)$/.test(location.hostname) && !/^\d+\.\d+\.\d+\.\d+$/.test(location.hostname)) location.replace('https://' + location.host + location.pathname + location.search + location.hash);
@@ -44,6 +44,7 @@
   <h2>ROM accepted</h2>
   <dl id="romInfo"></dl>
   <div class="row"><button class="btn" id="buildBtn">Build game data in this browser</button><span class="dim" id="buildNote"></span></div>
+  <p class="dim" id="spaceNote" role="status"></p>
 </div>
 
 <div class="win" id="progress" hidden>

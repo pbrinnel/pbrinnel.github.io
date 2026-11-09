@@ -1,5 +1,5 @@
 {
- "version": "20261109.1947+7a9d139",
+ "version": "20261109.2113+d44172b",
  "files": [
   {
    "path": "LICENSE.txt",
@@ -8,13 +8,18 @@
   },
   {
    "path": "builder/dist/builder.js",
-   "size": 159516,
-   "sha256": "47c33d1305b3eed1f9f61971b7e1fbf49e6e5ae1744b50320482338b9944386f"
+   "size": 159573,
+   "sha256": "dd363dfdab3ae5976b240012af874bf483b289165eb293196dd0771dc830ca7f"
   },
   {
    "path": "core/dist/core.js",
    "size": 219220,
    "sha256": "5168fa6443b743fe97174c93cf7783711d44be3ddd54d906e46c02e2a7b86da5"
+  },
+  {
+   "path": "favicon.svg",
+   "size": 244,
+   "sha256": "4c5cc5094f6a2167207d8a39d3b286f7f9ee68e793e0c8aa14d63f748d766ad1"
   },
   {
    "path": "fx/atmosphere.js",
@@ -342,11 +347,6 @@
    "sha256": "8a42760a5152d562efbb307757d286a7215f0d7005d1dfc8bac02f5548566626"
   },
   {
-   "path": "game/singleplayer/stress.js",
-   "size": 464,
-   "sha256": "d0393a3280cce7b7b06da8a6407be6b31502fd017462fbc6f4ede87e56a341f0"
-  },
-  {
    "path": "game/singleplayer/summary.js",
    "size": 3885,
    "sha256": "89b4561b92307e929cf5567e20d0f40c2eae1006e350f7d63465434db682d383"
@@ -405,11 +405,6 @@
    "path": "game/skirmish/battlestrip.js",
    "size": 3493,
    "sha256": "ac523d405a6e82f97b28dcff3c8e4653ca165f3d4eee7ffd9637bec65219d968"
-  },
-  {
-   "path": "game/skirmish/clarity.js",
-   "size": 841,
-   "sha256": "6a512671e1ff628224e8f7109895cbec65d6ba53862d507e7a0ef0baa33ad076"
   },
   {
    "path": "game/skirmish/controls.js",
@@ -533,8 +528,8 @@
   },
   {
    "path": "game/skirmish/scenes.js",
-   "size": 7709,
-   "sha256": "214fbb048d8bfc2426db7b04e221e0c8b8b5ed021e19e163ebd680c2c4c7bf38"
+   "size": 7730,
+   "sha256": "3990f05a04a402fd7833fb6a96c21a9e1d7e58d20a6c773e8d66f6892f5a87cf"
   },
   {
    "path": "game/skirmish/settings.js",
@@ -562,11 +557,6 @@
    "sha256": "fb9b5519ebabb370d62a3ec03e814ff72d6b16c7a2a778ce7d72b7f37aa3e532"
   },
   {
-   "path": "game/skirmish/statuslab.js",
-   "size": 1349,
-   "sha256": "cc4514a06da8ce71f47c3ff0d2184c5d0500093d9e0cb66e2b53f3bb1f84b05d"
-  },
-  {
    "path": "game/skirmish/tip.js",
    "size": 11006,
    "sha256": "1e19984dce01791c6fd67b3197b6321267ba10c83326bfcb5c226e8e02bfcc41"
@@ -592,11 +582,6 @@
    "sha256": "cc24c8dec1df52e9264635b3dc8ed039b9f525952bbaaec0efbb97ef53d3689c"
   },
   {
-   "path": "game/viewer/clarity-test.js",
-   "size": 3902,
-   "sha256": "499a080c4ef6449f5f8e902c29490cb64eeecb63566559bd3ef76512c1cdfdd0"
-  },
-  {
    "path": "game/viewer/grid.js",
    "size": 7004,
    "sha256": "63de4ac9df6dfaa6a8f04e0f33ee340e1ba95ba24e80bd083fcd53653cea0777"
@@ -613,8 +598,8 @@
   },
   {
    "path": "index.html",
-   "size": 5727,
-   "sha256": "33042e2766105bcd25b9f66b3c7d7fd21ffe159a7dda4dd3e2c199f39cd7ad25"
+   "size": 5784,
+   "sha256": "1c2f354333bcde2f83d93b978e25e6b9575805ba335e17078034b0e1c0061392"
   },
   {
    "path": "shell.css",
@@ -628,13 +613,13 @@
   },
   {
    "path": "start.html",
-   "size": 4149,
-   "sha256": "3285fa324f9fdc8ad82d842f652ce1f7fe6ce2a2b9273864028193b04b3d028a"
+   "size": 4257,
+   "sha256": "ee1434ab888022d99d29776717d78751d04ea8a51265163c123c627d7c3a4194"
   },
   {
    "path": "start.js",
-   "size": 8041,
-   "sha256": "5e6427e3192b30c94e533b7b531370a47ad4b8fe28d5f7e3feb82ed3f96186f2"
+   "size": 8611,
+   "sha256": "ddd2c375e8859135a65d317e68eeb8ced43a51f3aeb3413b22ce2975bb47291e"
   },
   {
    "path": "sw.js",
