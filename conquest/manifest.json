@@ -1,5 +1,5 @@
 {
- "version": "20261109.2133+af17621",
+ "version": "20261110.0023+7897d50",
  "files": [
   {
    "path": "LICENSE.txt",
@@ -273,8 +273,8 @@
   },
   {
    "path": "game/singleplayer/index.html",
-   "size": 6309,
-   "sha256": "54b2838e71ed57082440035a18cfba4dafae0fba7517debd1924927ea01164df"
+   "size": 6316,
+   "sha256": "b1bb4493517bcf3f6a9031d1ba96f5873c91a63839bbffc0f71053a15a68f5d3"
   },
   {
    "path": "game/singleplayer/lines.js",
@@ -453,8 +453,8 @@
   },
   {
    "path": "game/skirmish/game.js",
-   "size": 38981,
-   "sha256": "9fd615c266a7c35c5c1aa76b1167cce4428830d90664f5621798c750c4914f89"
+   "size": 39034,
+   "sha256": "0c0364dea9b10c092a55b61ec63dfd3ba35293bc386f474fa2039ade2bfcbc8e"
   },
   {
    "path": "game/skirmish/gimmickfx.js",
@@ -463,8 +463,8 @@
   },
   {
    "path": "game/skirmish/hud.js",
-   "size": 20782,
-   "sha256": "68cce214ac148ffcc650b8c4d76c6e9819471c6a706f2446089962ca22ac77ee"
+   "size": 20865,
+   "sha256": "15884c575141c48634d7e7d07e1978433044d4eead7f4af95bf365f4714535ab"
   },
   {
    "path": "game/skirmish/index.html",
