@@ -1,5 +1,5 @@
 {
- "version": "20261110.0023+7897d50",
+ "version": "20261110.0344+5b71bf8",
  "files": [
   {
    "path": "LICENSE.txt",
@@ -13,8 +13,8 @@
   },
   {
    "path": "core/dist/core.js",
-   "size": 219220,
-   "sha256": "5168fa6443b743fe97174c93cf7783711d44be3ddd54d906e46c02e2a7b86da5"
+   "size": 220225,
+   "sha256": "3bd0c0399f30ca2d999d4568ba84e425cad590ceebaa9cf6e57a1b7600c6982a"
   },
   {
    "path": "favicon.svg",
