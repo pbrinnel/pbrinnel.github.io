@@ -1,5 +1,5 @@
 {
- "version": "20261114.2144+f879f7b",
+ "version": "20261114.2156+ded4be5",
  "files": [
   {
    "path": "LICENSE.txt",
@@ -463,13 +463,13 @@
   },
   {
    "path": "game/skirmish/hud.js",
-   "size": 23009,
-   "sha256": "8fcb53a10ea31d3c0e811d757a243cc3997420c4eaa44d26874e7404ac783375"
+   "size": 23987,
+   "sha256": "b2ffe26c671daf7172508ca1e12fa5bce732cc884e36ee722700dd23dd32f06a"
   },
   {
    "path": "game/skirmish/index.html",
-   "size": 17875,
-   "sha256": "26303a2a49175212571cf169b8b58336421071efca3b13aebb3f2fe069d73902"
+   "size": 18243,
+   "sha256": "7da0381211886ec9caeb5052c9b7ebbe3a8cfd11a08109c2dfb7df226ca7786b"
   },
   {
    "path": "game/skirmish/inforoster.js",
@@ -493,8 +493,8 @@
   },
   {
    "path": "game/skirmish/main.js",
-   "size": 24014,
-   "sha256": "6ae54a8b1f0329f46d8274de6a2fed98426df11a0c2d0fad84c3200a93f19c44"
+   "size": 24235,
+   "sha256": "4bca61b464e68bf33df21aa31f300ce9b06ab00122937103028e55acc500028a"
   },
   {
    "path": "game/skirmish/minimap.js",
@@ -543,8 +543,8 @@
   },
   {
    "path": "game/skirmish/settings.js",
-   "size": 13094,
-   "sha256": "228447692fdf78ac8ef14fb77cc6b3a932a19af5a55e3c1487605b629573c7ff"
+   "size": 13143,
+   "sha256": "4bdcd4f4b48dd6f22e5bdc6860645dd7e92477006a83bf0d0f8eb15f1cff332f"
   },
   {
    "path": "game/skirmish/skillcard.js",
