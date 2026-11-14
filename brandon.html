@@ -66,6 +66,18 @@
     <meta name="theme-color" content="#000000">
 
     <style>
+        /* Two faces for a few letters of the ending card and one speech bubble,
+           each cut down to just the glyphs used (the card's line, and BRANDON!).
+           Subsets of Uncial Antiqua (Copyright (c) 2011 Brian J. Bonislawsky DBA
+           Astigmatic, Reserved Font Name "Uncial Antiqua") and UnifrakturMaguntia
+           (Copyright (c) 2010 j. 'mach' wust, (c) 2009 Peter Wiegel, Reserved Font
+           Name UnifrakturMaguntia), both under the SIL Open Font License 1.1,
+           https://openfontlicense.org. Embedded so the page stays one file and the
+           type looks the same on every machine. */
+        @font-face { font-family: 'Uncial Antiqua'; font-weight: 400; font-display: block;
+                     src: url(data:font/woff2;base64,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) format('woff2'); }
+        @font-face { font-family: 'UnifrakturMaguntia'; font-weight: 400; font-display: block;
+                     src: url(data:font/woff2;base64,d09GMgABAAAAAAeoAA4AAAAAC6wAAAdUB9oAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGhYbIBwwBmAATBEQCoxQiwwBNgIkAxwLEAAEIAWFAgcgG+UJEVWsGSD4URg3PqHFn+9cW6xltV6ZWgtx0IjD5bQdK1fD0zb/HZhBGZ/hKKsCOLMCZIUr/GCx6DqOVQQP9Gvt/V1vO53IXGKIN2SvmjR0mieGUMhXKcmrJzy6NdnBc0/x2SOBf0qBRb4a2MuvX1O9LvZkJKA7L+9v8P0Q7kUDF4CFRSM6HU/oAIWKsTXK1Gw4BzVb8L8grYcACABqBAQDAklmy5sBFdAGyADyDwxnASWQAAD8+/1FME8HsATYv8PlZ5QWAHJxRnUpIHMIvIyVY0DjQB6QXyVvBwBE1xW9MDcCAEZVASuPxfRJuRLrBVEuBN58xGZBf/6iVTAAdcoFyXfUKUD+ChMBLABwMhl0Qw50QUUiIlO7+YsSezj42CjSaqZu/4f+nf925vpDhxepAMTi1C4AFAHRAICZoPdgLWXW/mG4mA5kNKnBFHPtZKvMpkGog5glEtAQBMi1w6IlGkvIQDnThGmc+DKCRqIoi7td4iaTwTIZx3glglAQKVsqZQnnDRxBUMczeOjGuMcsLp6H9yc8BhMsOmTGh9Bbk9E8rhDHVcnVlj3ioDctgoD2JBfC/AXVoZU4sTOiguCJR8Ly1XjEITQhWxTUCBoS0JJeBJB05D4HRauy+L8SAd2J1dvXWTKulu5O1V8WzsBiiZnsEVv6CL71MhO9z0IewCKmaIm2HYc8xHYAqsnduME2I/czUTRLKGHaseitU3PUWt3Gs0ANhWSOWUNSNk+Vf5zXsmdX0pDrbKkUXlgyRhAWl4DezONP13mVQXsBL91TDkHE0yyxxOwZe+mI0ykZhN7koAh78qP4NTthmfRwkPkSD4Vl0w9usEa8hjZLb8EyGczHS5+k0vfPWOPOw0HajFmQ+j262kr32c8mK40RsMa59cxYYPMeLPGgNbmJ5mjpXMDlouNFS8bnkXDuSom3CVcxs/jEDsJBdPndKUVfP8H/Tn9kC5Gg/mz96ZWPUv0dmLtatl+bCZPg1C4f8JjmmeptI3V15taFXV0SM0yivHuaMkmTh/C5EXa8cm9/ODn/nx6XNPriwnpivmbGcJlKQl62v/I6w5LrfQ3k7RtN44vJ1RTB+sHDFrgj4OFrdWgeOqlj0Z5TrafU6W9YEs3x8C7V4XimxTPtFbCHoM6jDO0o0Plft3FmrByBqPa/gOP/DRyDni0GO5quLBaVtc0O48ox/ja9w2qaDf35K31M2A8xS4+N8hi/DudChRNtdumh69UMDLJXNdVXLUwyhIbFNvh0lwf5s/oqW2v1t5+fwj412yxMszHqtVzpcPOv6c6eXb2KKtV+TKNu/YyYhkjFAiJtm1olfvcv0+G8BJA+4ec7WRFDz7W+QAhJcwjA7B09gATMKEdnAmn++LashRlN+M7w8Rar5QEb6vSbzdxDb9nt2sbYYiUlHJmi0YwX8g6mbRgxh/dp8w98ZXIzCfP2uwN+Klb4UOCMKd79JW7YljhzCfW+4AArrTJiUiQ9LxmB1nAO5I5xky9L9gvMiMDBhjiYhBtZfu/oYXD2p9J1UPTeFdcSqLLOmJEkWJWzrpdnKiZW+yt6W/Uf9hkxir5Py+mOjbA6ssXGx6G7yMeBL3os9t9oRe4zrA40o5/QzQj3DXVPziOFEmmurfJT8ltGOA3D3WueWqUNx7VwUlmfA7Twq893nDk63vbjIPS9rhVqCbUPrMEUY0pKu3gMSgidzLoG3N/eXBKpXuSf4zGZmYNJnZyb7xbEdWlekwnJznrnJxy0svRub+y1qr5Hygqd9/mdplr5tH7cb1+VdULw5nfkftXIc5EXY9saOs/dPuR3ZzjTQ5geZP48GDwYUY+H1sxKVByD/JMzSe3BMP2L/JCCqJu4NuQgx1AMLdaNzXVo9mqVR13/alQeL1DmK+8/hF2NNVin/MZPYle0O1E30rjvnyDg22+xGFgfFLkp+XyVEpHdXWOw1WxTxUSQm9eWzj8tqa9Zk/PuQZ6GIyFTvpq9xcW1L+JI8sEvIpLOEYtGUkIYQXT9Oe0gs82EAzoTkz+/pJc0fWGnECmr0kqjs77LBtNtltXP2Yd9llX9q+CSHnKoX7OjdJVj/SUvSfexri/zZroMIr8AllYKdqdpuv8Uywqwg8vVL3p8/6tiLa+kCaLoYgLZwF9NcdE4/hYPAfn7bZ5+/y2FLpZ5w7JsQZJXHLJCM5+WgsCz3bPXAZsiFUEFY0BIUhJmIjZf0B5mfJEitHyxqSDcn6C+VCOKkpl/FLnR5LaQOGEDGMviobBlzYY1ikIxCqYSEF7I6dXZrTzUpaBtIhCLWqksjg7E0ws0GuDQSFCPgi1cErOgRbBb0NjABXMg5cliKkc0rLn0olFb6Q4AkxZwqrtEisgo4Tu4HghxFmK9E7QcLAKiWAe2Y2jDl+BjKT1SwqgmOIkUat2OMnEOKHAwPBGFSU4SrJLRHmDDku74KSQzkmxbhnW9XDL8DGR5GhSuz8oMZnccWLAhGYtP3vygMf86/NztUWD9AQAAAA==) format('woff2'); }
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         html {
@@ -817,6 +829,16 @@
     const TALK_SECS   = 1.8;
     const TALK_MAX    = 3;
     const TALK_LINES  = ['The Chosen One...', 'Ouch', '...', 'Brandon?'];
+    // One more line, a cheer, that comes up as often as one of TALK_LINES does
+    // when this is 1: its share of the rolls is YELL_WEIGHT out of
+    // YELL_WEIGHT + TALK_LINES.length. It is set in a face of its own, so the
+    // letters are the same ones everybody else is saying and only the type is
+    // different.
+    const YELL_LINE   = 'BRANDON!';
+    const YELL_WEIGHT = 1;
+    const YELL_FACE   = '"Uncial Antiqua", serif';
+    // a canvas draws in whatever is loaded right now, so ask for the face up front
+    if (document.fonts) document.fonts.load('12px ' + YELL_FACE);
     const FLEE_AT     = 3;       // how few are left before they start running
     const FLEE_ODDS   = 0.5;     // each one's chance, every time they decide
     const FLEE_REROLL = 5;       // seconds before the ones still there decide again
@@ -1170,6 +1192,21 @@
     // what the board can actually hold -- see killShip
     const SCORE_CAP  = 9999999;
 
+    // The last thing a lost run does. After the table, in the instant before the
+    // next game goes up, the screen goes black and says one line in a voice from
+    // somewhere else, then lets the new game back in. Only a run that ended in the
+    // fall gets it (lostRun, set by startFall and cleared by newGame): a game over
+    // that was let stand, and a win, go straight back as they always did. Seconds
+    // each: the black coming in, the line coming up, the line held, and the black
+    // going out (the line takes the first half of that to go).
+    const EP_BLACK  = 1.0;
+    const EP_REVEAL = 0.4;
+    const EP_HOLD   = 2.4;
+    const EP_FADE   = 2.0;
+    const EP_PX     = 22;         // the line's size, in field pixels
+    const EP_INK    = '#e8b64c';
+    const EP_LINE   = [['BRANDON', '"UnifrakturMaguntia", serif'], [' is coming.', '"Uncial Antiqua", serif']];
+
     // the fall. fourteen seconds, and not skippable until the end: the whole
     // run was about how fast you could take something apart, so the one thing
     // that should not be quick is watching it happen to you.
@@ -1382,6 +1419,8 @@
     // it swells him rather than snapping it longer in one frame
     let gBarMax = 0;
     let fallT = 0, kingFall = null, victor = null, impact = null;
+    let lostRun = false;          // this run ended in the fall, so newGame() owes it the closing card
+    let epilogue = null;          // that card while it is up: { t, waiting, pending }
     let bossFall = null;          // the old one coming apart, during the takeover
     let board = [], boardLive = false;
     let entry = '', entryRank = -1, sending = false;
@@ -1980,6 +2019,8 @@
     }
 
     function newGame() {
+        if (lostRun && epilogueGate()) return;
+        lostRun = false;
         score = 0; lives = 3; stage = 0;
         popups = [];
         king = null; ships = []; gBul = []; gThrow = []; gDrop = []; sparks = [];
@@ -2569,6 +2610,7 @@
 
     function action() {
         if (!debugEl.hidden) return;              // ignore taps behind the menu
+        if (epilogue) return;                     // not queued, not skipped: see EP_BLACK
         // the gauntlet: a tap is a thrown head, and nothing else. the ceremony
         // at the end of it is not skippable by the click that was already on
         // its way when you died.
@@ -2922,7 +2964,9 @@
     // ---- the hat stage talks back ----------------------------------------------
     function say(b) {
         talk = talk.filter(t => t.brick !== b);        // one thing at a time each
-        talk.push({ brick: b, text: TALK_LINES[(Math.random() * TALK_LINES.length) | 0],
+        const yell = Math.random() < YELL_WEIGHT / (YELL_WEIGHT + TALK_LINES.length);
+        talk.push({ brick: b, yell,
+                    text: yell ? YELL_LINE : TALK_LINES[(Math.random() * TALK_LINES.length) | 0],
                     life: TALK_SECS });
         if (talk.length > TALK_MAX) talk.shift();
     }
@@ -4150,6 +4194,7 @@
     // came up once the boss was, which is the honest version of how you got it.
     function startFall() {
         phase = 'fall';
+        lostRun = true;
         fallT = 0;
         // what you were owed for staying up here, as the screen that goes up at
         // F_TITLE and pays once it has been read -- see eorShowing
@@ -4505,6 +4550,58 @@
             }
             if (near) { hitShip(near); gThrow.splice(i, 1); }
         }
+    }
+
+    // ---- the closing card ----------------------------------------------------
+    // See EP_BLACK. newGame() hands itself over here while lostRun is set and the
+    // card has not played; the card then calls newGame() again itself, under full
+    // black, so the fade out opens on the next game instead of on the table.
+    function epilogueGate() {
+        if (epilogue) return false;
+        epilogue = { t: 0, waiting: true, pending: true };
+        // the faces are embedded, but a canvas does not wait for one: hold the
+        // card's clock until both are in, so the line is never drawn in a stand-in
+        const load = f => document.fonts.load('22px ' + f);
+        Promise.all(EP_LINE.map(p => load(p[1])))
+            .then(() => { if (epilogue) epilogue.waiting = false; },
+                  () => { if (epilogue) epilogue.waiting = false; });
+        return true;
+    }
+
+    function stepEpilogue(dt) {
+        const e = epilogue;
+        if (!e || e.waiting) return;
+        e.t += dt;
+        if (e.pending && e.t >= EP_BLACK + EP_REVEAL + EP_HOLD + EP_FADE / 2) {
+            e.pending = false;
+            lostRun = false;
+            newGame();
+        }
+        if (e.t >= EP_BLACK + EP_REVEAL + EP_HOLD + EP_FADE) epilogue = null;
+    }
+
+    function drawEpilogue() {
+        const e = epilogue;
+        if (!e) return;
+        const ease = k => { k = Math.max(0, Math.min(1, k)); return k * k * (3 - 2 * k); };
+        const out = EP_BLACK + EP_REVEAL + EP_HOLD;
+        const black = ease(e.t / EP_BLACK) * (1 - ease((e.t - out - EP_FADE / 2) / (EP_FADE / 2)));
+        const line = Math.min(1, Math.max(0, (e.t - EP_BLACK) / EP_REVEAL))
+                   * (1 - ease((e.t - out) / (EP_FADE / 2)));
+        ctx.save();
+        ctx.globalAlpha = black;
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, LW, LH);
+        if (line > 0.002 && !e.waiting) {
+            ctx.globalAlpha = line;
+            ctx.textAlign = 'left';
+            ctx.fillStyle = EP_INK;
+            // each part in its own face, set side by side and centered as one line
+            const widths = EP_LINE.map(p => { ctx.font = EP_PX + 'px ' + p[1]; return ctx.measureText(p[0]).width; });
+            let x = LW / 2 - widths.reduce((a, b) => a + b, 0) / 2;
+            EP_LINE.forEach((p, i) => { ctx.font = EP_PX + 'px ' + p[1]; ctx.fillText(p[0], x, LH / 2 + EP_PX * 0.35); x += widths[i]; });
+        }
+        ctx.restore();
     }
 
     // ---- drawing -----------------------------------------------------------
@@ -5027,7 +5124,8 @@
         const size = 12 * uiScale;
         for (const t of talk) {
             const b = t.brick;
-            ctx.font = size + 'px "Trebuchet MS", sans-serif';
+            const face = t.yell ? YELL_FACE : '"Trebuchet MS", sans-serif';
+            ctx.font = size + 'px ' + face;
             const w = ctx.measureText(t.text).width + size, h = size * 1.7;
             const hx = b.x + bw * 0.84;
             const x = Math.max(8 + w / 2, Math.min(LW - 8 - w / 2, hx));
@@ -5044,14 +5142,14 @@
             ctx.lineTo(tx, y + h + 6);
             ctx.closePath();
             ctx.fill();
-            text(t.text, x, y + h / 2 + size * 0.36, size, '#12100e', 'center');
+            text(t.text, x, y + h / 2 + size * 0.36, size, '#12100e', 'center', face);
         }
         ctx.globalAlpha = 1;
     }
 
-    function text(str, x, y, size, color, align) {
+    function text(str, x, y, size, color, align, face) {
         ctx.fillStyle = color;
-        ctx.font = size + 'px "Trebuchet MS", sans-serif';
+        ctx.font = size + 'px ' + (face || '"Trebuchet MS", sans-serif');
         ctx.textAlign = align || 'left';
         ctx.fillText(str, x, y);
     }
@@ -6038,8 +6136,9 @@
         // the stage menu can move you on from under a pause, and then there is
         // nothing left to hold.
         if (paused && !pausable()) hold(false);
-        if (!paused) update(dt);
+        if (!paused) { stepEpilogue(dt); update(dt); }
         draw();
+        drawEpilogue();
         if (paused) drawPaused();
         padShow();
         requestAnimationFrame(frame);

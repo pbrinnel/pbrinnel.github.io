@@ -2,7 +2,7 @@
 
 How to get oriented in a 6,054-line single file without reading it end to end.
 
-**Current as of `97c9281`, 28 Sep 2026.** Before trusting anything below, run:
+**Current as of `97c9281`, 28 Sep 2026. NOT yet refreshed for the closing card and the cheer bubble below: Paul's commit hash for them has to replace this one after he commits.** Before trusting anything below, run:
 
 ```bash
 git log --oneline 97c9281..HEAD -- brandon.html
@@ -29,7 +29,7 @@ split across several files can reach a returning player half-updated. See CLAUDE
 
 ## Where things are
 
-The map is in the file, not in this document. 44 sections, in reading order:
+The map is in the file, not in this document. 45 sections, in reading order:
 
 ```bash
 grep -n "// ---- " brandon.html
@@ -46,6 +46,22 @@ change shifts. Names are stable. Navigate by section name and by `grep`.
 Rough shape of the order: constants and tuning first (lines ~279–970), then canvas
 and mutable state, then the small helpers, then input, then collision and physics,
 then all the drawing, then the loop at the very bottom.
+
+## Added after that hash
+
+- **`the closing card`** (new section, just before `drawing`): the last thing a lost run
+  shows. A black card says `BRANDON is coming.` in two embedded faces (subsets, base64
+  `@font-face` in the `<style>`, OFL notes in the comment above them), then the next game
+  goes up. Its feel numbers are the flat `EP_*` consts, in the block just above `the fall`'s
+  constants. It is not a phase: `phase` stays `scores` (or `fall`) underneath.
+  - Gating: `lostRun` (set in `startFall`, cleared in `newGame`) and `epilogue` (the card
+    while it is up, else null). `newGame()` hands itself to `epilogueGate()` while `lostRun`
+    is set; the card calls `newGame()` itself under full black, so the fade opens on the
+    new game. A game over that was let stand and the `ascend` path never set `lostRun`, so
+    they get no card. `action()` returns while `epilogue` is set: taps are swallowed, not
+    queued. `stepEpilogue` and `drawEpilogue` hang off the frame loop, not off `update`/`draw`.
+- **The cheer bubble** lives in `the hat stage talks back`: `say()` rolls `YELL_WEIGHT`
+  against `TALK_LINES.length`; `drawTalk` sets a bubble's text in `YELL_FACE`.
 
 ## The phase machine
 
