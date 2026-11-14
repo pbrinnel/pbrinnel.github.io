@@ -1994,7 +1994,8 @@
     // fall through and serve the ball
     const splash = document.getElementById('splash');
     function dismissSplash(e) {
-        if (splash.hidden) return;
+        // the title after the credits is the menu's to take away (menuTitleUp)
+        if (splash.hidden || (typeof menuTitleUp === 'function' && menuTitleUp())) return;
         splash.hidden = true;          // hard cut, no fade
         keepAwake();
         e.preventDefault();
@@ -6064,6 +6065,10 @@
             }
         }
 
+        // over the title after the credits, not over the town (menuTitleUp)
+        if ((phase === 'initials' || phase === 'scores') && typeof menuTitleUp === 'function' && menuTitleUp()) {
+            ctx.clearRect(0, 0, LW, LH);
+        }
         if (phase === 'initials') { drawInitials(u); return; }
 
         // the table on its own, after a winning run has been recorded

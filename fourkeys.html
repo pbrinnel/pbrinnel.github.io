@@ -164,6 +164,17 @@
             -webkit-tap-highlight-color: transparent;
         }
 
+        /* the initials after the credits are drawn on the canvas, over the title:
+           lifted above the splash and left clear for as long as they are up.
+           The shadow veils the margins either side of the field the way
+           drawInitials' fill veils the field, so the title is dimmed alike */
+        body.title-asks #stage {
+            position: relative;
+            z-index: 11;
+            background: transparent;
+            box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.86);
+        }
+
         /* the id selector above outranks the browser's own [hidden] rule, so
            this has to be spelled out or hiding it would do nothing */
         #splash[hidden] { display: none; }

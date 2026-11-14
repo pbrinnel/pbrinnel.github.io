@@ -311,10 +311,14 @@
     // A NUZLOCKE run can owe two: the stage it ended on, then its own total
     // (menu.postQ, nuzPost). The next is taken up once this one is done with,
     // whether it asked for initials or not.
-    function menuBoardAsk() {
+    // `after`, if given, runs once it is all done with, initials or not.
+    function menuBoardAsk(after) {
         const p = menu.post;
         menu.post = null;
-        const next = () => { if (menu.postQ && menu.postQ.length) menu.post = menu.postQ.shift(); };
+        const next = () => {
+            if (menu.postQ && menu.postQ.length) menu.post = menu.postQ.shift();
+            if (after) after();
+        };
         boardPick(p.n);
         if (qualifies(p.score) || (boardLive && p.score > p.was)) boardAsk(p.n, p.score, next, p.pad, p.pads);
         else next();
@@ -1069,7 +1073,8 @@
         const run = menu && menu.run;
         if (run && run.nuz) { menuBoardPost(run); nuzWon(run); return; }    // the VOID's own score, then the run's
         const rush = !!(menu && menu.keys[MENU_VOID.n]);
-        const end = run && run.n === MENU_VOID.n ? [{ credits: true }].concat(rush ? [] : [{ rushCard: true }]) : [];
+        // the credits end in black and then the title, where the initials are asked for (menuTitleStep)
+        const end = run && run.n === MENU_VOID.n ? [{ credits: true }, { black: true }, { title: true }].concat(rush ? [] : [{ rushCard: true }]) : [];
         if (run) { menuBoardPost(run); menuBeatSlew(run, true, end); }
         menuOpen();
     }
@@ -1099,7 +1104,15 @@
         menu.showT += dt;
         const s = menu.shows[0];
         const done = s.mem ? typeof memoryDone === 'function' && memoryDone(s.mem, menu.showT)
-                   : s.credits ? menu.showT >= menuCreditsSecs() : false;
+                   : s.credits ? menu.showT >= menuCreditsSecs()
+                   : s.black ? menu.showT >= TITLE_BLACK : false;
+        if (s.title && s.go && !s.asked) {
+            // asked from here, a frame after the tap, so the tap that ended the
+            // wait is gone before the initials can read a press as a key
+            s.asked = true;
+            document.body.classList.add('title-asks');
+            menuBoardAsk(menuShowNext);
+        }
         if (done) menuShowNext();
         else if (menuCutUp()) menuCutStep(dt);
     }
@@ -2918,6 +2931,14 @@
     // credits are not tapped away but held (menuCutPress).
     function menuUnlockNext() {
         if (!menuUnlockUp()) return false;
+        const s = menu.shows[0];
+        if (s.black) return true;                       // nothing to tap: a press already in flight lands here
+        if (s.title) {
+            if (menu.showT < TITLE_IN + UNLOCK_WAIT || s.go) return true;
+            if (menu.post && menu.post.ready) s.go = true;     // asked in menuShowStep
+            else menuShowNext();                        // no initials to take: the town asks if it still must
+            return true;
+        }
         if (menu.showT >= UNLOCK_WAIT) menuShowNext();
         return true;
     }
@@ -2925,7 +2946,12 @@
     // every card after it, and only once the last is gone, back in the town,
     // are you handed the last paddle those cards showed you (menuAddPad).
     function menuShowNext() {
-        menu.shows.shift();
+        const gone = menu.shows.shift();
+        if (gone && gone.title) menuTitleOff();
+        // the line under the field has nothing to say over black and the title
+        const bare = menu.shows[0] && (menu.shows[0].black || menu.shows[0].title);
+        const line = document.querySelector('.hint');
+        if (line) line.style.visibility = bare ? 'hidden' : '';
         menu.showT = 0;
         menu.skipT = -1;
         if (!menu.shows.length) menu.fightShow = false;
@@ -2942,6 +2968,8 @@
         const show = menu.shows[0];
         if (show.mem) { menuMemoryCard(show.mem, menu.showT); menuSkipDraw(); return true; }
         if (show.credits) { menuCreditsDraw(menu.showT); menuSkipDraw(); return true; }
+        if (show.black) { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, LW, LH); return true; }
+        if (show.title) { menuTitleDraw(); return true; }
         if (show.memCard) { menuMemoryUnlocked(show.memCard, menu.showT); menuTapPrompt(menu.showT - UNLOCK_WAIT); return true; }
         if (show.rushCard) { menuRushUnlocked(menu.showT); menuTapPrompt(menu.showT - UNLOCK_WAIT); return true; }
         if (show.nuzWin) { nuzWinDraw(show.nuzWin, menu.showT); menuTapPrompt(menu.showT - UNLOCK_WAIT); return true; }
@@ -3125,6 +3153,31 @@
         text(CREDITS[i][0], LW / 2, LH / 2 - 30, 17, '#8d877d', 'center');
         text(CREDITS[i][1], LW / 2, LH / 2 + 24, 46, '#f2efe9', 'center');
         ctx.globalAlpha = 1;
+    }
+
+    // After the credits: black, then the title the game opened with, which is
+    // the page's #splash fading in over the field. A tap takes it away, but not
+    // the way the opening's tap does (dismissSplash stands aside while this is
+    // up): the initials are asked for first, and they are the engine's, on the
+    // canvas. So while they are up the canvas is lifted over the splash
+    // (fourkeys.html, title-asks) and draw() leaves it clear under them,
+    // which puts them over the title.
+    // Then the town arrives as it does after the opening cards.
+    const TITLE_BLACK = 1.5;         // seconds of black between the credits and the title
+    const TITLE_IN = 2.5;            // seconds the title takes to fade in out of it
+    function menuTitleUp() { return !!(menu && menu.shows.length && menu.shows[0].title); }
+    function menuTitleDraw() {
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, LW, LH);
+        splash.hidden = false;
+        splash.style.opacity = Math.min(1, menu.showT / TITLE_IN);
+    }
+    function menuTitleOff() {
+        splash.hidden = true;
+        splash.style.opacity = '';
+        document.body.classList.remove('title-asks');
+        menu.leaving = null;
+        menuReturn();
     }
 
     // A memory, which memory.js draws. The boss lab builds this file without
