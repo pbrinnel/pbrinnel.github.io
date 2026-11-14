@@ -215,7 +215,7 @@
         memories: 'every memory you have won, to watch again',
         board: 'the best runs on every stage, and yours among them',
         6: 'where it ends',
-        nuzlocke: 'one life for every BRANDON'
+        nuzlocke: 'THE ULTIMATE CHALLENGE'
     };
 
     // the paddles you have, in the gates' order
