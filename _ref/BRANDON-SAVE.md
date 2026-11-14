@@ -57,7 +57,7 @@ SEAL ff3cacb0
 | `MEMORY` | the player has earned this memory | `menu.mems` | memory |
 | `GAVE` | this stage has already handed out its memory | `menu.memFrom` | stage |
 | `VISITED` | this building's dust has been wiped off | `menu.seen` | stage |
-| `BEST <stage> <n>` | the player's best score on this stage, a whole number above 0 | `menu.best` | stage |
+| `BEST <stage> <n>` | the player's best score on this stage (including `BOSS RUSH` and `NUZLOCKE`), a whole number above 0 | `menu.best` | stage |
 | `BOSSES <n>` | how many bosses the player has beaten, over every run, a whole number above 0 | `menu.slain` | none |
 
 A save lists only what the player has. The writer never writes a "no" line, and the
@@ -72,6 +72,15 @@ reader has no way to read one.
   from before the count existed starts it at the number of keys held, the next time a
   boss is beaten.
 
+## Not in the file: a NUZLOCKE run in progress
+
+A NUZLOCKE run (one life per paddle, spread over several stages) is deliberately **not**
+part of a `.brandon` file. It lives only in localStorage under `brandon2.nuzlocke`, is
+created by SAVE AND QUIT and deleted when it is resumed, so it can never be exported,
+duplicated or restored from an old file. Only its finished score is saved, as
+`BEST NUZLOCKE <score>`. The NUZLOCKE building itself is derived from owning every paddle,
+so it has no token either.
+
 ## Tokens
 
 These tokens are **pinned**. Once a token has shipped, it never changes. They are
@@ -83,6 +92,7 @@ paddle can't break old saves.
 |---|---|---|
 | stage | `FARM` `RUINS` `CITY` `VOLCANO` `CASTLE` `VOID` | 1 2 3 4 5 6 |
 | stage | `BOSS RUSH` | `rush` |
+| stage | `NUZLOCKE` (`BEST` only: it has no key, no `VISITED`, no `GAVE`) | `nuzlocke` |
 | paddle | `STATUE` `PAIR` `CLASSIC` `MULTI` `PRINCE` `CHELL` | same id, lowercase |
 | paddle | `GILT` (shown as GILDED since 1 Oct 2026) | `gilded` |
 | paddle | `FROST` (shown as CRYSTALLINE since 1 Oct 2026) | `crystalline` |
@@ -171,3 +181,6 @@ the IMPORT screen shows a summary and needs its own press to go ahead.
   `FROST` and `EMBER` stay and point at the new ids, so the file format is unchanged.
   Progress kept in localStorage and leaderboard rows can still hold the old ids. The page
   maps them on load (`PAD_WAS` in `paddles.js`).
+- **v1** (13 Nov 2026): the stage token `NUZLOCKE` (internal key `nuzlocke`), written only
+  as `BEST NUZLOCKE <score>`. No version bump: an older reader skips the unknown token (rule
+  2). An in-progress run is deliberately not part of the file (see the section above).

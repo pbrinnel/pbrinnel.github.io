@@ -1159,13 +1159,13 @@
     // M_RUSH). They are the save file's tokens and pinned like them: the
     // worker has the same list, and renaming one orphans its table.
     const BOARD_IDS = { 1: 'FARM', 2: 'RUINS', 3: 'CITY', 4: 'VOLCANO', 5: 'CASTLE', 6: 'VOID',
-                        rush: 'BOSS RUSH' };
+                        rush: 'BOSS RUSH', nuzlocke: 'NUZLOCKE' };
     const BOARD_TOTAL = 'TOTAL';
     // the initials you last put in, so the next entry is one press
     const BOARD_INI_KEY = 'brandon2.initials';
     let boards = {}, boardId = null;
     // the town's, once the table after an entry has been read (boardAsk)
-    let boardThen = null, boardWas = null, boardScore = 0, boardPad = null;
+    let boardThen = null, boardWas = null, boardScore = 0, boardPad = null, boardPads = null;
 
     // rows come back from a public endpoint, so treat them as untrusted text.
     // TOTAL adds up every stage it counts, so it can run past one run's cap.
@@ -1176,7 +1176,10 @@
             ini: String((r && r.ini) || '???').toUpperCase()
                      .replace(/[^A-Z]/g, '').slice(0, 3).padEnd(3, '?'),
             score: Math.max(0, Math.min(cap || SCORE_CAP, parseInt(r && r.score, 10) || 0)),
-            pad: r && typeof r.pad === 'string' && Object.hasOwn(LAB_PAD, padNow(r.pad)) ? padNow(r.pad) : null
+            pad: r && typeof r.pad === 'string' && Object.hasOwn(LAB_PAD, padNow(r.pad)) ? padNow(r.pad) : null,
+            // NUZLOCKE's rows keep every paddle the run played as
+            pads: r && Array.isArray(r.pads) ? r.pads.filter(k => typeof k === 'string' && Object.hasOwn(LAB_PAD, padNow(k)))
+                                                      .map(padNow).slice(0, 12) : null
         })).sort((a, b) => b.score - a.score).slice(0, TOP_N);
     }
 
@@ -1211,7 +1214,7 @@
             const res = await fetch(BOARD_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ stage: boardId, ini, score: n, pad: boardPad || LAB.pad })
+                body: JSON.stringify({ stage: boardId, ini, score: n, pad: boardPads ? null : boardPad || LAB.pad, pads: boardPads || undefined })
             });
             if (!res.ok) throw new Error(res.status);
             takeBoards(await res.json());
@@ -1234,10 +1237,11 @@
     // interrupted comes back with it. The run's score is kept apart, since
     // the town has its own by now -- and so is the paddle it was played with,
     // since the town may have put a new one in your hands since.
-    function boardAsk(n, points, then, pad) {
+    function boardAsk(n, points, then, pad, pads) {
         boardPick(n);
         boardScore = points;
         boardPad = pad || null;
+        boardPads = pads && pads.length ? pads.slice() : null;
         let ini = '';
         try { ini = localStorage.getItem(BOARD_INI_KEY) || ''; } catch (e) { /* private window */ }
         entry = /^[A-Z]{3}$/.test(ini) ? ini : '';
@@ -1252,6 +1256,7 @@
         const then = boardThen;
         boardThen = null;
         boardPad = null;
+        boardPads = null;
         showCursor(false);
         phase = boardWas;
         then();
@@ -2332,7 +2337,9 @@
     debugBuild();
 
     function startAt(n) {
-        score = 0; lives = 3; stage = n;
+        // a NUZLOCKE run carries its score and its line-up of paddles from stage to stage
+        if (!(typeof nuzCarry === 'function' && nuzCarry())) { score = 0; lives = 3; }
+        stage = n;
         popups = [];
         buildStage(n);
         banner = '';
@@ -2671,9 +2678,10 @@
             flawless: !round.lost ? 1 : 0,
             multi:    balls.length > 1 ? 1 : 0,
             // only the throne converts lives, so only the throne pays for them,
-            // and it pays for exactly what the corner has been showing you --
-            // which is also exactly what startGauntlet is about to eat
-            spare:    boss ? spares() : 0,
+            // and it pays for what the corner has been showing you, up to
+            // SPARE_PAY_MAX: a NUZLOCKE run can hold more spares than three
+            // heads ever gave, and no stage should score easier for it
+            spare:    boss ? Math.min(spares(), SPARE_PAY_MAX) : 0,
             fast:     round.fast ? 1 : 0,
             heads:    round.heads ? 1 : 0,
             grit:     round.grit ? 1 : 0,
@@ -2897,12 +2905,20 @@
 
     // What you have IN RESERVE: `lives` counts the head in your hands as well,
     // and that one is not a spare. This is the number the corner prints, the
-    // number EXTRA pays for and the number the throne absorbs -- one
-    // function so the three can never disagree.
+    // number EXTRA pays for (to SPARE_PAY_MAX) and the number the throne
+    // absorbs -- one function so the three can never disagree.
+    const SPARE_PAY_MAX = 2;        // the most spares a normal run's three heads can leave
     function spares() { return Math.max(0, lives - 1); }
+    // what a level begins with: three heads, or a NUZLOCKE run's whole queue.
+    // READY keys on it, so a run with any number of paddles starts on BRANDON
+    // and goes to lore only after one is lost.
+    function livesAtStart() { return typeof nuzLivesAtStart === 'function' && nuzLivesAtStart() || 3; }
 
     function loseLife() {
-        if (!menuLost()) lives--;
+        if (!menuLost()) {
+            lives--;
+            if (typeof nuzLost === 'function') nuzLost();     // a NUZLOCKE life is a paddle, and it goes
+        }
         combo = 0;
         round.lost = true;              // there goes FLAWLESS for this round
         if (lives <= 0) {
@@ -2944,6 +2960,8 @@
     // Only the score's: what a continue costs a paddle is left for the win to tell.
     function overButtons() {
         const w = 300, h = 58, y = PADDLE_Y - h / 2;
+        // NUZLOCKE has no CONTINUE: the one choice is the end
+        if (typeof nuzOn === 'function' && nuzOn()) return [{ key: 'end', label: 'END RUN', x: LW / 2 - w / 2, y, w, h }];
         return [
             { key: 'continue', label: 'CONTINUE', x: 56, y, w, h,
               note: 'Score −' + Math.round((1 - CONTINUE_KEEP) * 100) + '%' },
@@ -2969,9 +2987,10 @@
 
     // With the keyboard there is nothing to aim, so the old rule still stands
     // there: the arrows walk him across, and space takes the side he is on.
-    function overKeyPick() { return paddle.x < LW / 2 ? 'continue' : 'end'; }
+    function overKeyPick() { return typeof nuzOn === 'function' && nuzOn() ? 'end' : paddle.x < LW / 2 ? 'continue' : 'end'; }
 
     function overChoose(key) {
+        if (key === 'continue' && typeof nuzOn === 'function' && nuzOn()) return;
         overPress = null;
         showCursor(false);             // endRun brings it back for the initials
         if (key === 'end' && menuQuit()) return;     // a level ends in the town
@@ -5208,9 +5227,20 @@
             const mine = i === entryRank;
             const col = mine ? '#c9a94e' : i === 0 ? '#f2efe9' : '#9a958c';
             // right-aligned, so 9 and 10 end in the same column
-            text(String(i + 1), LW / 2 - 128 * k, y, size, col, 'right');
-            text(r.ini, LW / 2 - 60 * k, y, size, col);
-            text(fmtScore(r.score), LW / 2 + 160 * k, y, size, col, 'right');
+            // a run's whole line-up needs more room than one paddle does, so
+            // the columns move over for the table that carries one
+            const sh = boardId === BOARD_IDS.nuzlocke ? -70 * k : 0;
+            text(String(i + 1), LW / 2 - 128 * k + sh, y, size, col, 'right');
+            text(r.ini, LW / 2 - 60 * k + sh, y, size, col);
+            text(fmtScore(r.score), LW / 2 + 160 * k + sh, y, size, col, 'right');
+            if (r.pads && r.pads.length) {
+                const x0 = LW / 2 + 160 * k + sh + 24, step = Math.min(34, (LW - 14 - x0) / r.pads.length);
+                r.pads.forEach((pk, j) => {
+                    const px = x0 + step * (j + 0.5), py = y - size * 0.33, a = mine || i === 0 ? 1 : 0.75;
+                    if (typeof menuBoardPadIcon === 'function') menuBoardPadIcon(pk, px, py, step * 0.95, a);
+                    else labPadIcon(pk, px, py, step * 0.95, false, a);
+                });
+            }
             // the paddle the run was played with, level with the row's letters,
             // dark if it is not yours yet (menuBoardPadIcon)
             if (r.pad) {
@@ -5831,6 +5861,7 @@
         powDrawLoose();
         drawCapsule();
         drawOverChoices(false);   // boxes under him
+        if (typeof powDrawUnder === 'function') powDrawUnder();     // LASER's heads, seated behind his top edge
         drawPaddle();
         drawOverChoices(true);    // labels over him, so they stay readable
         drawPhantoms();
@@ -5885,9 +5916,10 @@
         //
         // It counts spares, so a fresh run reads 2, 1, 0 and an empty corner
         // means the next one you lose ends it -- see spares()
-        if (hud && phase !== 'ascend') {
+        if (hud && phase !== 'ascend' && !(typeof nuzSpares === 'function' && nuzSpares(u))) {
             for (let i = 0; i < spares(); i++) drawBall(LW - (25 + i * 29) * u, 25 * u, 9 * u, 0);
         }
+        if (typeof nuzBoomDraw === 'function') nuzBoomDraw();
 
         // active effects along the bottom, out of the playfield.
         //
@@ -5953,7 +5985,7 @@
 
         for (const k of TIMED) {
             if (fx[k] <= 0) continue;
-            const label = CAPS[k].short + ' ' + Math.ceil(fx[k]);
+            const label = typeof powHud === 'function' ? powHud(k) : CAPS[k].short + ' ' + Math.ceil(fx[k]);
             text(label, x, by, 12 * u, CAPS[k].color);
             x += ctx.measureText(label).width + 14 * u;
         }
@@ -6051,9 +6083,9 @@
             && (phase !== 'ascend' || ascendT >= A_TITLE)) {
             const my = 424;
             const bandH = 104 * u;
-            // READY carries lore once a head is gone (a run starts with 3), and
-            // draws a fresh line each time it comes up
-            if (phase === 'ready' && lives < 3) {
+            // READY carries lore once a head is gone, and draws a fresh line
+            // each time it comes up
+            if (phase === 'ready' && lives < livesAtStart()) {
                 if (!loreReady) { loreNow = lorePick(); loreReady = true; }
                 loreBand(loreLayout(loreNow, u), my, bandH, my + 26 * u, u);
             } else {
@@ -6061,7 +6093,7 @@
                 ctx.fillRect(0, my - bandH / 2, LW, bandH);
             }
 
-            const msg = phase === 'ready' ? (serveWait ? 'WAIT' : stage === 0 && lives === 3 && score === 0
+            const msg = phase === 'ready' ? (serveWait ? 'WAIT' : stage === 0 && lives === livesAtStart() && score === 0
                             ? 'BRANDON' : 'READY')
                       : banner;
             text(msg, LW / 2, my - 4 * u, 32 * u, '#f2efe9', 'center');

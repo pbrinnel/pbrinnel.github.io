@@ -147,7 +147,7 @@
                  cards: [], run: null, side: 0, hold: 0, spent: 0, gate: { '-1': 1, '1': 1 }, gateTo: {}, gateQuick: {}, sw: null,
                  march: false, lift: 0, lastX: 0, into: null, walk: 0, gait: 0, arriveT: -1,
                  going: null, screen: null, press: null,
-                 shows: [], showT: 0, a0: 1, padNext: null };
+                 shows: [], showT: 0, a0: 1, padNext: null, postQ: [] };
         let kept = null;
         try { kept = localStorage.getItem(MENU_PAD_KEY); } catch (e) { /* a private window */ }
         kept = padNow(kept);
@@ -162,14 +162,19 @@
     }
     // LAB.usePad tells us each time the paddle in hand is changed
     function menuPadKept(key) {
+        // a run's hand is its queue's head, not a preference
+        if (menu && menu.nuz) { if (typeof nuzFront === 'function') nuzFront(key); return; }
         try { localStorage.setItem(MENU_PAD_KEY, key); } catch (e) { /* a private window just will not remember */ }
     }
 
     function menuSave() {
         try {
-            localStorage.setItem(MENU_KEY, JSON.stringify({ keys: menu.keys, pads: menu.pads, best: menu.best,
-                                                            seen: menu.seen, mems: menu.mems,
-                                                            memFrom: menu.memFrom, slain: menu.slain }));
+            // inside a NUZLOCKE run `menu` holds the run's own tables, and it is
+            // the real ones that are kept (nuzlocke.js); only the best is shared
+            const m = menu.main || menu;
+            localStorage.setItem(MENU_KEY, JSON.stringify({ keys: m.keys, pads: m.pads, best: menu.best,
+                                                            seen: m.seen, mems: m.mems,
+                                                            memFrom: m.memFrom, slain: m.slain }));
         } catch (e) { /* a private window just will not remember */ }
     }
 
@@ -186,8 +191,17 @@
     // win, MEMORIES on its first memory, the LEADERBOARD on a score above
     // nothing on any stage, BOSS RUSH on the VOID, and BRANDONS on enough of them
     function menuStands(c) {
+        // a NUZLOCKE run has its own town: no memories or rush, only the levels,
+        // the LEADERBOARD (its stage scores count), the BRANDONS you hold, and
+        // a way out in SETTINGS' place
+        if (menu.nuz) {
+            if (c.level.key === 'settings' || c.level.key === 'paddles') return true;
+            if (c.level.key && c.level.key !== 'board') return false;
+        }
+        // (the boss lab builds this file without nuzlocke.js)
+        if (c.level.key === 'nuzlocke') return typeof nuzBegin === 'function' && MENU_PADS.every(k => menu.pads[k]);
         if (c.level.key === 'memories') return MENU_MEMS.some(m => !m.always && menu.mems[m.id]);
-        if (c.level.key === 'board') return MENU_ALL.some(l => menu.best[l.n] > 0);
+        if (c.level.key === 'board') return MENU_ALL.some(l => menu.best[l.n] > 0) || menu.best[M_NUZ] > 0;
         if (c.level.key === 'rush') return !!menu.keys[MENU_VOID.n];
         if (c.level.key === 'paddles') return menuOwned().length >= MENU_RACK_AT;
         return !c.level.after || !!menu.keys[c.level.after];
@@ -200,7 +214,8 @@
     const M_BUILD_LINES = {
         memories: 'every memory you have won, to watch again',
         board: 'the best runs on every stage, and yours among them',
-        6: 'where it ends'
+        6: 'where it ends',
+        nuzlocke: 'one life for every BRANDON'
     };
 
     // the paddles you have, in the gates' order
@@ -217,7 +232,7 @@
         if (show) { menu.shows.push({ pad }); menu.padNext = pad; }
         const i = menu.shows.findIndex(s => s.rackCard);
         if (i >= 0) menu.shows.push(...menu.shows.splice(i, 1));
-        else if (had < MENU_RACK_AT && menuOwned().length >= MENU_RACK_AT) menu.shows.push({ rackCard: true });
+        else if (!menu.nuz && had < MENU_RACK_AT && menuOwned().length >= MENU_RACK_AT) menu.shows.push({ rackCard: true });
     }
 
     // ---- what the debug menu reaches in through ---------------------------------------
@@ -279,6 +294,7 @@
     function menuBoardRun() {
         if (!menuBoardOn()) return;
         menu.post = null;                // one left from a run the town never got to ask about
+        menu.postQ = [];
         menu.run.was = best;
         menu.run.pad = LAB.pad;          // what the row will say it was played with
         boardPick(menu.run.n);           // the one the game-over screen shows
@@ -290,11 +306,16 @@
         const p = menu.post = { n: run.n, score, was: run.was || 0, pad: run.pad, ready: false };
         fetchBoard().then(() => { p.ready = true; });
     }
+    // A NUZLOCKE run can owe two: the stage it ended on, then its own total
+    // (menu.postQ, nuzPost). The next is taken up once this one is done with,
+    // whether it asked for initials or not.
     function menuBoardAsk() {
         const p = menu.post;
         menu.post = null;
+        const next = () => { if (menu.postQ && menu.postQ.length) menu.post = menu.postQ.shift(); };
         boardPick(p.n);
-        if (qualifies(p.score) || (boardLive && p.score > p.was)) boardAsk(p.n, p.score, () => {}, p.pad);
+        if (qualifies(p.score) || (boardLive && p.score > p.was)) boardAsk(p.n, p.score, next, p.pad, p.pads);
+        else next();
     }
 
     // The LEADERBOARD building: a tab for every stage that is standing in the
@@ -309,10 +330,11 @@
         return [{ id: 'back', label: 'BACK', ink: M_SAFE, act: menuLeave }]
             .concat(menuBestTotal() > 0 ? [tab('total', 'TOTAL', side('board').ink, BOARD_TOTAL)] : [])
             .concat(MENU_ALL.filter(l => !l.after || menu.keys[l.after]).map(l => tab('s' + l.n, l.name, l.ink, l.n)))
-            .concat(menu.keys[MENU_VOID.n] ? [tab('rush', 'BOSS RUSH', side('rush').ink, M_RUSH)] : []);
+            .concat(menu.keys[MENU_VOID.n] ? [tab('rush', 'BOSS RUSH', side('rush').ink, M_RUSH)] : [])
+            .concat(typeof nuzBegin === 'function' && (menu.best[M_NUZ] > 0 || MENU_PADS.every(k => (menu.main || menu).pads[k])) ? [tab('nuz', 'NUZLOCKE', side('nuzlocke').ink, M_NUZ)] : []);
     }
 
-    function menuName(n) { if (n === M_RUSH) return 'BOSS RUSH'; const l = MENU_ALL.find(o => o.n === n); return l ? l.name : 'STAGE ' + n; }
+    function menuName(n) { if (n === M_RUSH) return 'BOSS RUSH'; if (n === M_NUZ) return 'NUZLOCKE'; const l = MENU_ALL.find(o => o.n === n); return l ? l.name : 'STAGE ' + n; }
 
     // the first boss whose level slider points at this one, if any
     function menuBossFor(n) {
@@ -371,33 +393,39 @@
     // side is told from the door.
     const M_SIDE_IN = 10;
 
-    // More that are not levels. MEMORIES and the boards take the top corners,
-    // behind the FARM and the VOLCANO: walk up the gap beside one, and once
-    // you are above its roof, across and on up. MEMORIES is not built until there is a memory to
-    // keep in it, nor the boards until you have a score to put on one
-    // (menuStands). SETTINGS is the least of them, a small sign up and to the
-    // right of MEMORIES, and its lane is the gap between the FARM and the
+    // More that are not levels, along the top of the town, left to right:
+    // BRANDONS, NUZLOCKE, MEMORIES, the CASTLE, SETTINGS, BOSS RUSH and the
+    // LEADERBOARD, the outermost biggest and getting smaller toward the middle.
+    // Each is walked up to the way a level is, up the gap beside it and, once
+    // he is above the roof, across. A sign's card is its scaled size (`s` times
+    // `art`, the size it is drawn at: menuDrawSide), at the position and the
+    // scale Paul tuned in the town layout lab, and its lane is where he lines
+    // up with it. MEMORIES is not built until there is a memory to keep in it,
+    // nor the LEADERBOARD until you have a score to put on one, nor BOSS RUSH
+    // until the VOID has been won, nor BRANDONS until you own MENU_RACK_AT
+    // paddles (menuStands). SETTINGS' lane is the gap between the FARM and the
     // RUINS -- narrower than the sign, so nobody wanders into it. Going in
     // is only a screen of choices (menuShow); erasing is two presses deeper.
-    // BOSS RUSH is its mirror, up and to the left of the boards over the
-    // gap between the CITY and the VOLCANO, and it is not there until the
-    // VOID has been won. BRANDONS hangs beside SETTINGS, lower, over the
-    // RUINS' roof: up SETTINGS' gap until he is above the roof, then across.
-    // Its lane is the RUINS', so it stops where the CASTLE's starts. It goes
-    // up once you own MENU_RACK_AT paddles.
+    // NUZLOCKE is up a little from the others (y 88): its BEST line hangs
+    // under it, and at the 95 it was first put at the RUINS' standing stones
+    // were drawn over the end of it. Its card is the foundation of the sign,
+    // a small hole in the ground (nuzlocke.js draws that and the heads over it).
     const M_SIDES = [
-        { key: 'memories', side: -1, lines: ['MEMORIES'], ink: '#d9a5b3',
-          at: { x: 70, y: 80, w: 116, h: 90 } },
-        { key: 'settings', lines: ['SETTINGS'], ink: '#a9a39a', small: true,
-          at: { x: 174, y: 44, w: 80, h: 28, lane: [162, 186] } },
-        { key: 'board', side: 1, lines: ['LEADERBOARD'], ink: '#c9a94e',
-          at: { x: 730, y: 80, w: 116, h: 90 } },
-        { key: 'rush', lines: ['BOSS RUSH'], ink: '#e0a040', small: true,
-          at: { x: 626, y: 44, w: 80, h: 28, lane: [614, 638] } },
-        { key: 'paddles', lines: ['BRANDONS'], ink: '#6cb8a8', small: true,
-          at: { x: 270, y: 76, w: 92, h: 26, lane: [187, 305] } }
+        { key: 'memories', side: -1, lines: ['MEMORIES'], ink: '#d9a5b3', s: 0.75, art: [116, 90],
+          at: { x: 277, y: 54, w: 87, h: 67.5, lane: [227, 297] } },
+        { key: 'settings', lines: ['SETTINGS'], ink: '#a9a39a', small: true, s: 1.05, art: [80, 28],
+          at: { x: 520, y: 40, w: 84, h: 29.4, lane: [495, 520] } },
+        { key: 'board', side: 1, lines: ['LEADERBOARD'], ink: '#c9a94e', s: 1.05, art: [116, 90],
+          at: { x: 730, y: 74, w: 121.8, h: 94.5, lane: [674, 788] } },
+        { key: 'rush', lines: ['BOSS RUSH'], ink: '#e0a040', small: true, s: 1.2, art: [80, 28],
+          at: { x: 614, y: 52, w: 96, h: 33.6, lane: [614, 638] } },
+        { key: 'paddles', lines: ['BRANDONS'], ink: '#6cb8a8', small: true, s: 1.1, art: [92, 26],
+          at: { x: 56, y: 88, w: 101.2, h: 28.6, lane: [14, 110] } },
+        { key: 'nuzlocke', lines: ['NUZLOCKE'], ink: '#d0584c', small: true, s: 1.55, art: [56, 16],
+          at: { x: 168, y: 88, w: 86.8, h: 24.8, lane: [135, 195] } }
     ];
     const M_RUSH = 'rush';           // BOSS RUSH's name in menu.run and menu.best
+    const M_NUZ = 'nuzlocke';        // NUZLOCKE's, the same way (nuzlocke.js)
 
     function menuBuild() {
         menuLoad();
@@ -581,9 +609,10 @@
         if ((g.t += dt) < menuPushSecs(g.card)) return;
         menu.going = null;
         const l = g.card.level;
-        if (l.key === 'settings' || l.key === 'memories' || l.key === 'board' || l.key === 'paddles') {
+        if (l.key === 'settings' || l.key === 'memories' || l.key === 'board' || l.key === 'paddles' || l.key === 'nuzlocke') {
             if (l.key === 'board') fetchBoard();        // the tables as they are now, not as the game found them
-            menuShow(l.key);
+            // in a NUZLOCKE run the SETTINGS sign is the way out of it
+            menuShow(l.key === 'settings' && menu.nuz ? 'nuzleave' : l.key);
             menu.screen.from = g.x;
         }
         else menuEnter(l);
@@ -626,7 +655,7 @@
         if (!m) return;
         if (m.card.level.key) {
             // into a sign's board, far enough for it, wide and short, to fill the screen both ways
-            const G = menuHang(m.card), fx = m.card.x, fy = G.top + G.bh / 2;
+            const G = menuBoardBox(m.card), fx = m.card.x, fy = G.top + G.bh / 2;
             const S = 1 + Math.pow(menuBand(m.k, M_SIGN_ZOOM_FROM, 1), 3) * (Math.max(LW / G.bw, LH / G.bh) + 1);
             const s = Math.pow(S, Math.max(0.15, 1 + M_SIGN_PARALLAX * (near - menuNear(m.card))));
             const centre = menuEase(menuBand(m.k, M_SIGN_ZOOM_FROM - 0.05, 0.9));
@@ -828,13 +857,19 @@
     // into a sign: he fades where he stands, and the board he is pushed into
     // goes to the dark of the screen it opens as it fills it
     function menuDrawPushSign(m) {
-        const c = m.card, G = menuHang(c), k = m.k;
+        const c = m.card, k = m.k;
         ctx.save();
         menuCamera(menuNear(c));
         const a = 1 - menuEase(menuBand(k, 0, M_SIGN_FADE));
         if (a > 0) labPadIcon(LAB.pad, m.x, m.y, padW() * menuShrinkAt(m.y), false, a);
         const dark = menuBand(k, M_SIGN_DARK_FROM, 1);
-        if (dark > 0) { menuAlpha(dark); menuBoardPath(c, G.left, G.top, G.bw, G.bh); ctx.fillStyle = M_FIELD; ctx.fill(); menuAlpha(1); }
+        if (dark > 0) {
+            // the board's shape is in art coordinates, so it goes in under the sign's own scale
+            const art = menuArtOf(c), G = menuHang(art), s = c.level.s;
+            ctx.save(); ctx.translate(c.x, c.y); ctx.scale(s, s); ctx.translate(-c.x, -c.y);
+            menuAlpha(dark); menuBoardPath(art, G.left, G.top, G.bw, G.bh); ctx.fillStyle = M_FIELD; ctx.fill();
+            ctx.restore(); menuAlpha(1);
+        }
         ctx.restore();
     }
 
@@ -859,7 +894,7 @@
         if (!boss) { menuSay(level.name + ' · no boss is set to this stage'); return; }
         menu.cameFrom = level;      // the door he comes back out of (menuOpen)
         menu.arriveT = -1;          // walked in before the town finished arriving
-        menu.run = { n: level.n, over: false, cont: false, out: 0 };
+        menu.run = { n: level.n, over: false, cont: false, out: 0, nuz: !!menu.nuz };
         menu.stood = menuStanding();
         best = menu.best[level.n] || 0;
         menuBoardRun();
@@ -915,6 +950,7 @@
     // (menuBoardPost). True means the town took it.
     function menuQuit() {
         if (!menu || !menu.run) return false;
+        if (menu.run.nuz) { nuzOver(); return true; }
         const n = menu.run.n;
         menuBoardPost(menu.run);
         menuOpen();
@@ -992,6 +1028,7 @@
         }
         if (phase !== 'ascend' && (run.out += dt) < M_OUT) return;
         menu.run = null;
+        if (run.nuz) { menuBoardPost(run); nuzBeat(run); return; }     // the stage's score counts as it does anywhere
         menuBoardPost(run);
         menuBeatSlew(run, phase === 'ascend');
         menuOpen();
@@ -1006,7 +1043,7 @@
     // debug menu can hand memories over out of order, so it is the first
     // missing one, not the next after a count. True if one was earned.
     function menuNextMemory(n) {
-        if (menu.memFrom[n]) return false;
+        if (menu.nuz || menu.memFrom[n]) return false;     // a NUZLOCKE run has no memories
         const id = MENU_MEM_ORDER.find(k => !menu.mems[k]);
         if (!id) return false;
         menu.mems[id] = true;
@@ -1019,7 +1056,7 @@
     // over, so the boss can be seen letting it go (memShardDrop).
     function menuMemoryDue() {
         const run = menu && menu.run;
-        if (!run || run.n === M_RUSH || menu.memFrom[run.n]) return null;
+        if (!run || run.nuz || run.n === M_RUSH || menu.memFrom[run.n]) return null;
         return MENU_MEM_ORDER.find(k => !menu.mems[k]) || null;
     }
 
@@ -1028,6 +1065,7 @@
     // end of the game, so the credits roll on the way.
     function menuWon() {
         const run = menu && menu.run;
+        if (run && run.nuz) { menuBoardPost(run); nuzWon(run); return; }    // the VOID's own score, then the run's
         const rush = !!(menu && menu.keys[MENU_VOID.n]);
         const end = run && run.n === MENU_VOID.n ? [{ credits: true }].concat(rush ? [] : [{ rushCard: true }]) : [];
         if (run) { menuBoardPost(run); menuBeatSlew(run, true, end); }
@@ -1136,6 +1174,7 @@
     // boss for each key, so the count starts from there. Returns the last
     // paddle it handed over, or null.
     function menuSlew() {
+        if (menu.nuz) return null;      // a run's bosses do not count toward the town's paddles
         const keys = MENU_ALL.filter(l => menu.keys[l.n]).length;
         menu.slain = Math.max(menu.slain || 0, keys) + 1;
         let got = null;
@@ -1208,6 +1247,7 @@
         }
         // the initials and the table after them are the engine's, over the town
         if (phase === 'initials' || phase === 'scores') { menu.march = false; return; }
+        if (menu.nuz && nuzTick()) { menu.march = false; return; }
         if (menu.post && menu.post.ready) { menuBoardAsk(); return; }
         if (menu.leaving) { menu.march = false; menuLeaveStep(dt); return; }
         if (menu.going) { menuGoStep(dt); return; }
@@ -1232,7 +1272,7 @@
     // it is aimed at.
     const ARRIVE_SECS = 1.5;
     const M_ARRIVE_BACK = 6;         // how far back he starts, in lengths of the nearest ground (the gates' foot)
-    const M_SIGN_FEET = 80 + 45 + 4; // the four signs ride at the depth of the big two's posts, together
+    const M_SIGN_FEET = 80 + 45 + 4; // the signs ride at the depth of the big two's posts, together
     const ARRIVE_SETTLE = 0.4;       // the last of it, where his pace slows to a stop
 
     function menuArrive() { menuLoad(); menu.arriveT = 0; }
@@ -1484,6 +1524,18 @@
             g.filter = 'none';
             g.globalCompositeOperation = 'destination-in';
             g.drawImage(ballImg, 0, 0, w, h);
+        }
+        if (mode === 'outline') {
+            // his silhouette less a copy of it drawn smaller: just the rim of him
+            const r = Math.max(7, w * 0.022), q = r * 0.7;
+            const inner = document.createElement('canvas');
+            inner.width = w; inner.height = h;
+            const ig = inner.getContext('2d');
+            ig.drawImage(ballImg, r, 0);
+            ig.globalCompositeOperation = 'destination-in';
+            for (const [dx, dy] of [[-r, 0], [0, r], [0, -r], [q, q], [-q, q], [q, -q], [-q, -q]]) ig.drawImage(ballImg, dx, dy);
+            g.globalCompositeOperation = 'destination-out';
+            g.drawImage(inner, 0, 0);
         }
         if (mode === 'stone') {
             g.globalCompositeOperation = 'source-atop';
@@ -2141,21 +2193,39 @@
         menuAlpha(1);
     }
 
-    // ---- the signs: MEMORIES, SETTINGS, BOSS RUSH, BRANDONS, the LEADERBOARD -------
+    // ---- the signs: MEMORIES, SETTINGS, BOSS RUSH, BRANDONS, the LEADERBOARD, NUZLOCKE ----
     // A tier under the levels: they matter, but they should not compete. So
-    // they are signs rather than buildings -- a board hung on two short chains
-    // of little heads, from a post and arm on the big two and a bracket on the
-    // small two -- drawn in thin lines that sit in slate while he is elsewhere
-    // and take their color as he lines up, swaying a little more when lit.
-    // Each board is cut to what it is for: MEMORIES a scroll, the LEADERBOARD
-    // a plaque with a crest its wings rise out of, SETTINGS a tag, BOSS RUSH an
-    // arrow pointing into the town, BRANDONS a plain board with every paddle you
-    // own hung under it in miniature. The crow circles MEMORIES.
+    // they are signs rather than buildings, drawn in thin lines that sit in
+    // slate while he is elsewhere and take their color as he lines up,
+    // swaying a little more when lit. Each says what it is for by its shape:
+    // MEMORIES a scroll on a post and arm, with the crow circling it; the
+    // LEADERBOARD a plaque with a crest its wings rise out of; SETTINGS a tag
+    // with three slider knobs; BOSS RUSH a cave of boulders with a barred
+    // cell for each boss, the boss behind the bars; BRANDONS a name plate
+    // with shelves standing over it, a shelf of paddles for every few you
+    // own; NUZLOCKE its own thing (nuzlocke.js).
+    // Every sign is drawn at its ART size (M_SIDES' `art`) under its own
+    // scale about the card's middle (`s`), so its posts, chains, text and
+    // extras scale together; the card the town walks into is the scaled size.
+    // The two sets of boards are drawn small and the two big ones large, and
+    // the scales even their names out (M_NAME_PX), so a name is the same
+    // height on screen whatever the sign's scale.
     const M_SIGN_WING = 22;          // the board's wings, smaller than a level's things would be
-    const M_SIGN_PAD = 12;           // longest a paddle hung under BRANDONS gets
     const M_SIGN_SWAY = 0.01, M_SIGN_SWAY_LIT = 0.035;   // radians a board swings, and the more it swings lit
+    const M_NAME_PX = 11;            // a sign's name, on screen, whatever the sign's scale
+    const M_NAME_MIN = 9.5;          // ...and the least it is shrunk to when the board is too short for it
+    const M_BEST_PX = 10;            // BOSS RUSH's "BEST n" line, on screen
     const menuSignLine = st => menuMix(st.ink, M_SLATE, M_RIM_REST * (1 - st.rise));
     const menuSignInk = st => st.aimed ? menuMix(st.ink, '#ffffff', 0.25) : M_WORD_REST;
+    let menuSignS = 1;               // the scale of the sign being drawn, for the name's size
+
+    // The name, M_NAME_PX high on screen: drawn at that over the sign's scale,
+    // and shrunk only as far as the room on the board needs, no further than M_NAME_MIN.
+    function menuSignName(st, txt, cx, cy, room) {
+        const want = M_NAME_PX / menuSignS, least = M_NAME_MIN / menuSignS;
+        ctx.font = want + 'px "Fira Sans", "Trebuchet MS", sans-serif';   // as text() sets it
+        text(txt, cx, cy, Math.max(least, Math.min(want, want * room / ctx.measureText(txt).width)), menuSignInk(st), 'center');
+    }
 
     // where a sign's board hangs
     function menuHang(c) {
@@ -2164,6 +2234,14 @@
         const bw = small ? c.w : c.w * 0.84, bh = small ? c.h : c.h * 0.46;
         return { small, x0, y0, armY, bw, bh, top: armY + drop, left: c.x - bw / 2 };
     }
+    // a sign as menuHang and menuBoardPath see it: at its art size, about the card's middle
+    const menuArtOf = c => Object.assign({}, c, { w: c.level.art[0], h: c.level.art[1] });
+    // the board's box in the town's own coordinates, once the sign's scale is on it (the push-in's camera aims at it)
+    function menuBoardBox(c) {
+        const G = menuHang(menuArtOf(c)), s = c.level.s;
+        return { left: c.x + (G.left - c.x) * s, top: c.y + (G.top - c.y) * s, bw: G.bw * s, bh: G.bh * s };
+    }
+    // the board's shape, in art coordinates, added to a new path: what the push-in fills to the screen's dark
     function menuBoardPath(c, x, y, w, h) {
         ctx.beginPath();
         switch (c.level.key) {
@@ -2176,78 +2254,294 @@
                 ctx.moveTo(x, y + 7); ctx.lineTo(x + w / 2 - 12, y + 7); ctx.lineTo(x + w / 2, y - 5); ctx.lineTo(x + w / 2 + 12, y + 7);
                 ctx.lineTo(x + w, y + 7); ctx.lineTo(x + w, y + h); ctx.lineTo(x, y + h); ctx.closePath();
                 break;
-            case 'paddles':         // a plain board: what hangs off it is the point
+            case 'paddles':         // the name plate: the shelves stand over it, so it is the whole of what he walks into
+            case 'nuzlocke':        // the foundation of its sign (nuzlocke.js draws all of it)
                 ctx.rect(x, y, w, h);
                 break;
             case 'settings':        // a tag, clipped at one end
                 ctx.moveTo(x + 9, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + h); ctx.lineTo(x + 9, y + h); ctx.lineTo(x, y + h / 2); ctx.closePath();
                 break;
-            default: {              // an arrow, pointing toward the middle of the town
-                const inward = c.x > LW / 2 ? -1 : 1;
-                if (inward < 0) { ctx.moveTo(x, y + h / 2); ctx.lineTo(x + 10, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + h); ctx.lineTo(x + 10, y + h); }
-                else { ctx.moveTo(x, y); ctx.lineTo(x + w - 10, y); ctx.lineTo(x + w, y + h / 2); ctx.lineTo(x + w - 10, y + h); ctx.lineTo(x, y + h); }
-                ctx.closePath();
-            }
+            default:                // BOSS RUSH: the mound the cave is cut into
+                menuCavePath(x, y, w, h);
         }
     }
 
-    function menuDrawSide(c) {
-        const st = menuState(c), G = menuHang(c), line = menuSignLine(st), key = c.level.key;
-        ctx.strokeStyle = line; ctx.lineWidth = 1.5;
-        if (!G.small) {
-            // the post on the side toward the wall, its arm, and a brace
-            const postX = c.level.side < 0 ? G.x0 + 3 : G.x0 + c.w - 3, armTo = c.level.side < 0 ? G.x0 + c.w - 8 : G.x0 + 8;
-            ctx.beginPath();
-            ctx.moveTo(postX, G.y0 + c.h + 4); ctx.lineTo(postX, G.armY - 3);
-            ctx.moveTo(postX, G.armY); ctx.lineTo(armTo, G.armY);
-            ctx.moveTo(postX, G.armY + 14); ctx.lineTo(postX + (armTo - postX) * 0.18, G.armY);
-            ctx.stroke();
-        } else {
-            ctx.beginPath(); ctx.moveTo(c.x - G.bw * 0.35, G.armY); ctx.lineTo(c.x + G.bw * 0.35, G.armY); ctx.stroke();
+    // ---- what the signs are made of: parts in two fixed colors, so no frame makes one ----
+    // Every sprite is cached in ONE color, slate-mixed (resting) or the sign's own, and the lit one
+    // is laid over the resting one by the rise.
+    const M_SIGN_REST_MIX = 0.5;     // how far toward slate a part sits while he is elsewhere
+    const M_SIGN_LINK = 3.2;         // a chain link's width
+    const M_SIGN_LINK_GAP = 0.8;     // a link's step, as a share of its height: they touch and overlap a little
+    const M_SIGN_FILL_A = 0.45;      // the doorway fill, over a board
+    const menuSignRests = {};
+    function menuSignRest(col) { return menuSignRests[col] || (menuSignRests[col] = menuMix(col, M_SLATE, M_SIGN_REST_MIX)); }
+    function menuSignTwo(st, col, fn) { fn(menuSignRest(col), 1); if (st.rise > 0.002) fn(col, st.rise); menuAlpha(1); }
+    function menuSignHead(st, col, mode, x, y, w, rot, a) {
+        menuSignTwo(st, col, (k, r) => {
+            const img = menuHead(k, mode); if (!img) return;
+            menuAlpha(r * (a === undefined ? 1 : a));
+            if (rot) { ctx.save(); ctx.translate(x, y); ctx.rotate(rot); menuPutHead(img, 0, 0, w); ctx.restore(); }
+            else menuPutHead(img, x, y, w);
+        });
+    }
+    // a string of heads from (x0, y0) to (x1, y1), each lying along the line
+    function menuSignString(st, col, x0, y0, x1, y1, w) {
+        const hh = w * (BALL_RY / BALL_RX), d = Math.hypot(x1 - x0, y1 - y0), n = Math.max(1, Math.round(d / (hh * M_SIGN_LINK_GAP)));
+        const rot = Math.atan2(y1 - y0, x1 - x0) - Math.PI / 2;
+        for (let i = 0; i <= n; i++) menuSignHead(st, col, 'flat', x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n, w, rot);
+    }
+    const menuSignChain = (st, col, x, y0, y1, w) => menuSignString(st, col, x, y0, x, y1, w || M_SIGN_LINK);
+    const menuSignRim = st => { ctx.strokeStyle = menuSignLine(st); ctx.lineWidth = 1 + 0.6 * st.rise; };
+    // a board: dark, the doorway filling it from the floor, the rim over all. `path` builds its shape; `b` is its box
+    function menuSignFace(c, st, path, b) {
+        path(); ctx.fillStyle = M_FILL; ctx.fill();
+        const k = menuDoorK(c);
+        if (k) {
+            ctx.save(); path(); ctx.clip();
+            menuAlpha(M_SIGN_FILL_A); ctx.fillStyle = st.ink;
+            ctx.fillRect(b.x - 12, b.y + b.h - (b.h + 12) * k, b.w + 24, (b.h + 12) * k);
+            ctx.restore(); menuAlpha(1);
         }
+        path(); menuSignRim(st); ctx.stroke();
+    }
+    // the bracket (small signs) a board hangs from
+    function menuSignBracket(c, st, G, y) {
+        ctx.strokeStyle = menuSignLine(st); ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(c.x - G.bw * 0.35, y); ctx.lineTo(c.x + G.bw * 0.35, y); ctx.stroke();
+    }
+    // what hangs from the arm sways, a little more lit; fn draws it, then the turn is put back
+    function menuSignSwing(c, armY, st, fn) {
+        ctx.save(); ctx.translate(c.x, armY);
+        ctx.rotate(Math.sin(menuNow() * 1.3 + c.x) * (M_SIGN_SWAY + M_SIGN_SWAY_LIT * st.rise));
+        ctx.translate(-c.x, -armY);
+        try { fn(); } finally { ctx.restore(); }
+    }
+    // a small sign hung from its bracket by two chains: fn draws the board and what is on it
+    function menuSignHung(c, st, G, fn) {
+        menuSignBracket(c, st, G, G.armY);
+        menuSignSwing(c, G.armY, st, () => {
+            for (const sx of [-1, 1]) menuSignChain(st, c.level.ink, c.x + sx * G.bw * 0.35, G.armY + 2, G.top);
+            fn();
+        });
+    }
+
+    // ---- SETTINGS: a mixing strip ----
+    // Three slots with a head for a knob, packed close at the tag's blunt end; the name sits centered in the room left,
+    // with M_SLIDE_MARGIN at the far edge. Lined up, the knobs slide slowly to new places, as if somebody were adjusting.
+    const M_SLIDE_N = 3;
+    const M_SLIDE_H = 15;            // a slot's length
+    const M_SLIDE_KNOB = 4.4;        // a knob head's width
+    const M_SLIDE_SPACE = 5.2;       // between slots
+    const M_SLIDE_X = 13;            // the first slot, in from the tag's point
+    const M_SLIDE_PAD = 6;           // the slots to the name
+    const M_SLIDE_MARGIN = 9;        // the name to the far edge
+    const M_SLIDE_REST = [0.2, 0.7, 0.45];   // each knob's place along its slot at rest (0 = the top)...
+    const M_SLIDE_LIT = [0.75, 0.25, 0.8];   // ...and lit
+    function menuSignSliders(c, st, G) {
+        menuSignHung(c, st, G, () => {
+            menuSignFace(c, st, () => menuBoardPath(c, G.left, G.top, G.bw, G.bh), { x: G.left, y: G.top, w: G.bw, h: G.bh });
+            const e = menuEase(st.rise), y0 = G.top + (G.bh - M_SLIDE_H) / 2, kh = M_SLIDE_KNOB * BALL_RY / BALL_RX;
+            for (let i = 0; i < M_SLIDE_N; i++) {
+                const x = G.left + M_SLIDE_X + i * M_SLIDE_SPACE, k = menuLerp(M_SLIDE_REST[i], M_SLIDE_LIT[i], e);
+                ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y0 + M_SLIDE_H); menuSignRim(st); ctx.lineWidth = 1; ctx.stroke();
+                menuSignHead(st, c.level.ink, 'flat', x, y0 + kh / 2 + (M_SLIDE_H - kh) * k, M_SLIDE_KNOB);
+            }
+            const left = G.left + M_SLIDE_X + (M_SLIDE_N - 1) * M_SLIDE_SPACE + M_SLIDE_KNOB / 2 + M_SLIDE_PAD, right = G.left + G.bw - M_SLIDE_MARGIN;
+            menuSignName(st, menu.nuz ? 'LEAVE' : c.level.lines.join(''), (left + right) / 2, G.top + G.bh / 2 + 4, right - left);
+        });
+    }
+
+    // ---- BOSS RUSH: every boss locked up, one after another ----
+    // A mound of boulders (his head in the 'rock' mode) with a barred cell cut into it for each boss, in the order the
+    // rush runs them (menuRush: a boss for each stage). Behind the bars is that boss's own key sigil (menuSigil): dark
+    // in slate, in the level's color lit. The name is a plank nailed across the mound's top. Nothing about the sign
+    // changes as bosses are beaten: it is only there once the VOID has been won.
+    const M_CAVE_ROCK = '#76705f', M_CAVE_ROCK_LIT = '#a8946f';   // the boulders, resting and lit
+    const M_CAVE_CROWN = 7;          // the mound's rise over the card's top
+    const M_CAVE_ROUND = 20;         // its shoulders' radius
+    const M_CAVE_ROCKS = 5;          // boulders across a row (two rows)
+    const M_CAVE_ROCK_W = 17;        // a boulder's width
+    const M_CAVE_PLATE = 0.78;       // the plank's width, of the board's...
+    const M_CAVE_PLATE_H = 12.5;     // ...and its height
+    const M_CAVE_PLATE_UP = 5;       // how far its top stands over the card's top
+    const M_CAVE_DARK = '#050403';   // the inside of a cell
+    const M_CAVE_GLOW = 0.16;        // the cell's inside lit, as an alpha of the sign's color
+    const M_CELLS = 6;               // one for each boss
+    const M_CELL_W = 10.5, M_CELL_H = 19, M_CELL_GAP = 1.8;
+    const M_CELL_VERTICAL = 0, M_CELL_HORIZONTAL = 1;
+    const M_CELL_BARS = M_CELL_VERTICAL;   // which way the bars run: M_CELL_VERTICAL or M_CELL_HORIZONTAL
+    const M_CELL_NBARS = 3;          // bars across a cell, evenly spaced, running its whole height (or width)
+    const M_CELL_BAR_LW = 1.15;      // a bar's width: about 1.4 px on screen at the sign's scale, so it reads as a line
+    const M_CELL_SILL = 1.8;         // the sill across a cell's foot
+    const M_CELL_SIGIL = 17;         // menuSigil's size `s` in a cell (the town's own is M_KEY, 40)
+    const M_CELL_SIGIL_DY = 0.38;    // its middle, up from the cell's floor, as a share of the cell's height
+    const M_CELL_SIGIL_DARK = 0.6;   // how far toward the dark a level's color goes for the resting sigil
+    const M_CELL_SIGIL_A = 0.9;
+    const M_CELL_SIGILS = { windmill: 1, idol: 2, twins: 3, lamps: 4, gleeok: 5, lucifer: 6 };   // the town draws a sigil for these six; any other boss takes the stage's own
+    // The bosses rattle the bars now and then: each its own interval and its own start within each interval, from a
+    // seed, so they never go in unison and the gaps are never the same. Calm between, with a very slight breath.
+    const M_RATTLE_MIN = 6, M_RATTLE_MAX = 14;   // seconds between one boss's rattles, picked for each cell
+    const M_RATTLE_SECS = 0.5;       // a rattle's length
+    const M_RATTLE_JOLTS = 3;        // jolts in one rattle
+    const M_RATTLE_PX = 0.8;         // px a jolt moves it sideways
+    const M_RATTLE_TURN = 0.08;      // rad a jolt turns it
+    const M_RATTLE_LEAN = 0.03;      // rad it leans into the bars through a rattle
+    const M_RATTLE_LIT = 1.4;        // how much stronger lit
+    const M_RATTLE_BREATH_PX = 0.2, M_RATTLE_BREATH_SECS = 5;
+    function menuCavePath(x, y, w, h) { ctx.beginPath(); ctx.roundRect(x, y - M_CAVE_CROWN, w, h + M_CAVE_CROWN, [M_CAVE_ROUND, M_CAVE_ROUND, 2, 2]); }
+    // boulders over the mound, clipped to it
+    function menuCaveRocks(st, G) {
+        ctx.save(); menuCavePath(G.left, G.top, G.bw, G.bh); ctx.clip();
+        const a = menuHead(M_CAVE_ROCK, 'rock'), b = menuHead(M_CAVE_ROCK_LIT, 'rock');
+        for (let i = 0; i < M_CAVE_ROCKS * 2; i++) {
+            const row = i < M_CAVE_ROCKS ? 0 : 1, col = i % M_CAVE_ROCKS, step = G.bw / M_CAVE_ROCKS;
+            const x = G.left + step * (col + 0.5 + (row ? 0.5 : 0)) + (menuHash(i) - 0.5) * 3;
+            const y = row ? G.top + G.bh - 3 : G.top - M_CAVE_CROWN + 4 + (menuHash(i + 5) - 0.5) * 3;
+            const w = M_CAVE_ROCK_W * (0.85 + 0.3 * menuHash(i + 9)), rot = (menuHash(i + 2) - 0.5) * 3.2;
+            for (const [img, al] of [[a, 0.95], [b, 0.95 * st.rise]]) {
+                if (!img || al < 0.002) continue;
+                ctx.save(); ctx.translate(x, y); ctx.rotate(rot); menuAlpha(al); menuPutHead(img, 0, 0, w); ctx.restore();
+            }
+        }
+        menuAlpha(1); ctx.restore();
+    }
+    function menuArchPath(x, baseY, w, h) {
+        ctx.beginPath(); ctx.moveTo(x - w / 2, baseY); ctx.lineTo(x - w / 2, baseY - h + w / 2);
+        ctx.arc(x, baseY - h + w / 2, w / 2, Math.PI, 0); ctx.lineTo(x + w / 2, baseY); ctx.closePath();
+    }
+    // when boss i's next rattle is, if it is on: 0..1 through it, else -1
+    function menuRattleAt(i) {
+        const T = menuNow(), I = M_RATTLE_MIN + (M_RATTLE_MAX - M_RATTLE_MIN) * menuHash(i * 7.3 + 1), t0 = T + menuHash(i * 3.1 + 2) * I, k = Math.floor(t0 / I);
+        const u = (t0 - k * I - menuHash(i * 11 + k * 5.7 + 3) * Math.max(0.01, I - M_RATTLE_SECS)) / M_RATTLE_SECS;
+        return u < 0 || u > 1 ? -1 : u;
+    }
+    // one cell: the dark arch, the boss shaking in it, the bars over him, the sill, the rim
+    function menuCell(c, st, i, x, baseY) {
+        const l = MENU_ALL[i % MENU_ALL.length], who = menuBossFor(l.n), n = M_CELL_SIGILS[who] || l.n;
+        const w = M_CELL_W, h = M_CELL_H, cy = baseY - h + w / 2;
+        menuArchPath(x, baseY, w, h); ctx.fillStyle = M_CAVE_DARK; ctx.fill();
+        if (st.rise > 0.01) { menuAlpha(M_CAVE_GLOW * st.rise); ctx.fillStyle = st.ink; ctx.fill(); menuAlpha(1); }
+        ctx.save(); menuArchPath(x, baseY, w, h); ctx.clip();
+        const u = menuRattleAt(i), amp = 1 + (M_RATTLE_LIT - 1) * st.rise, env = u < 0 ? 0 : Math.sin(Math.PI * u), ph = Math.PI * 2 * M_RATTLE_JOLTS * u;
+        const sy = baseY - h * M_CELL_SIGIL_DY, breath = Math.sin(menuNow() * Math.PI * 2 / M_RATTLE_BREATH_SECS + i * 1.9) * M_RATTLE_BREATH_PX;
+        ctx.translate(x + (u < 0 ? 0 : M_RATTLE_PX * amp * env * Math.sin(ph)), sy + breath);
+        ctx.rotate(u < 0 ? 0 : amp * env * (M_RATTLE_TURN * Math.sin(ph + 1.3) + M_RATTLE_LEAN * (i % 2 ? 1 : -1)));
+        ctx.translate(-x, -sy);
+        menuAlpha(M_CELL_SIGIL_A); menuSigil(n, x, sy, M_CELL_SIGIL, menuMix(l.ink, M_DARK, M_CELL_SIGIL_DARK), 0);
+        if (st.rise > 0.002) { menuAlpha(st.rise); menuSigil(n, x, sy, M_CELL_SIGIL, l.ink, 0); }
+        menuAlpha(1); ctx.restore();
+        // the bars, from the lintel to the sill (or across, edge to edge)
+        ctx.save(); menuArchPath(x, baseY, w, h); ctx.clip();
+        menuSignRim(st); ctx.lineWidth = M_CELL_BAR_LW; ctx.beginPath();
+        for (let b = 0; b < M_CELL_NBARS; b++) {
+            if (M_CELL_BARS === M_CELL_VERTICAL) {
+                const bx = x - w / 2 + w * (b + 1) / (M_CELL_NBARS + 1), top = cy - Math.sqrt(Math.max(0, (w / 2) * (w / 2) - (bx - x) * (bx - x)));
+                ctx.moveTo(bx, top - 0.5); ctx.lineTo(bx, baseY + 0.5);
+            } else {
+                const by = baseY - h + h * (b + 1) / (M_CELL_NBARS + 1);
+                ctx.moveTo(x - w / 2 - 0.5, by); ctx.lineTo(x + w / 2 + 0.5, by);
+            }
+        }
+        ctx.stroke(); ctx.restore();
+        ctx.lineWidth = M_CELL_SILL; ctx.beginPath(); ctx.moveTo(x - w / 2 - 0.5, baseY); ctx.lineTo(x + w / 2 + 0.5, baseY); ctx.stroke();
+        menuArchPath(x, baseY, w, h); menuSignRim(st); ctx.stroke();
+    }
+    function menuSignCells(c, st, G) {
+        const base = G.top + G.bh - 1;
+        // the bracket sits over the mound's crown, and the chains reach down to it
+        const armY = G.armY - M_CAVE_CROWN + 2;
+        menuSignBracket(c, st, G, armY);
+        menuSignSwing(c, armY, st, () => {
+            for (const sx of [-1, 1]) menuSignChain(st, c.level.ink, c.x + sx * G.bw * 0.35, armY + 2, G.top - M_CAVE_CROWN + 6);
+            menuSignFace(c, st, () => menuCavePath(G.left, G.top, G.bw, G.bh), { x: G.left, y: G.top - M_CAVE_CROWN, w: G.bw, h: G.bh + M_CAVE_CROWN });
+            menuCaveRocks(st, G);
+            for (let i = 0; i < M_CELLS; i++) menuCell(c, st, i, c.x + (i - (M_CELLS - 1) / 2) * (M_CELL_W + M_CELL_GAP), base);
+            // the name's plank, nailed across the top
+            const pw = G.bw * M_CAVE_PLATE, py = G.top - M_CAVE_PLATE_UP;
+            ctx.beginPath(); ctx.rect(c.x - pw / 2, py, pw, M_CAVE_PLATE_H); ctx.fillStyle = M_FILL; ctx.fill(); menuSignRim(st); ctx.stroke();
+            menuSignName(st, c.level.lines.join(''), c.x, py + M_CAVE_PLATE_H / 2 + 3.6, pw - 8);
+        });
+        // its best hangs under it, once it has one
+        if (menu.best[M_RUSH] > 0) text('BEST ' + fmtScore(menu.best[M_RUSH]), c.x, G.y0 + c.h + 13, M_BEST_PX / menuSignS, menuSignInk(st), 'center');
+    }
+
+    // ---- BRANDONS: shelves of the paddles you own ----
+    // The name plate keeps the card's own place at the bottom, which is the door he walks up into, and the shelves
+    // stand over it so he never walks into them. A shelf holds M_SHELF_PER paddles, and they are made long enough
+    // that that many exactly fill it; a new shelf is added upward as each fills, up to M_SHELF_MAX, and past that the
+    // paddles pack tighter, still filling the shelves there are. The rack hangs from a rail over the top shelf.
+    const M_SHELF_PER = 4;           // paddles on a shelf
+    const M_SHELF_MAX = 3;           // most shelves it will ever grow
+    const M_SHELF_GAP = 1.4;         // between paddles on a shelf
+    const M_SHELF_MARGIN = 1.6;      // the paddles' ends to the plank's
+    const M_SHELF_BUDGET = 42;       // art px over the plate the shelves may take, all of them: the sign is near the top of the field
+    const M_SHELF_THICK = 2.4;       // a plank's thickness
+    const M_SHELF_AIR = 1.2;         // between a paddle and the plank over it
+    const M_SHELF_NAIL = 2.2;        // a nail head's width
+    const M_SHELF_FAINT = 0.5;       // a paddle's alpha at rest, lit to 1
+    function menuSignShelves(c, st, G) {
+        const own = menuOwned(), x0 = G.left, x1 = G.left + G.bw;
+        const rows = Math.max(1, Math.min(M_SHELF_MAX, Math.ceil(own.length / M_SHELF_PER))), perRow = Math.max(M_SHELF_PER, Math.ceil(own.length / rows));
+        const fit = (x1 - x0 - 2 * M_SHELF_MARGIN - (perRow - 1) * M_SHELF_GAP) / perRow;
+        const len = Math.min(fit, (M_SHELF_BUDGET / rows - M_SHELF_THICK - M_SHELF_AIR) * SHAPE_ASPECT), th = len / SHAPE_ASPECT;
+        const gap = th + M_SHELF_THICK + M_SHELF_AIR, y1 = G.top - 1, topY = y1 - (rows - 1) * gap - th - 3;
+        const sx = x0 + M_SHELF_MARGIN + (len < fit - 0.01 ? ((x1 - x0 - 2 * M_SHELF_MARGIN) - (perRow * len + (perRow - 1) * M_SHELF_GAP)) / 2 : 0);
+        menuSignBracket(c, st, { bw: (G.bw - 5) / 0.7 }, topY);
+        menuSignSwing(c, topY, st, () => {
+            for (const cx of [x0 + 2.5, x1 - 2.5]) menuSignChain(st, c.level.ink, cx, topY + 1, G.top, 2.6);
+            menuSignFace(c, st, () => menuBoardPath(c, G.left, G.top, G.bw, G.bh), { x: G.left, y: G.top, w: G.bw, h: G.bh });
+            menuSignName(st, c.level.lines.join(''), c.x, G.top + G.bh / 2 + 4, G.bw - 22);
+            for (let r = 0; r < rows; r++) {
+                const y = y1 - r * gap;
+                ctx.beginPath(); ctx.rect(x0, y, x1 - x0, M_SHELF_THICK); ctx.fillStyle = M_FILL; ctx.fill(); menuSignRim(st); ctx.lineWidth = 1; ctx.stroke();
+                for (const nx of [x0 + 3, x1 - 3]) menuSignHead(st, c.level.ink, 'flat', nx, y + M_SHELF_THICK / 2, M_SHELF_NAIL);
+            }
+            own.forEach((k, i) => {
+                const r = Math.min(rows - 1, Math.floor(i / perRow)), col = i - r * perRow;
+                ctx.save(); ctx.translate(sx + (len + M_SHELF_GAP) * col + len / 2, y1 - r * gap - th / 2 - 0.2);
+                labPadIcon(k, 0, 0, len, false, M_SHELF_FAINT + (1 - M_SHELF_FAINT) * st.rise);
+                ctx.restore();
+            });
+        });
+    }
+
+    // ---- MEMORIES and the LEADERBOARD: a board on a post and arm ----
+    function menuDrawSide(c) {
+        // the art is drawn at its own size under the sign's scale about the card's middle, and the card put back after
+        const s = c.level.s, w = c.w, h = c.h;
+        c.w = c.level.art[0]; c.h = c.level.art[1];
+        menuSignS = s;
+        ctx.save(); ctx.translate(c.x, c.y); ctx.scale(s, s); ctx.translate(-c.x, -c.y);
+        try { menuDrawSignArt(c); } finally { ctx.restore(); c.w = w; c.h = h; }
+    }
+    function menuDrawSignArt(c) {
+        const st = menuState(c), G = menuHang(c), line = menuSignLine(st), key = c.level.key;
+        if (key === 'nuzlocke') { nuzDrawSign(c, st); return; }
+        if (key === 'settings') { menuSignSliders(c, st, G); return; }
+        if (key === 'rush') { menuSignCells(c, st, G); return; }
+        if (key === 'paddles') { menuSignShelves(c, st, G); return; }
+        ctx.strokeStyle = line; ctx.lineWidth = 1.5;
+        // the post on the side toward the wall, its arm, and a brace
+        const postX = c.level.side < 0 ? G.x0 + 3 : G.x0 + c.w - 3, armTo = c.level.side < 0 ? G.x0 + c.w - 8 : G.x0 + 8;
+        ctx.beginPath();
+        ctx.moveTo(postX, G.y0 + c.h + 4); ctx.lineTo(postX, G.armY - 3);
+        ctx.moveTo(postX, G.armY); ctx.lineTo(armTo, G.armY);
+        ctx.moveTo(postX, G.armY + 14); ctx.lineTo(postX + (armTo - postX) * 0.18, G.armY);
+        ctx.stroke();
         if (key === 'memories') menuCrow(c, st, false);
         if (key === 'board') {
             const beat = M_WING_BEAT_LIT * st.rise, ph = menuNow() / (M_WING_FLAP.period * M_WING_SLOW);
             for (const tr of [-1, 1]) menuWing(c.x + tr * 6, G.top - 3, tr > 0 ? -M_WING_RISE : Math.PI + M_WING_RISE, tr, M_SIGN_WING, beat, ph, st);
         }
-        ctx.save();
-        ctx.translate(c.x, G.armY);
-        ctx.rotate(Math.sin(menuNow() * 1.3 + c.x) * (M_SIGN_SWAY + M_SIGN_SWAY_LIT * st.rise));
-        ctx.translate(-c.x, -G.armY);
-        // the chains: a few little heads each
-        const link = menuHead(line, 'flat');
-        for (const cx of [c.x - G.bw * 0.35, c.x + G.bw * 0.35]) for (let i = 0; i < (G.small ? 1 : 3); i++) menuPutHead(link, cx, G.armY + 2 + i * 4, 3);
-        const shape = () => menuBoardPath(c, G.left, G.top, G.bw, G.bh);
-        shape(); ctx.fillStyle = M_FILL; ctx.fill();
-        // stood in the doorway, the board fills from the floor up
-        const k = menuDoorK(c);
-        if (k) {
-            ctx.save(); shape(); ctx.clip();
-            menuAlpha(0.45); ctx.fillStyle = st.ink;
-            ctx.fillRect(G.left - 12, G.top + G.bh - (G.bh + 12) * k, G.bw + 24, (G.bh + 12) * k);
-            ctx.restore(); menuAlpha(1);
-        }
-        shape(); ctx.strokeStyle = line; ctx.lineWidth = 1 + 0.6 * st.rise; ctx.stroke();
-        if (key === 'settings') { ctx.beginPath(); ctx.arc(G.left + 7, G.top + G.bh / 2, 2, 0, Math.PI * 2); ctx.stroke(); }
-        if (key === 'paddles') {
-            // each on a head of the chain's, faint until he lines up with it
-            const own = menuOwned(), step = G.bw / own.length;
-            own.forEach((k, i) => {
-                const x = G.left + step * (i + 0.5);
-                menuPutHead(link, x, G.top + G.bh + 2, 3);
-                labPadIcon(k, x, G.top + G.bh + 8, Math.min(M_SIGN_PAD, step - 1), false, 0.3 + 0.7 * st.rise);
-            });
-        }
-        // the name, shrunk to fit, a little off the middle where the shape asks for it
-        const name = c.level.lines.join(''), size = G.small ? 11 : 14, room = G.bw - 22;
-        ctx.font = size + 'px "Fira Sans", "Trebuchet MS", sans-serif';   // as text() sets it
-        const fit = Math.min(size, Math.floor(size * room / ctx.measureText(name).width));
-        const nudge = key === 'settings' ? 4 : key === 'rush' ? (c.x > LW / 2 ? 4 : -4) : 0;
-        text(name, c.x + nudge, G.top + G.bh / 2 + (G.small ? 4 : key === 'board' ? 8 : 5), fit, menuSignInk(st), 'center');
-        ctx.restore();
+        menuSignSwing(c, G.armY, st, () => {
+            // the chains: a few little heads each
+            const link = menuHead(line, 'flat');
+            for (const cx of [c.x - G.bw * 0.35, c.x + G.bw * 0.35]) for (let i = 0; i < 3; i++) menuPutHead(link, cx, G.armY + 2 + i * 4, 3);
+            menuSignFace(c, st, () => menuBoardPath(c, G.left, G.top, G.bw, G.bh), { x: G.left, y: G.top, w: G.bw, h: G.bh });
+            // the name, a little lower on the plaque, whose crest takes the top of it
+            menuSignName(st, c.level.lines.join(''), c.x, G.top + G.bh / 2 + (key === 'board' ? 8 : 5), G.bw - 22);
+        });
         if (key === 'memories') menuCrow(c, st, true);
-        // BOSS RUSH's best hangs under its sign, once it has one
-        if (key === 'rush' && menu.best[M_RUSH] > 0) text('BEST ' + fmtScore(menu.best[M_RUSH]), c.x, G.y0 + c.h + 13, 10, menuSignInk(st), 'center');
     }
 
     function menuDrawClean(c) {
@@ -2648,6 +2942,7 @@
         if (show.credits) { menuCreditsDraw(menu.showT); menuSkipDraw(); return true; }
         if (show.memCard) { menuMemoryUnlocked(show.memCard, menu.showT); menuTapPrompt(menu.showT - UNLOCK_WAIT); return true; }
         if (show.rushCard) { menuRushUnlocked(menu.showT); menuTapPrompt(menu.showT - UNLOCK_WAIT); return true; }
+        if (show.nuzWin) { nuzWinDraw(show.nuzWin, menu.showT); menuTapPrompt(menu.showT - UNLOCK_WAIT); return true; }
         if (show.rackCard) { menuRackUnlocked(menu.showT); menuTapPrompt(menu.showT - UNLOCK_WAIT); return true; }
         if (show.buildCard) { menuBuildUnlocked(show.buildCard, menu.showT); menuTapPrompt(menu.showT - UNLOCK_WAIT); return true; }
         const key = show.pad, p = LAB_PAD[key];
@@ -2987,7 +3282,8 @@
         // the choices are the smaller tabs along the bottom (menuBoardTabs)
         // home is TOTAL once there is a TOTAL tab, and FARM's until then
         board: { title: 'LEADERBOARD', ink: '#c9a94e', home: () => menuBestTotal() > 0 ? 'total' : 's1', table: true,
-                 line: sc => sc.view === BOARD_TOTAL ? 'best on all six stages (excluding BOSS RUSH), added up'
+                 line: sc => sc.view === BOARD_TOTAL ? 'best on all six stages (excluding BOSS RUSH and NUZLOCKE), added up'
+                                                     : sc.view === M_NUZ ? 'one run, one life for every BRANDON · the ones that played'
                                                      : 'the ten best runs',
                  choices: menuBoardTabs }
     };
@@ -3033,7 +3329,7 @@
     function menuLeave() {
         if (menu.screen.from !== undefined) paddle.x = paddle.tx = menu.screen.from;
         // back out of the sign the screen was opened from, the way it was gone into
-        const c = menu.cards.find(o => o.level.key === menu.screen.kind && menuStands(o));
+        const c = menu.cards.find(o => o.level.key === (menu.screen.kind === 'nuzleave' ? 'settings' : menu.screen.kind) && menuStands(o));
         if (c) { menu.leaving = { card: c, t: 0, x: paddle.x }; menu.lift = 0; }
         menu.screen = null;
         setHint(M_HINT);
@@ -3084,7 +3380,7 @@
     // token, once shipped, is forever. Something new needs a new token here
     // (menuSaveText warns about anything had that has none).
     const M_SAVE_STAGES = { 1: 'FARM', 2: 'RUINS', 3: 'CITY', 4: 'VOLCANO', 5: 'CASTLE', 6: 'VOID',
-                            rush: 'BOSS RUSH' };
+                            rush: 'BOSS RUSH', nuzlocke: 'NUZLOCKE' };
     // Some keep the token of the name they had when they shipped.
     const M_SAVE_PADS = { gilded: 'GILT', statue: 'STATUE', crystalline: 'FROST', magma: 'EMBER', pair: 'PAIR',
                           classic: 'CLASSIC', multi: 'MULTI', prince: 'PRINCE', chell: 'CHELL',
@@ -3432,6 +3728,7 @@
 
     // what it takes to earn one, from the same lists that hand them over
     function menuRackHow(k) {
+        if (menu.nuz) return menu.nuz.got.includes(k) ? 'lost earlier in this run' : 'one is found for every stage won';
         const lv = MENU_LEVELS.concat(MENU_LAST).find(l => l.pad === k);
         const slain = MENU_SLAIN_PADS.find(s => s[1] === k);
         if (lv) return 'win the ' + lv.name + ' without a continue' + (slain ? ', or beat ' + slain[0] + ' bosses' : '');
@@ -3468,7 +3765,8 @@
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, LW, LH);
         text('BRANDONS', LW / 2, 56, 30, ink, 'center');
-        text(menuOwned().length + ' of ' + MENU_PADS.length, LW / 2, 82, 14, '#9a958c', 'center');
+        text(menu.nuz ? 'the one you pick goes first' : menuOwned().length + ' of ' + MENU_PADS.length, LW / 2, 82, 14, '#9a958c', 'center');
+        if (menu.nuz) nuzDrawQueue(LW - 26, 36, 1);
 
         if (lit.back) {
             text('BACK', LW / 2, 220, 40, M_SAFE, 'center');

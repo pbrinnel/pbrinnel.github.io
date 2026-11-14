@@ -11,6 +11,13 @@
 // PADS, and the page shows it beside the score. TOTAL adds up runs that may
 // have been played with different paddles, so its rows have none.
 //
+// NUZLOCKE is a board of its own but not one of IN_TOTAL, so it never touches
+// TOTAL. Its run is played with several paddles, so the page posts `pads`, the
+// ids of every paddle the run played as, in the order it played them, instead
+// of `pad`: { stage: "NUZLOCKE", ini: "ABC", score: 1234, pads: ["standard", ...] }.
+// The row keeps `pads` (unknown ids dropped, at most MAX_PADS, repeats kept
+// because the order is the point) and never a `pad`. Other stages ignore `pads`.
+//
 // Every stage in STAGES is a table of its own, exactly like brandon.html's:
 // the best TOP_N runs, the same initials as often as they earn it. TOTAL is
 // each set of initials' best on every stage in IN_TOTAL, added up, and only
@@ -43,7 +50,7 @@ const BESTS = 'bests';
 // The ids are the save file's stage tokens (_ref/BRANDON-SAVE.md), and they are
 // pinned the same way: renaming one orphans its table. A new stage is a new id
 // here and in the page's BOARD_IDS.
-const STAGES = ['FARM', 'RUINS', 'CITY', 'VOLCANO', 'CASTLE', 'VOID', 'BOSS RUSH'];
+const STAGES = ['FARM', 'RUINS', 'CITY', 'VOLCANO', 'CASTLE', 'VOID', 'BOSS RUSH', 'NUZLOCKE'];
 const IN_TOTAL = ['FARM', 'RUINS', 'CITY', 'VOLCANO', 'CASTLE', 'VOID'];
 // how totals() counts; change the word in front whenever totals() changes
 const TOTAL_RULE = 'every:' + IN_TOTAL.join(',');
@@ -51,6 +58,7 @@ const TOTAL_RULE = 'every:' + IN_TOTAL.join(',');
 // the save file's tokens, which stay pinned when a paddle is renamed. One the
 // page sends that is not here is left off the row rather than refused.
 const PADS = ['standard', 'classic', 'gilded', 'statue', 'crystalline', 'magma', 'pair', 'multi', 'prince', 'chell', 'blur'];
+const MAX_PADS = 12;
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -114,7 +122,11 @@ export default {
       const stage = String(body?.stage ?? '');
       const ini = String(body?.ini ?? '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
       const score = Math.floor(Number(body?.score));
-      const pad = PADS.includes(body?.pad) ? body.pad : null;
+      const nuz = stage === 'NUZLOCKE';
+      const pad = !nuz && PADS.includes(body?.pad) ? body.pad : null;
+      const pads = nuz && Array.isArray(body?.pads)
+        ? body.pads.filter(p => PADS.includes(p)).slice(0, MAX_PADS)
+        : [];
 
       if (!STAGES.includes(stage)) return json({ error: 'no such stage' }, 400);
       if (ini.length !== 3) return json({ error: 'need three letters' }, 400);
@@ -137,7 +149,10 @@ export default {
       const list = view.boards[stage];
       const onBoard = list.length < TOP_N || score > list[list.length - 1].score;
       if (onBoard) {
-        list.push(pad ? { ini, score, at: Date.now(), pad } : { ini, score, at: Date.now() });
+        const row = { ini, score, at: Date.now() };
+        if (pad) row.pad = pad;
+        if (pads.length) row.pads = pads;
+        list.push(row);
         list.sort(byScore);
         view.boards[stage] = list.slice(0, TOP_N);
       }

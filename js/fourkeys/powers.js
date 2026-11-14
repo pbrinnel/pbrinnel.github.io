@@ -321,61 +321,148 @@
     }
 
     // ==== LASER ====================================================================
-    // L  LASER BRANDON: a gun on each end of him. Every LZ_EVERY seconds both
-    //    fire a head, LZ_BURSTS times, so three bursts is six heads. The guns
-    //    are fixed to him, so they lean as he leans and turn as BLUR
-    //    turns, and a shot goes the way its gun is pointing.
-    //    With LZ_STAYS off a shot is a bolt: it breaks (or hurts) the first
-    //    thing it meets and is gone, as Arkanoid's laser was. On, each shot is
-    //    a real head that joins the rally.
+    // L  LASER BRANDON: a head grows on each end of him over the wait for the next
+    //    burst, and when it is full grown THAT head is the shot. It leaves him slowly
+    //    and picks up speed, stretching as it goes, and the end stays empty until the
+    //    next head begins. Its growth is the countdown. Every LZ_EVERY seconds both
+    //    launch, LZ_BURSTS times, so three bursts is six heads. The last launch ends
+    //    the capsule: the heads and the LASER on the effect strip are up only while
+    //    shots are still to go, and the strip counts them. A paddle that lengthens
+    //    capsules (GILDED) is paid in bursts (lzBursts), not in idle time.
+    //    The heads stand on his own top outline at each end, a little behind it, and
+    //    lean as he leans and turn as BLUR turns; a shot goes the way its head
+    //    pointed. They are in the paddle's own tint (labPadHead).
+    //    With LZ_STAYS off a shot is a bolt: it breaks (or hurts) the first thing it
+    //    meets and is gone, as Arkanoid's laser was. On, each shot is a real head
+    //    that joins the rally.
     let LZ_EVERY  = 2;      // seconds between bursts
-    let LZ_BURSTS = 3;      // bursts a capsule gives
-    let LZ_FIRST  = 0;      // seconds after pickup the first goes; 0 fires at once
-    let LZ_SPEED  = 720;    // px/s a bolt climbs at
-    let LZ_SIZE   = 0.6;    // a bolt's size, as a share of a head
-    let LZ_MOUNT  = 0.9;    // where the guns sit, as a share of the way out to his ends
+    let LZ_BURSTS = 3;      // bursts a capsule gives (times the paddle's capsule multiplier)
+    let LZ_FIRST  = 0;      // seconds after pickup the first goes; never less than a head's growth (lzFirst)
+    let LZ_SPEED  = 720;    // px/s a shot climbs at once it is up to speed
+    let LZ_SIZE   = 0.62;   // a head's width, as a share of a head in play
+    let LZ_REACH  = 0.66;   // where on each end it stands, as a share of the way out to his tip
     let LZ_STAYS  = 0;      // 1: every shot is a head in play, not a bolt
-    LAB_KNOBS.push('LZ_EVERY', 'LZ_BURSTS', 'LZ_FIRST', 'LZ_SPEED', 'LZ_SIZE', 'LZ_MOUNT', 'LZ_STAYS');
-    const LZ_FLASH = 0.12;  // seconds of muzzle flash
+    let LZ_GROW   = 0.8;    // share of each wait between launches spent growing (the rest the end is empty)
+    let LZ_SINK   = 0.3;    // how deep its base is tucked behind his top edge, as a share of its height
+    let LZ_TILT   = 0.28;   // radians it leans away from his middle while it grows
+    let LZ_SQUASH = 0.12;   // how wide and flat it starts, easing out as it grows
+    let LZ_HEAT   = 0.2;    // how far his tint goes red just before it launches
+    let LZ_GLOW   = 0.5;    // the soft red behind it just before it launches
+    let LZ_V0     = 0.25;   // the speed it leaves at, as a share of LZ_SPEED...
+    let LZ_RAMP   = 0.45;   // ...and the seconds it takes to get up to full speed
+    let LZ_STRETCH = 1.4;   // how much it stretches along its flight at full speed
+    let LZ_TAIL   = 3;      // fading copies behind it in flight
+    let LZ_TAILGAP = 15;    // px between them
+    let LZ_TURN   = 40;     // px of flight it takes to stop leaning and point along its way
+    let LZ_TINT   = 0.72;   // the share of his tint a head takes, which is less than he does: full strength flattens a face this small
+    LAB_KNOBS.push('LZ_EVERY', 'LZ_BURSTS', 'LZ_FIRST', 'LZ_SPEED', 'LZ_SIZE', 'LZ_REACH', 'LZ_STAYS',
+        'LZ_GROW', 'LZ_SINK', 'LZ_TILT', 'LZ_SQUASH', 'LZ_HEAT', 'LZ_GLOW', 'LZ_V0', 'LZ_RAMP',
+        'LZ_STRETCH', 'LZ_TAIL', 'LZ_TAILGAP', 'LZ_TURN', 'LZ_TINT');
+    const LZ_HOT_WASH = 0.75;    // how red the baked heat sprite is: LZ_HEAT is how much of it shows
+    const LZ_STONE_LOOK = 'grayscale(1) contrast(1.35) brightness(1.25)';   // STATUE's heads are stone
+    const LZ_STONE_WASH = 0.5;
+    const LZ_BAKE_W = 64;        // px across a baked head
 
     let lzBolts = [];       // shots in the air
     let lzT = -1;           // seconds since pickup, or -1 with no capsule on
     let lzFired = 0;        // bursts gone this capsule
     let lzWas = 0;          // fx.L last frame, so a fresh capsule can be told from an old one
-    let lzFlash = 0;
+    const lzSprites = new Map();
 
-    // The two muzzles, on the outside ends of the outermost of him: where
-    // each sits and which way it points (`a`, 0 straight up), both turned
-    // with the end it is on.
-    function lzGuns() {
+    const lzEase = t => t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
+    // bursts this capsule gives: GILDED's longer capsules are more of them
+    const lzBursts = () => Math.max(1, Math.round(Math.max(1, LZ_BURSTS) * labPadCaps()));
+    // the wait a head spends growing, and so the wait before the first launch
+    const lzSpan = () => Math.min(1, Math.max(0.2, LZ_GROW)) * LZ_EVERY;
+    const lzFirst = () => Math.max(LZ_FIRST, lzSpan());
+    // shots still to go, which is what the effect strip counts
+    const lzLeft = () => fx.L > 0 ? Math.max(0, lzBursts() - (lzT >= 0 ? lzFired : 0)) : 0;
+    function powHud(k) {
+        return k === 'L' ? 'LASER x' + lzLeft() : CAPS[k].short + ' ' + Math.ceil(fx[k]);
+    }
+
+    // how far grown the next head is, 0 to 1: it spends the last lzSpan() of the wait growing
+    function lzGrown() {
+        if (lzT < 0 || lzLeft() <= 0) return 0;
+        const fire = lzFirst() + lzFired * LZ_EVERY;
+        return Math.max(0, Math.min(1, (lzT - (fire - lzSpan())) / lzSpan()));
+    }
+
+    // A head standing at each outer end of him: where its base sits, on his own drawn
+    // top there turned with him, which way it points (`a`, 0 straight up) and which
+    // end it is. Outermost of whatever pieces he is in, so PAIR has one on each outer
+    // end and a short paddle has them closer together.
+    function lzHeads() {
         const sgs = segs();
         let l = sgs[0], r = sgs[0];
         for (const sg of sgs) { if (sg.cx < l.cx) l = sg; if (sg.cx > r.cx) r = sg; }
-        const ly = -padH() * 0.35;
         const at = (sg, side) => {
             const a = segWig(sg.i) + paddle.dip[sg.i], ca = Math.cos(a), sa = Math.sin(a);
-            const lx = side * sg.w / 2 * LZ_MOUNT;
-            return { x: sg.cx + lx * ca - ly * sa, y: padY() + lx * sa + ly * ca, a, sg };
+            const hw = sg.w / 2, lx = side * hw * LZ_REACH, e = outlineAt(lx, hw);
+            const ly = e ? e.top : -padH() * 0.4;
+            const o = paddle.jt[sg.i] > 0 ? wobble(paddle.jt[sg.i]) * JIG_PADDLE : 0;
+            return { x: sg.cx + lx * ca - ly * sa, y: padY() + lx * sa + ly * ca + o, a, side };
         };
         return [at(l, -1), at(r, 1)];
     }
+    function lzHeadSize() {
+        const w = bRX() * 2 * LZ_SIZE;
+        return { w, h: w * BALL_RY / BALL_RX };
+    }
+    // the middle of a full-grown head, which is where a shot starts from
+    function lzCenter(hd) {
+        const { h } = lzHeadSize(), rot = hd.a + hd.side * LZ_TILT, y = h * LZ_SINK - h / 2;
+        return { x: hd.x - y * Math.sin(rot), y: hd.y + y * Math.cos(rot), rot };
+    }
+
+    // The head photograph in the paddle's own tint (or stone), baked once, and the
+    // same head gone red for the heat.
+    function lzHeadSprite(hot) {
+        if (!ready(ballImg)) return null;
+        const L = labPadHead();
+        const filter = L.stone ? LZ_STONE_LOOK : 'none';
+        const ink = hot ? CAPS.L.color : L.stone ? STONE : L.ink;
+        const wash = hot ? LZ_HOT_WASH : L.stone ? LZ_STONE_WASH : L.wash * LZ_TINT;
+        const key = [hot ? 'hot' : 'head', L.key, filter, ink, wash].join('|');
+        let c = lzSprites.get(key);
+        if (c) return c;
+        const w = LZ_BAKE_W, h = Math.round(w * BALL_RY / BALL_RX);
+        c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        const g = c.getContext('2d');
+        g.filter = filter;
+        g.drawImage(ballImg, 0, 0, w, h);
+        g.filter = 'none';
+        if (ink && wash > 0) {
+            g.globalCompositeOperation = 'source-atop';
+            g.globalAlpha = wash;
+            g.fillStyle = ink;
+            g.fillRect(0, 0, w, h);
+        }
+        lzSprites.set(key, c);
+        return c;
+    }
 
     function lzFire() {
-        lzFlash = LZ_FLASH;
-        for (const g of lzGuns()) {
-            const dx = Math.sin(g.a), dy = -Math.cos(g.a);
+        for (const hd of lzHeads()) {
+            const c = lzCenter(hd), dx = Math.sin(hd.a), dy = -Math.cos(hd.a);
             if (LZ_STAYS) {
-                const b = newBall(g.x + dx * bRY(), g.y + dy * bRY());
-                const a = g.a + (Math.random() - 0.5) * 0.1, s = effSpeed();
+                const b = newBall(c.x, c.y);
+                const a = hd.a + (Math.random() - 0.5) * 0.1, s = effSpeed();
                 b.vx = Math.sin(a) * s; b.vy = -Math.cos(a) * s;
                 balls.push(b);
             } else {
-                const off = bRY() * LZ_SIZE;
-                lzBolts.push({ x: g.x + dx * off, y: g.y + dy * off, dx, dy, a: 0, spin: (Math.random() - 0.5) * 30 });
+                lzBolts.push({ x: c.x, y: c.y, ox: c.x, oy: c.y, dx, dy, a: 0, spin: (Math.random() - 0.5) * 30,
+                               side: hd.side, born: clock });
             }
         }
         if (balls.length >= HEADS_AT) round.heads = true;
     }
+
+    // how fast a shot is going, as a share of LZ_SPEED: it leaves slowly. It hits
+    // things from the first frame it is out (lzStep tests it every step at whatever
+    // speed it has); the ramp only delays when it arrives.
+    const lzSpd = z => LZ_V0 + (1 - LZ_V0) * lzEase((clock - z.born) / Math.max(0.05, LZ_RAMP));
 
     // A bolt meets things the way a head does, through labContact, so bosses
     // and mini-bosses answer it with their own shapes -- tested at a head's
@@ -384,14 +471,14 @@
         const n = Math.max(1, Math.ceil(LZ_SPEED * dt / SUBSTEP_PX));
         for (let k = 0; k < n; k++) {
             for (let i = lzBolts.length - 1; i >= 0; i--) {
-                const z = lzBolts[i];
-                z.x += z.dx * LZ_SPEED * dt / n;
-                z.y += z.dy * LZ_SPEED * dt / n;
+                const z = lzBolts[i], v = LZ_SPEED * lzSpd(z);
+                z.x += z.dx * v * dt / n;
+                z.y += z.dy * v * dt / n;
                 z.a += z.spin * dt / n;
                 const m = bRY();
                 if (z.y < -m || z.y > LH + m || z.x < -m || z.x > LW + m) { lzBolts.splice(i, 1); continue; }
                 const probe = newBall(z.x, z.y);
-                probe.angle = z.a; probe.vx = z.dx * LZ_SPEED; probe.vy = z.dy * LZ_SPEED;
+                probe.angle = z.a; probe.vx = z.dx * v; probe.vy = z.dy * v;
                 for (const br of hitOrder()) {
                     if (!br.alive) continue;
                     const hit = labContact(br, probe);
@@ -413,8 +500,8 @@
     }
 
     function lzUpdate(dt) {
-        CAPS.L.secs = LZ_FIRST + LZ_EVERY * Math.max(1, LZ_BURSTS);
-        if (lzFlash > 0) lzFlash = Math.max(0, lzFlash - dt);
+        // a plain paddle's capsule, for anything that reads it before the first frame
+        CAPS.L.secs = lzFirst() + LZ_EVERY * (Math.max(1, LZ_BURSTS) - 1);
         const now = fx.L || 0;
         if (now > lzWas + 1e-6) { lzT = 0; lzFired = 0; }     // a capsule just caught
         lzWas = now;
@@ -422,41 +509,82 @@
         if (phase !== 'play') { lzBolts = []; return; }
         if (lzT >= 0) {
             lzT += dt;
-            while (lzFired < LZ_BURSTS && lzT >= LZ_FIRST + lzFired * LZ_EVERY) { lzFire(); lzFired++; }
+            while (lzFired < lzBursts() && lzT >= lzFirst() + lzFired * LZ_EVERY) { lzFire(); lzFired++; }
+            // the clock is the time to the last launch, and the capsule is over with it:
+            // whatever the paddle's multiplier made of the pickup, nothing idles on
+            fx.L = lzFired >= lzBursts() ? 0 : Math.max(1e-3, lzFirst() + (lzBursts() - 1) * LZ_EVERY - lzT);
+            lzWas = fx.L;
         }
         lzStep(dt);
     }
 
-    // the guns ride on him while it is on, and flash as they go
+    // The shots, over everything but the heads in play: each is the head that grew,
+    // in flight, leaning the way it grew until it has gone a little way, longer the
+    // faster it goes, with a tail.
     function lzDraw() {
+        const head = lzHeadSprite(false), hot = lzHeadSprite(true);
+        if (!head || !hot) return;
+        const { w } = lzHeadSize();
         for (const z of lzBolts) {
-            // its trail streams out behind it, whichever way it is going
-            ctx.save();
-            ctx.translate(z.x, z.y);
-            ctx.rotate(Math.atan2(z.dx, -z.dy));
-            ctx.globalAlpha = 0.35;
-            ctx.fillStyle = CAPS.L.color;
-            ctx.fillRect(-2, 0, 4, bRY() * 2.2);
-            ctx.restore();
-            drawBall(z.x, z.y, bRX() * LZ_SIZE, z.a);
-        }
-        if (lzT < 0 || !(phase === 'play' || phase === 'ready')) return;
-        for (const g of lzGuns()) {
-            const o = paddle.jt[g.sg.i] > 0 ? wobble(paddle.jt[g.sg.i]) * JIG_PADDLE : 0;
-            ctx.save();
-            ctx.translate(g.x, g.y + o);
-            ctx.rotate(g.a);
-            ctx.fillStyle = '#2b2b2e';
-            ctx.fillRect(-5, -16, 10, 22);
-            ctx.fillStyle = CAPS.L.color;
-            ctx.fillRect(-3, -20, 6, 6);
-            if (lzFlash > 0) {
-                ctx.globalAlpha = lzFlash / LZ_FLASH;
-                ctx.beginPath(); ctx.arc(0, -22, 9, 0, 7); ctx.fill();
+            const dist = Math.hypot(z.x - z.ox, z.y - z.oy);
+            const rot = Math.atan2(z.dx, -z.dy) + z.side * LZ_TILT * (1 - lzEase(dist / Math.max(1, LZ_TURN)));
+            const st = 1 + (LZ_STRETCH - 1) * (lzSpd(z) - LZ_V0) / Math.max(0.01, 1 - LZ_V0);
+            const put = (img, x, y, ww, sy, alpha) => {
+                const hh = ww * img.height / img.width;
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                ctx.translate(x, y);
+                ctx.rotate(rot);
+                ctx.scale(1, sy);
+                ctx.drawImage(img, -ww / 2, -hh / 2, ww, hh);
+                ctx.restore();
+            };
+            const n = Math.round(LZ_TAIL);
+            for (let k = n; k >= 1; k--) {
+                if (k * LZ_TAILGAP > dist) continue;
+                const f = 1 - k / (n + 1);
+                put(head, z.x - z.dx * k * LZ_TAILGAP, z.y - z.dy * k * LZ_TAILGAP, w * (0.55 + 0.35 * f), 1, 0.4 * f);
             }
+            put(head, z.x, z.y, w, st, 1);
+            put(hot, z.x, z.y, w, st, LZ_HEAT);
+        }
+    }
+
+    // The heads growing on his ends, before he is drawn: his own top edge covers the
+    // foot of each, so it is seated on him and not laid on top. Each starts from
+    // nothing and is the countdown to its launch.
+    function lzDrawHeads() {
+        if (lzT < 0 || !(phase === 'play' || phase === 'ready')) return;
+        const p = lzGrown();
+        if (p <= 0) return;
+        const head = lzHeadSprite(false), hot = lzHeadSprite(true);
+        if (!head || !hot) return;
+        const { w, h } = lzHeadSize();
+        const heat = p * p * p, squash = 1 - lzEase(Math.min(1, p / 0.5));
+        for (const hd of lzHeads()) {
+            ctx.save();
+            ctx.translate(hd.x, hd.y);
+            ctx.rotate(hd.a + hd.side * LZ_TILT * lzEase(Math.min(1, p / 0.6)));
+            ctx.translate(0, h * LZ_SINK);
+            const k = lzEase(p);
+            ctx.scale((1 + LZ_SQUASH * squash) * k, (1 - LZ_SQUASH * squash) * k);
+            // the glow sits behind the face, so it is a halo and not a red mask
+            if (LZ_GLOW > 0) {
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.globalAlpha = Math.min(1, heat * LZ_GLOW);
+                const r = h * 0.7;
+                ctx.drawImage(padGlow(CAPS.L.color), -r, -h / 2 - r, r * 2, r * 2);
+                ctx.globalCompositeOperation = 'source-over';
+            }
+            ctx.globalAlpha = 1;
+            ctx.drawImage(head, -w / 2, -h, w, h);
+            ctx.globalAlpha = heat * LZ_HEAT;
+            ctx.drawImage(hot, -w / 2, -h, w, h);
             ctx.restore();
         }
     }
+    // before he is drawn: the engine calls this ahead of drawPaddle
+    function powDrawUnder() { lzDrawHeads(); }
 
     // ==== PORTAL ===================================================================
     // T  PORTAL BRANDON (T for porTal): the side walls are gone. A head that
@@ -830,7 +958,7 @@
         ctx.globalAlpha = 1;
     }
 
-    // over him: PORTAL's edges, LASER's guns and bolts, MIDAS's sparks,
+    // over him: PORTAL's edges, LASER's shots, MIDAS's sparks,
     // WILD's ring, then the lab's overlay: every point the lump collides with, and the room
     // each piece packs to
     function powDrawOver() {

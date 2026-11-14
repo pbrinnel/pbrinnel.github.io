@@ -140,6 +140,14 @@
     const labPadCaps  = () => labP && labP.caps ? labP.caps() : 1;
     const labPadSplit = () => !!(labP && labP.split);
     const labPadFavour = () => (labP && labP.favour) || null;
+    // What he is tinted with, for the heads LASER grows on his ends: `tint` is the ink
+    // and the share of it his skin lays over him (null: bare photograph); a dressed
+    // paddle's share is its dressA. Stone is its own look, so it has no ink here.
+    const labPadHead = () => {
+        const t = labP && labP.tint;
+        return { key: (labP && labP.name) || '', stone: !!(labP && labP.stone),
+                 ink: t ? t[0] : null, wash: t ? (t[1] !== undefined ? t[1] : labP.dressA) : 0 };
+    };
     const labPadPortal = () => !!(labP && labP.portal);
     const labPadBlur = () => !!(labP && labP.blur);
     const labPadHeavy = () => labP && labP.heavy ? labP.heavy() : 1;
@@ -731,14 +739,14 @@
     // lasts him longer.
     LAB_PAD.gilded = {
         name: 'GILDED',
-        ink: GILDED_INK, rim: GILDED_RIM,
+        ink: GILDED_INK, rim: GILDED_RIM, tint: [GILDED_INK, 0.8],
         blurb: '15% shorter · power-ups last 60% longer',
         lore: 'Leafed in the gold of the harvest {odin} blessed when he walked these fields.',
         len: () => GILDED_LEN,
         caps: () => GILDED_CAPS,
         under() { padRim('padRimG', GILDED_RIM, 3, 0.5); },
         skin(sg, o) {
-            padLay(sg, o, padTint('padGilded', GILDED_INK), 0.8);
+            padLay(sg, o, padTint('padGilded', GILDED_INK), this.tint[1]);
             const sp = padFlat('padShine', '#fff6d8');
             if (!sp) return;
             const tw = sg.w, th = tw / SHAPE_ASPECT;
@@ -791,7 +799,7 @@
     // curve of his own outline and a return is less of a sure thing.
     LAB_PAD.crystalline = {
         name: 'CRYSTALLINE',
-        ink: CRYST_INK, rim: CRYST_RIM,
+        ink: CRYST_INK, rim: CRYST_RIM, tint: [CRYST_INK, 0.82],
         blurb: '5% shorter, 40% smaller sweet spot · +50% end spin, +120% moving spin · ices what it cannot break',
         lore: 'Cut from the ice that sealed the city when {odin} vanished. Forever cold to the touch.',
         len: () => CRYST_LEN,
@@ -799,7 +807,7 @@
         swipe: () => CRYST_SWIPE,
         deck: () => CRYST_DECK,
         under() { padRim('padRimF', CRYST_RIM, 2.5, 0.55); },
-        skin(sg, o) { padLay(sg, o, padTint('padCrystal', CRYST_INK), 0.82); },
+        skin(sg, o) { padLay(sg, o, padTint('padCrystal', CRYST_INK), this.tint[1]); },
         mark: 'crystalline',
         shedRate: 21,
         // one of his flakes, off a head he has hit
@@ -839,7 +847,7 @@
     // (MAGMA's crit).
     LAB_PAD.magma = {
         name: 'MAGMA',
-        ink: MAGMA_INK, rim: MAGMA_RIM,
+        ink: MAGMA_INK, rim: MAGMA_RIM, tint: [MAGMA_INK, 0.72],
         blurb: '30% shorter · 30% of breaks ignite neighbors · 15% chance of 2x boss damage',
         lore: 'Forged in the fire of {surtr}\'s footsteps, he still remembers his name.',
         len: () => MAGMA_LEN,
@@ -857,7 +865,7 @@
             ctx.globalAlpha = padK;
             padRim('padRimE', MAGMA_RIM, 2.5, 0.5);
         },
-        skin(sg, o) { padLay(sg, o, padTint('padMagma', MAGMA_INK), 0.72); },
+        skin(sg, o) { padLay(sg, o, padTint('padMagma', MAGMA_INK), this.tint[1]); },
         mark: 'magma',
         shedRate: 20,
         // one of his sparks, off a head he has hit
@@ -895,7 +903,7 @@
     // it -- and DOUBLE, when it drops, makes four of him, smaller again.
     LAB_PAD.pair = {
         name: 'THE PAIR',
-        ink: PAIR_INK, twin: true,
+        ink: PAIR_INK, twin: true, tint: [PAIR_INK, 0.62],
         blurb: 'two of him, each 38% shorter · a hole down the middle',
         lore: 'Soldiers. Brandons. How much longer?',
         len: () => PAIR_LEN,
@@ -922,7 +930,7 @@
                 }
             }
         },
-        skin(sg, o) { padLay(sg, o, padTint('padPair', PAIR_INK), 0.62); }
+        skin(sg, o) { padLay(sg, o, padTint('padPair', PAIR_INK), this.tint[1]); }
     };
 
     // ---- the ones bosses buy --------------------------------------------------------
@@ -998,7 +1006,7 @@
     // PRINCE: green over purple, and nothing more.
     LAB_PAD.prince = {
         name: 'PRINCE',
-        ink: PRINCE_TOP, rim: PRINCE_RIM,
+        ink: PRINCE_TOP, rim: PRINCE_RIM, tint: [PRINCE_TOP],
         favour: 'K',
         dress: () => padDress('padPrince', PRINCE_TOP, PRINCE_LEGS, false),
         dressA: 0.85,
@@ -1012,7 +1020,7 @@
     // for as long as he is in hand, outside the town.
     LAB_PAD.chell = {
         name: 'CHELL',
-        ink: CHELL_LEGS, rim: CHELL_RIM,
+        ink: CHELL_LEGS, rim: CHELL_RIM, tint: [CHELL_TOP],
         portal: true,
         dress: () => padDress('padChell', CHELL_TOP, CHELL_LEGS, true),
         dressA: 0.8,
@@ -1391,7 +1399,7 @@
     // BLUR: Sonic, with afterimages of himself following round behind.
     LAB_PAD.blur = {
         name: 'BLUR',
-        ink: BLUR_INK, rim: BLUR_RIM,
+        ink: BLUR_INK, rim: BLUR_RIM, tint: [BLUR_INK, 0.7],
         blur: true,
         len: () => BLUR_LEN,
         edge: () => BLUR_SPIN_X,
@@ -1426,6 +1434,6 @@
         },
         skin(sg, o) {
             if (blurSonic()) padLay(sg, o, blurLook.dress, 1);
-            else padLay(sg, o, padTint('padBlur', BLUR_INK), 0.7);
+            else padLay(sg, o, padTint('padBlur', BLUR_INK), this.tint[1]);
         }
     };
