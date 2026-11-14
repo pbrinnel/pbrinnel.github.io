@@ -1071,7 +1071,14 @@
     // end of the game, so the credits roll on the way.
     function menuWon() {
         const run = menu && menu.run;
-        if (run && run.nuz) { menuBoardPost(run); nuzWon(run); return; }    // the VOID's own score, then the run's
+        // the VOID's own score, then the run's. Any other stage reaches here only
+        // through the debug menu's win, and is a stage won like menuWatch's
+        if (run && run.nuz) {
+            menu.run = null;
+            menuBoardPost(run);
+            if (run.n === MENU_VOID.n) nuzWon(run); else nuzBeat(run);
+            return;
+        }
         const rush = !!(menu && menu.keys[MENU_VOID.n]);
         // the credits end in black and then the title, where the initials are asked for (menuTitleStep)
         const end = run && run.n === MENU_VOID.n ? [{ credits: true }, { black: true }, { title: true }].concat(rush ? [] : [{ rushCard: true }]) : [];
@@ -3466,15 +3473,17 @@
             if (!(what === 'pads' && k === 'standard')) console.warn('no save token for', what, k);
             return false;
         };
+        // inside a NUZLOCKE run `menu` holds the run's tables; the file is the town's (menu.main)
+        const town = menu.main || menu;
         for (const [word, what, table] of M_SAVE_SETS) {
-            for (const k of Object.keys(menu[what])) {
-                if (menu[what][k] && had(what, k, table)) lines.push(word + ' ' + table[k]);
+            for (const k of Object.keys(town[what])) {
+                if (town[what][k] && had(what, k, table)) lines.push(word + ' ' + table[k]);
             }
         }
         for (const k of Object.keys(menu.best)) {
             if (menu.best[k] > 0 && had('best', k, M_SAVE_STAGES)) lines.push('BEST ' + M_SAVE_STAGES[k] + ' ' + menu.best[k]);
         }
-        if (menu.slain > 0) lines.push('BOSSES ' + menu.slain);
+        if (town.slain > 0) lines.push('BOSSES ' + town.slain);
         const body = lines.join('\n');
         return body + '\nSEAL ' + menuSeal(body) + '\n';
     }
