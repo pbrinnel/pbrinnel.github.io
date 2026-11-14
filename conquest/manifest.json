@@ -1,5 +1,5 @@
 {
- "version": "20261110.0344+5b71bf8",
+ "version": "20261114.2144+f879f7b",
  "files": [
   {
    "path": "LICENSE.txt",
@@ -13,8 +13,8 @@
   },
   {
    "path": "core/dist/core.js",
-   "size": 220225,
-   "sha256": "3bd0c0399f30ca2d999d4568ba84e425cad590ceebaa9cf6e57a1b7600c6982a"
+   "size": 220556,
+   "sha256": "f8c9ca74afd830759d7703e5303f553b8c4577d94b7b046731c3332eb4b70eee"
   },
   {
    "path": "favicon.svg",
@@ -203,8 +203,8 @@
   },
   {
    "path": "game/shared/props.js",
-   "size": 14086,
-   "sha256": "41c5ac795d489afbb26196433834f1c5bb5ba5fb4ca5fe0d52ae00435264f3bb"
+   "size": 14095,
+   "sha256": "b2467c3a02065bfd460bd44ea93315642eccaafc816eefb1c13f85c86800aa30"
   },
   {
    "path": "game/shared/tiptext.js",
@@ -248,13 +248,13 @@
   },
   {
    "path": "game/singleplayer/end.js",
-   "size": 1024,
-   "sha256": "c712591472bdf038b8d9aca87b0ba0c03de88142cdda815fc397e7363e827ded"
+   "size": 1035,
+   "sha256": "ff36f4d4f3de42e29fbd97e6d4521fbeba86f09bbbf207405372a25253e31eda"
   },
   {
    "path": "game/singleplayer/event.js",
-   "size": 1298,
-   "sha256": "15dbfe3e01201a2ff9bb1fc427496eaa867a3e9205e45dcddd9cefc4e639eac5"
+   "size": 1315,
+   "sha256": "711830a839785bb6f37e80f4ef55da54beddfb7d8ed29a30ca563b490f8d274f"
   },
   {
    "path": "game/singleplayer/events.js",
@@ -263,8 +263,8 @@
   },
   {
    "path": "game/singleplayer/evolution.js",
-   "size": 1538,
-   "sha256": "a244479a143595f93192f11b6ef000ceadba41d5d8cb7f7ce2f41ef2efe454e8"
+   "size": 1516,
+   "sha256": "82195bd7cd1c971ddd15ed2668d542d051ac1ce642a6ff2756511c8cb89bb5d4"
   },
   {
    "path": "game/singleplayer/flow.js",
@@ -288,8 +288,8 @@
   },
   {
    "path": "game/singleplayer/main.js",
-   "size": 6228,
-   "sha256": "184119db07f5e3a1e6dcb9ba80ae38eaaa051fdf2996d6fc2dda70aa3ea62a4f"
+   "size": 6854,
+   "sha256": "d4d709fd1483359f260fa36cc99b00249db666f3c48479b4e7ef2f870b507ea4"
   },
   {
    "path": "game/singleplayer/map.js",
@@ -303,13 +303,13 @@
   },
   {
    "path": "game/singleplayer/mapui.css",
-   "size": 6403,
-   "sha256": "5fca65c309929421f0e3d807ce4dc7eb1849ae67899a4cab2da4eec845ce1504"
+   "size": 6576,
+   "sha256": "470c601e2ccdf5fffee22635e4434a051548a5ef4f9fd4f05ab6848457b93ae8"
   },
   {
    "path": "game/singleplayer/mapui.js",
-   "size": 9399,
-   "sha256": "f8ac113a2cce9018ff90d7d4b9d5e9f9e6ad7ac465617dbde2d4c964f809b4f7"
+   "size": 10219,
+   "sha256": "5505a3ce868be3bb91eb5c88b49f0491db0ff98a7bb01fd86c021f4730683a29"
   },
   {
    "path": "game/singleplayer/nodeart.js",
@@ -318,23 +318,23 @@
   },
   {
    "path": "game/singleplayer/recruit.js",
-   "size": 2896,
-   "sha256": "cc93504a013fdf6c2f081774266281c3fa60fca610f6a7d25bc68cfdcbcee0e7"
+   "size": 2925,
+   "sha256": "5f79bfe48c912c6d9f30182b17c2d2c88dbb9f5fdde7c18021d2a352e7a14dd3"
   },
   {
    "path": "game/singleplayer/rest.js",
-   "size": 747,
-   "sha256": "254279e96e6dbd45465ddf3c43d5292f47b0531a86090ba3830f5e50d5d1a594"
+   "size": 758,
+   "sha256": "06e5ffa7ba3ed8b8ce24cdc8c6d29d0ffdce1b60409220fb59879aafca6e9ae3"
   },
   {
    "path": "game/singleplayer/reward.js",
-   "size": 1665,
-   "sha256": "7da46266397d40a6250e5312e9ca63929e3dbcb73b2f0fb737c1bbbf6e63076c"
+   "size": 1637,
+   "sha256": "4d57eb0430fe4cc6b7a2ef010f2ab86c0237e2ab79595c6ae75c0e68ae8fadf1"
   },
   {
    "path": "game/singleplayer/rival.js",
-   "size": 2771,
-   "sha256": "d889cbfaa8de699171548de14c58c35163c4ab27f8e627ab09c0def366d86dce"
+   "size": 2782,
+   "sha256": "47196f77f728bd9c25d2811bcfb05a329b7582bda3f38ebf1ccc002d0fcc261f"
   },
   {
    "path": "game/singleplayer/save.js",
@@ -343,28 +343,28 @@
   },
   {
    "path": "game/singleplayer/shop.js",
-   "size": 1417,
-   "sha256": "56c875e0ca81b0208535242216390ffaaee5d1736a9e678920b396532fd3a2b9"
+   "size": 1442,
+   "sha256": "fbd6fbb81911b27c38076f0650dea8827ac51cb03a618a5cd20d7ddbae32c4d0"
   },
   {
    "path": "game/singleplayer/squad.js",
-   "size": 2461,
-   "sha256": "00cdc46dd511b3245c2fbc633b7e4bf1c7f5332d4bf260cc4bc0e889eeee0027"
+   "size": 2505,
+   "sha256": "f6d560c44de8d6e02bdac42ce66bb2a3a96b2b6dc7a21f94fae14548134716c4"
   },
   {
    "path": "game/singleplayer/starter.js",
-   "size": 1908,
-   "sha256": "8a42760a5152d562efbb307757d286a7215f0d7005d1dfc8bac02f5548566626"
+   "size": 1919,
+   "sha256": "d6c0a02bf8d9c62fb5a93020bc4f02a6b70a9b928f6255dd6e12a95c04d8264f"
   },
   {
    "path": "game/singleplayer/summary.js",
-   "size": 3885,
-   "sha256": "89b4561b92307e929cf5567e20d0f40c2eae1006e350f7d63465434db682d383"
+   "size": 3896,
+   "sha256": "5964cbb0c2e3c2fb13fa2a50875a5bf5b844a055c8f825ae5076c5a90acdf6e3"
   },
   {
    "path": "game/singleplayer/title.js",
-   "size": 3322,
-   "sha256": "c8f169ebb51a185672629e73c40c2f811df3843130896a5de6c22cfc4f65092b"
+   "size": 3361,
+   "sha256": "4cf3f25c7cd03c94495ab52b91f4f172b07eb2ee17683fdf24d60d2ce6da9fd1"
   },
   {
    "path": "game/singleplayer/trainers.json",
@@ -378,18 +378,18 @@
   },
   {
    "path": "game/singleplayer/warrior.js",
-   "size": 2064,
-   "sha256": "f42634434a54ebdd9bb797ba2c10f3d38aa1f9f35c6dd7da8c40e639f135abdc"
+   "size": 2075,
+   "sha256": "f1df000365ef74335f3647381c8135beb9b02e14bac0262cafbc01d6cb94f2f5"
   },
   {
    "path": "game/singleplayer/wild.js",
-   "size": 1264,
-   "sha256": "5d50add826b1b98ecf7eedb8022b1ec8ff3ae34144b9b4c21b6c1c045f16895a"
+   "size": 1242,
+   "sha256": "51c0d04d721c8cdf7759dd0a46d285dc12766ca37e3224b0f0628dc89a35f99e"
   },
   {
    "path": "game/skirmish/armies.js",
-   "size": 2627,
-   "sha256": "719b7e5a78ab0c0a99cdb61b6ebff8ddd9b10053b5305528738f8c11ac21bf42"
+   "size": 2633,
+   "sha256": "1705a58a5a5b7ecaea4924adea921cf59f3c0177823a8cfe1073684655ca40ed"
   },
   {
    "path": "game/skirmish/army.js",
@@ -433,8 +433,8 @@
   },
   {
    "path": "game/skirmish/dirarrows.js",
-   "size": 3771,
-   "sha256": "fb3d406e55e89ba0960228aab94dfd7e3d5d88888f5cdae74fba6f8d089bb391"
+   "size": 4027,
+   "sha256": "58f947f11fc7affbf428f52fb4c174d2093ceafbbaf0bb6317a2f1464de93dba"
   },
   {
    "path": "game/skirmish/dirarrows3d.js",
@@ -463,13 +463,13 @@
   },
   {
    "path": "game/skirmish/hud.js",
-   "size": 20865,
-   "sha256": "15884c575141c48634d7e7d07e1978433044d4eead7f4af95bf365f4714535ab"
+   "size": 23009,
+   "sha256": "8fcb53a10ea31d3c0e811d757a243cc3997420c4eaa44d26874e7404ac783375"
   },
   {
    "path": "game/skirmish/index.html",
-   "size": 17699,
-   "sha256": "2fd686887075d55931545f274942dc7bbd77cefc8d3dc6c1b2195fe6e5f5950d"
+   "size": 17875,
+   "sha256": "26303a2a49175212571cf169b8b58336421071efca3b13aebb3f2fe069d73902"
   },
   {
    "path": "game/skirmish/inforoster.js",
@@ -548,8 +548,8 @@
   },
   {
    "path": "game/skirmish/skillcard.js",
-   "size": 12377,
-   "sha256": "2f31c82f4e3bafef52d7620b4c30e966a7645b82c50be6436197a45af59bf35f"
+   "size": 12483,
+   "sha256": "42c8820587efd6228c717abcd9915cc6c428ce7bf551c73742f9a541e1752972"
   },
   {
    "path": "game/skirmish/speed.js",
@@ -558,8 +558,8 @@
   },
   {
    "path": "game/skirmish/stage.js",
-   "size": 34514,
-   "sha256": "b7be2dda57e714a890d8e492d39b1444328c13fbb9d66976b1a1fd40a52855c0"
+   "size": 35011,
+   "sha256": "0de92c5f8a5355aa1aca4bde57e52904542004d387b74df424eb43272fd69ebd"
   },
   {
    "path": "game/skirmish/status.js",

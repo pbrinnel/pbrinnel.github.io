@@ -50,3 +50,5 @@ body.embed #app{padding:6px}
 .hero.portrait{min-height:0}.hero.portrait .hside{padding:12px 0;gap:12px;min-height:0}.hero.portrait .hinfo{gap:3px}
 /* portrait tile: info panel and action button side by side (title on one line); the tile grows (portrait with it) rather than clipping */
 .hero.portrait .hside{flex-direction:row;flex-wrap:wrap;justify-content:center;gap:12px 16px;align-items:center;min-width:0}.hero.portrait .hinfo{flex:0 1 auto;min-width:0}.htitle{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;justify-content:center}
+
+.hteam.row.fit{width:0;min-width:100%;position:relative;z-index:1;overflow:visible}   /* team row: no intrinsic width (sized by the panel), drawn above the panel stroke */

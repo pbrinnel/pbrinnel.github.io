@@ -58,6 +58,7 @@
   body:not(.opt-log):not(.opt-roster) #right { display:none; }
   body:not(.opt-log) #logwrap { display:none; }
   body:not(.opt-logbtn) #b-logtoggle { display:none !important; }   /* Log button: off by default, the L key still toggles the log */
+  #b-summary { display:none !important; }   /* the grey native-font 'Summary' button is not ROM UI: the result card is reopened from the end card, not from a top-bar button */
   body:not(.opt-logbtn) #top:not(:has(#b-summary:not([hidden]), #badge:not([hidden]))) { display:none !important; }   /* no empty panel left behind */
   body:not(.opt-roster) #roster { display:none; }
 </style>
