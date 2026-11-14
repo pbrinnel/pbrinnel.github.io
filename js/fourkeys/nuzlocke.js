@@ -208,7 +208,11 @@
         const dead = n.queue.shift();
         delete menu.pads[dead];
         nuzBoomStart(dead);
-        if (n.queue.length) { LAB.usePad(n.queue[0]); nuzUsed(n.queue[0]); }
+        if (n.queue.length) {
+            LAB.usePad(n.queue[0]); nuzUsed(n.queue[0]);
+            const held = menu.run.held;     // the stage's row shows every one held in it
+            if (held && held.length < BOARD_STAGE_PADS && held[held.length - 1] !== n.queue[0]) held.push(n.queue[0]);
+        }
         lives = n.queue.length;
     }
     // a stage won: its score into the run's, its key, its BRANDON, and the

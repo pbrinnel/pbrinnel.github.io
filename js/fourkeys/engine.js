@@ -1155,6 +1155,10 @@
     const BOARD_URL = 'https://brandon2-board.pbrinnel.workers.dev/';
     const BOARD_ON = !!BOARD_URL;
     const TOP_N = 10;
+    // the most paddles a row can show: a stage's row is the ones held during
+    // that stage (a NUZLOCKE run fields seven at most), NUZLOCKE's own is every
+    // one the run played as
+    const BOARD_STAGE_PADS = 7, BOARD_NUZ_PADS = 12;
     // The worker's name for each of the town's stages (menu.js's `n`, and
     // M_RUSH). They are the save file's tokens and pinned like them: the
     // worker has the same list, and renaming one orphans its table.
@@ -1169,23 +1173,27 @@
 
     // rows come back from a public endpoint, so treat them as untrusted text.
     // TOTAL adds up every stage it counts, so it can run past one run's cap.
-    // A row's paddle is kept only if it is one this game has.
-    function cleanRows(raw, cap) {
+    // A row's paddle is kept only if it is one this game has, and so is each
+    // of its paddles, up to padCap.
+    function cleanRows(raw, cap, padCap) {
         if (!Array.isArray(raw)) return [];
         return raw.map(r => ({
             ini: String((r && r.ini) || '???').toUpperCase()
                      .replace(/[^A-Z]/g, '').slice(0, 3).padEnd(3, '?'),
             score: Math.max(0, Math.min(cap || SCORE_CAP, parseInt(r && r.score, 10) || 0)),
             pad: r && typeof r.pad === 'string' && Object.hasOwn(LAB_PAD, padNow(r.pad)) ? padNow(r.pad) : null,
-            // NUZLOCKE's rows keep every paddle the run played as
+            // NUZLOCKE's rows keep every paddle the run played as; a stage's, the
+            // ones held during it, when there was more than one (the worker
+            // leaves `pads` off a row of one, and an older worker never has it)
             pads: r && Array.isArray(r.pads) ? r.pads.filter(k => typeof k === 'string' && Object.hasOwn(LAB_PAD, padNow(k)))
-                                                      .map(padNow).slice(0, 12) : null
+                                                      .map(padNow).slice(0, padCap || BOARD_STAGE_PADS) : null
         })).sort((a, b) => b.score - a.score).slice(0, TOP_N);
     }
 
     function takeBoards(raw) {
         boards = {};
-        for (const id of Object.values(BOARD_IDS)) boards[id] = cleanRows(raw && raw.boards && raw.boards[id]);
+        for (const id of Object.values(BOARD_IDS)) boards[id] = cleanRows(raw && raw.boards && raw.boards[id], undefined,
+                                         id === BOARD_IDS.nuzlocke ? BOARD_NUZ_PADS : BOARD_STAGE_PADS);
         boards[BOARD_TOTAL] = cleanRows(raw && raw.total, SCORE_CAP * Object.keys(BOARD_IDS).length);
         board = boards[boardId] || [];
         boardLive = true;
@@ -1214,7 +1222,11 @@
             const res = await fetch(BOARD_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ stage: boardId, ini, score: n, pad: boardPads ? null : boardPad || LAB.pad, pads: boardPads || undefined })
+                // the first paddle is `pad`, as ever, so a worker that does not know
+                // `pads` still shows a stage row one; NUZLOCKE's row has `pads` only
+                body: JSON.stringify({ stage: boardId, ini, score: n,
+                                       pad: boardPads && boardId === BOARD_IDS.nuzlocke ? null : boardPad || LAB.pad,
+                                       pads: boardPads || undefined })
             });
             if (!res.ok) throw new Error(res.status);
             takeBoards(await res.json());
@@ -1236,7 +1248,8 @@
     // then the table, and a press on that runs `then`. The phase it
     // interrupted comes back with it. The run's score is kept apart, since
     // the town has its own by now -- and so is the paddle it was played with,
-    // since the town may have put a new one in your hands since.
+    // since the town may have put a new one in your hands since. A stage row
+    // that held several carries them all in `pads`, with `pad` the first.
     function boardAsk(n, points, then, pad, pads) {
         boardPick(n);
         boardScore = points;
@@ -5208,6 +5221,21 @@
     // on a desktop, where the table is the whole point of the screen, and at
     // phone scale it ran the tenth row straight through the game-over clock.
     const BOARD_PITCH = 32;       // row to row at full size
+    // A stage row held several paddles (a NUZLOCKE run loses one and the next
+    // takes over): they shrink to share the slot the single icon has, side by
+    // side in the order they were played, so a row of one is exactly the one
+    // paddle it always was. The slot, in k units from the icon's own centre
+    // (BOARD_PAD_X), grows a little either way, and never nearer the score
+    // than BOARD_PAD_SCORE_GAP px or the field's edge than BOARD_PAD_EDGE px.
+    const BOARD_PAD_X = 215, BOARD_PAD_W = 64;
+    const BOARD_PAD_GROW_L = 14, BOARD_PAD_GROW_R = 8;
+    const BOARD_PAD_CAP = 0.7;          // no icon wider than this share of the single one's
+    const BOARD_PAD_GAP = 1;            // between two, in k units
+    const BOARD_PAD_SCORE_GAP = 10, BOARD_PAD_EDGE = 6;
+    function boardPadIcon(pk, x, y, w, a) {
+        if (typeof menuBoardPadIcon === 'function') menuBoardPadIcon(pk, x, y, w, a);
+        else labPadIcon(pk, x, y, w, false, a);
+    }
     function drawBoard(top, bottom, hudU) {
         // title baseline to the foot of the tenth row is 10.5 pitches
         const pitch = Math.min(BOARD_PITCH * Math.min(hudU, 1.25), (bottom - top) / 10.5);
@@ -5229,24 +5257,26 @@
             // right-aligned, so 9 and 10 end in the same column
             // a run's whole line-up needs more room than one paddle does, so
             // the columns move over for the table that carries one
-            const sh = boardId === BOARD_IDS.nuzlocke ? -70 * k : 0;
+            const nuz = boardId === BOARD_IDS.nuzlocke;
+            const sh = nuz ? -70 * k : 0;
             text(String(i + 1), LW / 2 - 128 * k + sh, y, size, col, 'right');
             text(r.ini, LW / 2 - 60 * k + sh, y, size, col);
             text(fmtScore(r.score), LW / 2 + 160 * k + sh, y, size, col, 'right');
-            if (r.pads && r.pads.length) {
+            const py = y - size * 0.33, a = mine || i === 0 ? 1 : 0.75;
+            if (nuz && r.pads && r.pads.length) {
                 const x0 = LW / 2 + 160 * k + sh + 24, step = Math.min(34, (LW - 14 - x0) / r.pads.length);
-                r.pads.forEach((pk, j) => {
-                    const px = x0 + step * (j + 0.5), py = y - size * 0.33, a = mine || i === 0 ? 1 : 0.75;
-                    if (typeof menuBoardPadIcon === 'function') menuBoardPadIcon(pk, px, py, step * 0.95, a);
-                    else labPadIcon(pk, px, py, step * 0.95, false, a);
-                });
-            }
-            // the paddle the run was played with, level with the row's letters,
-            // dark if it is not yours yet (menuBoardPadIcon)
-            if (r.pad) {
-                const px = LW / 2 + 215 * k, py = y - size * 0.33, a = mine || i === 0 ? 1 : 0.75;
-                if (typeof menuBoardPadIcon === 'function') menuBoardPadIcon(r.pad, px, py, 64 * k, a);
-                else labPadIcon(r.pad, px, py, 64 * k, false, a);
+                r.pads.forEach((pk, j) => boardPadIcon(pk, x0 + step * (j + 0.5), py, step * 0.95, a));
+            } else if (!nuz && r.pads && r.pads.length > 1) {
+                const sw = BOARD_PAD_W * k, n = r.pads.length, c0 = LW / 2 + BOARD_PAD_X * k;
+                const lo = Math.max(LW / 2 + 160 * k + BOARD_PAD_SCORE_GAP, c0 - sw / 2 - BOARD_PAD_GROW_L * k);
+                const hi = Math.min(LW - BOARD_PAD_EDGE, c0 + sw / 2 + BOARD_PAD_GROW_R * k);
+                const gap = BOARD_PAD_GAP * k, w = Math.min(sw * BOARD_PAD_CAP, (hi - lo - gap * (n - 1)) / n);
+                const x0 = (lo + hi) / 2 - (w * n + gap * (n - 1)) / 2 + w / 2;
+                r.pads.forEach((pk, j) => boardPadIcon(pk, x0 + (w + gap) * j, py, w, a));
+            } else if (r.pad) {
+                // the paddle the run was played with, level with the row's letters,
+                // dark if it is not yours yet (menuBoardPadIcon)
+                boardPadIcon(r.pad, LW / 2 + BOARD_PAD_X * k, py, BOARD_PAD_W * k, a);
             }
         }
     }

@@ -296,14 +296,16 @@
         menu.post = null;                // one left from a run the town never got to ask about
         menu.postQ = [];
         menu.run.was = best;
-        menu.run.pad = LAB.pad;          // what the row will say it was played with
+        menu.run.pad = LAB.pad;          // what the row will say it was played with...
+        menu.run.held = [LAB.pad];       // ...and every one held in the stage, in order (nuzLost adds the ones that take over)
         boardPick(menu.run.n);           // the one the game-over screen shows
     }
     // ...and ended, on its way back to the town. It is decided against the
     // tables as they are once they have been fetched again (menuUpdate waits).
     function menuBoardPost(run) {
         if (!menuBoardOn() || !(score > 0)) return;
-        const p = menu.post = { n: run.n, score, was: run.was || 0, pad: run.pad, ready: false };
+        const held = run.held && run.held.length > 1 ? run.held.slice() : null;     // a row of one is just `pad`
+        const p = menu.post = { n: run.n, score, was: run.was || 0, pad: run.pad, pads: held, ready: false };
         fetchBoard().then(() => { p.ready = true; });
     }
     // A NUZLOCKE run can owe two: the stage it ended on, then its own total
