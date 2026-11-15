@@ -69,6 +69,10 @@
     const NUZ_BASE_LINK = 6;         // px, a head at the rim of an arm
     const NUZ_BASE_STEP = 0.11;      // an arm's links, as shares of its length
     const NUZ_TEXT_PX = 7;           // the name across him
+    // the BEST line's size on screen, as the levels' own (it is drawn under the sign's scale, so divided back out)
+    const NUZ_BEST_PX = 11;
+    // ...and how far under the sign it hangs on screen, the same as BOSS RUSH's (13 px at its 1.2 scale)
+    const NUZ_BEST_DROP = 15.6;
     const NUZ_BOOM_SECS = 0.9;       // a lost paddle coming apart
     const NUZ_SHARDS = 22;
 
@@ -433,7 +437,7 @@
         for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, 1], [-1, 1], [1, -1]]) text('NUZLOCKE', cx + dx, cy + 2.5 + dy, NUZ_TEXT_PX, '#000', 'center');
         ctx.restore();
         text('NUZLOCKE', cx, cy + 2.5, NUZ_TEXT_PX, menuSignInk(st), 'center');
-        if (menu.best[M_NUZ] > 0) text('BEST ' + fmtScore(menu.best[M_NUZ]), c.x, c.y + ry + 12, 10, menuSignInk(st), 'center');
+        if (menu.best[M_NUZ] > 0) text('BEST ' + fmtScore(menu.best[M_NUZ]), c.x, c.y + ry + NUZ_BEST_DROP / menuSignS, NUZ_BEST_PX / menuSignS, menuSignInk(st), 'center');
     }
 
     // ---- the corner: the BRANDONS still to play ---------------------------------------
