@@ -615,7 +615,7 @@ served (locally or on the site), not opened as a file.
 
 **Unlisted, always:** found by direct URL only. The page carries `noindex, nofollow`, has
 no link-preview tags (`og:`/`twitter:`), and nothing on the site links to it, like
-brandon.html and fourkeys.html.
+brandon.html and brandon2.html.
 
 The target is 4-digit agent counts, smooth on a phone as well as the Mac. Grass counts as
 agents, and grass far outnumbers the animals: a 300×200 world at 40% grass is about 24,000

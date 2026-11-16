@@ -79,7 +79,7 @@
                           lamps: 'LAMP_LVL', gleeok: 'GL_LVL', headless: 'HL_LVL',
                           agahnim: 'AG_LVL', dodongo: 'DOD_LVL', lucifer: 'LU_LVL' };
     const MENU_ALL = MENU_LEVELS.concat([MENU_LAST, MENU_VOID]);
-    // fourkeys.html's ?reset names this key and MENU_PAD_KEY itself, since it
+    // brandon2.html's ?reset names this key and MENU_PAD_KEY itself, since it
     // runs before this file: rename either and change it there too.
     const MENU_KEY = 'brandon-metalab.progress';
     // The paddle last in your hands, so the next visit starts with it. Kept in
@@ -3167,7 +3167,7 @@
     // the way the opening's tap does (dismissSplash stands aside while this is
     // up): the initials are asked for first, and they are the engine's, on the
     // canvas. So while they are up the canvas is lifted over the splash
-    // (fourkeys.html, title-asks) and draw() leaves it clear under them,
+    // (brandon2.html, title-asks) and draw() leaves it clear under them,
     // which puts them over the title.
     // Then the town arrives as it does after the opening cards.
     const TITLE_BLACK = 1.5;         // seconds of black between the credits and the title
@@ -3244,7 +3244,7 @@
         menu.skipShow = 0;
         if (menuUnlockUp()) menuShowNext(); else menuShow('memories');
     }
-    const SKIP_INK0 = '#6d685f';     // the line under the field, as fourkeys.html has it...
+    const SKIP_INK0 = '#6d685f';     // the line under the field, as brandon2.html has it...
     const SKIP_INK1 = '#f2efe9';     // ...and held all the way
     const SKIP_BAR_W = 240;          // the bar, px at full size
     const SKIP_BAR_H = 10;

@@ -10,7 +10,7 @@
 menuOpen();
 
 // A phone has no keys to enter the konami code with, so the address can ask
-// for the debug menu instead: fourkeys.html?debug opens it as the page loads.
+// for the debug menu instead: brandon2.html?debug opens it as the page loads.
 // It has to come after the town, because standing a stage up closes the menu.
 // The splash is cleared first and the wake lock taken, as a tap on it would:
 // a tap that clears the splash can lose its click (see splash), and the first

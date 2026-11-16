@@ -17,7 +17,7 @@
     // numbers. The bosses were all tuned as the fifth of brandon.html's five
     // stages, so they keep 4 whichever screen of a level they fall on.
     //
-    // Only fourkeys.html loads this. The boss lab does not, so menu.js asks
+    // Only brandon2.html loads this. The boss lab does not, so menu.js asks
     // for it with typeof, and falls back to going straight to the boss.
     const LV_BOSS = { dbg: 'BOSS', boss: true, pace: 4 };
 

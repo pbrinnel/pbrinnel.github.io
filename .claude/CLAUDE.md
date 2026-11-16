@@ -28,10 +28,12 @@ A game with a shared online leaderboard.
 - Feel numbers (spin, speeds, angles, timings) stay flat named `const`s. When a change is about how something feels, offer Paul a slider page to tune it himself instead of guessing values.
 - Don't rebuild the spin lab. If `.claude/spinlab/` exists, write what the next build will need into `.claude/spinlab/TODO.md` instead — new sliders, hooks, panel rows — and say so when you finish. Paul rebuilds it when he next wants it: `node .claude/spinlab/spinlab-build.js`.
 
-## fourkeys.html
+## brandon2.html
 
-The sequel, under a codename. `brandon.html` is the released game and sequel work never
-touches it.
+The sequel. It was built under the codename fourkeys, which its folders keep:
+`js/fourkeys/` and `fonts/fourkeys/` (renamed from `fourkeys.html` on 16 Nov 2026; the
+folders were left alone so no script or font path changed). `brandon.html` is the released
+game and sequel work never touches it.
 
 - **Unlisted, like brandon.html**: `noindex, nofollow`, not linked from anywhere, and no
   `og:`/`twitter:` tags at all, so a pasted link shows nothing. It carries the site's Google
@@ -70,11 +72,11 @@ touches it.
   brandon.html (the lab refuses a name declared twice). Where the lab needs an engine
   change of fourkeys', the build lifts it out of `engine.js` rather than copying it (the
   paddle split, `spread()`..`halfSpan()`, is the first).
-- **Load order is the whole design and `fourkeys.html` sets it.** They are plain scripts
+- **Load order is the whole design and `brandon2.html` sets it.** They are plain scripts
   sharing one scope: runtime and modules first, `engine.js` after them, `start.js` last.
   Nothing in a module may READ an engine const at load time — inside a function is fine.
 - **Every font ships with the game**, in `fonts/fourkeys/` (woff2, with each font's OFL
-  licence), declared by `@font-face` in `fourkeys.html`. Never a system font or a font
+  licence), declared by `@font-face` in `brandon2.html`. Never a system font or a font
   service: text must look the same on every machine. Fira Sans is the player's and the
   UI's; each other Brandon speaks in his own font and colour (see `MEM_VOICE` in
   `memory.js`).

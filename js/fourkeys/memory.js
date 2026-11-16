@@ -31,7 +31,7 @@
     const MEM_FONT_WAIT = 4;
     const MEM_CLAY = '#c48a6c';
     // Each Brandon's voice: his face and his colour. The faces ship with the
-    // game (see fourkeys.html), and the card holds until they are in, so no
+    // game (see brandon2.html), and the card holds until they are in, so no
     // line is ever drawn in a stand-in. Each colour is taken from how he
     // looks: the Angel cool as his halo's light, the Fallen the clay of his
     // arms, HIM his radiance rather than his clay, so the two warm ones stay

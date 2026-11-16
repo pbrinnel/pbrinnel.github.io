@@ -9,7 +9,7 @@
 // share, and its functions onto the window. The indentation is brandon.html's,
 // left as it is so the two can still be read side by side.
 //
-// Load order matters and fourkeys.html sets it: runtime, then the bosses,
+// Load order matters and brandon2.html sets it: runtime, then the bosses,
 // mini-bosses, paddles and the town, and this last -- setup at the bottom of
 // this file calls into all of them.
 'use strict';
@@ -1039,7 +1039,7 @@
     const canvas = document.getElementById('stage');
     const ctx = canvas.getContext('2d');
 
-    // a phone held upright, which fourkeys.html gives the thumb pad. the same
+    // a phone held upright, which brandon2.html gives the thumb pad. the same
     // query is written out in its css, and the two must match.
     const PORTRAIT_PAD = matchMedia('(max-width: 700px) and (orientation: portrait)');
 

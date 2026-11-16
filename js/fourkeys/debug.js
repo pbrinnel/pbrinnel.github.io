@@ -1,7 +1,7 @@
 'use strict';
 
     // ---- FOUR KEYS: the debug menu ---------------------------------------------------
-    // What the konami code opens, and fourkeys.html?debug on a phone. The town
+    // What the konami code opens, and brandon2.html?debug on a phone. The town
     // is the whole of the game's progress, so this is the whole of the cheat
     // menu: hand yourself a key, a paddle or a memory, or put it all back --
     // and, inside a level, skip the screen you are on or go straight to its boss.

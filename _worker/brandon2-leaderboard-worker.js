@@ -1,4 +1,4 @@
-// Leaderboards for brandon2 (fourkeys.html until it launches under that name).
+// Leaderboards for brandon2 (brandon2.html; it was built under the codename fourkeys).
 // Deploy as its own Cloudflare Worker, `brandon2-board`, with its own KV
 // namespace bound as SCORES -- never brandon.html's, whose table this must not
 // touch. Kept in the repo so the deployed source is not only living in the
