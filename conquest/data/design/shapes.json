@@ -1,0 +1,795 @@
+{
+ "_header": {
+  "source": "authored by us for the levels redesign (docs/DESIGN_LEVELS.md 5.4 / 5.6); no external source",
+  "date": "2026-11-14",
+  "method": "hand-written cell masks",
+  "notes": "cells are [dx, dy] relative to the user, facing North (y grows south, as docs/rules/battle.md 14); rotated like ROM shapes. A move with shape {kind:new, id} points here. DRAFT: the user reviews the shapes in labs/design."
+ },
+ "data": [
+  {
+   "id": "front1",
+   "name": "Front cell",
+   "desc": "melee contact: the cell in front",
+   "cells": [
+    [
+     0,
+     -1
+    ]
+   ],
+   "needs_engine": false
+  },
+  {
+   "id": "line2",
+   "name": "Line 2",
+   "desc": "short ranged: two cells ahead",
+   "cells": [
+    [
+     0,
+     -1
+    ],
+    [
+     0,
+     -2
+    ]
+   ],
+   "needs_engine": false
+  },
+  {
+   "id": "line3-pierce",
+   "name": "Beam, line 3 (pierce)",
+   "desc": "three cells ahead, hits everything in the line",
+   "cells": [
+    [
+     0,
+     -1
+    ],
+    [
+     0,
+     -2
+    ],
+    [
+     0,
+     -3
+    ]
+   ],
+   "needs_engine": false
+  },
+  {
+   "id": "line4-pierce",
+   "name": "Long beam, line 4",
+   "desc": "four cells ahead",
+   "cells": [
+    [
+     0,
+     -1
+    ],
+    [
+     0,
+     -2
+    ],
+    [
+     0,
+     -3
+    ],
+    [
+     0,
+     -4
+    ]
+   ],
+   "needs_engine": false
+  },
+  {
+   "id": "blast-r1-at2",
+   "name": "Blast, burst r1 at 2",
+   "desc": "3x3 burst centred two cells ahead",
+   "cells": [
+    [
+     -1,
+     -3
+    ],
+    [
+     0,
+     -3
+    ],
+    [
+     1,
+     -3
+    ],
+    [
+     -1,
+     -2
+    ],
+    [
+     0,
+     -2
+    ],
+    [
+     1,
+     -2
+    ],
+    [
+     -1,
+     -1
+    ],
+    [
+     0,
+     -1
+    ],
+    [
+     1,
+     -1
+    ]
+   ],
+   "needs_engine": false
+  },
+  {
+   "id": "blast-r1-at3",
+   "name": "Blast, burst r1 at 3",
+   "desc": "3x3 burst centred three cells ahead",
+   "cells": [
+    [
+     -1,
+     -4
+    ],
+    [
+     0,
+     -4
+    ],
+    [
+     1,
+     -4
+    ],
+    [
+     -1,
+     -3
+    ],
+    [
+     0,
+     -3
+    ],
+    [
+     1,
+     -3
+    ],
+    [
+     -1,
+     -2
+    ],
+    [
+     0,
+     -2
+    ],
+    [
+     1,
+     -2
+    ]
+   ],
+   "needs_engine": false
+  },
+  {
+   "id": "cone2",
+   "name": "Cone, depth 2",
+   "desc": "3-wide triangle, depth 2 (1 + 3 cells)",
+   "cells": [
+    [
+     0,
+     -1
+    ],
+    [
+     -1,
+     -2
+    ],
+    [
+     0,
+     -2
+    ],
+    [
+     1,
+     -2
+    ]
+   ],
+   "needs_engine": false
+  },
+  {
+   "id": "cone3",
+   "name": "Cone, depth 3",
+   "desc": "triangle, depth 3 (1 + 3 + 5 cells)",
+   "cells": [
+    [
+     0,
+     -1
+    ],
+    [
+     -1,
+     -2
+    ],
+    [
+     0,
+     -2
+    ],
+    [
+     1,
+     -2
+    ],
+    [
+     -2,
+     -3
+    ],
+    [
+     -1,
+     -3
+    ],
+    [
+     0,
+     -3
+    ],
+    [
+     1,
+     -3
+    ],
+    [
+     2,
+     -3
+    ]
+   ],
+   "needs_engine": false
+  },
+  {
+   "id": "self-burst-r1",
+   "name": "Self burst r1",
+   "desc": "3x3 around the user (the 8 neighbours)",
+   "cells": [
+    [
+     -1,
+     -1
+    ],
+    [
+     0,
+     -1
+    ],
+    [
+     1,
+     -1
+    ],
+    [
+     -1,
+     0
+    ],
+    [
+     1,
+     0
+    ],
+    [
+     -1,
+     1
+    ],
+    [
+     0,
+     1
+    ],
+    [
+     1,
+     1
+    ]
+   ],
+   "needs_engine": false
+  },
+  {
+   "id": "self-burst-r2",
+   "name": "Self burst r2",
+   "desc": "diamond of radius 2 around the user",
+   "cells": [
+    [
+     0,
+     -2
+    ],
+    [
+     -1,
+     -1
+    ],
+    [
+     0,
+     -1
+    ],
+    [
+     1,
+     -1
+    ],
+    [
+     -2,
+     0
+    ],
+    [
+     -1,
+     0
+    ],
+    [
+     1,
+     0
+    ],
+    [
+     2,
+     0
+    ],
+    [
+     -1,
+     1
+    ],
+    [
+     0,
+     1
+    ],
+    [
+     1,
+     1
+    ],
+    [
+     0,
+     2
+    ]
+   ],
+   "needs_engine": false
+  },
+  {
+   "id": "wall3",
+   "name": "Wall, 3 wide",
+   "desc": "three cells perpendicular to the facing, one ahead",
+   "cells": [
+    [
+     -1,
+     -1
+    ],
+    [
+     0,
+     -1
+    ],
+    [
+     1,
+     -1
+    ]
+   ],
+   "needs_engine": false
+  },
+  {
+   "id": "wall5-at2",
+   "name": "Wall, 5 wide at 2",
+   "desc": "five cells perpendicular to the facing, two ahead",
+   "cells": [
+    [
+     -2,
+     -2
+    ],
+    [
+     -1,
+     -2
+    ],
+    [
+     0,
+     -2
+    ],
+    [
+     1,
+     -2
+    ],
+    [
+     2,
+     -2
+    ]
+   ],
+   "needs_engine": false
+  },
+  {
+   "id": "sweep5",
+   "name": "Sweep, arc 5",
+   "desc": "arc of 5 cells around the front",
+   "cells": [
+    [
+     -1,
+     0
+    ],
+    [
+     -1,
+     -1
+    ],
+    [
+     0,
+     -1
+    ],
+    [
+     1,
+     -1
+    ],
+    [
+     1,
+     0
+    ]
+   ],
+   "needs_engine": false
+  },
+  {
+   "id": "cross-r2",
+   "name": "Cross r2",
+   "desc": "plus shape, 2 cells each way (the four directions)",
+   "cells": [
+    [
+     0,
+     -1
+    ],
+    [
+     0,
+     -2
+    ],
+    [
+     1,
+     0
+    ],
+    [
+     2,
+     0
+    ],
+    [
+     0,
+     1
+    ],
+    [
+     0,
+     2
+    ],
+    [
+     -1,
+     0
+    ],
+    [
+     -2,
+     0
+    ]
+   ],
+   "needs_engine": false
+  },
+  {
+   "id": "chain-jump",
+   "name": "Chain (2 cells + 1 jump)",
+   "desc": "two cells ahead then jumps to a cell beside the last: needs a new engine step and targeting UI",
+   "cells": [
+    [
+     0,
+     -1
+    ],
+    [
+     0,
+     -2
+    ],
+    [
+     -1,
+     -3
+    ],
+    [
+     1,
+     -3
+    ]
+   ],
+   "needs_engine": true,
+   "note": "engine: chain targeting"
+  },
+  {
+   "id": "free-aim-r4",
+   "name": "Free aim, within 4",
+   "desc": "any cell within 4 (drawn as the reachable area): needs a targeting UI",
+   "cells": [
+    [
+     0,
+     -4
+    ],
+    [
+     -1,
+     -3
+    ],
+    [
+     0,
+     -3
+    ],
+    [
+     1,
+     -3
+    ],
+    [
+     -2,
+     -2
+    ],
+    [
+     -1,
+     -2
+    ],
+    [
+     0,
+     -2
+    ],
+    [
+     1,
+     -2
+    ],
+    [
+     2,
+     -2
+    ],
+    [
+     -3,
+     -1
+    ],
+    [
+     -2,
+     -1
+    ],
+    [
+     -1,
+     -1
+    ],
+    [
+     0,
+     -1
+    ],
+    [
+     1,
+     -1
+    ],
+    [
+     2,
+     -1
+    ],
+    [
+     3,
+     -1
+    ],
+    [
+     -4,
+     0
+    ],
+    [
+     -3,
+     0
+    ],
+    [
+     -2,
+     0
+    ],
+    [
+     -1,
+     0
+    ],
+    [
+     1,
+     0
+    ],
+    [
+     2,
+     0
+    ],
+    [
+     3,
+     0
+    ],
+    [
+     4,
+     0
+    ],
+    [
+     -3,
+     1
+    ],
+    [
+     -2,
+     1
+    ],
+    [
+     -1,
+     1
+    ],
+    [
+     0,
+     1
+    ],
+    [
+     1,
+     1
+    ],
+    [
+     2,
+     1
+    ],
+    [
+     3,
+     1
+    ],
+    [
+     -2,
+     2
+    ],
+    [
+     -1,
+     2
+    ],
+    [
+     0,
+     2
+    ],
+    [
+     1,
+     2
+    ],
+    [
+     2,
+     2
+    ],
+    [
+     -1,
+     3
+    ],
+    [
+     0,
+     3
+    ],
+    [
+     1,
+     3
+    ],
+    [
+     0,
+     4
+    ]
+   ],
+   "needs_engine": true,
+   "note": "engine: free-aim targeting (the player picks a cell)",
+   "aim": "free"
+  },
+  {
+   "id": "free-aim-r3",
+   "name": "Free aim, within 3",
+   "desc": "any cell within 3 (area): needs a targeting UI",
+   "cells": [
+    [
+     0,
+     -3
+    ],
+    [
+     -1,
+     -2
+    ],
+    [
+     0,
+     -2
+    ],
+    [
+     1,
+     -2
+    ],
+    [
+     -2,
+     -1
+    ],
+    [
+     -1,
+     -1
+    ],
+    [
+     0,
+     -1
+    ],
+    [
+     1,
+     -1
+    ],
+    [
+     2,
+     -1
+    ],
+    [
+     -3,
+     0
+    ],
+    [
+     -2,
+     0
+    ],
+    [
+     -1,
+     0
+    ],
+    [
+     1,
+     0
+    ],
+    [
+     2,
+     0
+    ],
+    [
+     3,
+     0
+    ],
+    [
+     -2,
+     1
+    ],
+    [
+     -1,
+     1
+    ],
+    [
+     0,
+     1
+    ],
+    [
+     1,
+     1
+    ],
+    [
+     2,
+     1
+    ],
+    [
+     -1,
+     2
+    ],
+    [
+     0,
+     2
+    ],
+    [
+     1,
+     2
+    ],
+    [
+     0,
+     3
+    ]
+   ],
+   "needs_engine": true,
+   "note": "engine: free-aim targeting",
+   "aim": "free"
+  },
+  {
+   "id": "all-adjacent-r1",
+   "name": "All adjacent (user + 8)",
+   "desc": "the 8 neighbours plus the user cell (self effects too)",
+   "cells": [
+    [
+     -1,
+     -1
+    ],
+    [
+     0,
+     -1
+    ],
+    [
+     1,
+     -1
+    ],
+    [
+     -1,
+     0
+    ],
+    [
+     1,
+     0
+    ],
+    [
+     -1,
+     1
+    ],
+    [
+     0,
+     1
+    ],
+    [
+     1,
+     1
+    ],
+    [
+     0,
+     0
+    ]
+   ],
+   "needs_engine": false
+  }
+ ]
+}

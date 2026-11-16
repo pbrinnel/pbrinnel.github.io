@@ -144,6 +144,3 @@ button[title^="Show / hide the rings"] { bottom:calc(30px + var(--ldock, 0px)) !
 /* brief 8: the top strip held only the status badge on wide windows; hide it while nothing in it is visible (no Summary, Log button / badge off) */
 @media (min-width: 1101px) { #top:not(:has(#b-summary:not([hidden]))):not(:has(#badge:not([hidden]))) { display:none !important; } }
 
-/* banner objective strip (ROM goal messages 36..39, game.js objectiveHint) */
-#objective { position:fixed; top:8px; left:50%; transform:translateX(-50%); z-index:5; padding:4px 12px; border-radius:6px; background:rgba(20,20,30,.78); color:#f4efe0; font:600 14px system-ui,sans-serif; pointer-events:none; white-space:nowrap; }
-#objective b { color:#ffd86a; }

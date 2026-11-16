@@ -44,7 +44,7 @@ body.embed #app{padding:6px}
 .pick .ck{display:inline-block;width:12px;height:12px;border:2px solid #9ab;border-radius:2px;box-sizing:border-box;position:relative}.pick.cur .ck{border-color:#7fe08f}
 .pick.cur .ck::after{content:"";position:absolute;left:2px;top:-3px;width:4px;height:8px;border:solid #7fe08f;border-width:0 3px 3px 0;transform:rotate(45deg)}
 .sbox{padding:2px 8px;gap:8px}.prog{gap:3px}
-@media (max-width:820px){.hero{flex-wrap:wrap;padding:0 12px}.hero .hside{padding:12px 0}}
+@media (max-width:820px){.hero:not(.portrait){flex-wrap:wrap;padding:0 12px}.hero:not(.portrait) .hside{padding:12px 0}}
 .hteam{display:flex;gap:2px;align-items:center}.hteam.col{flex-direction:column;justify-content:center;align-self:center}.hteam.row{flex-wrap:nowrap;justify-content:center;max-width:100%}.hteam.row img{margin-left:-8px;flex:0 0 auto}.hteam.row img:first-child{margin-left:0}.hero>.hteam.col img{margin:-6px 0}
 .hero .hstage{position:relative}.hstage>.hteam.row{position:absolute;left:100%;bottom:0;margin-left:-56px;flex-wrap:nowrap;align-items:flex-end;gap:0}.hstage>.hteam.row img{margin-left:-14px;flex:none}.hstage>.hteam.row img:first-child{margin-left:0}
 .hero.portrait{min-height:0}.hero.portrait .hside{padding:12px 0;gap:12px;min-height:0}.hero.portrait .hinfo{gap:3px}
@@ -52,3 +52,25 @@ body.embed #app{padding:6px}
 .hero.portrait .hside{flex-direction:row;flex-wrap:wrap;justify-content:center;gap:12px 16px;align-items:center;min-width:0}.hero.portrait .hinfo{flex:0 1 auto;min-width:0}.htitle{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;justify-content:center}
 
 .hteam.row.fit{width:0;min-width:100%;position:relative;z-index:1;overflow:visible}   /* team row: no intrinsic width (sized by the panel), drawn above the panel stroke */
+
+/* info panel is never narrower than its text (the ROM-font lines are never squeezed: mapFits in map.js steps the layout down instead); the title row never shrinks to a dot */
+.hero.portrait:not(.tight) .hside{min-width:min-content}.hero.portrait .hinfo{min-width:max-content}.htitle>[data-ds-text]{flex:none}
+/* tight fit (small windows, design choice): the panel column overlaps the portrait's empty side by --ov px, less padding */
+.hero.tight{padding:0 8px;gap:0}.hero.tight .hside{position:relative;z-index:2;margin-left:calc(var(--ov,0px) * -1)}
+/* level-up screens (results.js): one wide row per unit, the list scrolls inside the window; text is the ROM font at lk() (levels.js) */
+.rlist{display:flex;flex-direction:column;gap:6px;width:min(1180px,96vw);overflow:auto;padding:4px;box-sizing:border-box}
+.rrow{display:flex;gap:16px;align-items:center;justify-content:flex-start;flex-wrap:wrap;box-sizing:border-box}.rrow.flat{gap:18px}.rrow .stack{align-items:flex-start;gap:2px}.rrow .line{justify-content:flex-start;gap:4px 16px;min-height:0}
+.mpq{width:min(1100px,96vw);box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:6px}
+.evo{flex-wrap:nowrap;justify-content:center;gap:24px;width:100%}.evo .optbody{width:auto;flex:0 1 auto}
+
+/* MOVE TABLE (moninfo.js moveTable): every row is a grid with the SAME px column template (--cols), one row height (--rh), one separator style, alternating shade */
+.mtab{display:flex;flex-direction:column;box-sizing:border-box;max-width:100%;border:2px solid #4a5a8a;border-radius:4px;background:#1c2340;overflow:hidden}
+.mrow{display:grid;grid-template-columns:var(--cols);height:var(--rh);align-items:center;border-top:1px solid #3a4770;box-sizing:border-box;margin:0;padding:0;background:none;border-left:0;border-right:0;border-bottom:0;width:100%;text-align:left;font:inherit;color:inherit;cursor:default}
+.mrow:first-child{border-top:0}.mrow.alt{background:#232c52}.mrow.mhead{background:#2c3866}.mrow.pick{cursor:pointer}.mrow.pick:hover,.mrow.pick:focus-visible{background:#3a4a8a;outline:none}
+.mc{display:flex;align-items:center;min-width:0;padding:0 4px;overflow:hidden}.mc.l{justify-content:flex-start}.mc.c{justify-content:center}.mc.r{justify-content:flex-end}
+/* label + 'i' chip as one nowrap unit (main.js tagged); the 3-column stat grid is made of them */
+.tag{display:inline-flex;flex-wrap:nowrap;align-items:center;gap:4px;flex:none;white-space:nowrap}
+.sgrid{display:grid;grid-template-columns:repeat(3,auto);gap:3px 10px;justify-content:center}
+
+/* level-up results: tight rows so about 6 Pokémon fit 1280 x 720 without scrolling */
+.rlist{gap:3px}.rlist .rrow{padding:0 12px;gap:14px;border-width:2px}.rlist .rrow .grid{grid-template-columns:repeat(3,minmax(150px,auto))}
