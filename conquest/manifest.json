@@ -1,5 +1,5 @@
 {
- "version": "20261116.1433+f9927bb",
+ "version": "20261117.0508+0fe1361",
  "files": [
   {
    "path": "LICENSE.txt",
@@ -8,13 +8,13 @@
   },
   {
    "path": "builder/dist/builder.js",
-   "size": 536678,
-   "sha256": "9480924c3df69fdab15939b74db0f3104bdd32cf63bc56e4bca95fc765c18b3a"
+   "size": 544779,
+   "sha256": "f29459762708c78e2f8b03147156ce59c0e4cd472204d4b0423933631a0e622b"
   },
   {
    "path": "core/dist/core.js",
-   "size": 254776,
-   "sha256": "38e099d51b2f73da672b64c6a44e505cc402a30c27c09adc5194ec33fa2d0b6d"
+   "size": 268175,
+   "sha256": "d523ede0b1ddeb0f282eeeb86404f7d81b7fda509c36f840a7cdb5188a93ee3a"
   },
   {
    "path": "data/design/gen5_moves.json",
@@ -118,8 +118,8 @@
   },
   {
    "path": "game/design/effects_text.js",
-   "size": 16111,
-   "sha256": "23f3112ee99559184d8c3ec8e45b4c278ebf58f0a64385f1979d564bc2f9c91e"
+   "size": 16060,
+   "sha256": "f7915818d7b886ab80c54b8621dedc8e1d8c52552f7c0fc2f4187d442fe76aeb"
   },
   {
    "path": "game/design/shapes.js",
@@ -212,6 +212,11 @@
    "sha256": "b90e0bec9126e1ad0d278fe55849eb56332fb904eb3930fe4d11e62659a17b63"
   },
   {
+   "path": "game/shared/movefx.js",
+   "size": 3835,
+   "sha256": "4a439f7c565e0b9c3c45c512db80bdd0be48c478b4f82400dbab2651c6f9ad53"
+  },
+  {
    "path": "game/shared/msgurl.js",
    "size": 203,
    "sha256": "6405f4f91db4224697ce5d8e7aa37fac369bfde20552c8123481fc3ffaed1a9a"
@@ -298,8 +303,8 @@
   },
   {
    "path": "game/singleplayer/levels.js",
-   "size": 10815,
-   "sha256": "17e7e4ad02c95bbd63836301590de1707ca084d0764030626fcde8aab73d9c3e"
+   "size": 11358,
+   "sha256": "91a66e1b7d92fb641a7b63f6d6bce4b633329f010d86cf7eca31addab1fb6acd"
   },
   {
    "path": "game/singleplayer/levelsresult.js",
@@ -388,8 +393,8 @@
   },
   {
    "path": "game/singleplayer/shop.js",
-   "size": 1500,
-   "sha256": "bf82f45e1b84f1b90848cbeaea82d6c7308d1645f1ea38c9268eb7a0eb4f8dd0"
+   "size": 2608,
+   "sha256": "16c38155c51aacb94633ee0aaed9d335026935eadc0abc9c78867efd69b12cf3"
   },
   {
    "path": "game/singleplayer/squad.js",
@@ -553,8 +558,8 @@
   },
   {
    "path": "game/skirmish/levelsbattle.js",
-   "size": 5070,
-   "sha256": "247e04bd3811d180bac321bada413b5d8f4a9f6141a14d3b9d5e1fb5be65fe5e"
+   "size": 5073,
+   "sha256": "13bd6a5255d4d2a17eef74fe307a3d7a428c3a8957a7b39c8cb6dfb070d48ea9"
   },
   {
    "path": "game/skirmish/listlayer.js",
