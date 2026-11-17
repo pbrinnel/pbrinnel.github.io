@@ -3652,7 +3652,9 @@
         // timed effects
         for (const k of TIMED) {
             if (fx[k] <= 0) continue;
-            fx[k] = Math.max(0, fx[k] - dt);
+            // LASER's clock is lzUpdate's, which ends the capsule itself on its last
+            // launch: running it down to 0 here first would cancel that launch
+            fx[k] = Math.max(k === 'L' ? 1e-3 : 0, fx[k] - dt);
             if (fx[k] === 0 && k === 'B') paddle.w = PADDLE_W;
             // when ENGLISH lets go the head keeps what it was turning at, and
             // runs down from there like any other spin instead of stopping dead
