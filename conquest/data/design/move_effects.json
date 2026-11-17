@@ -1,0 +1,2299 @@
+{
+ "_header": {
+  "source": "authored by us: assigned by the rule of tools/design_move_effects.py (docs/formats/design_data.md move_effects.json); templates are ROM move INDICES (ids only, no ROM text)",
+  "date": "2026-11-15",
+  "method": "tools/design_move_effects.py (deterministic rule: contact / type / area / power band / least-used / index)",
+  "notes": "DRAFT for review in labs/design. template = ROM move whose scene (effect keys, spawn style, timing) the new move reuses; tint = type colour multiplied onto the effect when the types differ; scale reserved (1.0). Moves with class status / zone / special_effect carry a fallback scene until the status-effect audit."
+ },
+ "data": [
+  {
+   "move": "pay-day",
+   "template": 2,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "fire-punch",
+   "template": 15,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 2"
+  },
+  {
+   "move": "ice-punch",
+   "template": 50,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 2 (nearest)"
+  },
+  {
+   "move": "thunder-punch",
+   "template": 33,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 2"
+  },
+  {
+   "move": "scratch",
+   "template": 5,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "guillotine",
+   "template": 2,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 2 (nearest), band 0 (nearest), fallback: class special_effect, status / zone / special design pending"
+  },
+  {
+   "move": "razor-wind",
+   "template": 6,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 2"
+  },
+  {
+   "move": "swords-dance",
+   "template": 1,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 1, band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "cut",
+   "template": 5,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "gust",
+   "template": 76,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1 (nearest), band 1 (nearest)"
+  },
+  {
+   "move": "whirlwind",
+   "template": 2,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "fly",
+   "template": 76,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1 (nearest), band 3 (nearest)"
+  },
+  {
+   "move": "bind",
+   "template": 5,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "slam",
+   "template": 6,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 2"
+  },
+  {
+   "move": "stomp",
+   "template": 6,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 2"
+  },
+  {
+   "move": "double-kick",
+   "template": 56,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "sand-attack",
+   "template": 68,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2, band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "horn-attack",
+   "template": 6,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 2"
+  },
+  {
+   "move": "fury-attack",
+   "template": 2,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "horn-drill",
+   "template": 5,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 2 (nearest), band 0 (nearest), fallback: class special_effect, status / zone / special design pending"
+  },
+  {
+   "move": "wrap",
+   "template": 2,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "take-down",
+   "template": 8,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 3"
+  },
+  {
+   "move": "thrash",
+   "template": 8,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 4 (nearest)"
+  },
+  {
+   "move": "double-edge",
+   "template": 8,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 4 (nearest)"
+  },
+  {
+   "move": "tail-whip",
+   "template": 3,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "pin-missile",
+   "template": 90,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2, band 1"
+  },
+  {
+   "move": "leer",
+   "template": 4,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "growl",
+   "template": 7,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "roar",
+   "template": 5,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "sing",
+   "template": 1,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "supersonic",
+   "template": 3,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "disable",
+   "template": 2,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "acid",
+   "template": 61,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2, band 1"
+  },
+  {
+   "move": "mist",
+   "template": 50,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "surf",
+   "template": 50,
+   "tint": "#5aa0ff",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 3 (nearest)"
+  },
+  {
+   "move": "aurora-beam",
+   "template": 47,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2, band 2 (nearest)"
+  },
+  {
+   "move": "hyper-beam",
+   "template": 8,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 4 (nearest)"
+  },
+  {
+   "move": "peck",
+   "template": 76,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1 (nearest), band 1 (nearest)"
+  },
+  {
+   "move": "drill-peck",
+   "template": 76,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1 (nearest), band 2 (nearest)"
+  },
+  {
+   "move": "submission",
+   "template": 59,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 2 (nearest)"
+  },
+  {
+   "move": "counter",
+   "template": 56,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "seismic-toss",
+   "template": 59,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "strength",
+   "template": 6,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 2"
+  },
+  {
+   "move": "leech-seed",
+   "template": 72,
+   "tint": "#7be26a",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "growth",
+   "template": 5,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "solar-beam",
+   "template": 72,
+   "tint": "#7be26a",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 4 (nearest)"
+  },
+  {
+   "move": "poison-powder",
+   "template": 61,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2, band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "stun-spore",
+   "template": 40,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "sleep-powder",
+   "template": 41,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "string-shot",
+   "template": 90,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2, band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "thunder-wave",
+   "template": 31,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2, band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "rock-throw",
+   "template": 91,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 1"
+  },
+  {
+   "move": "earthquake",
+   "template": 72,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 3 (nearest)"
+  },
+  {
+   "move": "fissure",
+   "template": 68,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2, band 0 (nearest), fallback: class special_effect, status / zone / special design pending"
+  },
+  {
+   "move": "toxic",
+   "template": 61,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2, band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "agility",
+   "template": 77,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 1, band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "rage",
+   "template": 2,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "night-shade",
+   "template": 17,
+   "tint": "#6060c0",
+   "scale": 1.0,
+   "note": "contact, type fallback, area 1, band 1"
+  },
+  {
+   "move": "mimic",
+   "template": 5,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "screech",
+   "template": 4,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "double-team",
+   "template": 1,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 1, band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "recover",
+   "template": 3,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 1, band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "harden",
+   "template": 4,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 1, band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "minimize",
+   "template": 1,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 1, band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "smokescreen",
+   "template": 7,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "confuse-ray",
+   "template": 96,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "defense-curl",
+   "template": 3,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 1, band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "barrier",
+   "template": 77,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 1, band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "light-screen",
+   "template": 2,
+   "tint": "#ff80c0",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1"
+  },
+  {
+   "move": "haze",
+   "template": 50,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "reflect",
+   "template": 5,
+   "tint": "#ff80c0",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1"
+  },
+  {
+   "move": "focus-energy",
+   "template": 2,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "bide",
+   "template": 5,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "metronome",
+   "template": 2,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "self-destruct",
+   "template": 8,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 4 (nearest)"
+  },
+  {
+   "move": "smog",
+   "template": 61,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2, band 1"
+  },
+  {
+   "move": "waterfall",
+   "template": 50,
+   "tint": "#5aa0ff",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 2 (nearest)"
+  },
+  {
+   "move": "swift",
+   "template": 6,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 2"
+  },
+  {
+   "move": "constrict",
+   "template": 5,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "amnesia",
+   "template": 77,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 1, band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "kinesis",
+   "template": 83,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2, band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "glare",
+   "template": 7,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "leech-life",
+   "template": 76,
+   "tint": "#b6c94a",
+   "scale": 1.0,
+   "note": "contact, near type, area 1 (nearest), band 1 (nearest)"
+  },
+  {
+   "move": "flash",
+   "template": 4,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "psywave",
+   "template": 2,
+   "tint": "#ff80c0",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1"
+  },
+  {
+   "move": "acid-armor",
+   "template": 63,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 1, band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "explosion",
+   "template": 8,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 4 (nearest)"
+  },
+  {
+   "move": "rest",
+   "template": 5,
+   "tint": "#ff80c0",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1"
+  },
+  {
+   "move": "tri-attack",
+   "template": 6,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 2"
+  },
+  {
+   "move": "super-fang",
+   "template": 2,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "substitute",
+   "template": 5,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "thief",
+   "template": 56,
+   "tint": "#504868",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "spider-web",
+   "template": 76,
+   "tint": "#b6c94a",
+   "scale": 1.0,
+   "note": "contact, near type, area 1 (nearest), band 1 (nearest)"
+  },
+  {
+   "move": "mind-reader",
+   "template": 7,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "nightmare",
+   "template": 119,
+   "tint": "#6060c0",
+   "scale": 1.0,
+   "note": "contact, type fallback, area 1, band 1"
+  },
+  {
+   "move": "snore",
+   "template": 2,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "curse",
+   "template": 120,
+   "tint": "#6060c0",
+   "scale": 1.0,
+   "note": "contact, type fallback, area 1, band 1"
+  },
+  {
+   "move": "flail",
+   "template": 5,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "cotton-spore",
+   "template": 42,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "reversal",
+   "template": 59,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "spite",
+   "template": 17,
+   "tint": "#6060c0",
+   "scale": 1.0,
+   "note": "contact, type fallback, area 1, band 1"
+  },
+  {
+   "move": "protect",
+   "template": 2,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "mach-punch",
+   "template": 56,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "scary-face",
+   "template": 1,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "sweet-kiss",
+   "template": 3,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "belly-drum",
+   "template": 5,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "spikes",
+   "template": 72,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "zap-cannon",
+   "template": 31,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2, band 4 (nearest)"
+  },
+  {
+   "move": "foresight",
+   "template": 4,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "destiny-bond",
+   "template": 119,
+   "tint": "#6060c0",
+   "scale": 1.0,
+   "note": "contact, type fallback, area 1, band 1"
+  },
+  {
+   "move": "perish-song",
+   "template": 2,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "detect",
+   "template": 59,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "bone-rush",
+   "template": 68,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2, band 1"
+  },
+  {
+   "move": "lock-on",
+   "template": 7,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "sandstorm",
+   "template": 72,
+   "tint": "#a8885c",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "giga-drain",
+   "template": 44,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 2"
+  },
+  {
+   "move": "endure",
+   "template": 5,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "charm",
+   "template": 1,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "rollout",
+   "template": 72,
+   "tint": "#a8885c",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "false-swipe",
+   "template": 2,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "swagger",
+   "template": 5,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "mean-look",
+   "template": 2,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "attract",
+   "template": 5,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "sleep-talk",
+   "template": 2,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "heal-bell",
+   "template": 5,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "return",
+   "template": 2,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "frustration",
+   "template": 5,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "safeguard",
+   "template": 2,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "pain-split",
+   "template": 5,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "dynamic-punch",
+   "template": 56,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 3 (nearest)"
+  },
+  {
+   "move": "megahorn",
+   "template": 76,
+   "tint": "#b6c94a",
+   "scale": 1.0,
+   "note": "contact, near type, area 1 (nearest), band 4"
+  },
+  {
+   "move": "dragon-breath",
+   "template": 101,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2, band 2 (nearest)"
+  },
+  {
+   "move": "baton-pass",
+   "template": 2,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "encore",
+   "template": 5,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "pursuit",
+   "template": 59,
+   "tint": "#504868",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "rapid-spin",
+   "template": 2,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "sweet-scent",
+   "template": 3,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "vital-throw",
+   "template": 56,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 2 (nearest)"
+  },
+  {
+   "move": "morning-sun",
+   "template": 4,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 1, band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "synthesis",
+   "template": 40,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 1, band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "moonlight",
+   "template": 1,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 1, band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "hidden-power",
+   "template": 5,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "twister",
+   "template": 101,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2, band 1"
+  },
+  {
+   "move": "rain-dance",
+   "template": 50,
+   "tint": "#5aa0ff",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1"
+  },
+  {
+   "move": "sunny-day",
+   "template": 17,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "mirror-coat",
+   "template": 2,
+   "tint": "#ff80c0",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1"
+  },
+  {
+   "move": "psych-up",
+   "template": 5,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "extreme-speed",
+   "template": 6,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 2"
+  },
+  {
+   "move": "ancient-power",
+   "template": 93,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 2"
+  },
+  {
+   "move": "rock-smash",
+   "template": 59,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "whirlpool",
+   "template": 50,
+   "tint": "#5aa0ff",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1"
+  },
+  {
+   "move": "beat-up",
+   "template": 56,
+   "tint": "#504868",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "fake-out",
+   "template": 2,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "uproar",
+   "template": 8,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 3"
+  },
+  {
+   "move": "stockpile",
+   "template": 5,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "spit-up",
+   "template": 2,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "swallow",
+   "template": 5,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "heat-wave",
+   "template": 19,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 3"
+  },
+  {
+   "move": "hail",
+   "template": 50,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "torment",
+   "template": 59,
+   "tint": "#504868",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "flatter",
+   "template": 56,
+   "tint": "#504868",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "will-o-wisp",
+   "template": 13,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "memento",
+   "template": 59,
+   "tint": "#504868",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "facade",
+   "template": 6,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 2"
+  },
+  {
+   "move": "focus-punch",
+   "template": 56,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 4"
+  },
+  {
+   "move": "charge",
+   "template": 32,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 1, band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "taunt",
+   "template": 59,
+   "tint": "#504868",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "helping-hand",
+   "template": 2,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "trick",
+   "template": 5,
+   "tint": "#ff80c0",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1"
+  },
+  {
+   "move": "role-play",
+   "template": 2,
+   "tint": "#ff80c0",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1"
+  },
+  {
+   "move": "wish",
+   "template": 5,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "ingrain",
+   "template": 72,
+   "tint": "#7be26a",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "recycle",
+   "template": 2,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "revenge",
+   "template": 56,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 2 (nearest)"
+  },
+  {
+   "move": "brick-break",
+   "template": 59,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 2 (nearest)"
+  },
+  {
+   "move": "yawn",
+   "template": 5,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "knock-off",
+   "template": 56,
+   "tint": "#504868",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "endeavor",
+   "template": 2,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "eruption",
+   "template": 15,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 4 (nearest)"
+  },
+  {
+   "move": "imprison",
+   "template": 5,
+   "tint": "#ff80c0",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1"
+  },
+  {
+   "move": "refresh",
+   "template": 2,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "grudge",
+   "template": 120,
+   "tint": "#6060c0",
+   "scale": 1.0,
+   "note": "contact, type fallback, area 1, band 1"
+  },
+  {
+   "move": "snatch",
+   "template": 59,
+   "tint": "#504868",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "secret-power",
+   "template": 6,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 2"
+  },
+  {
+   "move": "dive",
+   "template": 50,
+   "tint": "#5aa0ff",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 2 (nearest)"
+  },
+  {
+   "move": "arm-thrust",
+   "template": 56,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "teeter-dance",
+   "template": 7,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "mud-sport",
+   "template": 72,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "slack-off",
+   "template": 3,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 1, band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "crush-claw",
+   "template": 6,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 2"
+  },
+  {
+   "move": "aromatherapy",
+   "template": 72,
+   "tint": "#7be26a",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "fake-tears",
+   "template": 109,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "air-cutter",
+   "template": 74,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 2"
+  },
+  {
+   "move": "overheat",
+   "template": 21,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 4"
+  },
+  {
+   "move": "odor-sleuth",
+   "template": 4,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "silver-wind",
+   "template": 90,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2, band 2 (nearest)"
+  },
+  {
+   "move": "metal-sound",
+   "template": 115,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "grass-whistle",
+   "template": 41,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "tickle",
+   "template": 5,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "cosmic-power",
+   "template": 2,
+   "tint": "#ff80c0",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1"
+  },
+  {
+   "move": "signal-beam",
+   "template": 90,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2, band 2 (nearest)"
+  },
+  {
+   "move": "shadow-punch",
+   "template": 116,
+   "tint": "#6060c0",
+   "scale": 1.0,
+   "note": "contact, type fallback, area 1, band 2"
+  },
+  {
+   "move": "extrasensory",
+   "template": 83,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2, band 2"
+  },
+  {
+   "move": "sand-tomb",
+   "template": 72,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "sheer-cold",
+   "template": 47,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2, band 0 (nearest), fallback: class special_effect, status / zone / special design pending"
+  },
+  {
+   "move": "muddy-water",
+   "template": 26,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2, band 3 (nearest)"
+  },
+  {
+   "move": "bullet-seed",
+   "template": 42,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 1"
+  },
+  {
+   "move": "aerial-ace",
+   "template": 76,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1 (nearest), band 2 (nearest)"
+  },
+  {
+   "move": "iron-defense",
+   "template": 115,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 1, band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "block",
+   "template": 5,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "bulk-up",
+   "template": 59,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "mud-shot",
+   "template": 68,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2, band 2 (nearest)"
+  },
+  {
+   "move": "covet",
+   "template": 6,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 2"
+  },
+  {
+   "move": "magical-leaf",
+   "template": 72,
+   "tint": "#7be26a",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 2"
+  },
+  {
+   "move": "water-sport",
+   "template": 50,
+   "tint": "#5aa0ff",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1"
+  },
+  {
+   "move": "calm-mind",
+   "template": 2,
+   "tint": "#ff80c0",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1"
+  },
+  {
+   "move": "dragon-dance",
+   "template": 105,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1 (nearest), band 1 (nearest)"
+  },
+  {
+   "move": "shock-wave",
+   "template": 33,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 2"
+  },
+  {
+   "move": "roost",
+   "template": 74,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 1, band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "gravity",
+   "template": 5,
+   "tint": "#ff80c0",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1"
+  },
+  {
+   "move": "miracle-eye",
+   "template": 83,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2, band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "hammer-arm",
+   "template": 56,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 3 (nearest)"
+  },
+  {
+   "move": "healing-wish",
+   "template": 2,
+   "tint": "#ff80c0",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1"
+  },
+  {
+   "move": "natural-gift",
+   "template": 5,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "feint",
+   "template": 2,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "pluck",
+   "template": 76,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1 (nearest), band 2 (nearest)"
+  },
+  {
+   "move": "tailwind",
+   "template": 76,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1 (nearest), band 1 (nearest)"
+  },
+  {
+   "move": "acupressure",
+   "template": 5,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "metal-burst",
+   "template": 119,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "u-turn",
+   "template": 76,
+   "tint": "#b6c94a",
+   "scale": 1.0,
+   "note": "contact, near type, area 1 (nearest), band 2 (nearest)"
+  },
+  {
+   "move": "close-combat",
+   "template": 59,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 4"
+  },
+  {
+   "move": "payback",
+   "template": 56,
+   "tint": "#504868",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "embargo",
+   "template": 59,
+   "tint": "#504868",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "fling",
+   "template": 56,
+   "tint": "#504868",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "trump-card",
+   "template": 2,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "heal-block",
+   "template": 5,
+   "tint": "#ff80c0",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1"
+  },
+  {
+   "move": "wring-out",
+   "template": 2,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "gastro-acid",
+   "template": 120,
+   "tint": "#b060e0",
+   "scale": 1.0,
+   "note": "contact, type fallback, area 1, band 1"
+  },
+  {
+   "move": "lucky-chant",
+   "template": 5,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "me-first",
+   "template": 2,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "copycat",
+   "template": 5,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "power-swap",
+   "template": 2,
+   "tint": "#ff80c0",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1"
+  },
+  {
+   "move": "guard-swap",
+   "template": 5,
+   "tint": "#ff80c0",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1"
+  },
+  {
+   "move": "punishment",
+   "template": 59,
+   "tint": "#504868",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "last-resort",
+   "template": 8,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 4 (nearest)"
+  },
+  {
+   "move": "sucker-punch",
+   "template": 56,
+   "tint": "#504868",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 2 (nearest)"
+  },
+  {
+   "move": "toxic-spikes",
+   "template": 17,
+   "tint": "#b060e0",
+   "scale": 1.0,
+   "note": "contact, type fallback, area 1, band 1"
+  },
+  {
+   "move": "aqua-ring",
+   "template": 50,
+   "tint": "#5aa0ff",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1"
+  },
+  {
+   "move": "magnet-rise",
+   "template": 33,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "flare-blitz",
+   "template": 15,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 4 (nearest)"
+  },
+  {
+   "move": "rock-polish",
+   "template": 92,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 1, band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "dark-pulse",
+   "template": 108,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 2"
+  },
+  {
+   "move": "seed-bomb",
+   "template": 44,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 2"
+  },
+  {
+   "move": "air-slash",
+   "template": 74,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 2"
+  },
+  {
+   "move": "bug-buzz",
+   "template": 90,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2, band 3 (nearest)"
+  },
+  {
+   "move": "power-gem",
+   "template": 93,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 2"
+  },
+  {
+   "move": "vacuum-wave",
+   "template": 59,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "focus-blast",
+   "template": 57,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 4 (nearest)"
+  },
+  {
+   "move": "energy-ball",
+   "template": 44,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 2"
+  },
+  {
+   "move": "switcheroo",
+   "template": 56,
+   "tint": "#504868",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "giga-impact",
+   "template": 8,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 4 (nearest)"
+  },
+  {
+   "move": "nasty-plot",
+   "template": 109,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 1, band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "ice-shard",
+   "template": 50,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "shadow-claw",
+   "template": 116,
+   "tint": "#6060c0",
+   "scale": 1.0,
+   "note": "contact, type fallback, area 1, band 2"
+  },
+  {
+   "move": "thunder-fang",
+   "template": 33,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 2"
+  },
+  {
+   "move": "ice-fang",
+   "template": 50,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 2 (nearest)"
+  },
+  {
+   "move": "zen-headbutt",
+   "template": 6,
+   "tint": "#ff80c0",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 2"
+  },
+  {
+   "move": "mirror-shot",
+   "template": 121,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 2"
+  },
+  {
+   "move": "rock-climb",
+   "template": 8,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 3"
+  },
+  {
+   "move": "defog",
+   "template": 74,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "trick-room",
+   "template": 2,
+   "tint": "#ff80c0",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1"
+  },
+  {
+   "move": "lava-plume",
+   "template": 14,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 2"
+  },
+  {
+   "move": "power-whip",
+   "template": 72,
+   "tint": "#7be26a",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 4 (nearest)"
+  },
+  {
+   "move": "gunk-shot",
+   "template": 61,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2, band 4 (nearest)"
+  },
+  {
+   "move": "captivate",
+   "template": 7,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "stealth-rock",
+   "template": 72,
+   "tint": "#a8885c",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "grass-knot",
+   "template": 72,
+   "tint": "#7be26a",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "charge-beam",
+   "template": 31,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2, band 1"
+  },
+  {
+   "move": "aqua-jet",
+   "template": 50,
+   "tint": "#5aa0ff",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1"
+  },
+  {
+   "move": "head-smash",
+   "template": 72,
+   "tint": "#a8885c",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 4 (nearest)"
+  },
+  {
+   "move": "double-hit",
+   "template": 5,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "ominous-wind",
+   "template": 100,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 2"
+  },
+  {
+   "move": "hone-claws",
+   "template": 59,
+   "tint": "#504868",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "wide-guard",
+   "template": 72,
+   "tint": "#a8885c",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "autotomize",
+   "template": 115,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 1, band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "rage-powder",
+   "template": 76,
+   "tint": "#b6c94a",
+   "scale": 1.0,
+   "note": "contact, near type, area 1 (nearest), band 1 (nearest)"
+  },
+  {
+   "move": "telekinesis",
+   "template": 2,
+   "tint": "#ff80c0",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1"
+  },
+  {
+   "move": "magic-room",
+   "template": 5,
+   "tint": "#ff80c0",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1"
+  },
+  {
+   "move": "smack-down",
+   "template": 72,
+   "tint": "#a8885c",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "sludge-wave",
+   "template": 61,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2, band 3 (nearest)"
+  },
+  {
+   "move": "quiver-dance",
+   "template": 76,
+   "tint": "#b6c94a",
+   "scale": 1.0,
+   "note": "contact, near type, area 1 (nearest), band 1 (nearest)"
+  },
+  {
+   "move": "heavy-slam",
+   "template": 119,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "synchronoise",
+   "template": 6,
+   "tint": "#ff80c0",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 2"
+  },
+  {
+   "move": "flame-charge",
+   "template": 17,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "coil",
+   "template": 120,
+   "tint": "#b060e0",
+   "scale": 1.0,
+   "note": "contact, type fallback, area 1, band 1"
+  },
+  {
+   "move": "low-sweep",
+   "template": 56,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 2 (nearest)"
+  },
+  {
+   "move": "acid-spray",
+   "template": 61,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2, band 1"
+  },
+  {
+   "move": "simple-beam",
+   "template": 2,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "entrainment",
+   "template": 5,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "after-you",
+   "template": 2,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "round",
+   "template": 6,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 2"
+  },
+  {
+   "move": "echoed-voice",
+   "template": 5,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "chip-away",
+   "template": 6,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 2"
+  },
+  {
+   "move": "stored-power",
+   "template": 2,
+   "tint": "#ff80c0",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1"
+  },
+  {
+   "move": "quick-guard",
+   "template": 59,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "ally-switch",
+   "template": 5,
+   "tint": "#ff80c0",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1"
+  },
+  {
+   "move": "scald",
+   "template": 27,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2, band 2"
+  },
+  {
+   "move": "heal-pulse",
+   "template": 2,
+   "tint": "#ff80c0",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1"
+  },
+  {
+   "move": "quash",
+   "template": 56,
+   "tint": "#504868",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "acrobatics",
+   "template": 76,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1 (nearest), band 2 (nearest)"
+  },
+  {
+   "move": "retaliate",
+   "template": 6,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 2"
+  },
+  {
+   "move": "final-gambit",
+   "template": 59,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1 (nearest)"
+  },
+  {
+   "move": "inferno",
+   "template": 19,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 3"
+  },
+  {
+   "move": "struggle-bug",
+   "template": 90,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2, band 1"
+  },
+  {
+   "move": "frost-breath",
+   "template": 47,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2, band 1"
+  },
+  {
+   "move": "work-up",
+   "template": 5,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 1"
+  },
+  {
+   "move": "electroweb",
+   "template": 31,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2, band 2 (nearest)"
+  },
+  {
+   "move": "wild-charge",
+   "template": 39,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 3 (nearest)"
+  },
+  {
+   "move": "dual-chop",
+   "template": 105,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1 (nearest), band 1 (nearest)"
+  },
+  {
+   "move": "razor-shell",
+   "template": 50,
+   "tint": "#5aa0ff",
+   "scale": 1.0,
+   "note": "contact, near type, area 1, band 2 (nearest)"
+  },
+  {
+   "move": "leaf-tornado",
+   "template": 44,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 2"
+  },
+  {
+   "move": "steamroller",
+   "template": 76,
+   "tint": "#b6c94a",
+   "scale": 1.0,
+   "note": "contact, near type, area 1 (nearest), band 2 (nearest)"
+  },
+  {
+   "move": "cotton-guard",
+   "template": 40,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 1, band 0 (nearest), fallback: class status, status / zone / special design pending"
+  },
+  {
+   "move": "hurricane",
+   "template": 74,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 4 (nearest)"
+  },
+  {
+   "move": "snarl",
+   "template": 110,
+   "tint": null,
+   "scale": 1.0,
+   "note": "ranged, same type, area 2 (nearest), band 2"
+  },
+  {
+   "move": "fusion-flare",
+   "template": 15,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 3 (nearest)"
+  },
+  {
+   "move": "fusion-bolt",
+   "template": 39,
+   "tint": null,
+   "scale": 1.0,
+   "note": "contact, same type, area 1, band 3 (nearest)"
+  }
+ ]
+}

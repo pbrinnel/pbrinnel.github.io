@@ -1,5 +1,5 @@
 {
- "version": "20261117.0508+0fe1361",
+ "version": "20261117.0518+6edb9a3",
  "files": [
   {
    "path": "LICENSE.txt",
@@ -8,8 +8,8 @@
   },
   {
    "path": "builder/dist/builder.js",
-   "size": 544779,
-   "sha256": "f29459762708c78e2f8b03147156ce59c0e4cd472204d4b0423933631a0e622b"
+   "size": 544851,
+   "sha256": "36a43f9159c92155e1bf1586cae45156fde2a1bd48470a4662f43bdeaae4a390"
   },
   {
    "path": "core/dist/core.js",
@@ -20,6 +20,11 @@
    "path": "data/design/gen5_moves.json",
    "size": 117407,
    "sha256": "b22eb6517213925b580e678ec7173f1a45aba0c94f5c11f16b1f54a94dc6bcfb"
+  },
+  {
+   "path": "data/design/move_effects.json",
+   "size": 50853,
+   "sha256": "53e6a9e3ac28fab97f5efd480f3b385a23d725346d7d79b625fd73240901bf04"
   },
   {
    "path": "data/design/shapes.json",
@@ -223,8 +228,8 @@
   },
   {
    "path": "game/shared/props.js",
-   "size": 14170,
-   "sha256": "bb1726dbddc8d3c34d2d3452d3152ebbe88bad39d8c7cf5fa882641937ece557"
+   "size": 14275,
+   "sha256": "0871fed8b5ec58d44d0779a00effa3e18a0adafc97699b8cf6007632224c8282"
   },
   {
    "path": "game/shared/tiptext.js",
@@ -538,8 +543,8 @@
   },
   {
    "path": "game/skirmish/hud.js",
-   "size": 24802,
-   "sha256": "48a492bcb7c7fbd048dc05b16e12e415975e1e4c846677dbd3c2383675db20fd"
+   "size": 24855,
+   "sha256": "fedcaddfec44a5b7eb71d951cee02133cbbe3737e4653f6f690e19217989c351"
   },
   {
    "path": "game/skirmish/index.html",
@@ -598,8 +603,8 @@
   },
   {
    "path": "game/skirmish/particles.js",
-   "size": 11199,
-   "sha256": "7979fb379a4d537026b4316f1976e0933ffc420262f76d68b34ae5d0ddd486a8"
+   "size": 11299,
+   "sha256": "dfeb1271fdc6670b7281db825f25e9936f96b227c25e1c81a68da88b277bad9a"
   },
   {
    "path": "game/skirmish/pathmark.js",
@@ -643,8 +648,8 @@
   },
   {
    "path": "game/skirmish/stage.js",
-   "size": 36539,
-   "sha256": "04768122e0984d98509b126b52042d543a28acd916d5f564b039279fb81d2e92"
+   "size": 36643,
+   "sha256": "e1b2fd0efa2f10adfeb23385f2546c4f1bb57b612442a840bd3c04df3af1a039"
   },
   {
    "path": "game/skirmish/stagefx.js",
