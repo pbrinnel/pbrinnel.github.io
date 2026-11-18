@@ -652,6 +652,9 @@
                 lay(shapeSprite('padStone', STONE, PAD_BAKE, PAD_BAKE / SHAPE_ASPECT, 'statue'), 0.8, dx, ww);
                 continue;
             }
+            // what sits behind him in play, where it holds still: MAGMA's glow,
+            // BLUR's quills. What moves with him (trails, sparks, flakes) does not
+            if (p.iconUnder) p.iconUnder(x + dx, y, ww, a0);
             if (rim) lay(padFlat('padRimI' + rim, rim), 0.5, dx, ww * 1.06);
             if (p.prints) {
                 // out of register by as much of him as they are in play
@@ -667,6 +670,7 @@
                 const dress = p.dress && p.dress();
                 if (dress) lay(dress, p.dressA, dx, ww);
                 else if (p.ink && !p.prints) lay(padTint('padTint' + p.ink, p.ink), 0.8, dx, ww);
+                if (p.iconOver) p.iconOver(x + dx, y, ww, a0);
             }
         }
     }
@@ -684,28 +688,40 @@
         lore: 'Reborn and freshly polished.',
         under() { padRim('padRimV', V2_RIM, 2, 0.45); },
         skin(sg, o) {
-            const sp = padFlat('padGloss', '#ffffff');
-            const gl = padGloss(sp);
-            if (!sp) return;
-            const tw = sg.w, th = tw / SHAPE_ASPECT;
             ctx.save();
             ctx.translate(sg.cx, padY() + o * JIG_PADDLE);
             ctx.rotate(segWig(sg.i) + paddle.dip[sg.i]);
-            ctx.globalAlpha = padK * (V2_GLOSS);
-            ctx.drawImage(gl, -tw / 2, -th / 2, tw, th);
-            // the glint: a narrow band crossing him, then nothing until the next
-            const t = (clock % V2_GLINT) / V2_SWEEP;
-            if (t < 1) {
-                ctx.beginPath();
-                ctx.rect(-tw / 2 + (t * 1.2 - 0.1) * tw, -th, tw * 0.08, th * 2);
-                ctx.clip();
-                ctx.globalAlpha = padK * (0.3);
-                ctx.drawImage(sp, -tw / 2, -th / 2, tw, th);
-            }
-            ctx.globalAlpha = padK;
+            padPolish(sg.w, padK);
+            ctx.restore();
+        },
+        // the same polish on the icon, which has no skin pass of its own
+        iconOver(x, y, w, a) {
+            ctx.save();
+            ctx.translate(x, y);
+            padPolish(w, a);
             ctx.restore();
         }
     };
+    // MODERN's gloss and glint, centered on the origin at width tw and at `k`
+    // of full strength
+    function padPolish(tw, k) {
+        const sp = padFlat('padGloss', '#ffffff');
+        if (!sp) return;
+        const gl = padGloss(sp), th = tw / SHAPE_ASPECT;
+        ctx.save();
+        ctx.globalAlpha = k * V2_GLOSS;
+        ctx.drawImage(gl, -tw / 2, -th / 2, tw, th);
+        // the glint: a narrow band crossing him, then nothing until the next
+        const t = (clock % V2_GLINT) / V2_SWEEP;
+        if (t < 1) {
+            ctx.beginPath();
+            ctx.rect(-tw / 2 + (t * 1.2 - 0.1) * tw, -th, tw * 0.08, th * 2);
+            ctx.clip();
+            ctx.globalAlpha = k * 0.3;
+            ctx.drawImage(sp, -tw / 2, -th / 2, tw, th);
+        }
+        ctx.restore();
+    }
     // in hand from the first frame: nothing picks a paddle until a gate does,
     // and he has a look of his own to show before then
     labP = LAB_PAD.standard;
@@ -747,22 +763,32 @@
         under() { padRim('padRimG', GILDED_RIM, 3, 0.5); },
         skin(sg, o) {
             padLay(sg, o, padTint('padGilded', GILDED_INK), this.tint[1]);
-            const sp = padFlat('padShine', '#fff6d8');
-            if (!sp) return;
-            const tw = sg.w, th = tw / SHAPE_ASPECT;
-            const t = (clock % GILDED_SHINE) / GILDED_SHINE;
             ctx.save();
             ctx.translate(sg.cx, padY() + o * JIG_PADDLE);
             ctx.rotate(segWig(sg.i) + paddle.dip[sg.i]);
-            ctx.beginPath();
-            ctx.rect(-tw / 2 + (t * 1.3 - 0.15) * tw, -th, tw * 0.15, th * 2);
-            ctx.clip();
-            ctx.globalAlpha = padK * (0.34);
-            ctx.drawImage(sp, -tw / 2, -th / 2, tw, th);
-            ctx.globalAlpha = padK;
+            padShine(sg.w, padK);
+            ctx.restore();
+        },
+        iconOver(x, y, w, a) {
+            ctx.save();
+            ctx.translate(x, y);
+            padShine(w, a);
             ctx.restore();
         }
     };
+    // GILDED's band of light crossing him, centered on the origin at width tw
+    function padShine(tw, k) {
+        const sp = padFlat('padShine', '#fff6d8');
+        if (!sp) return;
+        const th = tw / SHAPE_ASPECT, t = (clock % GILDED_SHINE) / GILDED_SHINE;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(-tw / 2 + (t * 1.3 - 0.15) * tw, -th, tw * 0.15, th * 2);
+        ctx.clip();
+        ctx.globalAlpha = k * 0.34;
+        ctx.drawImage(sp, -tw / 2, -th / 2, tw, th);
+        ctx.restore();
+    }
 
     // STATUE: carved, rimmed in pale stone, and shedding dust when struck.
     // Longer than standard and he leans further after a head going past, but
@@ -845,6 +871,21 @@
     // and then a brick it breaks goes up and the fire runs on from there
     // (MAGMA's wildfire, above) -- or, on a boss, the wound counts double
     // (MAGMA's crit).
+    // the light round him, for a paddle `w` wide centered on (x, y)
+    function padMagmaGlow(x, y, w, k) {
+        const r = w * 0.95;
+        const g = ctx.createRadialGradient(x, y, 8, x, y, r);
+        g.addColorStop(0, MAGMA_INK);
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.save();
+        // a steady light with a slow breath in it: nothing here flashes
+        ctx.globalAlpha = k * (MAGMA_GLOW * (0.85 + 0.15 * Math.sin(clock * 1.7)));
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
     LAB_PAD.magma = {
         name: 'MAGMA',
         ink: MAGMA_INK, rim: MAGMA_RIM, tint: [MAGMA_INK, 0.72],
@@ -852,19 +893,10 @@
         lore: 'Forged in the fire of {surtr}\'s footsteps, he still remembers his name.',
         len: () => MAGMA_LEN,
         under() {
-            const r = padW() * 0.95;
-            const g = ctx.createRadialGradient(paddle.x, padY(), 8, paddle.x, padY(), r);
-            g.addColorStop(0, MAGMA_INK);
-            g.addColorStop(1, 'rgba(0,0,0,0)');
-            // a steady light with a slow breath in it: nothing here flashes
-            ctx.globalAlpha = padK * (MAGMA_GLOW * (0.85 + 0.15 * Math.sin(clock * 1.7)));
-            ctx.fillStyle = g;
-            ctx.beginPath();
-            ctx.arc(paddle.x, padY(), r, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.globalAlpha = padK;
+            padMagmaGlow(paddle.x, padY(), padW(), padK);
             padRim('padRimE', MAGMA_RIM, 2.5, 0.5);
         },
+        iconUnder(x, y, w, a) { padMagmaGlow(x, y, w, a); },
         skin(sg, o) { padLay(sg, o, padTint('padMagma', MAGMA_INK), this.tint[1]); },
         mark: 'magma',
         shedRate: 20,
@@ -1387,11 +1419,14 @@
     }
     // his quills on one of him, turned `turn` further than he is
     function blurQuillsOn(sg, o, alpha, turn) {
-        const q = blurLook.quills, tw = sg.w, th = tw / SHAPE_ASPECT, pw = q.pad * tw;
+        blurQuillsAt(sg.cx, padY() + o * JIG_PADDLE, sg.w, segWig(sg.i) + paddle.dip[sg.i] + turn, padK * alpha);
+    }
+    function blurQuillsAt(x, y, tw, rot, alpha) {
+        const q = blurLook.quills, th = tw / SHAPE_ASPECT, pw = q.pad * tw;
         ctx.save();
-        ctx.translate(sg.cx, padY() + o * JIG_PADDLE);
-        ctx.rotate(segWig(sg.i) + paddle.dip[sg.i] + turn);
-        ctx.globalAlpha = padK * alpha;
+        ctx.translate(x, y);
+        ctx.rotate(rot);
+        ctx.globalAlpha = alpha;
         ctx.drawImage(q, -tw / 2 - pw, -th / 2 - pw, tw + 2 * pw, th + 2 * pw);
         ctx.restore();
     }
@@ -1432,6 +1467,7 @@
             if (look) for (const sg of segs()) blurQuillsOn(sg, paddle.jt[sg.i] > 0 ? wobble(paddle.jt[sg.i]) : 0, 1, 0);
             ctx.globalAlpha = padK;
         },
+        iconUnder(x, y, w, a) { if (blurSonic()) blurQuillsAt(x, y, w, 0, a); },
         skin(sg, o) {
             if (blurSonic()) padLay(sg, o, blurLook.dress, 1);
             else padLay(sg, o, padTint('padBlur', BLUR_INK), this.tint[1]);
