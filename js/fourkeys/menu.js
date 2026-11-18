@@ -602,7 +602,11 @@
     const M_SIGN_DARK_FROM = 0.6;    // ...and from which the board goes to the screen's dark
     const M_FIELD = '#000';          // the level's own background, what the doorway opens onto
 
+    // a stage already won in a NUZLOCKE run is closed for the rest of it
+    const menuNuzDone = l => !!(menu.nuz && !l.key && menu.keys[l.n]);
+
     function menuCanEnter(l) {
+        if (menuNuzDone(l)) return false;
         if (l.key) return l.key !== 'board' || menuBoardOn();
         if (l.n === 5 && !menuOpened()) return false;
         return !!menuBossFor(l.n);
@@ -921,6 +925,11 @@
     // the boss. menuWatch keeps an eye on whether you had to buy it back.
     function menuEnter(level) {
         menuLoad();
+        if (menuNuzDone(level)) {
+            menuSay(level.name + ' · ALREADY CLEARED THIS RUN');
+            menu.march = false;
+            return;
+        }
         if (level.key === 'board') {
             menuSay('LEADERBOARD · COMING SOON');       // no worker to ask yet (menuBoardOn)
             menu.march = false;
