@@ -459,7 +459,14 @@
         const [l, r] = menuLaneOf(c);
         return paddle.x >= l && paddle.x <= r;
     }
-    function menuLaneOf(c) { return c.lane || [c.x - c.w / 2, c.x + c.w / 2]; }
+    // BRANDONS' door is against the left wall, so a paddle wide enough that his
+    // middle cannot get as far left as the lane is long (THE PAIR: halfSpan()
+    // is past the lane's end) could never line up with it. Its lane reaches as
+    // far as he can.
+    function menuLaneOf(c) {
+        const [l, r] = c.lane || [c.x - c.w / 2, c.x + c.w / 2];
+        return c.level.key === 'paddles' ? [l, Math.max(r, halfSpan() + 2)] : [l, r];
+    }
 
     // lined up with it and nothing nearer still ahead of him, which is what
     // lights it: straight up from under the VOID, the CASTLE is not where he
@@ -607,8 +614,8 @@
         menu.going = { card: c, t: 0, x: paddle.x, y: padY() };
     }
 
-    const menuPushSecs = c => c.level.key ? M_SIGN_SECS : M_PUSH_SECS;
-    const menuPushBack = c => c.level.key ? M_SIGN_BACK : M_PUSH_BACK;
+    const menuPushSecs = c => c.level.key === 'paddles' ? M_RACK_SECS : c.level.key ? M_SIGN_SECS : M_PUSH_SECS;
+    const menuPushBack = c => c.level.key === 'paddles' ? M_RACK_BACK : c.level.key ? M_SIGN_BACK : M_PUSH_BACK;
 
     function menuGoStep(dt) {
         const g = menu.going;
@@ -659,6 +666,7 @@
     function menuCamera(near) {
         const m = menuMotion();
         if (!m) return;
+        if (m.card.level.key === 'paddles') { menuRackCamera(m, near); return; }
         if (m.card.level.key) {
             // into a sign's board, far enough for it, wide and short, to fill the screen both ways
             const G = menuBoardBox(m.card), fx = m.card.x, fy = G.top + G.bh / 2;
@@ -676,6 +684,35 @@
         const s = Math.pow(S, Math.max(0.15, 1 + M_PUSH_PARALLAX * (near - menuNear(m.card))));
         // the doorway drifts to the middle of the screen as it comes at you
         const centre = menuEase(menuBand(m.k, M_PUSH_ZOOM_FROM - 0.1, 0.9));
+        ctx.translate(menuLerp(fx, LW / 2, centre), menuLerp(fy, LH / 2, centre));
+        ctx.scale(s, s);
+        ctx.translate(-fx, -fy);
+    }
+
+    // BRANDONS' push-in starts high: the camera comes in on the shelves, so every
+    // paddle you own is on the screen, eases but does not stop there, and pans down
+    // the sign into its name plate, which fills the screen as any sign's does.
+    // The zoom is worked in logs, so it feels like one even speed rather than
+    // crawling and then lunging.
+    const M_RACK_SECS = 1.5, M_RACK_BACK = 1.3;   // going in, coming out
+    const M_RACK_SHELF_TO = 0.4;     // the share of going in by which the shelves are framed
+    const M_RACK_PAN_FROM = 0.3;     // ...and from which it already pans down to the plate
+    const M_RACK_FILL = 0.8;         // the shelves' share of the screen's width when it frames them
+    const menuSine = x => 0.5 - 0.5 * Math.cos(Math.PI * menuClamp(x));
+    function menuRackCamera(m, near) {
+        const c = m.card, G = menuBoardBox(c), art = menuHang(menuArtOf(c)), geo = menuShelfGeo(art, menuOwned());
+        const world = y => c.y + (y - c.y) * c.level.s;
+        const top = world(geo.topY), bot = world(geo.botY);
+        const fx = c.x, plateY = G.top + G.bh / 2, shelfY = (top + bot) / 2;
+        // how far in to frame the shelves: all of their width, or all of their height
+        const sShelf = Math.min(LW * M_RACK_FILL / G.bw, LH * M_RACK_FILL / Math.max(1, bot - top));
+        const sEnd = Math.max(LW / G.bw, LH / G.bh) + 1;
+        const into = Math.log(sShelf) * Math.sin(Math.PI / 2 * menuBand(m.k, 0, M_RACK_SHELF_TO));
+        const on = (Math.log(sEnd) - Math.log(sShelf)) * (1 - Math.cos(Math.PI / 2 * menuBand(m.k, M_RACK_PAN_FROM, 1)));
+        const S = Math.exp(into + on);
+        const s = Math.pow(S, Math.max(0.15, 1 + M_SIGN_PARALLAX * (near - menuNear(c))));
+        const fy = menuLerp(shelfY, plateY, menuSine(menuBand(m.k, M_RACK_PAN_FROM, 1)));
+        const centre = menuSine(menuBand(m.k, 0, M_RACK_SHELF_TO + 0.1));
         ctx.translate(menuLerp(fx, LW / 2, centre), menuLerp(fy, LH / 2, centre));
         ctx.scale(s, s);
         ctx.translate(-fx, -fy);
@@ -1370,7 +1407,7 @@
     const SWAP_HOLD = 0.85;          // pinned against the wall before he goes
     const SWAP_OUT = 0.26;           // him walking off
     const SWAP_IN = 0.34;            // the next one arriving
-    const SWAP_PEEK = 52;            // how far in the next one noses while you hold
+    const SWAP_BEAT = 0.4;           // after his mini is off the rack and out of the screen, before he walks on
     const SWAP_CLEAR = 12;           // and how far past the wall they go
     const SWAP_BACKOFF = 24;         // px the hand comes back off where it leaned before that gate opens again
     const GATE_SLIDE = 0.32;         // a spent gate going, or coming back
@@ -1383,7 +1420,31 @@
         return owned[((i < 0 ? 0 : i) + side + owned.length) % owned.length];
     }
 
+    // the new paddle is in your hands but still held off the screen (see padQuiet)
+    function menuPadWaiting() { return !!(menu && menu.sw && menu.sw.wait); }
+
     function menuSwapStep(dt) {
+        menuRackHopStep(dt);
+        // Leaning on a gate is the confirmation: from the first moment of it the
+        // next paddle's mini starts down off the rack, and if the hand comes
+        // back off the wall (or goes to the other one) before it is through, that
+        // mini turns round where it is and goes back up. Judged from last
+        // frame's hold, which is what the rest of this step ends up setting.
+        const want = !menu.sw && menu.hold > 0 && menu.side && menu.lift <= 1 ? menuNextPad(menu.side) : null;
+        if (want !== menu.holdHop) {
+            if (menu.holdHop && menu.holdHop !== LAB.pad) menuRackHop(menu.holdHop, true);
+            if (want) menuRackHop(want, false);
+            menu.holdHop = want;
+        }
+        // Whatever put a different paddle in your hands (the BRANDONS screen, a
+        // card, a save) moves the minis the same way the gates do. The gates'
+        // own swap does it itself, so this sits it out and forgets the old one.
+        if (menu.sw) menu.rackPrev = null;
+        else {
+            const was = menu.rackPrev;
+            if (was && was !== LAB.pad && menuOwned().includes(was)) { menuRackHop(was, true); menuRackHop(LAB.pad, false); }
+            menu.rackPrev = LAB.pad;
+        }
         for (const side of [-1, 1]) {
             const next = menuNextPad(side);
             if (!(side in menu.gateTo)) menu.gateTo[side] = next;
@@ -1404,7 +1465,30 @@
             if (s.out) {
                 const k = Math.min(1, s.t / SWAP_OUT);
                 paddle.x = s.from + (off - s.from) * k * k;
-                if (k >= 1) { LAB.usePad(s.to); s.out = false; s.t = 0; }
+                if (k >= 1) {
+                    menuRackHop(LAB.pad, true);
+                    // with the next one's mini still on its way off the rack, he waits
+                    s.wait = menuRackHopping(s.to);
+                    s.beat = 0;
+                    LAB.usePad(s.to); s.out = false; s.t = 0;
+                    // he may be wider than the one that left, and his looks reach
+                    // well past him: park him where none of it can show
+                    if (s.wait) paddle.x = s.side < 0 ? -LW : 2 * LW;
+                }
+            } else if (s.wait) {
+                // he is not on the screen until his mini has climbed off the
+                // rack and walked out of it, and then SWAP_BEAT more. Parked a
+                // screen away, because MAGMA's glow and sparks, FROST's flakes
+                // and MULTI's prints reach well past him, and he walks on with
+                // all of it, as he always has
+                paddle.x = s.side < 0 ? -LW : 2 * LW;
+                if (!menu.rackHop.some(h => h.key === LAB.pad && !h.enter)) s.beat += dt;
+                if (s.beat >= SWAP_BEAT) {
+                    s.wait = false; s.t = 0;
+                    // where he has been is the parking spot: THE PAIR's echo of him
+                    // is drawn from it, so start him with no past
+                    padTrail.length = 0;
+                }
             } else {
                 const k = Math.min(1, s.t / SWAP_IN);
                 // he arrives where your hand is, not where the last one left:
@@ -1432,23 +1516,123 @@
         if (!side || menu.lift > 1 || !menuNextPad(side)) { menu.hold = 0; return; }
         if ((menu.hold += dt) < SWAP_HOLD) return;
         menu.sw = { side, to: menuNextPad(side), from: paddle.x, t: 0, out: true };
+        menuRackHop(menuNextPad(side), false);     // already on its way from the hold; a no-op then
+        menu.holdHop = null;                       // it is the swap's now
         menu.hold = 0;
         menu.spent = side;
         menu.spentX = paddle.tx;
     }
 
-    // The next one, nosing in off the wall while you lean. Drawn over the one
-    // you are holding rather than under it -- under it is exactly where the
-    // paddle already is, so nothing of him would show -- and faded, because he
-    // has not arrived yet.
-    function menuPadPeek() {
-        if (!menu.side || menu.sw || menu.lift > 1) return;
-        const to = menuNextPad(menu.side);
-        if (!to) return;
-        const k = Math.min(1, menu.hold / SWAP_HOLD);
-        const w = padW();
-        labPadIcon(to, menu.side < 0 ? -w / 2 + SWAP_PEEK * k : LW + w / 2 - SWAP_PEEK * k,
-                   padY(), w, false, 0.25 + 0.45 * k);
+    // The little ones on the rack take part in a swap too, on their own clock,
+    // as extra to the big one walking off and on. Leaving is two parts: the
+    // next paddle's mini climbs down off its slot, stood on end and rocking hand
+    // over hand, to the foot of the sign, then turns level and walks left out of
+    // the screen the way the big one walks the town. Entering is the same
+    // journey backwards. While one is on its way its slot is empty.
+    const M_HOP_CLIMB_V = 38;        // px a second down (or up) the sign
+    const M_HOP_WALK_V = 70;         // ...and along the ground
+    const M_HOP_FOOT = 7;            // px under the plate it walks, so it stands on the ground it is in front of
+    const M_HOP_CLIMB_HZ = 2.6;      // hand-over-hand grips a second
+    const M_HOP_CLIMB_ROCK = 0.16;   // how far it rocks each grip, radians
+    const M_HOP_UPRIGHT = 1.25;      // how far it stands on end while it climbs, radians
+    const M_HOP_TURN = 0.18;         // the share of the climb it takes to turn upright, and to turn back
+    const M_HOP_BOB = 2.4;           // the walk's bob, at a 60 px paddle: scaled to the paddle's size
+    // the whole journey from the slot out, as distances and times
+    function menuHopPath(c, key) {
+        const slot = menuRackSlot(c, key), G = menuBoardBox(c), foot = G.top + G.bh + M_HOP_FOOT;
+        const dClimb = Math.max(1, foot - slot.y), dWalk = slot.x + slot.w;
+        const tClimb = dClimb / M_HOP_CLIMB_V, tWalk = dWalk / M_HOP_WALK_V;
+        // rest: the alpha the shelf draws it at, so it does not change on arriving
+        return { slot, foot, tClimb, tWalk, total: tClimb + tWalk, rest: M_SHELF_FAINT + (1 - M_SHELF_FAINT) * menuState(c).rise };
+    }
+    // Asked again for a mini already on its way, the other way, it turns round
+    // where it is rather than starting over from its slot or the edge: the
+    // journey is kept as how far along the way out it has got (tau), and only
+    // which way it is going changes.
+    function menuRackHop(key, enter) {
+        const c = key && menu.cards.find(o => o.level.key === 'paddles' && menuStands(o));
+        if (!c) return;
+        menu.rackHop = menu.rackHop || [];
+        const old = menu.rackHop.find(h => h.key === key), P = menuHopPath(c, key);
+        if (old && old.enter === enter) return;
+        // a new one starts at the end it is leaving from: the slot to go out,
+        // the edge to come in
+        const tau = old ? Math.max(0, Math.min(P.total, old.enter ? P.total - old.t : old.t)) : enter ? P.total : 0;
+        menu.rackHop = menu.rackHop.filter(h => h !== old);
+        menu.rackHop.push({ key, enter, t: enter ? P.total - tau : tau, secs: P.total });
+    }
+    function menuRackHopStep(dt) {
+        if (!menu.rackHop) return;
+        for (const h of menu.rackHop) h.t += dt;
+        menu.rackHop = menu.rackHop.filter(h => h.t < h.secs);
+    }
+    const menuRackHopping = key => !!menu.rackHop && menu.rackHop.some(h => h.key === key);
+    // where a hopping mini is and how it is turned, from how far along the way out
+    function menuHopPose(P, h) {
+        const slot = P.slot, tau = Math.max(0, Math.min(P.total, h.enter ? P.total - h.t : h.t));
+        if (tau < P.tClimb) {
+            const u = tau / P.tClimb;
+            // a grip is a small catch in the descent, and a rock to the side it grips
+            const grip = Math.sin(tau * M_HOP_CLIMB_HZ * Math.PI * 2);
+            const upright = menuEase(Math.min(u / M_HOP_TURN, (1 - u) / M_HOP_TURN, 1));
+            return { climb: true, a: menuLerp(P.rest, 1, menuEase(Math.min(1, u / 0.25))),
+                     x: slot.x + grip * 0.8 * (slot.w / 60),
+                     y: menuLerp(slot.y, P.foot, u) + Math.sin(tau * M_HOP_CLIMB_HZ * Math.PI * 4) * 0.6 * (slot.w / 60),
+                     rot: -M_HOP_UPRIGHT * upright + grip * M_HOP_CLIMB_ROCK * upright, bob: 0 };
+        }
+        const wt = tau - P.tClimb, ph = wt * WALK_HZ * Math.PI * 2;
+        // the same pace, bob and roll as the big one's walk
+        return { climb: false, a: 1, x: menuLerp(slot.x, -slot.w, wt / P.tWalk), y: P.foot,
+                 rot: Math.cos(ph) * WALK_ROCK * 2, bob: Math.abs(Math.sin(ph / 2)) * M_HOP_BOB * (slot.w / 60) };
+    }
+    // A mini sitting where another is climbing over it shakes it off, the way
+    // a wet dog does: a shudder in short bursts, each starting hard and dying
+    // away, with a rest between. Inside a burst it does not swing smoothly (that
+    // reads as a spring) but flicks to a new random twist every frame of
+    // M_SHAKE_HZ, alternating sides. The nearer the climber the harder, and it
+    // stops once he has gone by. Each mini keeps its own beat.
+    const M_SHAKE_HZ = 14;           // flicks a second inside a burst
+    const M_SHAKE_PERIOD = 1.1;      // a burst and its rest
+    const M_SHAKE_BURST = 0.38;      // the share of that the burst takes
+    const M_SHAKE_PX = 1.7, M_SHAKE_ROT = 0.2;
+    const M_SHAKE_REST = 0.12;       // how much of it is left between bursts
+    function menuShakeOf(key, amp) {
+        let seed = 0;
+        for (let i = 0; i < key.length; i++) seed += key.charCodeAt(i) * (i + 1);
+        const t = menuNow(), beat = (t / M_SHAKE_PERIOD + menuHash(seed)) % 1;
+        const burst = beat < M_SHAKE_BURST ? 1 - beat / M_SHAKE_BURST : 0;
+        const env = amp * (M_SHAKE_REST + (1 - M_SHAKE_REST) * burst * burst);
+        const n = Math.floor(t * M_SHAKE_HZ), side = n % 2 ? 1 : -1;
+        return { dx: -side * (0.4 + 0.6 * menuHash(n + seed)) * M_SHAKE_PX * env,
+                 dy: (menuHash(n * 1.7 + seed) - 0.5) * M_SHAKE_PX * env,
+                 rot: side * (0.5 + 0.5 * menuHash(n * 3.1 + seed)) * M_SHAKE_ROT * env };
+    }
+    function menuMiniShake(key) {
+        const c = menu.rackHop && menu.rackHop.length && menu.cards.find(o => o.level.key === 'paddles' && menuStands(o));
+        if (!c) return null;
+        const me = menuRackSlot(c, key);
+        let amp = 0;
+        for (const h of menu.rackHop) {
+            if (h.key === key) continue;
+            const pose = menuHopPose(menuHopPath(c, h.key), h);
+            if (!pose.climb) continue;
+            const near = 1 - Math.max(Math.abs(pose.y - me.y) / (me.w * 0.55), Math.abs(pose.x - me.x) / (me.w * 0.6));
+            if (near > amp) amp = near;
+        }
+        if (amp <= 0) return null;
+        return menuShakeOf(key, menuEase(Math.min(1, amp * 1.5)));
+    }
+    function menuDrawHops() {
+        const c = menu.rackHop && menu.rackHop.length && menu.cards.find(o => o.level.key === 'paddles' && menuStands(o));
+        if (!c) return;
+        for (const h of menu.rackHop) {
+            const P = menuHopPath(c, h.key), pose = menuHopPose(P, h);
+            ctx.save();
+            ctx.translate(pose.x, pose.y - pose.bob);
+            ctx.rotate(pose.rot);
+            labPadIcon(h.key, 0, 0, P.slot.w, false, pose.a);
+            ctx.restore();
+        }
     }
 
     // ---- the picture ----------------------------------------------------------------
@@ -1878,6 +2062,7 @@
             });
         }
         if (!him) menuDrawHim();
+        menuDrawHops();
         menuDrawPush();
         // every level's best added up, along the floor under him, once there is one.
         // It eases in and out with the town settling rather than switching on.
@@ -1891,7 +2076,6 @@
             ctx.globalAlpha = 1;
         }
         if (!still) return;
-        menuPadPeek();
         menuDrawLine();
     }
     const M_TOTAL_Y = 592;
@@ -2501,13 +2685,29 @@
     const M_SHELF_AIR = 1.2;         // between a paddle and the plank over it
     const M_SHELF_NAIL = 2.2;        // a nail head's width
     const M_SHELF_FAINT = 0.5;       // a paddle's alpha at rest, lit to 1
-    function menuSignShelves(c, st, G) {
-        const own = menuOwned(), x0 = G.left, x1 = G.left + G.bw;
+    // where the shelves are over a name plate G, in art coordinates: how many, how
+    // long each paddle is, and the topmost y of the lot (topY) down to the lowest
+    // plank's underside (botY). The push-in aims its camera at them as well.
+    function menuShelfGeo(G, own) {
+        const x0 = G.left, x1 = G.left + G.bw;
         const rows = Math.max(1, Math.min(M_SHELF_MAX, Math.ceil(own.length / M_SHELF_PER))), perRow = Math.max(M_SHELF_PER, Math.ceil(own.length / rows));
         const fit = (x1 - x0 - 2 * M_SHELF_MARGIN - (perRow - 1) * M_SHELF_GAP) / perRow;
         const len = Math.min(fit, (M_SHELF_BUDGET / rows - M_SHELF_THICK - M_SHELF_AIR) * SHAPE_ASPECT), th = len / SHAPE_ASPECT;
         const gap = th + M_SHELF_THICK + M_SHELF_AIR, y1 = G.top - 1, topY = y1 - (rows - 1) * gap - th - 3;
         const sx = x0 + M_SHELF_MARGIN + (len < fit - 0.01 ? ((x1 - x0 - 2 * M_SHELF_MARGIN) - (perRow * len + (perRow - 1) * M_SHELF_GAP)) / 2 : 0);
+        return { x0, x1, rows, perRow, fit, len, th, gap, y1, topY, sx, botY: y1 + M_SHELF_THICK };
+    }
+    // where `key` hangs on the rack, in the town's own coordinates once the
+    // sign's scale is on it: the middle of its slot and how long it is drawn
+    function menuRackSlot(c, key) {
+        const own = menuOwned(), geo = menuShelfGeo(menuHang(menuArtOf(c)), own), i = Math.max(0, own.indexOf(key));
+        const r = Math.min(geo.rows - 1, Math.floor(i / geo.perRow)), col = i - r * geo.perRow, k = c.level.s;
+        const ax = geo.sx + (geo.len + M_SHELF_GAP) * col + geo.len / 2, ay = geo.y1 - r * geo.gap - geo.th / 2 - 0.2;
+        return { x: c.x + (ax - c.x) * k, y: c.y + (ay - c.y) * k, w: geo.len * k };
+    }
+    function menuSignShelves(c, st, G) {
+        const own = menuOwned(), geo = menuShelfGeo(G, own);
+        const { x0, x1, rows, perRow, len, th, gap, y1, topY, sx } = geo;
         menuSignBracket(c, st, { bw: (G.bw - 5) / 0.7 }, topY);
         menuSignSwing(c, topY, st, () => {
             for (const cx of [x0 + 2.5, x1 - 2.5]) menuSignChain(st, c.level.ink, cx, topY + 1, G.top, 2.6);
@@ -2518,9 +2718,13 @@
                 ctx.beginPath(); ctx.rect(x0, y, x1 - x0, M_SHELF_THICK); ctx.fillStyle = M_FILL; ctx.fill(); menuSignRim(st); ctx.lineWidth = 1; ctx.stroke();
                 for (const nx of [x0 + 3, x1 - 3]) menuSignHead(st, c.level.ink, 'flat', nx, y + M_SHELF_THICK / 2, M_SHELF_NAIL);
             }
+            // the one in your hands is not on the rack: its slot stays empty
             own.forEach((k, i) => {
+                if (k === LAB.pad || menuRackHopping(k)) return;
                 const r = Math.min(rows - 1, Math.floor(i / perRow)), col = i - r * perRow;
                 ctx.save(); ctx.translate(sx + (len + M_SHELF_GAP) * col + len / 2, y1 - r * gap - th / 2 - 0.2);
+                const shake = menuMiniShake(k);
+                if (shake) { ctx.translate(shake.dx, shake.dy); ctx.rotate(shake.rot); }
                 labPadIcon(k, 0, 0, len, false, M_SHELF_FAINT + (1 - M_SHELF_FAINT) * st.rise);
                 ctx.restore();
             });

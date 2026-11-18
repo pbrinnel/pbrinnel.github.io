@@ -177,7 +177,7 @@
     // included, which is where a paddle is chosen and has to show what it is.
     function labPadUpdate(dt) {
         if (labPFrom && (labPFade += dt) >= labPFadeSecs) labPFrom = null;
-        if (labP && labP.step && !(king && phase === 'fall')) labP.step(dt);
+        if (labP && labP.step && !(king && phase === 'fall') && !padQuiet()) labP.step(dt);
         padMarkStep(dt);
         padBurnStep(dt);
         padIceStep(dt);
@@ -197,7 +197,13 @@
     // labPadOver) and lay a skin over whatever you are holding (padSkin). While
     // one paddle fades into another both are drawn, each at its share (padK).
     const padAlphaNow = () => labB && labB.padAlpha ? labB.padAlpha() : 1;
+    // The town's gate swap puts the new paddle in your hands but keeps him off
+    // the screen until his mini is off the rack (menuPadWaiting). His looks wait
+    // the same time, and come on with him as he walks in: drawn and shed for the
+    // whole wait they showed at the edge of the screen, or where the last one stood.
+    const padQuiet = () => typeof menuPadWaiting === 'function' && menuPadWaiting();
     function padBoth(part, args) {
+        if (padQuiet()) return;
         const a = padAlphaNow(), k = labPadFadeK();
         if (labPFrom && labPFrom[part]) { padK = a * (1 - k); labPFrom[part](...args); }
         if (labP && labP[part]) { padK = a * k; labP[part](...args); }
