@@ -951,7 +951,10 @@
         lore: 'Forged in the fire of {surtr}\'s footsteps, he still remembers his name.',
         len: () => MAGMA_LEN,
         under() {
-            padMagmaGlow(paddle.x, padY(), padW(), padK);
+            // round the middle of however many of him there are, so it follows
+            // the takeover's climb as well as paddle.x
+            const all = segs();
+            padMagmaGlow((all[0].cx + all[all.length - 1].cx) / 2, padY(), padW(), padK);
             padRim('padRimE', MAGMA_RIM, 2.5, 0.5);
         },
         iconUnder(x, y, w, a) { padMagmaGlow(x, y, w, a); },

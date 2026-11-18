@@ -65,7 +65,7 @@
     // field has, and the clamp would answer by pinning him at dead center,
     // unable to move, during the tightest part of the fight. so BIG keeps
     // winning for most of the climb and simply stops compounding at the end.
-    const padW = () => Math.max(paddle.w, PADDLE_W * (1 + CLIMB_GROW * climb)) * lifeScale() * labPadW();
+    const padW = () => ascendPose ? ascendPose.w : Math.max(paddle.w, PADDLE_W * (1 + CLIMB_GROW * climb)) * lifeScale() * labPadW();
     const padH = () => PADDLE_H * (padW() / PADDLE_W);
     const PADDLE_Y   = LH - 58;
 
