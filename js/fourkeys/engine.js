@@ -79,7 +79,11 @@
     const CLIMB_RISE = 150;
     const CLIMB_GROW = 0.5;
     const CLIMB_EASE = 0.8;     // seconds to catch up, near enough
-    const padY = () => PADDLE_Y - CLIMB_RISE * climb - labLift();
+    // the takeover's pose while drawPaddle0 draws it: the paddle's looks
+    // (paddles.js) find where he is through padY() and segs(), so they follow
+    // him up. null otherwise.
+    let ascendPose = null;
+    const padY = () => ascendPose ? ascendPose.y : PADDLE_Y - CLIMB_RISE * climb - labLift();
 
     // A head that has got below his top near one end, still coming down, makes
     // that end dip toward it -- DIP_MAX straight away, most of the way there in
@@ -1320,6 +1324,7 @@
     // ...and under PORTAL a copy of any of them that is through a wall,
     // on the far side of the field (ptSegs), so he is hit and drawn there too
     function segs() {
+        if (ascendPose) return [{ cx: ascendPose.x, w: ascendPose.w, i: 0 }];
         const w = segW();
         const k = spread();
         if (k < 0.001) return ptSegs([{ cx: paddle.x, w, i: 0 }]);
@@ -4812,18 +4817,32 @@
             const y = ascendFrom.y + (BOSS_Y - ascendFrom.y) * k;
             const w = ascendFrom.w + (ASCEND_W - ascendFrom.w) * k;
             const artW = w / BODY_LEN_PER_W, artH = artW / PADDLE_ASPECT;
+            const x = LW / 2 + (paddle.x - LW / 2) * (1 - k);
+            // he rises dressed as whatever you were holding (BLUR stays Sonic),
+            // not as the bare photograph
+            ascendPose = { x, y, w };
             ctx.save();
-            ctx.translate(LW / 2 + (paddle.x - LW / 2) * (1 - k), y);
-            ctx.rotate(PADDLE_LEVEL);
-            // the color drains out of him as he rises -- one slow transition,
-            // which is where the black and white comes from now
-            ctx.filter = 'grayscale(' + drain().toFixed(3) + ')';
-            if (ready(paddleImg)) {
-                ctx.drawImage(paddleImg, -artW / 2 - ART_OFF_X * artW,
-                              -artH / 2 - ART_OFF_Y * artH, artW, artH);
+            try {
+                // the color drains out of him as he rises -- one slow transition,
+                // which is where the black and white comes from now
+                ctx.filter = 'grayscale(' + drain().toFixed(3) + ')';
+                labPadUnder();
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.rotate(PADDLE_LEVEL);
+                if (ready(paddleImg)) {
+                    ctx.drawImage(paddleImg, -artW / 2 - ART_OFF_X * artW,
+                                  -artH / 2 - ART_OFF_Y * artH, artW, artH);
+                }
+                ctx.restore();
+                labPadSkin({ cx: x, w, i: 0 }, 0);
+                labPadOver();
+            } finally {
+                ascendPose = null;
+                ctx.filter = 'none';
+                ctx.globalAlpha = 1;
+                ctx.restore();
             }
-            ctx.filter = 'none';
-            ctx.restore();
             return;
         }
 
