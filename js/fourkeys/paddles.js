@@ -823,6 +823,15 @@
     // far more easily, both off his ends and off his own travel -- and spin is
     // the multiplier -- but his flat middle is narrow, so most of him is the
     // curve of his own outline and a return is less of a sure thing.
+    // each flake: where across him (his widths from his middle), its phase in
+    // the loop, half-width in px at PADDLE_W, loops per second, rim colored or
+    // ink, big or a speck. Big ones are slower, as in play.
+    const CRYST_ICON_FALL = 1.3;      // his heights a flake drifts before it starts over
+    const CRYST_ICON_FLAKES = [
+        [-0.30, 0.00, 11, 0.16, true, true], [0.26, 0.45, 9, 0.18, false, true],
+        [0.02, 0.20, 3, 0.35, true, false], [-0.12, 0.70, 2.5, 0.40, false, false],
+        [0.40, 0.55, 3, 0.33, false, false], [-0.42, 0.85, 2.5, 0.38, true, false]
+    ];
     LAB_PAD.crystalline = {
         name: 'CRYSTALLINE',
         ink: CRYST_INK, rim: CRYST_RIM, tint: [CRYST_INK, 0.82],
@@ -834,6 +843,38 @@
         deck: () => CRYST_DECK,
         under() { padRim('padRimF', CRYST_RIM, 2.5, 0.55); },
         skin(sg, o) { padLay(sg, o, padTint('padCrystal', CRYST_INK), this.tint[1]); },
+        // the icon has no simulation, so each flake is a loop worked out from the
+        // clock: it starts at his edge, drifts down CRYST_ICON_FALL of his height
+        // while it sways and turns, fading in and out, then starts over
+        iconOver(x, y, w, a) {
+            const u = w / PADDLE_W, th = w / SHAPE_ASPECT;
+            const big = padFlakeSprite(CRYST_RIM);
+            for (const [fx, ph, s, rate, rim, bigOne] of CRYST_ICON_FLAKES) {
+                const t = (clock * rate + ph) % 1;
+                const env = Math.min(1, t / 0.2, (1 - t) / 0.3);
+                const half = s * u;
+                ctx.save();
+                ctx.translate(x + fx * w + Math.sin(clock * 1.3 + ph * 6.28) * 0.04 * w,
+                              y + (0.35 + t * CRYST_ICON_FALL) * th);
+                ctx.rotate(clock * (bigOne ? 0.6 : 1.5) + ph * 6.28);
+                ctx.globalAlpha = a * env * (bigOne ? 0.8 : 0.7);
+                if (bigOne && big) {
+                    ctx.drawImage(big, -half, -half * big.height / big.width, half * 2, half * 2 * big.height / big.width);
+                } else {
+                    // a six-armed speck, as a small flake is drawn in play
+                    ctx.strokeStyle = rim ? CRYST_RIM : CRYST_INK;
+                    ctx.lineWidth = Math.max(0.8, 1.2 * u);
+                    ctx.beginPath();
+                    for (let k = 0; k < 3; k++) {
+                        const ang = k * Math.PI / 3, dx = Math.cos(ang) * half, dy = Math.sin(ang) * half;
+                        ctx.moveTo(-dx, -dy);
+                        ctx.lineTo(dx, dy);
+                    }
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+        },
         mark: 'crystalline',
         shedRate: 21,
         // one of his flakes, off a head he has hit
@@ -871,6 +912,17 @@
     // and then a brick it breaks goes up and the fire runs on from there
     // (MAGMA's wildfire, above) -- or, on a boss, the wound counts double
     // (MAGMA's crit).
+    // each icon spark: where across him (his widths from his middle), its phase
+    // in the loop, life in seconds, starting speed up (px/s at PADDLE_W), size,
+    // rim colored or ink, and how far it weaves. MAGMA_ICON_LIFT is the
+    // acceleration up, the -30 gravity the sparks have in play.
+    const MAGMA_ICON_LIFT = 30;
+    const MAGMA_ICON_SPARKS = [
+        [-0.38, 0.00, 1.3, 55, 3.2, false, 18], [-0.22, 0.35, 1.0, 80, 2.4, true, 24],
+        [-0.08, 0.65, 1.5, 50, 3.6, false, 20], [0.06, 0.15, 1.1, 95, 2.2, true, 26],
+        [0.20, 0.80, 1.4, 60, 3.0, false, 16], [0.34, 0.50, 1.2, 75, 2.6, true, 22],
+        [0.42, 0.25, 1.6, 45, 3.4, false, 20], [-0.30, 0.90, 0.9, 100, 2.0, true, 28]
+    ];
     // the light round him, for a paddle `w` wide centered on (x, y)
     function padMagmaGlow(x, y, w, k) {
         const r = w * 0.95;
@@ -897,6 +949,27 @@
             padRim('padRimE', MAGMA_RIM, 2.5, 0.5);
         },
         iconUnder(x, y, w, a) { padMagmaGlow(x, y, w, a); },
+        // sparks lifting off him, as in play but each one a loop worked out from
+        // the clock: it rises from just above his middle, speeding up by
+        // MAGMA_ICON_LIFT as it goes, weaving, and fades out over its life
+        iconOver(x, y, w, a) {
+            const u = w / PADDLE_W, th = w / SHAPE_ASPECT;
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            for (const [fx, ph, life, v0, s, rim, sway] of MAGMA_ICON_SPARKS) {
+                const t = (clock / life + ph) % 1, age = t * life;
+                const rise = (v0 * age + 0.5 * MAGMA_ICON_LIFT * age * age) * u;
+                const sx = x + fx * w + Math.sin(clock * 3 + ph * 6.28) * sway * u * 0.3;
+                const sy = y - 0.25 * th - rise, half = s * u;
+                const ink = rim ? MAGMA_RIM : MAGMA_INK, fade = a * Math.min(1, t / 0.1) * (1 - t) * 0.95;
+                ctx.globalAlpha = fade * 0.55;
+                ctx.drawImage(padGlow(ink), sx - half * 2.4, sy - half * 2.4, half * 4.8, half * 4.8);
+                ctx.globalAlpha = fade;
+                ctx.fillStyle = '#fff1d6';
+                ctx.fillRect(sx - half / 4, sy - half / 4, half / 2, half / 2);
+            }
+            ctx.restore();
+        },
         skin(sg, o) { padLay(sg, o, padTint('padMagma', MAGMA_INK), this.tint[1]); },
         mark: 'magma',
         shedRate: 20,
