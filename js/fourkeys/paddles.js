@@ -56,7 +56,7 @@
     let ICE_SECS   = 1;      // an icy brick struck sends the head off at full speed this long...
     let ICE_RAMP   = 0.15;   // ...getting there over this, and coming back down over twice it
     let ICE_TURN   = 0.35;   // ...turned this far (rad) the way it is spinning, at the most spin
-    let MAGMA_LEN  = 0.7;    // magma: much shorter...
+    let MAGMA_LEN  = 0.75;   // magma: shorter, but not MULTI's 0.7...
     let MAGMA_CATCH = 0.3;   // ...but a brick a head of his breaks has this chance of going up in embers
     let MAGMA_SPREAD = 0.45; // ...a burning brick this chance of catching each one beside it
     let MAGMA_SPREAD_AT = 1; // ...seconds into burning that it does
@@ -848,7 +848,7 @@
     LAB_PAD.magma = {
         name: 'MAGMA',
         ink: MAGMA_INK, rim: MAGMA_RIM, tint: [MAGMA_INK, 0.72],
-        blurb: '30% shorter · 30% of breaks ignite neighbors · 15% chance of 2x boss damage',
+        blurb: '25% shorter · 30% of breaks ignite neighbors · 15% chance of 2x boss damage',
         lore: 'Forged in the fire of {surtr}\'s footsteps, he still remembers his name.',
         len: () => MAGMA_LEN,
         under() {
