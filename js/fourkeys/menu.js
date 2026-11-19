@@ -1454,15 +1454,6 @@
             if (want) menuRackHop(want, false);
             menu.holdHop = want;
         }
-        // Whatever put a different paddle in your hands (the BRANDONS screen, a
-        // card, a save) moves the minis the same way the gates do. The gates'
-        // own swap does it itself, so this sits it out and forgets the old one.
-        if (menu.sw) menu.rackPrev = null;
-        else {
-            const was = menu.rackPrev;
-            if (was && was !== LAB.pad && menuOwned().includes(was)) { menuRackHop(was, true); menuRackHop(LAB.pad, false); }
-            menu.rackPrev = LAB.pad;
-        }
         for (const side of [-1, 1]) {
             const next = menuNextPad(side);
             if (!(side in menu.gateTo)) menu.gateTo[side] = next;
