@@ -1303,6 +1303,12 @@
         }
     }
 
+    function menuOwes() {
+        const n = menu.nuz;
+        return !!(menu.post || (menu.postQ && menu.postQ.length) || phase === 'initials' || phase === 'scores'
+                  || (n && (n.finish || n.ask)));
+    }
+
     function menuUpdate(dt) {
         if (!menu) return;
         // a memory that has finished goes on by itself (see memoryDone)
@@ -2029,6 +2035,9 @@
         if (!menuUp()) return;
         if (menuUnlockDraw()) return;
         if (menuScreenDraw()) return;
+        // what a run still owes (the score entry and its table, the NUZLOCKE
+        // prompts) comes before the town, so he never sees it flash up between
+        if (menuOwes()) { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, LW, LH); return; }
 
         const k = menuArriveK();
         menuRiseStep();
