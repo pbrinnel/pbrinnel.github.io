@@ -198,6 +198,9 @@
             if (c.level.key === 'settings' || c.level.key === 'paddles') return true;
             if (c.level.key && c.level.key !== 'board') return false;
         }
+        // a stage won in a NUZLOCKE run is gone from its town once he has walked
+        // out of it and c.fade has run out (menuOpen, menuDrawTown)
+        if (menuNuzDone(c.level) && !(c.fade > 0)) return false;
         // (the boss lab builds this file without nuzlocke.js)
         if (c.level.key === 'nuzlocke') return typeof nuzBegin === 'function' && MENU_PADS.every(k => menu.pads[k]);
         if (c.level.key === 'memories') return MENU_MEMS.some(m => !m.always && menu.mems[m.id]);
@@ -556,7 +559,7 @@
     function menuAt() {
         const y = padY() - padH() / 2;
         for (const c of menu.cards) {
-            if (!menuStands(c) || !menuLane(c)) continue;
+            if (!menuStands(c) || !menuLane(c) || c.fade > 0) continue;    // a fading stage has no door left
             if (y > c.y + c.h / 2 || y < c.y - c.h / 2) continue;
             return c;
         }
@@ -603,6 +606,8 @@
     const M_FIELD = '#000';          // the level's own background, what the doorway opens onto
 
     // a stage already won in a NUZLOCKE run is closed for the rest of it
+    const M_NUZ_FADE_WAIT = 0.9;     // secs after the exit begins before a won stage starts to fade
+    const M_NUZ_FADE_SECS = 1.2;     // and how long it takes to go
     const menuNuzDone = l => !!(menu.nuz && !l.key && menu.keys[l.n]);
 
     function menuCanEnter(l) {
@@ -1285,6 +1290,10 @@
         LAB.stageAt(0, true);
         setHint(M_HINT);
         // out of the door he went in by, if the building is still standing
+        if (menu.cameFrom && menuNuzDone(menu.cameFrom)) {
+            const won = menu.cards.find(o => o.level === menu.cameFrom);
+            if (won) { won.fade = 1; won.fadeWait = M_NUZ_FADE_WAIT; }
+        }
         const c = menu.cameFrom && menu.cards.find(o => o.level === menu.cameFrom && menuStands(o));
         menu.cameFrom = null;
         if (c) {
@@ -2062,10 +2071,14 @@
         // drawn over him, so walking up past the FARM puts him behind its windmill.
         const feet = padY() + padH() * menuShrinkAt(padY()) / 2;
         let him = !asked || !!menuMotion();
+        const fnow = menuNow(), fdt = Math.min(0.1, fnow - (menu.fadeT || fnow));    // this frame's step, for the won stage's fade
+        menu.fadeT = fnow;
         for (const c of menu.cards.filter(menuStands).sort((a, b) => (a.y + a.h / 2) - (b.y + b.h / 2))) {
             if (!him && c.y + c.h / 2 > feet) { menuDrawHim(); him = true; }
+            if (c.fade > 0 && (c.fadeWait -= fdt) < 0) c.fade = Math.max(0, c.fade + c.fadeWait / M_NUZ_FADE_SECS), c.fadeWait = 0;
             menuArriveCard(c, k, () => {
                 ctx.save(); menuCamera(menuNear(c));
+                if (menuNuzDone(c.level)) ctx.globalAlpha *= c.fade;    // the frame the fade runs out is still in this loop
                 menu.a0 = ctx.globalAlpha; menuDrawLevel(c); ctx.globalAlpha = menu.a0;
                 ctx.restore();
             });
@@ -2178,6 +2191,7 @@
             const near = menuNear(c);
             menuArriveCard(c, k, () => {
                 ctx.save(); menuCamera(near);
+                if (menuNuzDone(c.level)) ctx.globalAlpha *= c.fade;    // fades with its building
                 const r = c.rise || 0, feet = c.level === MENU_VOID ? c.y + c.h * 0.35 : c.y + c.h / 2;
                 const rx = c.w * (c.level === MENU_VOID ? 0.75 : 0.62), ry = rx * menuLerp(0.16, 0.3, menuClamp(near));
                 ctx.beginPath(); ctx.ellipse(c.x, feet, rx, ry, 0, 0, Math.PI * 2);

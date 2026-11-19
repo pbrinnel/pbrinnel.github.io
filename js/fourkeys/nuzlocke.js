@@ -278,7 +278,7 @@
             return true;
         }
         if (n.finish) { nuzFinish(); return true; }
-        if (n.ask && !menu.leaving && !menu.going && !menuArriving()) {
+        if (n.ask) {      // straight after the win, before the town: a won stage fades once the screen is closed (menuOpen)
             n.ask = false;
             menuShow('nuzsave');
             return true;
