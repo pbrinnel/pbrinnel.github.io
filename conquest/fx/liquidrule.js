@@ -1,0 +1,1 @@
+const LIQUID_KIND={2:"water",1:"lava",7:"poison",20:"swamp"},SINK_FRAC={water:.3,lava:.25,poison:.35,swamp:.3},liquidKind=terrain=>LIQUID_KIND[terrain]||null;function sinkFraction(kind,unit={},mode="sink"){return mode!=="sink"||!kind||unit.hover?0:SINK_FRAC[kind]||0}export{LIQUID_KIND,SINK_FRAC,liquidKind,sinkFraction};

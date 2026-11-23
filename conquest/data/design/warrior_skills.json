@@ -1,0 +1,392 @@
+{
+ "_header": {
+  "source": "docs/DESIGN_WARRIORS.md section 2 (Q7 approved by the user 2026-11-21); skill ids (Saihai index) only; ROM skill names are read at runtime from the player ROM, never stored",
+  "date": "2026-11-21",
+  "method": "tools/design_warrior_skills.py (rework table authored, text = DRAFT for review)",
+  "notes": "Rows without text keep the ROM description at build time. rework rows: our own mechanics wording (DRAFT), applied only under the levels rules. Design choice, not ROM."
+ },
+ "data": [
+  {
+   "skill": 0,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 1,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 2,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 3,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 4,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 5,
+   "uses_per_battle": 1,
+   "rework": true,
+   "change": "heal_hp 50 (absolute HP) -> heal_pct 25",
+   "text": "Restores 25% of max HP to all allies.",
+   "args": {
+    "heal_pct": 25
+   }
+  },
+  {
+   "skill": 6,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 7,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 8,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 9,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 10,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 11,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 12,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 13,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 14,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 15,
+   "uses_per_battle": 1,
+   "rework": true,
+   "change": "heal_hp 100 (absolute HP) -> heal_pct 50",
+   "text": "Restores 50% of max HP to an ally and the allies next to it.",
+   "args": {
+    "heal_pct": 50
+   }
+  },
+  {
+   "skill": 16,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 17,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 18,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 19,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 20,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 21,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 22,
+   "uses_per_battle": 1,
+   "rework": true,
+   "change": "double_treasure (no treasure boxes) -> +50% gold from the battle",
+   "text": "For 3 turns, gold won in this battle is increased by 50%.",
+   "args": {
+    "gold_pct": 50
+   }
+  },
+  {
+   "skill": 23,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 24,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 25,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 26,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 27,
+   "uses_per_battle": 1,
+   "rework": true,
+   "change": "heal_hp 100 (absolute HP) -> heal_pct 50",
+   "text": "Restores 50% of max HP to all allies and cures their status ailments.",
+   "args": {
+    "heal_pct": 50
+   }
+  },
+  {
+   "skill": 28,
+   "uses_per_battle": 1,
+   "rework": true,
+   "change": "energy + double_treasure (both removed) -> Atk +1, Def +1",
+   "text": "Raises Attack and Defense by 1 stage for 3 turns.",
+   "args": {
+    "attack_up": 1,
+    "defense_up": 1
+   }
+  },
+  {
+   "skill": 29,
+   "uses_per_battle": 1,
+   "rework": true,
+   "change": "attack_up + energy + double_treasure -> Atk +1, Def +1",
+   "text": "Raises Attack and Defense by 1 stage for 3 turns.",
+   "args": {
+    "attack_up": 1,
+    "defense_up": 1
+   }
+  },
+  {
+   "skill": 30,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 31,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 32,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 33,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 34,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 35,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 36,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 37,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 38,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 39,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 40,
+   "uses_per_battle": 1,
+   "rework": true,
+   "change": "energy + block_crits -> block_crits + Def +1",
+   "text": "For 3 turns, allies cannot be hit by critical hits and their Defense rises by 1 stage.",
+   "args": {
+    "defense_up": 1
+   }
+  },
+  {
+   "skill": 41,
+   "uses_per_battle": 1,
+   "rework": true,
+   "change": "viper_bite reads the warlord's gender -> reads the Pokemon's gender",
+   "text": "For 3 turns, moves deal extra damage to male Pokemon (genderless Pokemon are not affected).",
+   "args": {
+    "viper_bite": 80,
+    "gender_of": "pokemon"
+   }
+  },
+  {
+   "skill": 42,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 43,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 44,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 45,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 46,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 47,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 48,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 49,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 50,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 51,
+   "uses_per_battle": 1,
+   "rework": true,
+   "change": "skill 51 (m2) counts female warlords -> counts female Pokemon on the field",
+   "text": "Raises Attack for 1 turn in proportion to the number of female Pokemon on the field, and the next attack cannot miss.",
+   "args": {
+    "attack_up": 1,
+    "always_hit": 1,
+    "count": "female_pokemon"
+   }
+  },
+  {
+   "skill": 52,
+   "uses_per_battle": 1,
+   "rework": true,
+   "change": "heal_hp 80 (absolute HP) -> heal_pct 40",
+   "text": "Raises Attack by 2 stages for 1 turn and restores 40% of max HP to an ally and the allies next to it.",
+   "args": {
+    "attack_up": 2,
+    "heal_pct": 40
+   }
+  },
+  {
+   "skill": 53,
+   "uses_per_battle": 1,
+   "rework": true,
+   "change": "heal_hp 80 (absolute HP) -> heal_pct 40",
+   "text": "Raises Defense by 2 stages for 1 turn and restores 40% of max HP to an ally and the allies next to it.",
+   "args": {
+    "defense_up": 2,
+    "heal_pct": 40
+   }
+  },
+  {
+   "skill": 54,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 55,
+   "uses_per_battle": 1,
+   "rework": true,
+   "change": "attack_up + energy -> attack_up only",
+   "text": "Raises the Attack of all allies by 1 stage for 1 turn.",
+   "args": {
+    "attack_up": 1
+   }
+  },
+  {
+   "skill": 56,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 57,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 58,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 59,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 60,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 61,
+   "uses_per_battle": 1,
+   "rework": false
+  },
+  {
+   "skill": 62,
+   "uses_per_battle": 1,
+   "rework": false
+  }
+ ]
+}

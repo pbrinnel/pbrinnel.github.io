@@ -58,8 +58,7 @@
   body:not(.opt-log):not(.opt-roster) #right { display:none; }
   body:not(.opt-log) #logwrap { display:none; }
   body:not(.opt-logbtn) #b-logtoggle { display:none !important; }   /* Log button: off by default, the L key still toggles the log */
-  #b-summary { display:none !important; }   /* the grey native-font 'Summary' button is not ROM UI: the result card is reopened from the end card, not from a top-bar button */
-  body:not(.opt-logbtn) #top:not(:has(#b-summary:not([hidden]), #badge:not([hidden]))) { display:none !important; }   /* no empty panel left behind */
+  body:not(.opt-logbtn) #top:not(:has(#badge:not([hidden]))) { display:none !important; }   /* no empty panel left behind */
   body:not(.opt-roster) #roster { display:none; }
 </style>
 <link rel="stylesheet" href="ui.css">
@@ -75,7 +74,6 @@
 <div id="labels"></div>
 
 <div id="top" class="panel" hidden>
-  <button id="b-summary" hidden>Summary</button>
   <button id="b-logtoggle" class="narrowonly" title="Show or hide the battle log (L)">Log</button>
   <span class="badge" id="badge" hidden title="Stats, moves, types and the damage formula are real; warlords come from the decoded data; warlord items / trained stats are not modelled">Placeholder stats</span>
 </div>
@@ -89,10 +87,8 @@
     <select id="look" style="width:100%" title="Clarity: sharp pixels plus sun shadows. DS Original: plain nearest-filtered rendering."></select>
     <h3>Sprite projection</h3>
     <select id="proj" style="width:100%" title="Blend: sprites tilt mildly toward the original camera angle when you raise the camera. Flat: always screen-parallel."></select>
-    <h3>Info screen style</h3>
-    <select id="infostyle" style="width:100%" title="DS pages: the original two-screen Info (3 pages). Roster: the new modal roster + detail view."><option value="ds">DS pages</option><option value="roster">Roster (new)</option></select>
-    <h3>Command menu position</h3>
-    <select id="opt-menupos" style="width:100%" title="Where the Fight / Wait / Skill / Item stack sits. Follow unit: next to the unit, never over a clickable tile (falls back to the original spot). Fixed: always the original spot."><option value="1">Follow unit</option><option value="0">Fixed (original position)</option></select>
+    <h3>Liquid cells</h3>
+    <select id="opt-liquid" style="width:100%" title="Units standing on water, lava or poison cells. Sink (default, design choice): grounded units sink part-way, the part under the surface is hidden, with a ripple / bubbles / heat glow; Flying and Levitate units stay above. Surface (ROM): they stand on top, as the original draws them."><option value="sink">Sink</option><option value="surface">Surface (ROM)</option></select>
     <h3>Board HUD</h3>
     <select id="hudmode" style="width:100%" title="DS: HP numbers + thin bars under each unit and a Fight / Wait menu beside the selected one, drawn from the ROM's HUD graphics. Modern: rings and HP bars."></select>
     <h3>HUD size <span id="hudscale-val" class="dim"></span></h3>
@@ -110,8 +106,6 @@
     <label style="display:flex;gap:6px;align-items:center" title="Also list the debug / placeholder battle maps (docs/maps_catalog.md) in the stage picker. Off: only real stages."><input type="checkbox" id="opt-debugstages"> Show debug stages</label>
     <label style="display:flex;gap:6px;align-items:center" title="Per-unit damage / KOs / MVP table under the result screen. Not in the original."><input type="checkbox" id="opt-sumstats"> Result stats table</label>
     <label style="display:flex;gap:6px;align-items:center" title="A small shape (circle, square, triangle, diamond) per team beside each HP number, so teams are not told by colour alone (modern addition)."><input type="checkbox" id="opt-armyicon"> Team icons</label>
-    <label style="display:flex;gap:6px;align-items:center" title="Skill and Item buttons under Fight / Wait when the selected unit's warrior has a Warrior Skill or the unit holds an item (greyed with the reason when it cannot be used). The original has only the Warrior button in the lower dock (modern addition)."><input type="checkbox" id="opt-skillbtn" checked> Skill / Item buttons in command menu</label>
-    <label style="display:flex;gap:6px;align-items:center" title="Small i badge on the unit plate move / ability rows; click a row for its description (modern addition)."><input type="checkbox" id="opt-infocue" checked> Show info cues</label>
     <label style="display:flex;gap:6px;align-items:center" title="Upper-screen docks: no backdrop (default) or a parchment strip behind each dock, cut from the upper BG art."><input type="checkbox" id="opt-dockbg"> Parchment behind docks</label>
     <label style="display:flex;gap:6px;align-items:center" title="Side-coloured ring and facing arrow under every unit (always shown in the Modern HUD mode)."><input type="checkbox" id="opt-rings"> Unit rings + facing arrows</label>
     <label style="display:flex;gap:6px;align-items:center" title="Faint outline of every cell."><input type="checkbox" id="opt-grid"> Grid lines</label>
@@ -138,7 +132,7 @@
 
 
 <div id="status">
-  <span>Map <b id="st-map">-</b></span><span>Seed <b id="st-seed">-</b></span><span>Turns <b id="st-turn">-</b></span>
+  <span>Map <b id="st-map">-</b></span><span>Seed <b id="st-seed">-</b></span><span>Turns <b id="st-turn">-</b></span><span>Weather <b id="st-zone">-</b></span><span>Cells <b id="st-cells">-</b></span><span>Screens <b id="st-screens">-</b></span>
   <span>Hash <b id="st-hash">-</b></span><span>Actions <b id="st-acts">0</b></span><span id="st-badge"></span>
   <span id="st-hints"></span><span style="margin-left:auto" id="st-msg"></span>
 </div>
@@ -161,7 +155,7 @@
       <label style="width:auto"><input id="s-lock" type="checkbox"> lock</label></div>
     <div class="field"><label></label><button id="s-reroll">Random teams</button><span class="dim" id="s-note"></span></div>
     <div id="s-armies" class="armies"></div>
-    <div class="row" style="margin-top:14px"><button class="primary" id="s-start">Start battle</button></div>
+    <div class="row" style="margin-top:14px"><button class="primary" id="s-start">Start battle</button><button id="s-dex" title="Pokédex, Movedex, items and warriors">Dex</button></div>
     <p id="s-src" style="margin:8px 0 0;font-size:11px"></p>
   </div>
 </div>

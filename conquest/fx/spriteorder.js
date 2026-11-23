@@ -1,0 +1,1 @@
+const TIER={ground:.5,silhouette:1,shadow:2,item:2.5,unit:3,figure:4,effect:30},ITEM_PUSH_MIN=38,ITEM_PUSH_MAX=44,UNIT_LEAD=8,itemPush=z0=>Math.min(Math.max(z0,ITEM_PUSH_MIN),ITEM_PUSH_MAX),unitPush=speciesPush=>speciesPush+UNIT_LEAD;function drawsOver(a,b){return a.tier>b.tier&&a.push>b.push}export{ITEM_PUSH_MAX,ITEM_PUSH_MIN,TIER,UNIT_LEAD,drawsOver,itemPush,unitPush};

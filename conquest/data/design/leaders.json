@@ -1,0 +1,706 @@
+{
+ "_header": {
+  "source": "tools/design_leaders.py generate (authored tables + the built _out/design/moves.json); docs/DESIGN_LEADERS.md",
+  "date": "2026-11-23",
+  "method": "warlord per type, coverage types and signature moves are DESIGN CHOICES (not ROM); only ids committed",
+  "notes": "stab / cover = signature moves with the level they appear at (core leaders.ts leaderMoves). The species pool is derived from the species types at run time (core: leader type, coverage_types, include, exclude)."
+ },
+ "rules": {
+  "version": 1,
+  "core_share": 0.6,
+  "signature": {
+   "lead_stab": 1,
+   "lead_cover": 1,
+   "other_stab": 0,
+   "other_random": false
+  },
+  "champion": {
+   "warlord": 6,
+   "mixed": true
+  },
+  "leaders": [
+   {
+    "type": "Normal",
+    "warlord": 45,
+    "coverage_types": [
+     "Fighting",
+     "Water",
+     "Ground"
+    ],
+    "stab": [
+     {
+      "move": "chip-away",
+      "lv": 15
+     },
+     {
+      "move": "extreme-speed",
+      "lv": 28
+     },
+     {
+      "move": "tri-attack",
+      "lv": 28
+     },
+     {
+      "move": "double-edge",
+      "lv": 42
+     }
+    ],
+    "cover": [
+     {
+      "move": "brick-break",
+      "lv": 28
+     },
+     {
+      "move": "scald",
+      "lv": 28
+     }
+    ]
+   },
+   {
+    "type": "Fire",
+    "warlord": 53,
+    "coverage_types": [
+     "Ground",
+     "Rock",
+     "Dragon",
+     "Fighting"
+    ],
+    "stab": [
+     {
+      "move": "lava-plume",
+      "lv": 15
+     },
+     {
+      "move": "fire-punch",
+      "lv": 28
+     },
+     {
+      "move": "fusion-flare",
+      "lv": 28
+     },
+     {
+      "move": "flare-blitz",
+      "lv": 42
+     }
+    ],
+    "cover": [
+     {
+      "move": "earthquake",
+      "lv": 28
+     },
+     {
+      "move": "head-smash",
+      "lv": 42
+     }
+    ]
+   },
+   {
+    "type": "Water",
+    "warlord": 13,
+    "coverage_types": [
+     "Ground",
+     "Ice",
+     "Dragon",
+     "Psychic"
+    ],
+    "stab": [
+     {
+      "move": "aqua-jet",
+      "lv": 1
+     },
+     {
+      "move": "scald",
+      "lv": 28
+     },
+     {
+      "move": "surf",
+      "lv": 28
+     },
+     {
+      "move": "waterfall",
+      "lv": 28
+     }
+    ],
+    "cover": [
+     {
+      "move": "earthquake",
+      "lv": 28
+     },
+     {
+      "move": "ice-punch",
+      "lv": 28
+     }
+    ],
+    "power": 0.9,
+    "core_share": 0.8,
+    "signature": {
+     "lead_cover": 0
+    }
+   },
+   {
+    "type": "Electric",
+    "warlord": 15,
+    "coverage_types": [
+     "Water",
+     "Ice",
+     "Flying",
+     "Steel"
+    ],
+    "stab": [
+     {
+      "move": "shock-wave",
+      "lv": 15
+     },
+     {
+      "move": "fusion-bolt",
+      "lv": 28
+     },
+     {
+      "move": "thunder-punch",
+      "lv": 28
+     },
+     {
+      "move": "wild-charge",
+      "lv": 42
+     }
+    ],
+    "cover": [
+     {
+      "move": "scald",
+      "lv": 28
+     },
+     {
+      "move": "ice-punch",
+      "lv": 28
+     }
+    ],
+    "power": 0.85,
+    "core_share": 0.8,
+    "signature": {
+     "lead_cover": 0
+    }
+   },
+   {
+    "type": "Grass",
+    "warlord": 17,
+    "coverage_types": [
+     "Poison",
+     "Ground",
+     "Rock",
+     "Dragon"
+    ],
+    "stab": [
+     {
+      "move": "giga-drain",
+      "lv": 15
+     },
+     {
+      "move": "energy-ball",
+      "lv": 28
+     },
+     {
+      "move": "seed-bomb",
+      "lv": 28
+     },
+     {
+      "move": "power-whip",
+      "lv": 42
+     }
+    ],
+    "cover": [
+     {
+      "move": "sludge-wave",
+      "lv": 28
+     },
+     {
+      "move": "earthquake",
+      "lv": 28
+     }
+    ]
+   },
+   {
+    "type": "Ice",
+    "warlord": 19,
+    "coverage_types": [
+     "Water",
+     "Ground",
+     "Flying",
+     "Dragon"
+    ],
+    "stab": [
+     {
+      "move": "ice-shard",
+      "lv": 1
+     },
+     {
+      "move": "ice-fang",
+      "lv": 15
+     },
+     {
+      "move": "aurora-beam",
+      "lv": 15
+     },
+     {
+      "move": "ice-punch",
+      "lv": 28
+     }
+    ],
+    "cover": [
+     {
+      "move": "scald",
+      "lv": 28
+     },
+     {
+      "move": "earthquake",
+      "lv": 28
+     }
+    ],
+    "power": 0.82,
+    "core_share": 1.0,
+    "signature": {
+     "lead_stab": 0,
+     "lead_cover": 0
+    }
+   },
+   {
+    "type": "Fighting",
+    "warlord": 21,
+    "coverage_types": [
+     "Dark",
+     "Rock",
+     "Ground",
+     "Ghost"
+    ],
+    "stab": [
+     {
+      "move": "revenge",
+      "lv": 15
+     },
+     {
+      "move": "brick-break",
+      "lv": 28
+     },
+     {
+      "move": "vital-throw",
+      "lv": 28
+     },
+     {
+      "move": "submission",
+      "lv": 28
+     }
+    ],
+    "cover": [
+     {
+      "move": "sucker-punch",
+      "lv": 28
+     },
+     {
+      "move": "head-smash",
+      "lv": 42
+     }
+    ]
+   },
+   {
+    "type": "Poison",
+    "warlord": 23,
+    "coverage_types": [
+     "Dark",
+     "Flying",
+     "Bug",
+     "Ghost"
+    ],
+    "stab": [
+     {
+      "move": "acid",
+      "lv": 1
+     },
+     {
+      "move": "sludge-bomb",
+      "lv": 1
+     },
+     {
+      "move": "sludge-wave",
+      "lv": 28
+     },
+     {
+      "move": "gunk-shot",
+      "lv": 42
+     }
+    ],
+    "cover": [
+     {
+      "move": "sucker-punch",
+      "lv": 28
+     },
+     {
+      "move": "drill-peck",
+      "lv": 28
+     }
+    ]
+   },
+   {
+    "type": "Ground",
+    "warlord": 25,
+    "coverage_types": [
+     "Fire",
+     "Flying",
+     "Rock",
+     "Dragon"
+    ],
+    "stab": [
+     {
+      "move": "dig",
+      "lv": 1
+     },
+     {
+      "move": "earth-power",
+      "lv": 1
+     },
+     {
+      "move": "mud-shot",
+      "lv": 1
+     },
+     {
+      "move": "earthquake",
+      "lv": 28
+     }
+    ],
+    "cover": [
+     {
+      "move": "flare-blitz",
+      "lv": 42
+     },
+     {
+      "move": "drill-peck",
+      "lv": 28
+     }
+    ],
+    "power": 0.9,
+    "core_share": 0.8,
+    "signature": {
+     "lead_cover": 0
+    }
+   },
+   {
+    "type": "Flying",
+    "warlord": 27,
+    "coverage_types": [
+     "Steel",
+     "Dragon",
+     "Ground",
+     "Fighting"
+    ],
+    "stab": [
+     {
+      "move": "acrobatics",
+      "lv": 15
+     },
+     {
+      "move": "air-slash",
+      "lv": 28
+     },
+     {
+      "move": "drill-peck",
+      "lv": 28
+     },
+     {
+      "move": "hurricane",
+      "lv": 28
+     }
+    ],
+    "cover": [
+     {
+      "move": "mirror-shot",
+      "lv": 15
+     },
+     {
+      "move": "dragon-breath",
+      "lv": 28
+     }
+    ],
+    "power": 0.9,
+    "core_share": 0.8,
+    "signature": {
+     "lead_cover": 0
+    }
+   },
+   {
+    "type": "Psychic",
+    "warlord": 57,
+    "coverage_types": [
+     "Fighting",
+     "Steel",
+     "Ice",
+     "Flying"
+    ],
+    "stab": [
+     {
+      "move": "trick",
+      "lv": 1
+     },
+     {
+      "move": "synchronoise",
+      "lv": 15
+     },
+     {
+      "move": "extrasensory",
+      "lv": 28
+     },
+     {
+      "move": "zen-headbutt",
+      "lv": 28
+     }
+    ],
+    "cover": [
+     {
+      "move": "brick-break",
+      "lv": 28
+     },
+     {
+      "move": "mirror-shot",
+      "lv": 15
+     }
+    ],
+    "power": 0.9,
+    "core_share": 0.8,
+    "signature": {
+     "lead_cover": 0
+    }
+   },
+   {
+    "type": "Bug",
+    "warlord": 31,
+    "coverage_types": [
+     "Rock",
+     "Steel",
+     "Water",
+     "Fighting"
+    ],
+    "stab": [
+     {
+      "move": "signal-beam",
+      "lv": 15
+     },
+     {
+      "move": "steamroller",
+      "lv": 15
+     },
+     {
+      "move": "bug-buzz",
+      "lv": 28
+     },
+     {
+      "move": "megahorn",
+      "lv": 42
+     }
+    ],
+    "cover": [
+     {
+      "move": "head-smash",
+      "lv": 42
+     },
+     {
+      "move": "mirror-shot",
+      "lv": 15
+     }
+    ]
+   },
+   {
+    "type": "Rock",
+    "warlord": 33,
+    "coverage_types": [
+     "Fire",
+     "Flying",
+     "Ice",
+     "Dragon"
+    ],
+    "stab": [
+     {
+      "move": "ancient-power",
+      "lv": 15
+     },
+     {
+      "move": "smack-down",
+      "lv": 15
+     },
+     {
+      "move": "power-gem",
+      "lv": 28
+     },
+     {
+      "move": "head-smash",
+      "lv": 42
+     }
+    ],
+    "cover": [
+     {
+      "move": "flare-blitz",
+      "lv": 42
+     },
+     {
+      "move": "drill-peck",
+      "lv": 28
+     }
+    ]
+   },
+   {
+    "type": "Ghost",
+    "warlord": 35,
+    "coverage_types": [
+     "Fighting",
+     "Psychic",
+     "Poison",
+     "Fire"
+    ],
+    "stab": [
+     {
+      "move": "shadow-ball",
+      "lv": 1
+     },
+     {
+      "move": "ominous-wind",
+      "lv": 15
+     },
+     {
+      "move": "shadow-punch",
+      "lv": 15
+     },
+     {
+      "move": "shadow-claw",
+      "lv": 15
+     }
+    ],
+    "cover": [
+     {
+      "move": "brick-break",
+      "lv": 28
+     },
+     {
+      "move": "extrasensory",
+      "lv": 28
+     }
+    ]
+   },
+   {
+    "type": "Dragon",
+    "warlord": 67,
+    "coverage_types": [
+     "Steel",
+     "Fire",
+     "Fighting",
+     "Water"
+    ],
+    "stab": [
+     {
+      "move": "dual-chop",
+      "lv": 1
+     },
+     {
+      "move": "dragon-pulse",
+      "lv": 1
+     },
+     {
+      "move": "twister",
+      "lv": 1
+     },
+     {
+      "move": "dragon-breath",
+      "lv": 28
+     }
+    ],
+    "cover": [
+     {
+      "move": "mirror-shot",
+      "lv": 15
+     },
+     {
+      "move": "flare-blitz",
+      "lv": 42
+     }
+    ],
+    "power": 0.75,
+    "core_share": 1.0,
+    "signature": {
+     "lead_stab": 0,
+     "lead_cover": 0
+    }
+   },
+   {
+    "type": "Dark",
+    "warlord": 37,
+    "coverage_types": [
+     "Flying",
+     "Psychic",
+     "Fire",
+     "Poison"
+    ],
+    "stab": [
+     {
+      "move": "pursuit",
+      "lv": 1
+     },
+     {
+      "move": "payback",
+      "lv": 15
+     },
+     {
+      "move": "dark-pulse",
+      "lv": 28
+     },
+     {
+      "move": "sucker-punch",
+      "lv": 28
+     }
+    ],
+    "cover": [
+     {
+      "move": "drill-peck",
+      "lv": 28
+     },
+     {
+      "move": "extrasensory",
+      "lv": 28
+     }
+    ]
+   },
+   {
+    "type": "Steel",
+    "warlord": 39,
+    "coverage_types": [
+     "Water",
+     "Flying",
+     "Psychic",
+     "Ground"
+    ],
+    "stab": [
+     {
+      "move": "flash-cannon",
+      "lv": 1
+     },
+     {
+      "move": "iron-head",
+      "lv": 1
+     },
+     {
+      "move": "meteor-mash",
+      "lv": 1
+     },
+     {
+      "move": "mirror-shot",
+      "lv": 15
+     }
+    ],
+    "cover": [
+     {
+      "move": "scald",
+      "lv": 28
+     },
+     {
+      "move": "drill-peck",
+      "lv": 28
+     }
+    ]
+   }
+  ]
+ }
+}

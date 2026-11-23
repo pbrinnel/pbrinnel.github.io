@@ -1,0 +1,330 @@
+{
+ "_header": {
+  "source": "tools/design_warrior_passives.py seed rule (docs/DESIGN_WARRIORS.md section 2, Q1 / Q2), reviewed by the user in the Design Review Lab",
+  "date": "2026-11-21",
+  "method": "generated from the ROM stats at build time; only ids committed",
+  "notes": "group = BaseBushou group (the character; rank II / III share it). Edit via the lab diff + tools/design_apply_review.py."
+ },
+ "passives": [
+  {
+   "id": "vigor",
+   "name": "Vigor",
+   "effect": "+5% max HP while held.",
+   "note": "safe, always on"
+  },
+  {
+   "id": "edge",
+   "name": "Edge",
+   "effect": "+5% damage dealt while held.",
+   "note": "keep at 5"
+  },
+  {
+   "id": "hide",
+   "name": "Hide",
+   "effect": "-5% damage taken while held.",
+   "note": "safe"
+  },
+  {
+   "id": "sharp_eye",
+   "name": "Sharp Eye",
+   "effect": "The first attack of each battle gets +10 accuracy.",
+   "note": "small"
+  },
+  {
+   "id": "swift_start",
+   "name": "Swift Start",
+   "effect": "The battle starts with Speed stage +1.",
+   "note": "not Atk / Def"
+  },
+  {
+   "id": "scavenger",
+   "name": "Scavenger",
+   "effect": "When the holder defeats a unit, it heals 1/8 of its max HP.",
+   "note": "keep 1/8"
+  },
+  {
+   "id": "steady",
+   "name": "Steady",
+   "effect": "The first status ailment inflicted on the holder each battle is blocked.",
+   "note": "once per battle"
+  },
+  {
+   "id": "climber",
+   "name": "Climber",
+   "effect": "+1 climb height.",
+   "note": "utility"
+  },
+  {
+   "id": "anchor",
+   "name": "Anchor",
+   "effect": "Immune to knockback.",
+   "note": "utility"
+  }
+ ],
+ "data": [
+  {
+   "group": 0,
+   "passive": "scavenger"
+  },
+  {
+   "group": 1,
+   "passive": "scavenger"
+  },
+  {
+   "group": 2,
+   "passive": "steady"
+  },
+  {
+   "group": 3,
+   "passive": "swift_start"
+  },
+  {
+   "group": 4,
+   "passive": "swift_start"
+  },
+  {
+   "group": 5,
+   "passive": "vigor"
+  },
+  {
+   "group": 6,
+   "passive": "edge"
+  },
+  {
+   "group": 7,
+   "passive": "steady"
+  },
+  {
+   "group": 8,
+   "passive": "hide"
+  },
+  {
+   "group": 9,
+   "passive": "edge"
+  },
+  {
+   "group": 10,
+   "passive": "hide"
+  },
+  {
+   "group": 11,
+   "passive": "steady"
+  },
+  {
+   "group": 12,
+   "passive": "vigor"
+  },
+  {
+   "group": 13,
+   "passive": "edge"
+  },
+  {
+   "group": 14,
+   "passive": "swift_start"
+  },
+  {
+   "group": 15,
+   "passive": "swift_start"
+  },
+  {
+   "group": 16,
+   "passive": "swift_start"
+  },
+  {
+   "group": 17,
+   "passive": "edge"
+  },
+  {
+   "group": 18,
+   "passive": "sharp_eye"
+  },
+  {
+   "group": 19,
+   "passive": "steady"
+  },
+  {
+   "group": 20,
+   "passive": "anchor"
+  },
+  {
+   "group": 21,
+   "passive": "scavenger"
+  },
+  {
+   "group": 22,
+   "passive": "swift_start"
+  },
+  {
+   "group": 23,
+   "passive": "scavenger"
+  },
+  {
+   "group": 24,
+   "passive": "sharp_eye"
+  },
+  {
+   "group": 25,
+   "passive": "edge"
+  },
+  {
+   "group": 26,
+   "passive": "vigor"
+  },
+  {
+   "group": 27,
+   "passive": "hide"
+  },
+  {
+   "group": 28,
+   "passive": "swift_start"
+  },
+  {
+   "group": 29,
+   "passive": "edge"
+  },
+  {
+   "group": 30,
+   "passive": "swift_start"
+  },
+  {
+   "group": 31,
+   "passive": "hide"
+  },
+  {
+   "group": 32,
+   "passive": "anchor"
+  },
+  {
+   "group": 33,
+   "passive": "edge"
+  },
+  {
+   "group": 34,
+   "passive": "scavenger"
+  },
+  {
+   "group": 35,
+   "passive": "steady"
+  },
+  {
+   "group": 36,
+   "passive": "edge"
+  },
+  {
+   "group": 37,
+   "passive": "anchor"
+  },
+  {
+   "group": 100,
+   "passive": "steady"
+  },
+  {
+   "group": 101,
+   "passive": "vigor"
+  },
+  {
+   "group": 102,
+   "passive": "vigor"
+  },
+  {
+   "group": 103,
+   "passive": "vigor"
+  },
+  {
+   "group": 104,
+   "passive": "hide"
+  },
+  {
+   "group": 105,
+   "passive": "scavenger"
+  },
+  {
+   "group": 106,
+   "passive": "scavenger"
+  },
+  {
+   "group": 107,
+   "passive": "hide"
+  },
+  {
+   "group": 108,
+   "passive": "hide"
+  },
+  {
+   "group": 109,
+   "passive": "sharp_eye"
+  },
+  {
+   "group": 110,
+   "passive": "hide"
+  },
+  {
+   "group": 111,
+   "passive": "scavenger"
+  },
+  {
+   "group": 112,
+   "passive": "steady"
+  },
+  {
+   "group": 113,
+   "passive": "swift_start"
+  },
+  {
+   "group": 114,
+   "passive": "sharp_eye"
+  },
+  {
+   "group": 116,
+   "passive": "edge"
+  },
+  {
+   "group": 117,
+   "passive": "edge"
+  },
+  {
+   "group": 118,
+   "passive": "sharp_eye"
+  },
+  {
+   "group": 119,
+   "passive": "steady"
+  },
+  {
+   "group": 120,
+   "passive": "sharp_eye"
+  },
+  {
+   "group": 121,
+   "passive": "steady"
+  },
+  {
+   "group": 122,
+   "passive": "steady"
+  },
+  {
+   "group": 123,
+   "passive": "vigor"
+  },
+  {
+   "group": 124,
+   "passive": "climber"
+  },
+  {
+   "group": 125,
+   "passive": "sharp_eye"
+  },
+  {
+   "group": 126,
+   "passive": "swift_start"
+  },
+  {
+   "group": 128,
+   "passive": "vigor"
+  },
+  {
+   "group": 129,
+   "passive": "anchor"
+  }
+ ]
+}

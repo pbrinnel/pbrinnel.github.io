@@ -1,0 +1,40 @@
+{
+ "_header": {
+  "source": "authored (DESIGN_LEVELS 6.2 / 10 / 11; user decisions 2026-11-14 / 15)",
+  "date": "2026-11-15",
+  "method": "hand-written",
+  "notes": "New items only (the ROM items are read from the ROM). 2026-11-15 (Items Review Lab): added the optional fields desc, who, shop ('always' | 'party' = only when a party Pokemon can use it | 'off'), from_gym (Gym N shop = N-1 bosses beaten; the code has no stage gate, so 1), reward (boss pick / event item pool). They mirror core/src/run.ts DESIGN_SHOP_ITEMS and designShopItems; the game does not read the new fields. The tm record is a schema example: the 48 TMs live in learnsets_draft.json (tms). 2026-11-21 (Items Review Lab, enabled toggle): added top-level `rules` rows { key: 'rom:<Item.dat index>' | 'design:<id>' | 'tm:<tm70 / hm01>', enabled?: false, shop?, from_gym?, reward?, price?, desc? } written by tools/design_apply_items.py from a lab export. The game honours ONLY `enabled: false` (core parseItemRules: the item is in no shop, reward or event; a copy in a bag stays). No row = enabled. The other fields record the decision (shop section / Gym / price / our own description) for the shop rewrite. Keyed by index, never by ROM name or text."
+ },
+ "data": [
+  {
+   "id": "ice-stone",
+   "name": "Ice Stone",
+   "kind": "stone",
+   "price": 2100,
+   "desc": "Lets Eevee evolve into Glaceon.",
+   "who": "Eevee (stone row 133 -> 471)",
+   "shop": "party",
+   "from_gym": 1,
+   "reward": false
+  },
+  {
+   "id": "link-cable",
+   "name": "Link Cable",
+   "kind": "cable",
+   "price": 3000,
+   "desc": "Trade evolutions: used on a Pokemon whose evolution needs a trade (the Link Cable alone; trade-with-item lines use their item alone).",
+   "who": "the `cable` evolution rows (evolutions_draft.json)",
+   "shop": "party",
+   "from_gym": 1,
+   "reward": false
+  },
+  {
+   "id": "tm-thunder-wave",
+   "name": "TM Thunder Wave",
+   "kind": "tm",
+   "price": 3000,
+   "move": "thunder-wave"
+  }
+ ],
+ "rules": []
+}

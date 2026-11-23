@@ -141,6 +141,6 @@ button[title^="Show / hide the rings"] { bottom:calc(30px + var(--ldock, 0px)) !
 #logwrap { position:static; width:auto; height:auto; flex:1; background:none; border:0; border-top:1px solid var(--line); border-radius:0; padding:8px 0 0; }
 #logwrap.collapsed { display:none; }
 #left { display:none !important; }   /* brief 8: the web panel is gone; its hidden form controls stay as the Settings window backing store */
-/* brief 8: the top strip held only the status badge on wide windows; hide it while nothing in it is visible (no Summary, Log button / badge off) */
-@media (min-width: 1101px) { #top:not(:has(#b-summary:not([hidden]))):not(:has(#badge:not([hidden]))) { display:none !important; } }
+/* brief 8: the top strip held only the status badge on wide windows; hide it while nothing in it is visible (Log button / badge off) */
+@media (min-width: 1101px) { #top:not(:has(#badge:not([hidden]))) { display:none !important; } }
 

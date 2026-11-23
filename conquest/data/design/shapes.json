@@ -790,6 +790,234 @@
     ]
    ],
    "needs_engine": false
+  },
+  {
+   "id": "twin-lanes",
+   "name": "Twin lanes",
+   "desc": "Two parallel lanes either side of the facing line, 2 deep",
+   "cells": [
+    [
+     -1,
+     -1
+    ],
+    [
+     -1,
+     -2
+    ],
+    [
+     1,
+     -1
+    ],
+    [
+     1,
+     -2
+    ]
+   ],
+   "needs_engine": false,
+   "kind": "custom",
+   "notes": "proposal moves-b3-grass-bug-poison",
+   "from": "proposal:moves-b3-grass-bug-poison"
+  },
+  {
+   "id": "spore-puff",
+   "name": "Spore puff",
+   "desc": "A T-shaped puff: one cell ahead, then a row of 3",
+   "cells": [
+    [
+     0,
+     -1
+    ],
+    [
+     -1,
+     -2
+    ],
+    [
+     0,
+     -2
+    ],
+    [
+     1,
+     -2
+    ]
+   ],
+   "needs_engine": false,
+   "kind": "custom",
+   "notes": "proposal moves-b3-grass-bug-poison",
+   "from": "proposal:moves-b3-grass-bug-poison"
+  },
+  {
+   "id": "plow-3x2",
+   "name": "Plow 3x2",
+   "desc": "A 3-wide, 2-deep block in front",
+   "cells": [
+    [
+     -1,
+     -1
+    ],
+    [
+     0,
+     -1
+    ],
+    [
+     1,
+     -1
+    ],
+    [
+     -1,
+     -2
+    ],
+    [
+     0,
+     -2
+    ],
+    [
+     1,
+     -2
+    ]
+   ],
+   "needs_engine": false,
+   "kind": "custom",
+   "notes": "proposal moves-b3-grass-bug-poison",
+   "from": "proposal:moves-b3-grass-bug-poison"
+  },
+  {
+   "id": "x-burst",
+   "name": "X burst",
+   "desc": "The four diagonal neighbours",
+   "cells": [
+    [
+     -1,
+     -1
+    ],
+    [
+     1,
+     -1
+    ],
+    [
+     -1,
+     1
+    ],
+    [
+     1,
+     1
+    ]
+   ],
+   "needs_engine": false,
+   "kind": "custom",
+   "notes": "proposal moves-b3-grass-bug-poison",
+   "from": "proposal:moves-b3-grass-bug-poison"
+  },
+  {
+   "id": "gem-diamond",
+   "name": "Gem diamond",
+   "desc": "a diamond of gems 2 to 4 cells ahead",
+   "cells": [
+    [
+     0,
+     -2
+    ],
+    [
+     -1,
+     -3
+    ],
+    [
+     0,
+     -3
+    ],
+    [
+     1,
+     -3
+    ],
+    [
+     0,
+     -4
+    ]
+   ],
+   "needs_engine": false,
+   "kind": "custom",
+   "notes": "proposal moves-b4-ice-ground-rock",
+   "from": "proposal:moves-b4-ice-ground-rock"
+  },
+  {
+   "id": "acrobatics-pincer",
+   "name": "Pincer front",
+   "desc": "two flanking cells and one far cell",
+   "cells": [
+    [
+     -1,
+     -1
+    ],
+    [
+     1,
+     -1
+    ],
+    [
+     0,
+     -2
+    ]
+   ],
+   "needs_engine": false,
+   "kind": "custom",
+   "notes": "proposal moves-b5-flying-steel-dragon",
+   "from": "proposal:moves-b5-flying-steel-dragon"
+  },
+  {
+   "id": "twister-eye",
+   "name": "Twister",
+   "desc": "a funnel: front cell, two flanks 2 ahead and one 3 ahead",
+   "cells": [
+    [
+     0,
+     -1
+    ],
+    [
+     -1,
+     -2
+    ],
+    [
+     1,
+     -2
+    ],
+    [
+     0,
+     -3
+    ]
+   ],
+   "needs_engine": false,
+   "kind": "custom",
+   "notes": "proposal moves-b5-flying-steel-dragon",
+   "from": "proposal:moves-b5-flying-steel-dragon"
+  },
+  {
+   "id": "tri-fork",
+   "name": "Tri fork",
+   "desc": "three diverging beams (diagonal fork)",
+   "cells": [
+    [
+     0,
+     -1
+    ],
+    [
+     -1,
+     -2
+    ],
+    [
+     1,
+     -2
+    ],
+    [
+     -2,
+     -3
+    ],
+    [
+     2,
+     -3
+    ]
+   ],
+   "needs_engine": false,
+   "kind": "custom",
+   "notes": "proposal normal-m-z",
+   "from": "proposal:normal-m-z"
   }
  ]
 }

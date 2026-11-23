@@ -1,0 +1,28 @@
+{
+ "_header": "ROUTE RULES (design choice, not ROM; docs/route_rules.md). The tunable rules that build the route map of a single-player run: per stage the fixed / weighted / optional node slots, the extra non-battle Route, rival meetings, Warrior camps, and the tutor / relearner rules (docs/DESIGN_TUTORS.md: the extra Route of a stage becomes a tutor or the relearner). Read by core parseRouteRules -> RunData.routeRules; the defaults reproduce the previous hard-coded generator exactly (same seed, same map). Edited in labs/routes (export diff) and applied by tools/design_apply_routes.py. No ROM data.",
+ "rules": {
+  "version": 1,
+  "flip": {"enabled":true},
+  "stages": [
+   {"name": "Gym 1", "slots": [{"kind":"trainer"}, {"weights":{"wild":1},"flips":true}, {"kind":"trainer"}], "extra": {"chance":100,"weights":{"event":1,"shop":1,"wild":1},"minIndex":1,"trimEnd":0}},
+   {"name": "Gym 2", "slots": [{"kind":"trainer"}, {"weights":{"shop":1},"flips":true}, {"kind":"trainer"}], "extra": {"chance":100,"weights":{"event":1,"shop":1,"wild":1},"minIndex":0,"trimEnd":0}},
+   {"name": "Gym 3", "slots": [{"kind":"trainer"}, {"weights":{"wild":1},"flips":true}, {"kind":"trainer"}], "extra": {"chance":100,"weights":{"event":1,"shop":1,"wild":1},"minIndex":0,"trimEnd":0}},
+   {"name": "Gym 4", "slots": [{"kind":"trainer"}, {"weights":{"event":1},"flips":true}, {"kind":"trainer"}], "extra": {"chance":100,"weights":{"event":1,"shop":1,"wild":1},"minIndex":0,"trimEnd":0}},
+   {"name": "Gym 5", "slots": [{"kind":"trainer"}, {"weights":{"wild":1},"flips":true}, {"kind":"trainer"}], "extra": {"chance":100,"weights":{"event":1,"shop":1,"wild":1},"minIndex":0,"trimEnd":0}},
+   {"name": "Gym 6", "slots": [{"kind":"trainer"}, {"weights":{"shop":1},"flips":true}, {"kind":"trainer"}], "extra": {"chance":100,"weights":{"event":1,"shop":1,"wild":1},"minIndex":0,"trimEnd":0}},
+   {"name": "Gym 7", "slots": [{"kind":"trainer"}, {"weights":{"wild":1},"flips":true}, {"kind":"trainer"}], "extra": {"chance":100,"weights":{"event":1,"shop":1,"wild":1},"minIndex":0,"trimEnd":0}},
+   {"name": "Gym 8", "slots": [{"kind":"trainer"}, {"weights":{"event":1},"flips":true}, {"kind":"trainer"}, {"kind":"shop"}, {"kind":"rest"}], "extra": {"chance":100,"weights":{"event":1,"shop":1,"wild":1},"minIndex":0,"trimEnd":0}},
+   {"name": "Elite 1", "slots": [], "extra": null},
+   {"name": "Elite 2", "slots": [], "extra": null},
+   {"name": "Elite 3", "slots": [], "extra": null},
+   {"name": "Elite 4", "slots": [], "extra": null},
+   {"name": "Champion", "slots": [], "extra": null}
+  ],
+  "rivals": [{"stage":0,"node":0}, {"stage":1}, {"stage":2}, {"stage":4}, {"stage":6}, {"stage":7}],
+  "camp": {"share":0.75,"min":3,"max":5,"offer":3},
+  "gameCorner": {"share":0.2,"min":0,"max":2},
+  "tutor": {"enabled":true,"min":1,"max":2,"chance":27,"fromKinds":["event","shop","wild"],"firstStage":1,"lastStage":7},
+  "relearner": {"enabled":true,"count":1,"stages":[6,7],"replaces":"extra"},
+  "branching": {"enabled":true,"firstStage":1,"lastStage":7,"lanes":{"min":2,"max":3},"laneRanks":2,"hole":0.15,"diag":0.5,"maxCrossings":0,"pool":{"wild":3,"shop":2,"event":3,"rest":1}}
+ }
+}

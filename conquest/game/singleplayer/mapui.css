@@ -70,7 +70,26 @@ body.embed #app{padding:6px}
 .mc{display:flex;align-items:center;min-width:0;padding:0 4px;overflow:hidden}.mc.l{justify-content:flex-start}.mc.c{justify-content:center}.mc.r{justify-content:flex-end}
 /* label + 'i' chip as one nowrap unit (main.js tagged); the 3-column stat grid is made of them */
 .tag{display:inline-flex;flex-wrap:nowrap;align-items:center;gap:4px;flex:none;white-space:nowrap}
-.sgrid{display:grid;grid-template-columns:repeat(3,auto);gap:3px 10px;justify-content:center}
+.sgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px 6px;width:100%;box-sizing:border-box}.sgrid>.tag{justify-self:start;max-width:100%}
 
 /* level-up results: tight rows so about 6 Pokémon fit 1280 x 720 without scrolling */
 .rlist{gap:3px}.rlist .rrow{padding:0 12px;gap:14px;border-width:2px}.rlist .rrow .grid{grid-template-columns:repeat(3,minmax(150px,auto))}
+
+/* ROUTE GRAPH (stageGraph in mapui.js): ranks = columns, lanes = rows; DS window palette, gold = taken path / you are here, green = the routes you can choose now */
+.sgraph{display:flex;flex-direction:column;gap:6px;box-sizing:border-box;min-width:0;max-width:100%}
+.gheader{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.gbody{display:flex;gap:12px;align-items:stretch;min-width:0}
+.gview{flex:0 1 auto;min-width:0;overflow:auto;padding:6px 6px 4px;border:2px solid #4a6ab8;border-radius:5px;background:#10204e}
+.gboard{position:relative;flex:none}.gedges{position:absolute;left:0;top:0;pointer-events:none}
+.gnode{position:absolute;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;border:2px solid #4a6ab8;border-radius:5px;background:#1c2c66;cursor:default;outline:none}
+.gnode.future{background:#27325a;border-color:#5a6690}.gnode.done{opacity:.6;border-color:#c9a33a}.gnode.cur{border-color:#ffd24a;background:#2a3c78;box-shadow:0 0 10px #ffd24a66}
+.gnode.opt{border-color:#7fe08f;cursor:pointer;box-shadow:0 0 10px #7fe08f88;animation:gpulse 1.4s ease-in-out infinite}.gnode.opt.cur{border-color:#ffd24a;box-shadow:0 0 10px #7fe08f88,0 0 0 2px #7fe08f}
+.gnode:hover,.gnode:focus-visible{border-color:#fff;outline:2px solid #ffd24a;z-index:2}
+.gnode .tick{position:absolute;right:4px;top:0;width:5px;height:9px;border:solid #7fe08f;border-width:0 3px 3px 0;transform:rotate(45deg)}
+.gnode .here{position:absolute;left:50%;top:-7px;margin-left:-6px;width:0;height:0;border:6px solid transparent;border-top:8px solid #ffd24a;border-bottom:0}
+.gnode .nodeart,.gnode .sil{flex:none}
+.gnode .qbox{width:32px;height:32px;display:flex;align-items:center;justify-content:center;flex:none}
+.gview{max-height:100%}.ginfo{flex:1 1 220px;overflow:auto;min-width:200px;max-width:420px;display:flex;flex-direction:column;gap:4px;align-items:flex-start;padding:6px 8px;border:2px solid #4a6ab8;border-radius:5px;background:#10204e;box-sizing:border-box}
+.gteam{align-self:stretch;position:relative;min-height:34px}
+@keyframes gpulse{0%,100%{box-shadow:0 0 4px #7fe08f55}50%{box-shadow:0 0 12px #7fe08fcc}}
+@media (prefers-reduced-motion:reduce){.gnode.opt{animation:none}}
