@@ -1,5 +1,5 @@
 {
- "version": "20261123.1502+624934d",
+ "version": "20261123.2030+10bdd2c",
  "files": [
   {
    "path": "LICENSE.txt",
@@ -8,8 +8,8 @@
   },
   {
    "path": "builder/dist/builder.js",
-   "size": 668032,
-   "sha256": "b1fee3896ed88e185da9ecd60cc49b615d75b8e81013ba1aced62b29633184b5"
+   "size": 678333,
+   "sha256": "9979932b8e5c16b8b0f73e54c55ae6cc12e7d29f858f7d9ff5c522bb81e528d4"
   },
   {
    "path": "core/dist/core.js",
@@ -198,13 +198,13 @@
   },
   {
    "path": "game/dex/data.js",
-   "size": 7092,
-   "sha256": "4069e960897eee669f2d6b756731f905ef27183d423667a07525f1211ebc89a8"
+   "size": 7620,
+   "sha256": "05c94b3777451b372eb0573382604e85e6b7a9895bf9029e74779d2ce00fad54"
   },
   {
    "path": "game/dex/dex.js",
-   "size": 22401,
-   "sha256": "acef1fb026bde083afd44d0f342b7b99977a83f61cfaf9d34769c4f80d27956c"
+   "size": 22666,
+   "sha256": "8fdfb17312220532ea1c9e5ed34d705fb8e895754c526aaabea77b3c851941ba"
   },
   {
    "path": "game/evolab/reveal.js",
@@ -315,6 +315,11 @@
    "path": "game/shared/props.js",
    "size": 14369,
    "sha256": "cc38248f2a3c65f7cf17c4ff5972aef7831751baa798bf861e6b1fcb8cb5334e"
+  },
+  {
+   "path": "game/shared/safecapture.js",
+   "size": 682,
+   "sha256": "aee23e992027932fa28e79a78119d474a1ace15192632715daa069f50db9651c"
   },
   {
    "path": "game/shared/settingsdef.js",
@@ -658,8 +663,8 @@
   },
   {
    "path": "game/skirmish/battlestrip.js",
-   "size": 3493,
-   "sha256": "ac523d405a6e82f97b28dcff3c8e4653ca165f3d4eee7ffd9637bec65219d968"
+   "size": 3541,
+   "sha256": "a8f839270853b930af1cd65779d89d66e18189b5736e9cf61708824049d9234b"
   },
   {
    "path": "game/skirmish/btnlabel.js",
@@ -838,8 +843,8 @@
   },
   {
    "path": "game/skirmish/stage.js",
-   "size": 37830,
-   "sha256": "d998ac478cb7a665eb119f628a6291ac0063c69268b0ccf58524d4ed4cda8537"
+   "size": 37870,
+   "sha256": "97fe2fd60ab6d274147354798c62bc2356ebec56f4c5cfac5202facd33beb083"
   },
   {
    "path": "game/skirmish/stagefx.js",
