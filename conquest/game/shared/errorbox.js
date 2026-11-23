@@ -14,7 +14,7 @@ sw controller: `+(navigator.serviceWorker&&navigator.serviceWorker.controller?"y
   at `+(e.filename||"?")+":"+(e.lineno||0)+":"+(e.colno||0)+(e.error&&e.error.stack?`
 `+String(e.error.stack).split(`
 `).slice(0,4).join(`
-`):""))},!0),addEventListener("unhandledrejection",e=>{const m=fmt(e.reason);/AbortError/.test(m)||report("unhandled rejection: "+m)});const of=window.fetch.bind(window);window.fetch=async(...a)=>{const u=urlOf(a[0]);try{const r=await of(...a);if(!r.ok&&!ignoreUrl(u)){let b="";try{b=(await r.clone().text()).slice(0,160)}catch{}report("fetch failed: HTTP "+r.status+`
+`):""))},!0),addEventListener("unhandledrejection",e=>{const m=fmt(e.reason);/AbortError/.test(m)||report("unhandled rejection: "+m)});const of=window.fetch.bind(window);window.fetch=async(...a)=>{const u=urlOf(a[0]),optional=!!(a[1]&&a[1].optional);try{const r=await of(...a);if(!r.ok&&!optional&&!ignoreUrl(u)){let b="";try{b=(await r.clone().text()).slice(0,160)}catch{}report("fetch failed: HTTP "+r.status+`
   url: `+u+(b&&!/^\s*</.test(b)?`
-  `+b:""))}return r}catch(e){throw!(e&&e.name==="AbortError")&&!ignoreUrl(u)&&report("fetch failed: "+(e&&e.message||e)+`
+  `+b:""))}return r}catch(e){throw!(e&&e.name==="AbortError")&&!optional&&!ignoreUrl(u)&&report("fetch failed: "+(e&&e.message||e)+`
   url: `+u),e}},window.__errorbox={report,text}})();

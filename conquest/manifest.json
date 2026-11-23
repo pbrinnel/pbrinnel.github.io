@@ -1,5 +1,5 @@
 {
- "version": "20261123.1431+02264d1",
+ "version": "20261123.1502+624934d",
  "files": [
   {
    "path": "LICENSE.txt",
@@ -8,8 +8,8 @@
   },
   {
    "path": "builder/dist/builder.js",
-   "size": 667605,
-   "sha256": "7e9cd8d72f53624a977b613d00830c381d76192b45032efdf471705e7ec47500"
+   "size": 668032,
+   "sha256": "b1fee3896ed88e185da9ecd60cc49b615d75b8e81013ba1aced62b29633184b5"
   },
   {
    "path": "core/dist/core.js",
@@ -17,9 +17,19 @@
    "sha256": "b420d6b6db53fdf33d0ef5e958e7c3120a7a2231b80e1987fe4754ed3106c052"
   },
   {
+   "path": "data/design/evolution_enemy_levels.json",
+   "size": 4075,
+   "sha256": "b7946962c82c244aad15349624350280befb45fcf186e196cd11cf5abfaa3f0c"
+  },
+  {
    "path": "data/design/gen5_moves.json",
    "size": 117407,
    "sha256": "b22eb6517213925b580e678ec7173f1a45aba0c94f5c11f16b1f54a94dc6bcfb"
+  },
+  {
+   "path": "data/design/gender.json",
+   "size": 5860,
+   "sha256": "13679784c9de7c02b15450a7c40f4d44645718d2e317c58553f8b96aa1bc1dc1"
   },
   {
    "path": "data/design/items.json",
@@ -188,13 +198,13 @@
   },
   {
    "path": "game/dex/data.js",
-   "size": 6771,
-   "sha256": "f4d6b5df39677673944d7397ad3bdd563d542c52e0bd66f76dc0dd571e1414d1"
+   "size": 7092,
+   "sha256": "4069e960897eee669f2d6b756731f905ef27183d423667a07525f1211ebc89a8"
   },
   {
    "path": "game/dex/dex.js",
-   "size": 22178,
-   "sha256": "51d422b7fa7d73455493974d7062016b8c94638faee65813acb0b4ca5ff3e4e0"
+   "size": 22401,
+   "sha256": "acef1fb026bde083afd44d0f342b7b99977a83f61cfaf9d34769c4f80d27956c"
   },
   {
    "path": "game/evolab/reveal.js",
@@ -208,8 +218,8 @@
   },
   {
    "path": "game/shared/debuglog.js",
-   "size": 3797,
-   "sha256": "89c478057fcd65776552330d37e7ff44559c95be27c1fb5c0cd0cff7173f6a52"
+   "size": 3821,
+   "sha256": "3668adcf0d07d231ed86ccb7826823b6495136c7726fd10ece5bbf468a5ac774"
   },
   {
    "path": "game/shared/debugmode.js",
@@ -278,8 +288,8 @@
   },
   {
    "path": "game/shared/errorbox.js",
-   "size": 4002,
-   "sha256": "472afcdaa85257d4ee5dd143f2d52dd7269bd91d9d6d49f91eadf3c9dd44a6f8"
+   "size": 4057,
+   "sha256": "74addedf5fa0471cb216baf95d50f3b06323eabf964fef9ff1e1b9e34f1def12"
   },
   {
    "path": "game/shared/gender.js",

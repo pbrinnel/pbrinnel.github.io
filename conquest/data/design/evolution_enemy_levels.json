@@ -1,0 +1,232 @@
+{
+"_header": {
+"source": "authored by us (design choice, not ROM; DESIGN_LEVELS 11): level from which the evolved form of a NON-level evolution (stone, happiness, trade, item) may appear in enemy parties, tied to its usual availability in Gen V games",
+"date": "2026-11-15",
+"method": "hand-written from Gen V knowledge, reviewable table in docs/DESIGN_LEVELS.md 11",
+"notes": "UNSURE rows are marked in `reason`"
+},
+"data": [
+{
+"from": 25,
+"to": 26,
+"level": 30,
+"reason": "Thunder Stone from Chargestone Cave / Nimbasa area: trainers field Raichu in the 30s"
+},
+{
+"from": 39,
+"to": 40,
+"level": 32,
+"reason": "Moon Stone found mid-game; Wigglytuff on mid-game teams"
+},
+{
+"from": 133,
+"to": 134,
+"level": 30,
+"reason": "elemental stones are mid-game shop / field items; Eeveelutions on 30s teams"
+},
+{
+"from": 133,
+"to": 135,
+"level": 30,
+"reason": "same"
+},
+{
+"from": 133,
+"to": 136,
+"level": 30,
+"reason": "same"
+},
+{
+"from": 133,
+"to": 470,
+"level": 30,
+"reason": "Leaf Stone (our replacement for Mossy Rock), same pacing as the other Eeveelutions"
+},
+{
+"from": 133,
+"to": 471,
+"level": 30,
+"reason": "Ice Stone (our replacement for Icy Rock), same pacing"
+},
+{
+"from": 133,
+"to": 196,
+"level": 30,
+"reason": "happiness line (our 50 / 50 reroll), Eeveelution pacing"
+},
+{
+"from": 133,
+"to": 197,
+"level": 30,
+"reason": "same"
+},
+{
+"from": 200,
+"to": 429,
+"level": 34,
+"reason": "Dusk Stone is a mid / late item; Mismagius on 30s teams"
+},
+{
+"from": 608,
+"to": 609,
+"level": 40,
+"reason": "Lampent itself evolves at 41; Dusk Stone Chandelure belongs to the late mid-game"
+},
+{
+"from": 511,
+"to": 512,
+"level": 30,
+"reason": "Elemental Monkey stones are sold / found around Gym 3-4; Simis on 30s teams"
+},
+{
+"from": 513,
+"to": 514,
+"level": 30,
+"reason": "same"
+},
+{
+"from": 515,
+"to": 516,
+"level": 30,
+"reason": "same"
+},
+{
+"from": 517,
+"to": 518,
+"level": 30,
+"reason": "Moon Stone, Musharna appears around the 30s"
+},
+{
+"from": 546,
+"to": 547,
+"level": 32,
+"reason": "Sun Stone is a mid-game find"
+},
+{
+"from": 548,
+"to": 549,
+"level": 32,
+"reason": "same"
+},
+{
+"from": 572,
+"to": 573,
+"level": 30,
+"reason": "Shiny Stone found mid-game; Cinccino a 30s Pokemon"
+},
+{
+"from": 281,
+"to": 475,
+"level": 32,
+"reason": "Dawn Stone mid-game; Kirlia reaches Gardevoir at 30 so Gallade shows slightly later"
+},
+{
+"from": 361,
+"to": 478,
+"level": 32,
+"reason": "Dawn Stone mid-game; Glalie would be 42"
+},
+{
+"from": 215,
+"to": 461,
+"level": 40,
+"reason": "Razor Claw is a late-game item (Victory Road / Giant Chasm area)"
+},
+{
+"from": 42,
+"to": 169,
+"level": 32,
+"reason": "friendship line; Crobat is a late-mid-game Pokemon (Golbat evolves 22)"
+},
+{
+"from": 172,
+"to": 25,
+"level": 20,
+"reason": "friendship baby line: the first-stage form is common early (UNSURE: below the 25-35 band on purpose)"
+},
+{
+"from": 174,
+"to": 39,
+"level": 20,
+"reason": "friendship baby line, same (UNSURE)"
+},
+{
+"from": 433,
+"to": 358,
+"level": 28,
+"reason": "friendship line, Chimecho around the high 20s"
+},
+{
+"from": 446,
+"to": 143,
+"level": 35,
+"reason": "friendship baby line: Snorlax is a 30s-40s Pokemon"
+},
+{
+"from": 447,
+"to": 448,
+"level": 30,
+"reason": "friendship line, Lucario on 30s teams"
+},
+{
+"from": 541,
+"to": 542,
+"level": 30,
+"reason": "friendship line, Leavanny in the 30s"
+},
+{
+"from": 64,
+"to": 65,
+"level": 36,
+"reason": "trade line, Alakazam on 30s-40s teams"
+},
+{
+"from": 67,
+"to": 68,
+"level": 36,
+"reason": "trade line"
+},
+{
+"from": 93,
+"to": 94,
+"level": 36,
+"reason": "trade line"
+},
+{
+"from": 525,
+"to": 526,
+"level": 36,
+"reason": "trade line (UNSURE: Roggenrola line is early, Gigalith around the mid 30s)"
+},
+{
+"from": 533,
+"to": 534,
+"level": 38,
+"reason": "trade line, pseudo-strong, late 30s"
+},
+{
+"from": 95,
+"to": 208,
+"level": 38,
+"reason": "trade with Metal Coat"
+},
+{
+"from": 123,
+"to": 212,
+"level": 38,
+"reason": "trade with Metal Coat"
+},
+{
+"from": 112,
+"to": 464,
+"level": 44,
+"reason": "trade with Protector: late, Rhydon itself is 42"
+},
+{
+"from": 356,
+"to": 477,
+"level": 42,
+"reason": "trade with Reaper Cloth: late, Dusclops itself is 37"
+}
+]
+}
